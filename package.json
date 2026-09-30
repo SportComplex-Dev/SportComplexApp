@@ -2,6 +2,7 @@
   "name": "sportcomplex-monorepo",
   "version": "0.1.0",
   "private": true,
+  "pnpm": { "onlyBuiltDependencies": [ "prisma", "@prisma/engines" ] },
   "description": "Plataforma de Gestión de Reservas, Venta y Control de Acceso Deportivo (SportComplex) — Monorepo Turborepo + pnpm",
   "packageManager": "pnpm@12.6.0",
   "engines": {

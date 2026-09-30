@@ -1,162 +1,369 @@
-// MER / DER físico — PostgreSQL/Supabase. Ver docs/MER_&_DER.md (pendiente ratificar).
-// Incluye: borrado lógico empleados (RN-10), TTL 15 min, QR HMAC, HolidayCache fallback Nager,
-// aforo vs exclusividad, idempotencia Stripe, webhook n8n.
+datasource db {
+  provider = "postgresql"
+}
 
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+// ==========================================
+// ENUMS DE DOMINIO
+// ==========================================
+
+enum EstadoUsuario {
+  PENDIENTE
+  ACTIVO
+  TEMP_INACTIVO
+  INACTIVO
 }
 
-enum Role {
-  Administrador
-  Empleado_Vendedor
-  Empleado_Lector
-  Cliente
+enum TipoCategoriaServicio {
+  CANCHA
+  PISCINA
+  GIMNASIO
+  ZONA_HUMEDA
 }
 
-enum AccountStatus {
-  Pendiente
-  Activo
-  Inactivo
-  Temporalmente_Inactivo
+enum ModalidadServicio {
+  EXCLUSIVA
+  AFORO
 }
 
-enum BookingStatus {
-  BLOQUEADA_TTL
+enum TipoPiscina {
+  PUBLICA
+  PRIVADA
+}
+
+enum EstadoServicio {
+  ACTIVO
+  INHABILITADO
+}
+
+enum TipoPago {
+  RESERVA
+  MEMBRESIA
+}
+
+enum EstadoPago {
+  PENDIENTE
+  APROBADO
+  FALLIDO
+}
+
+enum CanalReserva {
+  ONLINE
+  TAQUILLA
+}
+
+enum EstadoReserva {
+  PENDIENTE_PAGO
   CONFIRMADA
+  EXPIRADA
   CANCELADA_ADMINISTRATIVA
 }
 
-enum TicketStatus {
+enum EstadoTicket {
   EMITIDO
   USADO
 }
 
-enum MembershipStatus {
+enum ModoLectura {
+  TURNO
+  CONSULTA
+}
+
+enum ResultadoLectura {
+  CONCEDIDO
+  DENEGADO_SERVICIO
+  DENEGADO_HORARIO
+  DENEGADO_USADO
+  CONSULTA
+}
+
+enum PeriodicidadPlan {
+  SEMANAL
+  MENSUAL
+  ANUAL
+}
+
+enum EstadoMembresia {
   VIGENTE
   VENCIDA
   CANCELADA
 }
 
-model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String?
-  googleId     String?       @unique
-  role         Role          @default(Cliente)
-  status       AccountStatus @default(Pendiente)
-  createdAt    DateTime      @default(now())
-  bookings     Booking[]
-  memberships  Membership[]
-  verifyTokens VerifyToken[]
+// ==========================================
+// MODELOS RELACIONALES (16 TABLAS)
+// ==========================================
+
+// 1. ROL
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique @db.VarChar(30)
+  usuarios Usuario[]
+
+  @@map("rol")
 }
 
-model VerifyToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+// 2. USUARIO
+model Usuario {
+  id           String        @id @default(uuid()) @db.Uuid
+  rolId        Int           @map("rol_id")
+  nombre       String        @db.VarChar(120)
+  correo       String        @unique @db.VarChar(150)
+  passwordHash String?       @map("password_hash") @db.VarChar(255)
+  googleSub    String?       @unique @map("google_sub") @db.VarChar(100)
+  estado       EstadoUsuario @default(PENDIENTE)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+  creadoEn     DateTime      @default(now()) @map("creado_en") @db.Timestamptz
 
-  @@index([userId])
+  // Relaciones
+  rol                  Rol                     @relation(fields: [rolId], references: [id], onDelete: Restrict)
+  tokens               TokenVerificacion[]
+  reservasTitular      Reserva[]               @relation("ReservaTitular")
+  reservasVendedor     Reserva[]               @relation("ReservaVendedor")
+  ticketsUsados        TicketQr[]              @relation("TicketUsadoPor")
+  asignacionesPuesto   AsignacionPuesto[]
+  lecturasAcceso       LecturaAcceso[]
+  membresias           Membresia[]
+  pagos                Pago[]
+  inhabilitaciones     InhabilitacionServicio[]
+
+  @@map("usuario")
 }
 
-model Category {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  services Service[]
+// 3. TOKEN_VERIFICACION
+model TokenVerificacion {
+  id        String    @id @default(uuid()) @db.Uuid
+  usuarioId String    @map("usuario_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  creadoEn  DateTime  @default(now()) @map("creado_en") @db.Timestamptz
+  expiraEn  DateTime  @map("expira_en") @db.Timestamptz
+  usadoEn   DateTime? @map("usado_en") @db.Timestamptz
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("token_verificacion")
 }
 
-model Service {
-  id          String   @id @default(uuid())
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  name        String   @unique
-  capacity    Int // aforo concurrente; 1 = exclusiva
-  isPool      Boolean  @default(false)
-  modality    String? // Publica | Privada (solo piscinas, RF-07)
-  isDisabled  Boolean  @default(false)
-  slots       Slot[]
-  bookings    Booking[]
+// 4. CATEGORIA_SERVICIO
+model CategoriaServicio {
+  id        Int                   @id @default(autoincrement())
+  nombre    String                @unique @db.VarChar(60)
+  tipo      TipoCategoriaServicio
+  servicios Servicio[]
 
-  @@index([categoryId])
+  @@map("categoria_servicio")
 }
 
-model Slot {
-  id        String   @id @default(uuid())
-  serviceId String
-  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  date      DateTime @db.Date
-  startTime DateTime
-  endTime   DateTime
-  capacity  Int
-  blocked   Boolean  @default(false)
-  reason    String?
+// 5. SERVICIO
+model Servicio {
+  id              Int               @id @default(autoincrement())
+  categoriaId     Int               @map("categoria_id")
+  nombre          String            @unique @db.VarChar(80)
+  capacidadMaxima Int               @map("capacidad_maxima")
+  tarifa          Decimal           @db.Decimal(12, 2)
+  modalidad       ModalidadServicio
+  tipoPiscina     TipoPiscina?      @map("tipo_piscina")
+  estado          EstadoServicio    @default(ACTIVO)
 
-  @@unique([serviceId, date, startTime])
-  @@index([serviceId, date])
+  // Relaciones
+  categoria          CategoriaServicio        @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  franjasHorarias    FranjaHoraria[]
+  disponibilidades   Disponibilidad[]
+  asignacionesPuesto AsignacionPuesto[]
+  inhabilitaciones   InhabilitacionServicio[]
+
+  @@map("servicio")
 }
 
-model Booking {
-  id            String        @id @default(uuid())
-  userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  serviceId     String
-  service       Service       @relation(fields: [serviceId], references: [id])
-  startTime     DateTime
-  endTime       DateTime
-  status        BookingStatus @default(BLOQUEADA_TTL)
-  lockedUntil   DateTime?
-  amountCents   Int
-  discountCents Int           @default(0)
-  stripePiId    String?       @unique
-  createdAt     DateTime      @default(now())
-  tickets       Ticket[]
+// 6. FRANJA_HORARIA
+model FranjaHoraria {
+  id          Int      @id @default(autoincrement())
+  servicioId  Int      @map("servicio_id")
+  diaSemana   Int      @map("dia_semana") @db.SmallInt
+  horaInicio  DateTime @map("hora_inicio") @db.Time
+  horaFin     DateTime @map("hora_fin") @db.Time
 
-  @@index([serviceId, startTime])
-  @@index([userId, status])
+  servicio         Servicio         @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  disponibilidades Disponibilidad[]
+
+  @@map("franja_horaria")
 }
 
-model Ticket {
-  id         String       @id @default(uuid()) // UUIDv4 codificado en QR + HMAC
-  bookingId  String
-  booking    Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  status     TicketStatus @default(EMITIDO)
-  usedAt     DateTime?
-  scannedBy  String?
-  createdAt  DateTime     @default(now())
+// 7. DISPONIBILIDAD
+model Disponibilidad {
+  id                      BigInt   @id @default(autoincrement())
+  servicioId              Int      @map("servicio_id")
+  franjaId                Int      @map("franja_id")
+  fecha                   DateTime @db.Date
+  cuposTotales            Int      @map("cupos_totales")
+  cuposOcupados           Int      @default(0) @map("cupos_ocupados")
+  bloqueadaMantenimiento Boolean  @default(false) @map("bloqueada_mantenimiento")
 
-  @@index([bookingId])
+  servicio Servicio      @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  franja   FranjaHoraria @relation(fields: [franjaId], references: [id], onDelete: Restrict)
+  reservas Reserva[]
+
+  @@unique([servicioId, franjaId, fecha])
+  @@index([fecha, servicioId])
+  @@map("disponibilidad")
 }
 
-model Membership {
-  id               String           @id @default(uuid())
-  userId           String
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan             String // Semanal | Mensual | Anual
-  status           MembershipStatus @default(VIGENTE)
-  stripeSubId      String?          @unique
-  currentPeriodEnd DateTime
-  createdAt        DateTime         @default(now())
+// 8. FESTIVO
+model Festivo {
+  fecha  DateTime @id @db.Date
+  nombre String   @db.VarChar(100)
+  anio   Int      @db.SmallInt
 
-  @@index([userId, status])
+  @@map("festivo")
 }
 
-model HolidayCache {
-  date      DateTime @id @db.Date
-  name      String
-  isHoliday Boolean  @default(true)
-  syncedAt  DateTime @default(now())
+// 9. PAGO
+model Pago {
+  id                    String     @id @default(uuid()) @db.Uuid
+  usuarioId             String     @map("usuario_id") @db.Uuid
+  membresiaId           Int?       @map("membresia_id")
+  tipo                  TipoPago
+  stripePaymentIntentId String     @unique @map("stripe_payment_intent_id") @db.VarChar(100)
+  monto                 Decimal    @db.Decimal(12, 2)
+  estado                EstadoPago
+  creadoEn              DateTime   @default(now()) @map("creado_en") @db.Timestamptz
+
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  membresia Membresia? @relation(fields: [membresiaId], references: [id], onDelete: SetNull)
+  reservas  Reserva[]
+
+  @@map("pago")
 }
 
-model StripeEvent {
-  eventId     String   @id
-  type        String
-  processedAt DateTime @default(now())
+// 10. RESERVA
+model Reserva {
+  id                String        @id @default(uuid()) @db.Uuid
+  disponibilidadId  BigInt        @map("disponibilidad_id")
+  titularId         String        @map("titular_id") @db.Uuid
+  vendedorId        String?       @map("vendedor_id") @db.Uuid
+  pagoId            String?       @map("pago_id") @db.Uuid
+  membresiaId       Int?          @map("membresia_id")
+  inhabilitacionId  Int?          @map("inhabilitacion_id")
+  cantidadCupos     Int           @map("cantidad_cupos")
+  canal             CanalReserva
+  estado            EstadoReserva
+  subtotal          Decimal       @db.Decimal(12, 2)
+  descuentoPct      Decimal       @default(0.00) @map("descuento_pct") @db.Decimal(5, 2)
+  total             Decimal       @db.Decimal(12, 2)
+  expiraEn          DateTime?     @map("expira_en") @db.Timestamptz
+  creadoEn          DateTime      @default(now()) @map("creado_en") @db.Timestamptz
+
+  // Relaciones
+  disponibilidad Disponibilidad          @relation(fields: [disponibilidadId], references: [id], onDelete: Restrict)
+  titular        Usuario                 @relation("ReservaTitular", fields: [titularId], references: [id], onDelete: Restrict)
+  vendedor       Usuario?                @relation("ReservaVendedor", fields: [vendedorId], references: [id], onDelete: Restrict)
+  pago           Pago?                   @relation(fields: [pagoId], references: [id], onDelete: SetNull)
+  membresia      Membresia?              @relation(fields: [membresiaId], references: [id], onDelete: SetNull)
+  inhabilitacion InhabilitacionServicio? @relation(fields: [inhabilitacionId], references: [id], onDelete: SetNull)
+  ticketQr       TicketQr?
+
+  @@index([titularId, estado])
+  @@index([expiraEn])
+  @@map("reserva")
+}
+
+// 11. TICKET_QR
+model TicketQr {
+  id         String       @id @default(uuid()) @db.Uuid
+  reservaId  String       @unique @map("reserva_id") @db.Uuid
+  codigoUuid String       @unique @default(uuid()) @map("codigo_uuid") @db.Uuid
+  usadoPor   String?      @map("usado_por") @db.Uuid
+  estado     EstadoTicket
+  emitidoEn  DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
+  usadoEn    DateTime?    @map("usado_en") @db.Timestamptz
+
+  reserva        Reserva         @relation(fields: [reservaId], references: [id], onDelete: Restrict)
+  empleadoLector Usuario?        @relation("TicketUsadoPor", fields: [usadoPor], references: [id], onDelete: Restrict)
+  lecturasAcceso LecturaAcceso[]
+
+  @@map("ticket_qr")
+}
+
+// 12. ASIGNACION_PUESTO
+model AsignacionPuesto {
+  id          Int      @id @default(autoincrement())
+  empleadoId  String   @map("empleado_id") @db.Uuid
+  servicioId  Int      @map("servicio_id")
+  inicioTurno DateTime @map("inicio_turno") @db.Timestamptz
+  finTurno    DateTime @map("fin_turno") @db.Timestamptz
+
+  empleado       Usuario         @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  servicio       Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  lecturasAcceso LecturaAcceso[]
+
+  @@map("asignacion_puesto")
+}
+
+// 13. LECTURA_ACCESO
+model LecturaAcceso {
+  id           BigInt           @id @default(autoincrement())
+  ticketId     String           @map("ticket_id") @db.Uuid
+  empleadoId   String           @map("empleado_id") @db.Uuid
+  asignacionId Int?             @map("asignacion_id")
+  modo         ModoLectura
+  resultado    ResultadoLectura
+  fechaHora    DateTime         @default(now()) @map("fecha_hora") @db.Timestamptz
+
+  ticket     TicketQr          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  empleado   Usuario           @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  asignacion AsignacionPuesto? @relation(fields: [asignacionId], references: [id], onDelete: SetNull)
+
+  @@index([fechaHora])
+  @@map("lectura_acceso")
+}
+
+// 14. PLAN_MEMBRESIA
+model PlanMembresia {
+  id            Int              @id @default(autoincrement())
+  nombre        String           @db.VarChar(60)
+  periodicidad  PeriodicidadPlan
+  precio        Decimal          @db.Decimal(12, 2)
+  descuentoPct  Decimal          @default(30.00) @map("descuento_pct") @db.Decimal(5, 2)
+  stripePriceId String?          @unique @map("stripe_price_id") @db.VarChar(100)
+  activo        Boolean          @default(true)
+  membresias    Membresia[]
+
+  @@map("plan_membresia")
+}
+
+// 15. MEMBRESIA
+model Membresia {
+  id                   Int             @id @default(autoincrement())
+  usuarioId            String          @map("usuario_id") @db.Uuid
+  planId               Int             @map("plan_id")
+  estado               EstadoMembresia
+  fechaInicio          DateTime        @db.Date
+  proximaRenovacion    DateTime        @map("proxima_renovacion") @db.Date
+  stripeSubscriptionId String?         @unique @map("stripe_subscription_id") @db.VarChar(100)
+
+  usuario  Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  plan     PlanMembresia @relation(fields: [planId], references: [id], onDelete: Restrict)
+  pagos    Pago[]
+  reservas Reserva[]
+
+  @@map("membresia")
+}
+
+// 16. INHABILITACION_SERVICIO
+model InhabilitacionServicio {
+  id               Int       @id @default(autoincrement())
+  servicioId       Int       @map("servicio_id")
+  adminId          String    @map("admin_id") @db.Uuid
+  motivo           String    @db.VarChar(255)
+  fechaInicio      DateTime  @map("fecha_inicio") @db.Timestamptz
+  fechaFin         DateTime? @map("fecha_fin") @db.Timestamptz
+  webhookEnviadoEn DateTime? @map("webhook_enviado_en") @db.Timestamptz
+
+  servicio          Servicio  @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  admin             Usuario   @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  reservasCanceladas Reserva[]
+
+  @@map("inhabilitacion_servicio")
 }
