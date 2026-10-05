@@ -1,11 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import { cn } from '@sportcomplex/ui'
 
 export function Brand({ light = false }: { light?: boolean }) {
   return (
     <div className={cn('flex items-center gap-2 select-none', light ? 'text-white' : 'text-app')}>
-      <img
+      <Image
         src="/images/Akros-logo.png"
         alt="AKROS Active Lifestyle Club"
         width={28}

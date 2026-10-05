@@ -1,6 +1,5 @@
-'use client';
-
-// RF-00 Landing institucional. LCP < 1.5s, sin CPU por petición.
+// RF-00 Landing institucional estática (SSG) conforme a ARCHITECTURE §4. LCP < 1.5s.
+export const dynamic = 'force-static';
 
 import Link from "next/link";
 import { ArrowRight, MapPin, Sparkles, Star } from "lucide-react";
@@ -14,6 +13,7 @@ import { MembershipsSection } from "@/components/home/memberships-section";
 import { ClubEvents } from "@/components/home/club-events";
 import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital-pass";
 import { TestimonialsSection } from "@/components/home/testimonials-section";
+import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 
 export default function HomePage() {
@@ -45,6 +45,9 @@ export default function HomePage() {
             </Link>
             <Link href="/portal/book" className="hero-secondary">
               Explorar servicios
+            </Link>
+            <Link href="/register" className="hero-secondary">
+              Hazte socio
             </Link>
           </div>
           <div className="hero-proof">
@@ -156,6 +159,9 @@ export default function HomePage() {
 
       {/* Sección 9: Testimonios de Atletas & Socios */}
       <TestimonialsSection />
+
+      {/* Sección 10: Preguntas Frecuentes y Políticas */}
+      <FaqSection />
 
       {/* CTA Final */}
       <section className="cta-strip">
