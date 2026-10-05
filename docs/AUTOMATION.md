@@ -73,6 +73,72 @@ Este documento describe el sistema de automatización del Complejo Deportivo imp
 
 Véase [N8N_WORKFLOWS.md](./N8N_WORKFLOWS.md) para detalles completos.
 
+### 2. **TSK-AU-02 - Sincronizacion de festivos Colombia**
+
+**Objetivo:** consultar los festivos colombianos del año siguiente en Nager.Date y hacer upsert de cada fecha en `festivo` (conflictos por fecha actualizan nombre y año).
+
+**Disparador y estado:** `Schedule Trigger - Mensual`; el JSON configura ejecución mensual a las 03:00. El workflow está inactivo (`active: false`) en el archivo exportado y debe activarse en n8n para ejecutarse.
+
+**Webhook:** no existe webhook en este flujo, por lo que no hay path ni método POST público. El request HTTP del flujo es un **GET** a la API externa `https://date.nager.at/api/v3/PublicHolidays/{anio}/CO`.
+
+**Parámetros que el workflow genera internamente** (no son entrada HTTP):
+
+| Campo | Tipo | Obligatorio | Descripción |
+| --- | --- | --- | --- |
+| `anio` | number entero | Sí | Año calendario siguiente al actual, generado al comenzar la ejecución. |
+| `pais` | string literal `CO` | Sí | Código de Colombia usado en la ruta de Nager.Date. |
+
+El objeto generado es validable con `ColombianHolidaySyncPayloadSchema`. Cada registro recibido desde Nager.Date debe contener `date` (string `YYYY-MM-DD`) y un nombre no vacío en `localName` o `name`. El workflow valida que el año coincida, que la fecha no esté duplicada y que el nombre no supere 100 caracteres. Antes de guardar normaliza cada registro como `{ "fecha": "2027-01-01", "nombre": "Año Nuevo", "anio": 2027 }`.
+
+**Ejemplo funcional del objeto generado:**
+
+```json
+{
+  "anio": 2027,
+  "pais": "CO"
+}
+```
+
+**Resultado:** no hay respuesta HTTP `200 OK` ni schema de respuesta webhook: el flujo se ejecuta por horario. En caso de éxito, cada festivo validado se inserta o actualiza en PostgreSQL. Si la API no devuelve festivos o falla una validación, la ejecución falla; el workflow de gestión de errores envía la alerta descrita a continuación.
+
+### 3. **TSK-AU-02 - Gestion de errores**
+
+**Objetivo:** capturar fallos de ejecución de workflows en n8n y enviar por Resend un email de alerta a `official@akros.lat` con el workflow, ejecución, último nodo, mensaje y fecha.
+
+**Disparador y estado:** `Error Trigger`; el JSON exportado indica que está activo (`active: true`). n8n lo invoca ante un error de ejecución y le entrega su evento de error.
+
+**Webhook:** este flujo tampoco define webhook; no hay path ni método POST. La activación es interna desde n8n, no una llamada HTTP desde la aplicación.
+
+**Contrato del evento de error:** el evento depende de n8n. Los campos consumidos son:
+
+| Campo | Tipo | Obligatorio | Descripción |
+| --- | --- | --- | --- |
+| `workflow` | object | No | Metadatos del workflow fallido. |
+| `workflow.name` | string | No | Nombre mostrado en la alerta; respaldo: `Workflow desconocido`. |
+| `execution` | object | No | Datos de la ejecución fallida. |
+| `execution.url` | string | No | Enlace a la ejecución; respaldo: cadena vacía. |
+| `execution.lastNodeExecuted` | string | No | Último nodo ejecutado; respaldo: `No identificado`. |
+| `execution.error` | object | No | Error reportado para la ejecución. |
+| `execution.error.message` | string | No | Detalle preferido del error. |
+| `message` | string | No | Mensaje alternativo si no existe `execution.error.message`. |
+
+El workflow aplica esos valores de respaldo si faltan los campos, y usa `Error sin detalle disponible` si no hay ningún mensaje. El schema `WorkflowErrorTriggerPayloadSchema` permite propiedades adicionales del evento n8n y valida la estructura consumida.
+
+**Ejemplo funcional mínimo de evento** (los valores reales los envía n8n):
+
+```json
+{
+  "workflow": { "name": "TSK-AU-02 - Sincronizacion de festivos Colombia" },
+  "execution": {
+    "url": "https://n8n.example.com/execution/123",
+    "lastNodeExecuted": "Consultar Nager.Date",
+    "error": { "message": "Tiempo de espera agotado" }
+  }
+}
+```
+
+**Resultado:** no hay respuesta HTTP `200 OK` ni body de webhook. Si la ejecución del manejador finaliza correctamente, se entrega el email a Resend; un error al enviar el email hace fallar la ejecución y queda registrado en n8n.
+
 ---
 
 ## Integración con Backend
@@ -197,11 +263,13 @@ interface SendVerificationCodePayload {
 **Ejemplo de uso:**
 
 ```typescript
-import { 
+import {
   validateSendVerificationCode, 
   trySendVerificationCode,
-  createTestVerificationCodePayload 
-} from "@sportcomplex/validation/automation.schema";
+  createTestVerificationCodePayload,
+  ColombianHolidaySyncPayloadSchema,
+  WorkflowErrorTriggerPayloadSchema,
+} from "@sportcomplex/validation";
 
 // Validar (lanza error si falla)
 const payload = validateSendVerificationCode({
@@ -220,6 +288,27 @@ if (!safePayload) {
 // Crear payload de prueba
 const test = createTestVerificationCodePayload({
   correo: "test@custom.com"
+});
+```
+
+#### Schemas TSK-AU-02
+
+Los dos schemas siguientes y sus tipos inferidos se reexportan desde `@sportcomplex/validation` mediante `packages/validation/src/index.ts`:
+
+```typescript
+import {
+  ColombianHolidaySyncPayloadSchema,
+  WorkflowErrorTriggerPayloadSchema,
+} from "@sportcomplex/validation";
+
+const scheduleInput = ColombianHolidaySyncPayloadSchema.parse({
+  anio: 2027,
+  pais: "CO",
+});
+
+const errorEvent = WorkflowErrorTriggerPayloadSchema.parse({
+  workflow: { name: "TSK-AU-02 - Sincronizacion de festivos Colombia" },
+  execution: { error: { message: "Tiempo de espera agotado" } },
 });
 ```
 

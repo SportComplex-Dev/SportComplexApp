@@ -94,6 +94,56 @@ export const ResendEmailResponseSchema = z.object({
 export type ResendEmailResponse = z.infer<typeof ResendEmailResponseSchema>;
 
 // ============================================================================
+// WORKFLOWS: TSK-AU-02 (Sincronización y gestión de errores)
+// ============================================================================
+
+/**
+ * Evento recibido por el workflow de gestión de errores de n8n.
+ * Los campos son opcionales porque el workflow aplica valores de respaldo.
+ */
+export const WorkflowErrorTriggerPayloadSchema = z
+  .object({
+    workflow: z
+      .object({
+        name: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+    execution: z
+      .object({
+        url: z.string().optional(),
+        lastNodeExecuted: z.string().optional(),
+        error: z
+          .object({
+            message: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+    message: z.string().optional(),
+  })
+  .passthrough();
+
+export type WorkflowErrorTriggerPayload = z.infer<
+  typeof WorkflowErrorTriggerPayloadSchema
+>;
+
+/**
+ * Parámetros que el workflow mensual construye internamente antes de
+ * consultar Nager.Date. No es un payload recibido por HTTP.
+ */
+export const ColombianHolidaySyncPayloadSchema = z.object({
+  anio: z.number().int().min(1).max(9999),
+  pais: z.literal("CO"),
+});
+
+export type ColombianHolidaySyncPayload = z.infer<
+  typeof ColombianHolidaySyncPayloadSchema
+>;
+
+// ============================================================================
 // SCHEMAS GENÉRICOS PARA WORKFLOWS
 // ============================================================================
 
