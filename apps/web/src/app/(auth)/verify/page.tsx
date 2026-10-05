@@ -7,7 +7,7 @@ export default function VerifyPage() {
       <p>Token con TTL improrrogable de 15 minutos (RF-02).</p>
       <form>
         <label>
-          Código <input name="token" required />
+          Código <input name="code" required pattern="\d{6}" maxLength={6} />
         </label>
         <button type="submit">Activar</button>
         <button type="button">Reenviar código (rate-limit 60s)</button>

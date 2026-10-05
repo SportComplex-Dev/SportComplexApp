@@ -1,4 +1,4 @@
-import { MEMBERSHIP_DISCOUNT_RATE } from "../domain/index.js";
+import { MEMBERSHIP_DISCOUNT_RATE } from "../domain/index";
 
 // RN-08: 30% descuento automático con membresía VIGENTE (online + taquilla)
 export function applyMembershipDiscount(amountCents: number, hasActiveMembership: boolean): number {

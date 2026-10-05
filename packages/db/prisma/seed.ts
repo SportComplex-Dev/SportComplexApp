@@ -1,5 +1,5 @@
 import { PeriodicidadPlan } from "@prisma/client";
-import { prisma } from "../src/client.js";
+import { prisma } from "../src/client";
 
 async function main() {
   console.log("Iniciando seed de base de datos...");
