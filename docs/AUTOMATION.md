@@ -82,7 +82,7 @@ Véase [N8N_WORKFLOWS.md](./N8N_WORKFLOWS.md) para detalles completos.
 **Ubicación típica del código**: `apps/web/src/app/api/auth/route.ts`
 
 ```typescript
-import { SendVerificationCodeSchema } from "@repo/validation";
+import { SendVerificationCodeSchema } from "@sportcomplex/validation";
 
 export async function POST(request: Request) {
   const { email, userName, userId } = await request.json();
@@ -201,7 +201,7 @@ import {
   validateSendVerificationCode, 
   trySendVerificationCode,
   createTestVerificationCodePayload 
-} from "@repo/validation/automation.schema";
+} from "@sportcomplex/validation/automation.schema";
 
 // Validar (lanza error si falla)
 const payload = validateSendVerificationCode({
@@ -281,7 +281,7 @@ Output: Actualizar cache, notificar clientes
 
 ```typescript
 // tests/automation.test.ts
-import { validateSendVerificationCode } from "@repo/validation";
+import { validateSendVerificationCode } from "@sportcomplex/validation";
 
 describe("Automation Schemas", () => {
   it("debe validar payload correcto", () => {
@@ -320,7 +320,7 @@ describe("Automation Schemas", () => {
 
 **Verificar con validador:**
 ```typescript
-import { trySendVerificationCode } from "@repo/validation";
+import { trySendVerificationCode } from "@sportcomplex/validation";
 
 const result = trySendVerificationCode(data);
 if (!result) console.error("Payload inválido");

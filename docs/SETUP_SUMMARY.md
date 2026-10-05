@@ -167,8 +167,8 @@ SportComplexApp/
 
 ### Para Implementadores
 ```typescript
-import { sendVerificationCodeWebhook } from "@repo/core";
-import { SendVerificationCodeSchema } from "@repo/validation";
+import { sendVerificationCodeWebhook } from "@sportcomplex/core";
+import { SendVerificationCodeSchema } from "@sportcomplex/validation";
 
 // Usar en tu endpoint
 const payload = {

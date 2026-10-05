@@ -33,8 +33,8 @@ pnpm install
 ### Paso 1: Importar las Funciones
 
 ```typescript
-import { sendVerificationCodeWebhook } from "@repo/core";
-import { SendVerificationCodeSchema } from "@repo/validation";
+import { sendVerificationCodeWebhook } from "@sportcomplex/core";
+import { SendVerificationCodeSchema } from "@sportcomplex/validation";
 ```
 
 ### Paso 2: Generar Código de Verificación
@@ -88,7 +88,7 @@ try {
 // File: apps/web/src/app/api/auth/register/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendVerificationCodeWebhook } from "@repo/core";
+import { sendVerificationCodeWebhook } from "@sportcomplex/core";
 
 export async function POST(request: NextRequest) {
   try {
@@ -325,7 +325,7 @@ async function sendWithRetry(payload: SendVerificationCodePayload, maxAttempts =
 ### Test Unitario
 
 ```typescript
-import { validateSendVerificationCode } from "@repo/validation";
+import { validateSendVerificationCode } from "@sportcomplex/validation";
 
 describe("Verificación de Email", () => {
   it("debería validar payload correcto", () => {
@@ -353,7 +353,7 @@ describe("Verificación de Email", () => {
 
 ```typescript
 // Mock del webhook
-jest.mock("@repo/core", () => ({
+jest.mock("@sportcomplex/core", () => ({
   sendVerificationCodeWebhook: jest.fn().mockResolvedValue({
     ok: true,
     mensaje: "Código enviado",
