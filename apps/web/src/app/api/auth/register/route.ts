@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   await createToken(usuario.id, tokenHash, expiraEn);
 
   // El código en claro nunca se persiste; se envía al webhook de correo (TSK-AU-01).
-  await sendVerificationCodeEmail({ to: email, nombre, code, expiraEn });
+  await sendVerificationCodeEmail({ usuarioId: usuario.id, to: email, nombre, code, expiraEn });
 
   return ok({
     usuarioId: usuario.id,
