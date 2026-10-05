@@ -108,6 +108,7 @@ model Rol {
 // 2. USUARIO
 model Usuario {
   id           String        @id @default(uuid()) @db.Uuid
+  avatar       String?       @map("avatar_url") @db.VarChar(2048)
   rolId        Int           @map("rol_id")
   nombre       String        @db.VarChar(120)
   correo       String        @unique @db.VarChar(150)
