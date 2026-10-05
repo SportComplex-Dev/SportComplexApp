@@ -12,3 +12,5 @@ build/
 coverage/
 .next/cache/
 prisma/*.db
+*.tsbuildinfo
+next-env.d.ts

@@ -7,17 +7,29 @@
   "types": "./src/index.ts",
   "scripts": {
     "db:generate": "prisma generate --schema prisma/schema.prisma",
-    "db:migrate": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:studio": "prisma studio --schema prisma/schema.prisma",
+    "db:seed": "prisma db seed",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "lint": "echo \"lint db (todo)\"",
+    "lint": "eslint .",
     "clean": "rm -rf dist"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
-    "@prisma/client": "7.10.0"
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "7.10.0",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
+    "@types/node": "22.13.10",
     "prisma": "7.10.0",
-    "typescript": "5.7.3"
+    "tsx": "^4.23.15",
+    "typescript": "5.7.3",
+    "@sportcomplex/config": "workspace:*"
   }
 }

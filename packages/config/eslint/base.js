@@ -1,7 +1,11 @@
 import tseslint from "typescript-eslint";
 
-export default tseslint.config({
-  extends: [],
-  ignores: ["dist/**", ".next/**", "node_modules/**"],
-  rules: {},
-});
+export default tseslint.config(
+  { ignores: ["dist/**", ".next/**", "node_modules/**"] },
+  ...tseslint.configs.recommended,
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
+  }
+);
