@@ -1,0 +1,161 @@
+{
+  "name": "TSK-AU-02 - Sincronizacion de festivos Colombia",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "87547d23-fcdd-49f4-878a-d0427460c01d",
+      "name": "Schedule Trigger - Mensual",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const anio = new Date().getFullYear() + 1;\n\nreturn [{\n  json: {\n    anio,\n    pais: 'CO'\n  }\n}];"
+      },
+      "id": "639028b6-169b-44ff-ae93-2bfe99796bef",
+      "name": "Preparar año siguiente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://date.nager.at/api/v3/PublicHolidays/' + $json.anio + '/' + $json.pais }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "5fc8ce93-9d76-4b5a-87e1-c52565ddaa0f",
+      "name": "Consultar Nager.Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        112
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.all();\nconst anioEsperado = $('Preparar año siguiente').first().json.anio;\nconst festivos = [];\n\nfor (const item of input) {\n  const data = item.json;\n  if (Array.isArray(data)) {\n    festivos.push(...data);\n  } else if (Array.isArray(data.body)) {\n    festivos.push(...data.body);\n  } else if (data && data.date) {\n    festivos.push(data);\n  }\n}\n\nif (festivos.length === 0) {\n  throw new Error('Nager.Date no devolvió festivos. Se cancela la sincronización.');\n}\n\nconst fechas = new Set();\nconst resultado = [];\n\nfor (const festivo of festivos) {\n  const fecha = festivo.date;\n  const nombre = festivo.localName || festivo.name;\n\n  if (typeof fecha !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(fecha) || !nombre) {\n    throw new Error('La API devolvió un festivo con fecha o nombre inválido.');\n  }\n\n  const anio = Number(fecha.slice(0, 4));\n  if (anio !== anioEsperado) {\n    throw new Error(`Se recibió una fecha fuera del año solicitado: ${fecha}`);\n  }\n  if (fechas.has(fecha)) {\n    throw new Error(`La API devolvió una fecha duplicada: ${fecha}`);\n  }\n  if (nombre.length > 100) {\n    throw new Error(`El nombre del festivo supera 100 caracteres: ${fecha}`);\n  }\n\n  fechas.add(fecha);\n  resultado.push({ json: { fecha, nombre, anio } });\n}\n\nreturn resultado;"
+      },
+      "id": "8f7fd011-8b49-4a55-9880-e7b576afa783",
+      "name": "Validar y preparar festivos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO festivo (fecha, nombre, anio)\nVALUES ($1::date, $2, $3::smallint)\nON CONFLICT (fecha)\nDO UPDATE SET\n  nombre = EXCLUDED.nombre,\n  anio = EXCLUDED.anio;",
+        "options": {
+          "queryReplacement": "={{ [$json.fecha, $json.nombre, $json.anio] }}"
+        }
+      },
+      "id": "c1d32bab-8954-4d43-acd3-eb454e3c7d70",
+      "name": "Guardar en PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        720,
+        112
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "postgres": {
+          "id": "OrmC1JokG7q1EUkP",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger - Mensual": {
+      "main": [
+        [
+          {
+            "node": "Preparar año siguiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar año siguiente": {
+      "main": [
+        [
+          {
+            "node": "Consultar Nager.Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Nager.Date": {
+      "main": [
+        [
+          {
+            "node": "Validar y preparar festivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar y preparar festivos": {
+      "main": [
+        [
+          {
+            "node": "Guardar en PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "20ba9c25-5b21-4f31-b539-7b875564721a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "ruAol2XnjHvrlD8K",
+  "tags": []
+}
