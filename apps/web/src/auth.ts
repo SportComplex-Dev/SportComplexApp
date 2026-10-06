@@ -2,6 +2,8 @@ import NextAuth from "next-auth";
 import { prisma } from "@sportcomplex/db";
 import { authConfig } from "./auth.config";
 
+type UsuarioTransaction = Pick<typeof prisma, "usuario">;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   callbacks: {
@@ -39,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         throw new Error("El rol CLIENTE no está configurado");
       }
 
-      return prisma.$transaction(async (tx: any) => {
+      return prisma.$transaction(async (tx: UsuarioTransaction) => {
         const linkedUser = await tx.usuario.findUnique({
           where: { googleSub },
         });
