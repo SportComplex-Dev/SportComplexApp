@@ -24,9 +24,9 @@ export const authConfig = {
     },
   },
   callbacks: {
-    authorized({ request, auth }) {
-      const { pathname } = request.nextUrl;
-      return pathname === "/" || pathname.startsWith("/api/auth/") || !!auth;
+    authorized() {
+      // La política granular de acceso se aplica en src/middleware.ts.
+      return true;
     },
     session({ session, token }) {
       if (session.user) {
