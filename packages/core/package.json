@@ -12,6 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "date-fns": "4.1.0",
     "date-fns-tz": "3.2.0",
     "ky": "1.7.5",

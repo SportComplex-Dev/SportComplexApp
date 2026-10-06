@@ -1,0 +1,133 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auth/enviar-codigo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2131c13a-717e-4868-94cf-fca1861c0272",
+      "name": "Webhook",
+      "webhookId": "44ee3d0c-6dbf-4207-8dce-e7c70ed25390"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n\n  // Contrato en camelCase (con fallback de seguridad)\n  const destinatario = body.correo || body.email;\n  const nombre = body.nombre || 'Usuario';\n  const codigo = body.codigoVerificacion || body.codigo_verificacion;\n  const expira = body.expiraEnMinutos || body.expira_en_minutos || 15;\n  const usuarioId = body.usuarioId || body.usuario_id;\n\n  const htmlTemplate = `\n  <!DOCTYPE html>\n  <html>\n  <head>\n    <meta charset=\"utf-8\">\n    <style>\n      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 20px; }\n      .card { max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }\n      .header { text-align: center; margin-bottom: 24px; }\n      .code-box { background: #0f172a; color: #38bdf8; font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 18px; border-radius: 6px; margin: 24px 0; }\n      .footer { font-size: 12px; color: #64748b; text-align: center; margin-top: 24px; line-height: 1.5; }\n    </style>\n  </head>\n  <body>\n    <div class=\"card\">\n      <div class=\"header\">\n        <h2 style=\"color: #0f172a; margin: 0;\">Verifica tu cuenta</h2>\n      </div>\n      <p style=\"color: #334155; font-size: 15px;\">Hola <strong>${nombre}</strong>,</p>\n      <p style=\"color: #334155; font-size: 15px;\">Ingresa el siguiente código en la plataforma para completar tu registro institucional. Este código vence en <strong>${expira} minutos</strong>:</p>\n      \n      <div class=\"code-box\">${codigo}</div>\n      \n      <p style=\"color: #64748b; font-size: 13px;\">Si no solicitaste este registro, puedes ignorar este mensaje.</p>\n      <div class=\"footer\">\n        Complejo Deportivo &copy; 2026. Todos los derechos reservados.\n      </div>\n    </div>\n  </body>\n  </html>\n  `;\n\n  return {\n    json: {\n      destinatario: destinatario,\n      asunto: `${codigo} es tu código de verificación`,\n      html: htmlTemplate,\n      usuarioId: usuarioId\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0b156b44-2543-40a3-b6c8-7307a87dc3d9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    from: \"Akros <no-reply@akros.lat>\",\n    to: [$json.destinatario],\n    subject: $json.asunto,\n    html: $json.html\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "f4bfe480-ba16-4645-8578-6226b713427c",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"mensaje\": \"Código de verificación despachado exitosamente\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "0a7bfe68-a582-402d-ac53-018837d5e830",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3ba3754c-d2e2-4bb8-9020-117142f4b53e",
+  "meta": {
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "bOl5gks1km1OSqyk",
+  "tags": []
+}

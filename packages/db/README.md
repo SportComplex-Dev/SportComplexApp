@@ -87,3 +87,90 @@ Ejecuta estos comandos desde la raíz del monorepo o filtrando por paquete:
   ```bash
   pnpm --filter @sportcomplex/db db:studio
   ```
+
+---
+
+### 5. Uso del esquema en código Backend (TS) — `avatar` vs `avatar_url`
+
+El modelo `Usuario` (`prisma/schema.prisma`) usa `@map` para traducir nombres entre TypeScript y la base de datos:
+
+```prisma
+model Usuario {
+  // ...
+  avatar String? @map("avatar_url") @db.VarChar(2048)
+  // ...
+  @@map("usuario")
+}
+```
+
+**Regla clave:**
+- **En TypeScript (Prisma Client): usar siempre `.avatar`** ← nombre del campo del modelo.
+- **En SQL directo (Supabase SQL Editor, n8n, psql): usar `avatar_url`** ← nombre real de la columna.
+
+```ts
+// ✅ Correcto (Prisma Client)
+const u = await prisma.usuario.findUnique({ where: { id } });
+u?.avatar;
+
+await prisma.usuario.update({
+  where: { id },
+  data: { avatar: "https://cdn.ejemplo.com/avatares/1.png" },
+});
+
+// ❌ Incorrecto — error de compilación (no existe en el tipo generado)
+u?.avatar_url;
+```
+
+```sql
+-- SQL directo (columna real en la BD)
+SELECT avatar_url FROM "usuario" WHERE id = '...';
+UPDATE "usuario" SET avatar_url = 'https://...' WHERE id = '...';
+```
+
+**Notas:**
+- `avatar_url` admite máximo **2048 caracteres** y es nullable.
+- La misma regla aplica a todos los campos mapeados: en TS usa camelCase (`passwordHash`, `googleSub`, `creadoEn`), en SQL usa snake_case (`password_hash`, `google_sub`, `creado_en`).
+- Si alguien modifica `schema.prisma`, ejecutar `pnpm --filter @sportcomplex/db db:generate` para regenerar los tipos del cliente.
+
+---
+
+### 6. Cuentas de prueba (BD de desarrollo en Supabase)
+
+Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
+
+| Correo | Rol | Estado |
+|---|---|---|
+| test@example.com | CLIENTE | ACTIVO |
+| admin@example.com | ADMIN | ACTIVO |
+| cliente@sportcomplex.com | CLIENTE | ACTIVO |
+| admin@sportcomplex.com | ADMIN | ACTIVO |
+| vendedor@example.com | VENDEDOR | PENDIENTE |
+| lector@example.com | LECTOR | PENDIENTE |
+
+**Importante:**
+- Todas autentican por **correo + contraseña** (`password_hash` con bcrypt, sin Google OAuth).
+- Las contraseñas en texto plano **no están en este repo** (solo existen los hashes). Si las necesitas, pídelas a quien creó las cuentas o resetea una con un hash nuevo.
+- `vendedor@example.com` y `lector@example.com` están en estado **PENDIENTE**: no podrán iniciar sesión hasta activarse.
+- Para listarlas en cualquier momento:
+  ```sql
+  SELECT u.nombre, u.correo, u.estado, r.nombre AS rol
+  FROM "usuario" u LEFT JOIN "rol" r ON r.id = u.rol_id
+  ORDER BY u."creado_en" DESC;
+  ```
+
+---
+
+### 7. Notas de entorno (pnpm, dotenv, conexión)
+
+1. **Gestor de paquetes:** el monorepo exige **pnpm 12.6.0** (ver `packageManager` en el `package.json` raíz). No uses `npm install`. Si `pnpm` no está instalado:
+   ```bash
+   npm install -g --prefix "$HOME/.local" pnpm@12.6.0
+   export PATH="$HOME/.local/bin:$PATH"  # agrégalo a tu ~/.bashrc
+   ```
+2. **`dotenv` es obligatorio** en `@sportcomplex/db` porque `prisma.config.ts` lo importa para cargar el `.env` (Prisma 7 ya no lo carga automáticamente). Si ves `Cannot find module 'dotenv/config'`, instala dependencias con pnpm.
+3. **Conexión a Supabase:** la conexión directa (`db.<ref>.supabase.co:5432`) solo resuelve por **IPv6**. Si tu red no tiene IPv6 (error `P1001: Can't reach database server`), usa el **Session Pooler (IPv4)** en `DATABASE_URL`:
+   ```env
+   DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+   ```
+   El mismo string del pooler sirve para integraciones externas (ej. n8n).
+4. **Seguridad:** `.env` contiene secretos — nunca lo subas al repo. Si una contraseña queda expuesta (chat, logs, commits), **rótala** en Supabase Dashboard → Database → Password y actualiza el `.env`.

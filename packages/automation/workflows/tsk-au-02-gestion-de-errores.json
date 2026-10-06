@@ -1,0 +1,92 @@
+{
+  "name": "TSK-AU-02 - Gestion de errores",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ff906bf1-7e99-4fd9-bc2e-2a2ff955544c",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $input.first()?.json ?? {};\nconst execution = e.execution ?? {};\nconst workflow = e.workflow ?? {};\nconst error = execution.error ?? {};\n\nreturn [{\n  json: {\n    asunto: '[ERROR] TSK-AU-02 - Sincronización de festivos Colombia',\n    workflow: workflow.name ?? 'Workflow desconocido',\n    ejecucionUrl: execution.url ?? '',\n    ultimoNodo: execution.lastNodeExecuted ?? 'No identificado',\n    mensaje: error.message ?? e.message ?? 'Error sin detalle disponible',\n    fecha: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "191dcc96-c009-4a16-9eec-cc0fee24188e",
+      "name": "Preparar detalle del error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "no-reply@akros.lat",
+        "to": "official@akros.lat",
+        "subject": "{{ $json.asunto }}",
+        "html": "=<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Alerta de sincronización AKROS</title>\n</head>\n\n<body style=\"\n  margin: 0;\n  padding: 0;\n  background-color: #f2f5f1;\n  font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif;\n  color: #141d18;\n\">\n\n  <table\n    width=\"100%\"\n    cellpadding=\"0\"\n    cellspacing=\"0\"\n    border=\"0\"\n    style=\"background-color: #f2f5f1; padding: 40px 20px;\"\n  >\n    <tr>\n      <td align=\"center\">\n\n        <!-- CONTENEDOR PRINCIPAL -->\n        <table\n          width=\"100%\"\n          cellpadding=\"0\"\n          cellspacing=\"0\"\n          border=\"0\"\n          style=\"\n            max-width: 620px;\n            background-color: #ffffff;\n            border-radius: 24px;\n            overflow: hidden;\n            box-shadow: 0 8px 32px rgba(18, 62, 48, 0.08);\n          \"\n        >\n\n          <!-- HEADER -->\n          <tr>\n            <td style=\"\n              background-color: #111815;\n              padding: 28px 32px;\n            \">\n\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n                <tr>\n\n                  <td>\n                    <div style=\"\n                      color: #c9ef75;\n                      font-size: 24px;\n                      font-weight: 800;\n                      letter-spacing: 1px;\n                    \">\n                      AKROS\n                    </div>\n\n                    <div style=\"\n                      color: #dcebc9;\n                      font-size: 11px;\n                      margin-top: 5px;\n                      letter-spacing: 1.5px;\n                      text-transform: uppercase;\n                    \">\n                      Athletic & Wellness Club\n                    </div>\n                  </td>\n\n                  <td align=\"right\">\n                    <div style=\"\n                      display: inline-block;\n                      background-color: #c62828;\n                      color: #ffffff;\n                      padding: 7px 12px;\n                      border-radius: 999px;\n                      font-size: 11px;\n                      font-weight: bold;\n                    \">\n                      ERROR\n                    </div>\n                  </td>\n\n                </tr>\n              </table>\n\n            </td>\n          </tr>\n\n\n          <!-- CONTENIDO -->\n          <tr>\n            <td style=\"padding: 36px 32px 20px 32px;\">\n\n              <div style=\"\n                font-size: 12px;\n                font-weight: 700;\n                color: #738379;\n                text-transform: uppercase;\n                letter-spacing: 1px;\n                margin-bottom: 10px;\n              \">\n                Automatización · n8n\n              </div>\n\n              <h1 style=\"\n                margin: 0;\n                font-size: 26px;\n                line-height: 1.25;\n                color: #141d18;\n              \">\n                Falló la sincronización\n              </h1>\n\n              <p style=\"\n                margin: 14px 0 0 0;\n                font-size: 15px;\n                line-height: 1.7;\n                color: #738379;\n              \">\n                La sincronización automática de festivos de Colombia\n                no pudo completarse correctamente.\n              </p>\n\n            </td>\n          </tr>\n\n\n          <!-- ALERTA -->\n          <tr>\n            <td style=\"padding: 0 32px 24px 32px;\">\n\n              <table\n                width=\"100%\"\n                cellpadding=\"0\"\n                cellspacing=\"0\"\n                style=\"\n                  background-color: #fff5f5;\n                  border: 1px solid #f1cccc;\n                  border-left: 5px solid #c62828;\n                  border-radius: 12px;\n                \"\n              >\n                <tr>\n                  <td style=\"padding: 18px 20px;\">\n\n                    <div style=\"\n                      font-size: 12px;\n                      font-weight: 700;\n                      color: #c62828;\n                      text-transform: uppercase;\n                      letter-spacing: 0.8px;\n                      margin-bottom: 8px;\n                    \">\n                      Mensaje del error\n                    </div>\n\n                    <div style=\"\n                      font-family: 'JetBrains Mono', Consolas, monospace;\n                      font-size: 13px;\n                      line-height: 1.6;\n                      color: #141d18;\n                      word-break: break-word;\n                    \">\n                      {{ $json.mensaje }}\n                    </div>\n\n                  </td>\n                </tr>\n              </table>\n\n            </td>\n          </tr>\n\n\n          <!-- INFORMACIÓN -->\n          <tr>\n            <td style=\"padding: 0 32px 28px 32px;\">\n\n              <div style=\"\n                font-size: 13px;\n                font-weight: 700;\n                color: #141d18;\n                margin-bottom: 14px;\n              \">\n                Información de la ejecución\n              </div>\n\n              <table\n                width=\"100%\"\n                cellpadding=\"0\"\n                cellspacing=\"0\"\n                style=\"\n                  border: 1px solid #e4eae1;\n                  border-radius: 12px;\n                  overflow: hidden;\n                \"\n              >\n\n                <tr>\n                  <td style=\"\n                    padding: 13px 15px;\n                    background-color: #fafbf9;\n                    color: #738379;\n                    font-size: 12px;\n                    width: 38%;\n                  \">\n                    Workflow\n                  </td>\n\n                  <td style=\"\n                    padding: 13px 15px;\n                    color: #141d18;\n                    font-size: 13px;\n                    font-weight: 600;\n                  \">\n                    {{ $json.workflow }}\n                  </td>\n                </tr>\n\n                <tr>\n                  <td style=\"\n                    padding: 13px 15px;\n                    border-top: 1px solid #e4eae1;\n                    background-color: #fafbf9;\n                    color: #738379;\n                    font-size: 12px;\n                  \">\n                    Último nodo\n                  </td>\n\n                  <td style=\"\n                    padding: 13px 15px;\n                    border-top: 1px solid #e4eae1;\n                    color: #141d18;\n                    font-size: 13px;\n                    font-weight: 600;\n                  \">\n                    {{ $json.ultimoNodo }}\n                  </td>\n                </tr>\n\n                <tr>\n                  <td style=\"\n                    padding: 13px 15px;\n                    border-top: 1px solid #e4eae1;\n                    background-color: #fafbf9;\n                    color: #738379;\n                    font-size: 12px;\n                  \">\n                    Fecha\n                  </td>\n\n                  <td style=\"\n                    padding: 13px 15px;\n                    border-top: 1px solid #e4eae1;\n                    color: #141d18;\n                    font-size: 13px;\n                  \">\n                    {{ $json.fecha }}\n                  </td>\n                </tr>\n\n              </table>\n\n            </td>\n          </tr>\n\n\n          <!-- BOTÓN -->\n          <tr>\n            <td align=\"center\" style=\"padding: 0 32px 36px 32px;\">\n\n              <a\n                href=\"{{ $json.ejecucionUrl }}\"\n                style=\"\n                  display: inline-block;\n                  background-color: #123e30;\n                  color: #ffffff;\n                  text-decoration: none;\n                  padding: 13px 24px;\n                  border-radius: 999px;\n                  font-size: 13px;\n                  font-weight: 700;\n                \"\n              >\n                Revisar ejecución en n8n\n              </a>\n\n            </td>\n          </tr>\n\n\n          <!-- FOOTER -->\n          <tr>\n            <td style=\"\n              background-color: #17221d;\n              padding: 22px 32px;\n            \">\n\n              <div style=\"\n                color: #c9ef75;\n                font-size: 13px;\n                font-weight: 700;\n              \">\n                AKROS Athletic & Wellness Club\n              </div>\n\n              <div style=\"\n                color: #738379;\n                font-size: 11px;\n                line-height: 1.6;\n                margin-top: 6px;\n              \">\n                Este mensaje fue generado automáticamente por el sistema\n                de automatización de AKROS.\n              </div>\n\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "id": "933dacb0-aba7-4589-ac03-cc5efc9fbe5d",
+      "name": "Send a new email",
+      "webhookId": "f3330977-adf6-484f-9773-6f40c0edeca7",
+      "credentials": {
+        "resendApi": {
+          "id": "QoyCY6ZzewUYBXCt",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Preparar detalle del error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar detalle del error": {
+      "main": [
+        [
+          {
+            "node": "Send a new email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fa87c606-7672-4734-b4c0-c5c4aacf6a22",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "OPHaetTDF7cfGwk1",
+  "tags": []
+}

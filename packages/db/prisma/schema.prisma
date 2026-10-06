@@ -108,6 +108,7 @@ model Rol {
 // 2. USUARIO
 model Usuario {
   id           String        @id @default(uuid()) @db.Uuid
+  avatar       String?       @map("avatar_url") @db.VarChar(2048)
   rolId        Int           @map("rol_id")
   nombre       String        @db.VarChar(120)
   correo       String        @unique @db.VarChar(150)
@@ -319,7 +320,8 @@ model LecturaAcceso {
   @@map("lectura_acceso")
 }
 
-// 14. PLAN_MEMBRESIA
+// 14. PLAN_MEMBRESIA — TSK-BD-11: periodicidad SEMANAL/MENSUAL/ANUAL,
+// descuento_pct fijo 30.00 (CHECK en migración) y stripe_price_id UK.
 model PlanMembresia {
   id            Int              @id @default(autoincrement())
   nombre        String           @db.VarChar(60)
@@ -333,13 +335,20 @@ model PlanMembresia {
   @@map("plan_membresia")
 }
 
-// 15. MEMBRESIA
+// 15. MEMBRESIA — TSK-BD-11 (HU-20/RF-16)
+// Regla crítica: una sola membresía VIGENTE por usuario, garantizada a nivel
+// motor con índice único parcial (ver migración membresia_vigente_uniq):
+//   CREATE UNIQUE INDEX "membresia_usuario_vigente_uniq"
+//     ON "membresia"("usuario_id") WHERE "estado" = 'VIGENTE';
+// Prisma no expresa índices parciales de forma declarativa; no agregar
+// @@unique([usuarioId]) global porque bloquearía el historial VENCIDA/CANCELADA.
+// CHECK plan_membresia.descuento_pct = 30.00 también vive en SQL raw.
 model Membresia {
   id                   Int             @id @default(autoincrement())
   usuarioId            String          @map("usuario_id") @db.Uuid
   planId               Int             @map("plan_id")
   estado               EstadoMembresia
-  fechaInicio          DateTime        @db.Date
+  fechaInicio          DateTime        @map("fecha_inicio") @db.Date
   proximaRenovacion    DateTime        @map("proxima_renovacion") @db.Date
   stripeSubscriptionId String?         @unique @map("stripe_subscription_id") @db.VarChar(100)
 
