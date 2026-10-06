@@ -18,24 +18,20 @@ export function TopBar() {
   const [dark, setDark] = useState(false)
 
   useEffect(() => {
+    const root = document.documentElement
     const isDark = document.documentElement.classList.contains('dark') ||
       localStorage.getItem('akros_theme') === 'dark'
     setDark(isDark)
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    }
+    root.classList.toggle('dark', isDark)
+    document.querySelector('.club-app')?.classList.toggle('dark', isDark)
   }, [])
 
   const toggleTheme = () => {
     const next = !dark
     setDark(next)
-    if (next) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('akros_theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('akros_theme', 'light')
-    }
+    document.documentElement.classList.toggle('dark', next)
+    document.querySelector('.club-app')?.classList.toggle('dark', next)
+    localStorage.setItem('akros_theme', next ? 'dark' : 'light')
   }
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`))

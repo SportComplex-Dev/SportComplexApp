@@ -5,26 +5,35 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { roleHome, type Role } from '@sportcomplex/core'
-import { loginSchema } from '@sportcomplex/validation'
+import { loginSchema, registerSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
 import { TopBar } from '@/components/top-bar'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
 
-export default function LoginPage() {
+function getSafeNextPath() {
+  const path = new URLSearchParams(window.location.search).get('next')
+  return path && path.startsWith('/') && !path.startsWith('//') ? path : null
+}
+
+export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
+  const register = mode === 'register'
   const router = useRouter()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
 
-    // 1. Validación en cliente con el contrato Zod oficial
-    const parsed = loginSchema.safeParse({ email, password })
+    // 1. Validación en cliente con los contratos Zod de @sportcomplex/validation
+    const parsed = register
+      ? registerSchema.safeParse({ name, email, password })
+      : loginSchema.safeParse({ email, password })
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Por favor verifica los datos ingresados.')
       return
@@ -32,24 +41,26 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      // 2. Petición real al endpoint /api/auth
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
-      })
-      const result = await res.json()
+      let role: Role = 'Cliente'
 
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'Correo o contraseña incorrectos.')
-        return
+      if (!register) {
+        // 2. Login real contra /api/auth
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parsed.data),
+        })
+        const result = await res.json()
+        if (!res.ok || !result.success) {
+          setError(result.error?.message || 'Correo o contraseña incorrectos.')
+          return
+        }
+        role = result.data.user.role
       }
+      // TODO(register): llamar al endpoint de registro cuando exista (hoy fe-00 solo valida y redirige)
 
-      // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
-      const role: Role = result.data.user.role
-      const next = new URLSearchParams(window.location.search).get('next')
-      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-      router.push(safeNext ?? roleHome[role])
+      // 3. Redirección: ?next= si es seguro; si no, la pantalla de inicio del rol
+      router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.')
@@ -62,7 +73,6 @@ export default function LoginPage() {
     <div className="club-app">
       <TopBar />
       <main className="auth-page">
-        {/* Panel de marca (izquierda) */}
         <div className="auth-art">
           <div className="auth-art-content">
             <Brand light />
@@ -70,26 +80,27 @@ export default function LoginPage() {
               <div className="eyebrow hero-eyebrow">TU ESPACIO, TU MOMENTO</div>
               <h2>El movimiento<br />cambia <span>todo.</span></h2>
               <p>Bienvenido a una comunidad que se mueve contigo.</p>
-              <div className="auth-decoration" aria-hidden="true">
-                <Activity size={152} strokeWidth={0.8} aria-hidden="true" />
+              <div className="auth-decoration">
+                <Activity size={152} strokeWidth={0.8} />
               </div>
             </div>
             <div className="auth-quote">“La mejor inversión es la que haces en ti.”</div>
           </div>
         </div>
 
-        {/* Formulario (derecha) */}
         <div className="auth-form-side">
           <div className="auth-mobile-brand"><Brand /></div>
           <div className="auth-form-wrap">
             <Link href="/" className="back-link">
-              <ArrowLeft size={15} strokeWidth={1.75} aria-hidden="true" /> Volver al inicio
+              <ArrowLeft size={15} /> Volver al inicio
             </Link>
-            <div className="eyebrow">QUÉ BUENO TENERTE DE VUELTA</div>
-            <h1>Ingresa a tu espacio.</h1>
-            <p className="auth-subtitle">Tu próximo momento de bienestar te espera.</p>
+            <div className="eyebrow">{register ? 'EMPIEZA HOY' : 'QUÉ BUENO TENERTE DE VUELTA'}</div>
+            <h1>{register ? 'Crea tu cuenta.' : 'Ingresa a tu espacio.'}</h1>
+            <p className="auth-subtitle">
+              {register ? 'Un paso más cerca de tu próxima aventura.' : 'Tu próximo momento de bienestar te espera.'}
+            </p>
 
-            <button type="button" className="google-button" disabled title="Próximamente">
+            <button type="button" className="google-button" disabled>
               <GoogleMark /> Continuar con Google
             </button>
 
@@ -97,7 +108,19 @@ export default function LoginPage() {
               <span />o con tu correo<span />
             </div>
 
-            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading}>
+            <form className="auth-fields" onSubmit={submit} noValidate>
+              {register && (
+                <label>
+                  Nombre completo
+                  <Input
+                    required
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Tu nombre"
+                    autoComplete="name"
+                  />
+                </label>
+              )}
               <label>
                 Correo electrónico
                 <Input
@@ -106,8 +129,6 @@ export default function LoginPage() {
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="nombre@correo.com"
                   autoComplete="email"
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? 'login-error' : undefined}
                   required
                 />
               </label>
@@ -118,31 +139,32 @@ export default function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Mínimo 6 caracteres"
-                  autoComplete="current-password"
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? 'login-error' : undefined}
+                  autoComplete={register ? 'new-password' : 'current-password'}
                   required
                 />
               </label>
 
-              <Link href="/forgot-password" className="forgot-link">
-                ¿Olvidaste tu contraseña?
-              </Link>
+              {!register && (
+                <Link href="/forgot-password" className="forgot-link">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              )}
 
               {error && (
-                <p id="login-error" role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600">
+                <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600">
                   {error}
                 </p>
               )}
 
               <ActionButton type="submit" disabled={loading} className="w-full justify-center">
-                {loading && <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" />}
-                Ingresar <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {register ? 'Crear mi cuenta' : 'Ingresar'} <ArrowRight size={16} />
               </ActionButton>
             </form>
 
             <div className="auth-switch">
-              ¿Aún no tienes cuenta? <Link href="/register">Regístrate</Link>
+              {register ? '¿Ya tienes cuenta?' : '¿Aún no tienes cuenta?'}{' '}
+              <Link href={register ? '/login' : '/register'}>{register ? 'Ingresar' : 'Regístrate'}</Link>
             </div>
           </div>
         </div>

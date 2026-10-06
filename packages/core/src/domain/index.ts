@@ -19,3 +19,9 @@ export const MEMBERSHIP_DISCOUNT_RATE = 0.3 as const;
 
 export * from "./catalog";
 
+export const roleHome: Record<Role, string> = {
+  Administrador: '/admin/dashboard',
+  Empleado_Vendedor: '/pos',
+  Empleado_Lector: '/scanner',
+  Cliente: '/portal',
+};
