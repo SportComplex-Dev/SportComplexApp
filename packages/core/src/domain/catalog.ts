@@ -236,3 +236,138 @@ export function minPrice(items: CatalogItem[], slug: CategorySlug): number | nul
   const prices = items.filter((item) => item.category === slug && item.status === 'Disponible').map((item) => item.price);
   return prices.length ? Math.min(...prices) : null;
 }
+
+export const defaultSchedules: Record<string, {
+  serviceId: string;
+  serviceName: string;
+  categorySlug: string;
+  capacity: number;
+  isShared: boolean;
+  startHour: number;
+  endHour: number;
+  slotDurationMinutes: number;
+  disabledSlots: string[];
+}> = {
+  'tenis-cancha-1': {
+    serviceId: 'tenis-cancha-1',
+    serviceName: 'Cancha de tenis · Cancha 1',
+    categorySlug: 'canchas',
+    capacity: 4,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'tenis-cancha-2': {
+    serviceId: 'tenis-cancha-2',
+    serviceName: 'Cancha de tenis · Cancha 2',
+    categorySlug: 'canchas',
+    capacity: 4,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'padel-cancha-1': {
+    serviceId: 'padel-cancha-1',
+    serviceName: 'Pádel · Cancha 1',
+    categorySlug: 'canchas',
+    capacity: 4,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'futbol-5-cancha-1': {
+    serviceId: 'futbol-5-cancha-1',
+    serviceName: 'Fútbol 5 · Cancha 1',
+    categorySlug: 'canchas',
+    capacity: 10,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'futbol-5-cancha-2': {
+    serviceId: 'futbol-5-cancha-2',
+    serviceName: 'Fútbol 5 · Cancha 2',
+    categorySlug: 'canchas',
+    capacity: 10,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'piscina-nado-libre': {
+    serviceId: 'piscina-nado-libre',
+    serviceName: 'Piscina · Nado libre',
+    categorySlug: 'piscinas',
+    capacity: 12,
+    isShared: true,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: ['13:00'],
+  },
+  'piscina-carril-entrenamiento': {
+    serviceId: 'piscina-carril-entrenamiento',
+    serviceName: 'Piscina · Carril de entrenamiento',
+    categorySlug: 'piscinas',
+    capacity: 2,
+    isShared: false,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'gimnasio-sesion-individual': {
+    serviceId: 'gimnasio-sesion-individual',
+    serviceName: 'Gimnasio · Sesión individual',
+    categorySlug: 'gimnasio',
+    capacity: 25, // HU-05: Capacidad máxima de 25 personas para gimnasio
+    isShared: true,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'gimnasio-funcional': {
+    serviceId: 'gimnasio-funcional',
+    serviceName: 'Gimnasio · Zona funcional',
+    categorySlug: 'gimnasio',
+    capacity: 20,
+    isShared: true,
+    startHour: 6,
+    endHour: 22,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'zona-humeda-sauna': {
+    serviceId: 'zona-humeda-sauna',
+    serviceName: 'Zona húmeda · Sauna',
+    categorySlug: 'zona-humeda',
+    capacity: 8,
+    isShared: true,
+    startHour: 7,
+    endHour: 21,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+  'zona-humeda-turco-jacuzzi': {
+    serviceId: 'zona-humeda-turco-jacuzzi',
+    serviceName: 'Zona húmeda · Turco y jacuzzi',
+    categorySlug: 'zona-humeda',
+    capacity: 10,
+    isShared: true,
+    startHour: 7,
+    endHour: 21,
+    slotDurationMinutes: 60,
+    disabledSlots: [],
+  },
+};
+

@@ -16,14 +16,16 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 function getSessionRole(req: NextRequest): string | null {
-  // Placeholder: lee cookie de sesión Supabase/Auth.
-  // TODO(feature/auth-provider-email): validar JWT real + estado Activo/Inactivo (RN-10).
+  // Placeholder: lee cookie de sesión Supabase/Auth o parámetro de rol en desarrollo
+  const queryRole = req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole");
+  if (queryRole) return queryRole;
   const role = req.cookies.get("sc-role")?.value ?? null;
   return role;
 }
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const queryRole = req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole");
   const role = getSessionRole(req);
 
   // 1. Landing pública: redirige autenticados a su portal (307)
@@ -67,7 +69,11 @@ export function middleware(req: NextRequest) {
     // TODO: validar estado Activo (bloqueo Pendiente/Inactivo)
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  if (queryRole) {
+    res.cookies.set("sc-role", queryRole, { path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return res;
 }
 
 export const config = {
