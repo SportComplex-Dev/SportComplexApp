@@ -10,7 +10,7 @@ export interface SessionUser {
 }
 
 export const ROLE_HOME: Record<CanonicalRole, string> = {
-  Administrador: "/admin",
+  Administrador: "/admin/dashboard",
   Empleado_Vendedor: "/pos",
   Empleado_Lector: "/scanner",
   Cliente: "/portal",
@@ -215,36 +215,38 @@ export function extractSession(req: NextRequest): SessionUser | null {
     }
   }
 
-  // 4. Cookie sc-session (JSON)
-  const sessionCookie = req.cookies.get("sc-session")?.value;
-  if (sessionCookie) {
-    try {
-      const parsed = JSON.parse(sessionCookie);
-      const role = normalizeRole(parsed.role);
-      const status = parsed.status ?? parsed.estado;
-      if (role && isAccountActive(status)) {
+  // 4. Cookie sc-session (JSON) y 5. Cookie directa sc-role - Solo desarrollo / testing local
+  // En producción se requiere token JWT verificado para prevenir inyección directa vía document.cookie
+  if (process.env.NODE_ENV !== "production") {
+    const sessionCookie = req.cookies.get("sc-session")?.value;
+    if (sessionCookie) {
+      try {
+        const parsed = JSON.parse(sessionCookie);
+        const role = normalizeRole(parsed.role);
+        const status = parsed.status ?? parsed.estado;
+        if (role && isAccountActive(status)) {
+          return {
+            role,
+            status: status ?? "ACTIVO",
+            userId: parsed.userId ?? parsed.id,
+            email: parsed.email ?? parsed.correo,
+          };
+        }
+      } catch {
+        // Ignorar cookie malformada
+      }
+    }
+
+    const roleCookie = req.cookies.get("sc-role")?.value;
+    if (roleCookie) {
+      const role = normalizeRole(roleCookie);
+      const statusCookie = req.cookies.get("sc-status")?.value;
+      if (role && isAccountActive(statusCookie)) {
         return {
           role,
-          status: status ?? "ACTIVO",
-          userId: parsed.userId ?? parsed.id,
-          email: parsed.email ?? parsed.correo,
+          status: statusCookie ?? "ACTIVO",
         };
       }
-    } catch {
-      // Ignorar cookie malformada
-    }
-  }
-
-  // 5. Cookie directa sc-role y sc-status
-  const roleCookie = req.cookies.get("sc-role")?.value;
-  if (roleCookie) {
-    const role = normalizeRole(roleCookie);
-    const statusCookie = req.cookies.get("sc-status")?.value;
-    if (role && isAccountActive(statusCookie)) {
-      return {
-        role,
-        status: statusCookie ?? "ACTIVO",
-      };
     }
   }
 

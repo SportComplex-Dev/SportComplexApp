@@ -66,8 +66,11 @@ export function middleware(req: NextRequest) {
   const role = session?.role ?? null;
 
   // 1. Landing pública (/) y páginas de login/registro (/login, /register):
-  // Si el usuario ya está autenticado, redirigir con 307 a su portal según rol
+  // Si el usuario ya está autenticado, redirigir con 307 a su portal según rol (o a /verify si su cuenta está PENDIENTE)
   if (pathname === "/" || pathname === "/login" || pathname === "/register") {
+    if (session?.status?.toUpperCase() === "PENDIENTE") {
+      return NextResponse.redirect(new URL("/verify", req.url), 307);
+    }
     if (role && ROLE_HOME[role]) {
       const url = req.nextUrl.clone();
       url.pathname = ROLE_HOME[role];
@@ -130,6 +133,9 @@ export function middleware(req: NextRequest) {
   if (pathname.startsWith("/portal")) {
     if (!role) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
+    }
+    if (session?.status?.toUpperCase() === "PENDIENTE") {
+      return NextResponse.redirect(new URL("/verify", req.url), 307);
     }
     if (role !== "Cliente" && role !== "Administrador") {
       return createForbiddenResponse(req, "Acceso exclusivo para clientes");
