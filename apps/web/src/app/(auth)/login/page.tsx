@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
@@ -11,6 +11,19 @@ import { Brand } from '@/components/brand'
 import { TopBar } from '@/components/top-bar'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
+import { createSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
+
+const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
+
+function getUserRole(role: unknown): Role {
+  return supportedRoles.find((supportedRole) => supportedRole === role) ?? 'Cliente'
+}
+
+function getSafeNextPath() {
+  const path = new URLSearchParams(window.location.search).get('next')
+  if (!path || !path.startsWith('/')) return null
+  return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,6 +31,81 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'google') {
+      setError('No se pudo completar el acceso con Google. Inténtalo nuevamente.')
+    } else if (params.get('error') === 'configuration') {
+      setError('El proveedor de autenticación todavía no está configurado.')
+    }
+
+    if (!isSupabaseAuthConfigured()) {
+      setCheckingSession(false)
+      return
+    }
+
+    let active = true
+    const supabase = createSupabaseBrowserClient()
+
+    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active) return
+      if (sessionError) {
+        setError('No se pudo verificar tu sesión. Inténtalo nuevamente.')
+        setCheckingSession(false)
+        return
+      }
+
+      const user = data.session?.user
+      if (user) {
+        const role = getUserRole(user.app_metadata.role)
+        router.replace(getSafeNextPath() ?? roleHome[role])
+        router.refresh()
+        return
+      }
+
+      setCheckingSession(false)
+    }).catch(() => {
+      if (active) {
+        setError('No se pudo verificar tu sesión. Inténtalo nuevamente.')
+        setCheckingSession(false)
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [router])
+
+  const handleGoogleLogin = async () => {
+    setError(null)
+    if (!isSupabaseAuthConfigured()) {
+      setError('El proveedor de autenticación todavía no está configurado.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const callbackUrl = new URL('/auth/callback', window.location.origin)
+      callbackUrl.searchParams.set('flow', 'oauth')
+      const next = getSafeNextPath()
+      if (next) callbackUrl.searchParams.set('next', next)
+
+      const { error: oauthError } = await createSupabaseBrowserClient().auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: callbackUrl.toString() },
+      })
+
+      if (oauthError) {
+        setError(oauthError.message || 'No se pudo iniciar sesión con Google.')
+        setLoading(false)
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Google.')
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -47,9 +135,7 @@ export default function LoginPage() {
 
       // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
       const role: Role = result.data.user.role
-      const next = new URLSearchParams(window.location.search).get('next')
-      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-      router.push(safeNext ?? roleHome[role])
+      router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.')
@@ -89,15 +175,22 @@ export default function LoginPage() {
             <h1>Ingresa a tu espacio.</h1>
             <p className="auth-subtitle">Tu próximo momento de bienestar te espera.</p>
 
-            <button type="button" className="google-button" disabled title="Próximamente">
-              <GoogleMark /> Continuar con Google
+            <button
+              type="button"
+              className="google-button"
+              onClick={handleGoogleLogin}
+              disabled={loading || checkingSession}
+              aria-busy={loading}
+            >
+              {loading ? <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : <GoogleMark />}
+              {loading ? 'Conectando con Google…' : 'Continuar con Google'}
             </button>
 
             <div className="auth-divider">
               <span />o con tu correo<span />
             </div>
 
-            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading}>
+            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading || checkingSession}>
               <label>
                 Correo electrónico
                 <Input
@@ -135,7 +228,7 @@ export default function LoginPage() {
                 </p>
               )}
 
-              <ActionButton type="submit" disabled={loading} className="w-full justify-center">
+              <ActionButton type="submit" disabled={loading || checkingSession} className="w-full justify-center">
                 {loading && <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" />}
                 Ingresar <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
               </ActionButton>

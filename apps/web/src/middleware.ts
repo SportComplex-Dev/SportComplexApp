@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 // RBAC perimetral — ARCHITECTURE §8.3 + redirección landing §4.1
 // Rutas:
@@ -22,9 +23,40 @@ function getSessionRole(req: NextRequest): string | null {
   return role;
 }
 
-export function middleware(req: NextRequest) {
+async function getSupabaseCustomerSession(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  let response = NextResponse.next({ request: req });
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => {
+          req.cookies.set(name, value);
+        });
+        response = NextResponse.next({ request: req });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+
+  const role = data.user.app_metadata.role;
+  return { isCustomer: role === undefined || role === "Cliente", response };
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const role = getSessionRole(req);
+  let supabaseResponse: NextResponse | null = null;
 
   // 1. Landing pública: redirige autenticados a su portal (307)
   if (pathname === "/") {
@@ -62,12 +94,16 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/portal")) {
-    if (!role)
-      return NextResponse.redirect(new URL("/login", req.url), 307);
+    if (!role) {
+      const session = await getSupabaseCustomerSession(req);
+      if (!session?.isCustomer)
+        return NextResponse.redirect(new URL("/login", req.url), 307);
+      supabaseResponse = session.response;
+    }
     // TODO: validar estado Activo (bloqueo Pendiente/Inactivo)
   }
 
-  return NextResponse.next();
+  return supabaseResponse ?? NextResponse.next();
 }
 
 export const config = {
