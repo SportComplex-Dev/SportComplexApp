@@ -15,11 +15,11 @@ export const metadata: Metadata = {
     "Landing institucional, reservas de pádel, tenis, fútbol, piscinas y wellness con modelo 100% cashless Stripe y control de acceso QR.",
   icons: {
     icon: [
-      { url: "/icon-light-32x32.png", media: "(prefers-color-scheme: light)" },
-      { url: "/icon-dark-32x32.png", media: "(prefers-color-scheme: dark)" },
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/images/Akros-logo-bosque.png", media: "(prefers-color-scheme: light)" },
+      { url: "/images/Akros-logo.png", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon.ico" },
     ],
-    apple: "/apple-icon.png",
+    apple: "/images/Akros-logo.png",
   },
 };
 
