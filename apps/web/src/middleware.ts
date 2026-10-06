@@ -1,4 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { NextResponse } from "next/server";
+import { authConfig } from "./auth.config";
 
 // RBAC perimetral — ARCHITECTURE §8.3 + redirección landing §4.1
 // Rutas:
@@ -9,26 +11,23 @@ import { NextResponse, type NextRequest } from "next/server";
 //  (public)/ landing SSG: si hay sesión, 307 al portal según rol.
 
 const ROLE_HOME: Record<string, string> = {
-  Administrador: "/admin/dashboard",
-  Empleado_Vendedor: "/pos",
-  Empleado_Lector: "/scanner",
-  Cliente: "/portal",
+  ADMIN: "/admin/dashboard",
+  VENDEDOR: "/pos",
+  LECTOR: "/scanner",
+  CLIENTE: "/portal",
 };
 
-function getSessionRole(req: NextRequest): string | null {
-  // Placeholder: lee cookie de sesión Supabase/Auth.
-  // TODO(feature/auth-provider-email): validar JWT real + estado Activo/Inactivo (RN-10).
-  const role = req.cookies.get("sc-role")?.value ?? null;
-  return role;
-}
+const { auth: withAuth } = NextAuth(authConfig);
 
-export function middleware(req: NextRequest) {
+export default withAuth((req) => {
   const { pathname } = req.nextUrl;
-  const role = getSessionRole(req);
+  const session = req.auth;
+  const role = session?.user?.role ?? null;
+  const isActive = session?.user?.estado === "ACTIVO";
 
   // 1. Landing pública: redirige autenticados a su portal (307)
   if (pathname === "/") {
-    if (role && ROLE_HOME[role]) {
+    if (isActive && role && ROLE_HOME[role]) {
       const url = req.nextUrl.clone();
       url.pathname = ROLE_HOME[role];
       return NextResponse.redirect(url, 307);
@@ -38,7 +37,7 @@ export function middleware(req: NextRequest) {
 
   // 2. RBAC
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    if (role !== "Administrador")
+    if (!isActive || role !== "ADMIN")
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Administrador" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -46,7 +45,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/pos") || pathname.startsWith("/api/pos")) {
-    if (role !== "Administrador" && role !== "Empleado_Vendedor")
+    if (!isActive || (role !== "ADMIN" && role !== "VENDEDOR"))
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Vendedor" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -54,7 +53,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/scanner") || pathname.startsWith("/api/access")) {
-    if (role !== "Administrador" && role !== "Empleado_Lector")
+    if (!isActive || (role !== "ADMIN" && role !== "LECTOR"))
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Lector" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -62,13 +61,18 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/portal")) {
-    if (!role)
+    if (!session?.user?.id)
       return NextResponse.redirect(new URL("/login", req.url), 307);
-    // TODO: validar estado Activo (bloqueo Pendiente/Inactivo)
+    if (!isActive || role !== "CLIENTE") {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "Requiere una cuenta de Cliente activa" }, timestamp: new Date().toISOString() },
+        { status: 403 },
+      );
+    }
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/", "/portal/:path*", "/pos/:path*", "/scanner/:path*", "/admin/:path*", "/api/:path*"],
