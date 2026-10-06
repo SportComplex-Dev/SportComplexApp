@@ -2,6 +2,8 @@ import { ok, fail } from '@/lib/api-response'
 import { prisma } from '@sportcomplex/db'
 import { loginSchema } from '@sportcomplex/validation'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'
+import { verifySecret } from '@sportcomplex/core/src/security/token'
+import { normalizeRole } from '@/lib/session'
 
 const supportedRoles = [
   'Administrador',
@@ -51,26 +53,32 @@ export async function POST(request: Request) {
     }
 
     // 2. Buscar al usuario en la base de datos
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+    const user = await prisma.usuario.findUnique({
+      where: { correo: email.toLowerCase().trim() },
+      include: { rol: true },
     })
 
-    if (!user) {
+    // 3. Comparar contraseña contra el hash Argon2id (nunca en texto plano)
+    const passwordOk =
+      !!user?.passwordHash && !user.deletedAt && (await verifySecret(user.passwordHash, password))
+    if (!user || !passwordOk) {
       return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
     }
 
-    // 3. Comparar contraseña
-    if (user.password !== password) {
-      return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
+    if (user.estado === 'PENDIENTE') {
+      return fail('ACCOUNT_PENDING', 'Verifica tu correo antes de ingresar.', 403)
+    }
+    if (user.estado !== 'ACTIVO') {
+      return fail('ACCOUNT_INACTIVE', 'Tu cuenta está inactiva.', 403)
     }
 
     // 4. Responder con los datos del usuario para autorizar el acceso
     return ok({
       user: {
         id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role, // 'Cliente', 'Administrador', etc.
+        email: user.correo,
+        name: user.nombre,
+        role: normalizeRole(user.rol.nombre) ?? 'Cliente',
       },
     })
   } catch (error: unknown) {

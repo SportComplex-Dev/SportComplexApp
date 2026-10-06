@@ -26,7 +26,7 @@ export default function RegisterPage() {
     setError(null)
 
     // 1. Validación en cliente con el contrato Zod oficial
-    const parsed = registerSchema.safeParse({ name, email, password })
+    const parsed = registerSchema.safeParse({ nombre: name, email, password })
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Por favor verifica los datos ingresados.')
       return
@@ -40,12 +40,17 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      // TODO(RF-02): crear la cuenta en estado Pendiente, enviar el token de 15 min y llevar a /verify.
-      // Hoy (igual que fe-00) solo valida y redirige al inicio del rol Cliente.
-      const role: Role = 'Cliente'
-      const next = new URLSearchParams(window.location.search).get('next')
-      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-      router.push(safeNext ?? roleHome[role])
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed.data),
+      })
+      const result = await res.json()
+      if (!res.ok || !result.success) {
+        setError(result.error?.message || 'No se pudo crear la cuenta.')
+        return
+      }
+      router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al registrar la cuenta.')
     } finally {
@@ -124,7 +129,7 @@ export default function RegisterPage() {
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? 'register-error' : undefined}
