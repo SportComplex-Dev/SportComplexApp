@@ -1,5 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { extractSession, ROLE_HOME } from "@/lib/session";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
+import {
+  extractSession,
+  isAccountActive,
+  normalizeRole,
+  ROLE_HOME,
+  type SessionUser,
+} from "@/lib/session";
 
 /**
  * RBAC perimetral y redirección de landing — ARCHITECTURE §4.1 y §8.3
@@ -18,6 +26,8 @@ import { extractSession, ROLE_HOME } from "@/lib/session";
  * - /scanner/* y /api/access/* → Administrador | Empleado Lector
  * - /admin/* y /api/admin/* → Administrador
  */
+
+const { auth: withAuth } = NextAuth(authConfig);
 
 function createForbiddenResponse(req: NextRequest, message: string) {
   const acceptsHtml = req.headers.get("accept")?.includes("text/html");
@@ -60,18 +70,31 @@ function createForbiddenResponse(req: NextRequest, message: string) {
   );
 }
 
-export function middleware(req: NextRequest) {
+export default withAuth((req) => {
   const { pathname } = req.nextUrl;
-  const session = extractSession(req);
-  const role = session?.role ?? null;
+  const authUser = req.auth?.user;
+  const authRole = normalizeRole(authUser?.role);
+  const session: SessionUser | null = authUser
+    ? authRole
+      ? {
+          role: authRole,
+          status: authUser.estado ?? "ACTIVO",
+          userId: authUser.id,
+          email: authUser.email ?? undefined,
+        }
+      : null
+    : extractSession(req);
+  const status = session?.status ?? "ACTIVO";
+  const isActive = session !== null && isAccountActive(status);
+  const role = isActive ? session.role : null;
 
   // 1. Landing pública (/) y páginas de login/registro (/login, /register):
   // Si el usuario ya está autenticado, redirigir con 307 a su portal según rol (o a /verify si su cuenta está PENDIENTE)
   if (pathname === "/" || pathname === "/login" || pathname === "/register") {
-    if (session?.status?.toUpperCase() === "PENDIENTE") {
+    if (status.toUpperCase() === "PENDIENTE") {
       return NextResponse.redirect(new URL("/verify", req.url), 307);
     }
-    if (role && ROLE_HOME[role]) {
+    if (role && isAccountActive(status) && ROLE_HOME[role]) {
       const url = req.nextUrl.clone();
       url.pathname = ROLE_HOME[role];
       return NextResponse.redirect(url, 307);
@@ -131,11 +154,14 @@ export function middleware(req: NextRequest) {
 
   // 3. Control perimetral para páginas protegidas (Web Views)
   if (pathname.startsWith("/portal")) {
-    if (!role) {
+    if (!session) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }
-    if (session?.status?.toUpperCase() === "PENDIENTE") {
+    if (status.toUpperCase() === "PENDIENTE") {
       return NextResponse.redirect(new URL("/verify", req.url), 307);
+    }
+    if (!isActive) {
+      return createForbiddenResponse(req, "La cuenta no está activa");
     }
     if (role !== "Cliente" && role !== "Administrador") {
       return createForbiddenResponse(req, "Acceso exclusivo para clientes");
@@ -174,7 +200,7 @@ export function middleware(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/", "/login", "/register", "/portal/:path*", "/pos/:path*", "/scanner/:path*", "/admin/:path*", "/api/:path*"],
