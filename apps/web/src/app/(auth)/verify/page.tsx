@@ -1,12 +1,20 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Mail, RotateCw, CheckCircle2 } from 'lucide-react'
 import { roleHome, type Role } from '@sportcomplex/core'
 
 export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-white">Cargando...</div>}>
+      <VerifyPageContent />
+    </Suspense>
+  )
+}
+
+function VerifyPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
