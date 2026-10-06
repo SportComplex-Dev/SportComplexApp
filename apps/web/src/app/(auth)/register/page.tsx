@@ -25,7 +25,7 @@ export default function RegisterPage() {
     event.preventDefault()
     setError(null)
 
-    // 1. Validación en cliente con el contrato Zod oficial
+    // 1. Validación en cliente con el contrato Zod oficial.
     const parsed = registerSchema.safeParse({ name, email, password })
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Por favor verifica los datos ingresados.')

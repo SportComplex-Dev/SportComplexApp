@@ -15,7 +15,7 @@ export default function VerifyPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [verified, setVerified] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(900) // 15 minutos (900 segundos) según RF-02
+  const [timeLeft, setTimeLeft] = useState(900) // 15 minutos (900 segundos) según RF-02.
 
   // Estado para el temporizador de 60 segundos del botón de reenvío
   const [resendCooldown, setResendCooldown] = useState(60)
