@@ -39,6 +39,8 @@ export interface MockReserva {
   id: string;
   disponibilidadId: bigint;
   estado: string;
+  cantidadCupos?: number;
+  expiraEn?: Date | null;
 }
 
 export function createMockPrisma() {
@@ -52,6 +54,8 @@ export function createMockPrisma() {
   let servIdSeq = 1;
   let franjaIdSeq = 1;
   let dispIdSeq = 1n;
+  let reservaIdSeq = 1;
+  let transactionQueue = Promise.resolve();
 
   const mock: any = {
     _state: {
@@ -63,6 +67,12 @@ export function createMockPrisma() {
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
+        let releaseTransaction!: () => void;
+        const previousTransaction = transactionQueue;
+        transactionQueue = new Promise<void>((resolve) => {
+          releaseTransaction = resolve;
+        });
+        await previousTransaction;
         const snapCategorias = [...categorias];
         const snapServicios = [...servicios];
         const snapFranjas = [...franjas];
@@ -82,12 +92,17 @@ export function createMockPrisma() {
           reservas.length = 0;
           reservas.push(...snapReservas);
           throw err;
+        } finally {
+          releaseTransaction();
         }
       }
       if (Array.isArray(arg)) {
         return Promise.all(arg);
       }
       return arg;
+    },
+    async $queryRaw() {
+      return [];
     },
     categoriaServicio: {
       async findUnique({ where }: any) {
@@ -277,7 +292,54 @@ export function createMockPrisma() {
       },
     },
     disponibilidad: {
-      async upsert({ where, create }: any) {
+      async findMany({ where }: any = {}) {
+        return disponibilidades
+          .filter((d) => {
+            if (where?.servicioId !== undefined && d.servicioId !== where.servicioId) return false;
+            if (
+              where?.fecha &&
+              d.fecha.toISOString().slice(0, 10) !== where.fecha.toISOString().slice(0, 10)
+            ) return false;
+            return true;
+          })
+          .map((d) => ({
+            ...d,
+            servicio: servicios.find((s) => s.id === d.servicioId),
+            franja: franjas.find((f) => f.id === d.franjaId),
+          }));
+      },
+      async findUnique({ where, include }: any) {
+        const disp = disponibilidades.find((d) => d.id === where.id);
+        if (!disp) return null;
+        return {
+          ...disp,
+          ...(include?.servicio ? { servicio: servicios.find((s) => s.id === disp.servicioId) } : {}),
+          ...(include?.franja ? { franja: franjas.find((f) => f.id === disp.franjaId) } : {}),
+        };
+      },
+      async update({ where, data }: any) {
+        const disp = disponibilidades.find((d) => d.id === where.id);
+        if (!disp) throw new Error("Not found");
+        if (data.cuposOcupados?.increment !== undefined) {
+          disp.cuposOcupados += data.cuposOcupados.increment;
+        }
+        if (data.cuposOcupados?.decrement !== undefined) {
+          disp.cuposOcupados -= data.cuposOcupados.decrement;
+        }
+        if (data.cuposTotales !== undefined) disp.cuposTotales = data.cuposTotales;
+        if (disp.cuposOcupados < 0 || disp.cuposOcupados > disp.cuposTotales) {
+          throw new Error("Disponibilidad cupo constraint failed");
+        }
+        return disp;
+      },
+      async findFirst({ where }: any) {
+        return disponibilidades.find(
+          (d) =>
+            d.servicioId === where.servicioId &&
+            d.cuposOcupados > where.cuposOcupados.gt,
+        ) ?? null;
+      },
+      async upsert({ where, create, update }: any) {
         const { servicioId, franjaId, fecha } = where.servicioId_franjaId_fecha;
         const dateStr = fecha.toISOString().split("T")[0];
         let existing = disponibilidades.find(
@@ -297,8 +359,20 @@ export function createMockPrisma() {
             bloqueadaMantenimiento: create.bloqueadaMantenimiento ?? false,
           };
           disponibilidades.push(existing);
+        } else {
+          Object.assign(existing, update);
         }
         return existing;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const disponibilidad of disponibilidades) {
+          if (disponibilidad.servicioId === where.servicioId) {
+            Object.assign(disponibilidad, data);
+            count++;
+          }
+        }
+        return { count };
       },
       async deleteMany({ where }: any) {
         const initial = disponibilidades.length;
@@ -309,6 +383,59 @@ export function createMockPrisma() {
       },
     },
     reserva: {
+      async findMany({ where }: any = {}) {
+        return reservas.filter((reservation) => {
+          if (
+            where?.disponibilidadId !== undefined &&
+            reservation.disponibilidadId !== where.disponibilidadId
+          ) return false;
+          if (where?.estado && reservation.estado !== where.estado) return false;
+          if (
+            where?.expiraEn?.lte &&
+            (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
+          ) return false;
+          return true;
+        });
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const reservation of reservas) {
+          if (where?.id?.in && !where.id.in.includes(reservation.id)) continue;
+          if (
+            where?.disponibilidadId !== undefined &&
+            reservation.disponibilidadId !== where.disponibilidadId
+          ) continue;
+          if (where?.estado && reservation.estado !== where.estado) continue;
+          if (where?.expiraEn?.lte && (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)) {
+            continue;
+          }
+          reservation.estado = data.estado;
+          count++;
+        }
+        return { count };
+      },
+      async create({ data, include }: any) {
+        const reservation = {
+          id: `reservation-${reservaIdSeq++}`,
+          ...data,
+        };
+        reservas.push(reservation);
+        if (include?.disponibilidad) {
+          return {
+            ...reservation,
+            disponibilidad: {
+              ...disponibilidades.find((d) => d.id === data.disponibilidadId),
+              servicio: servicios.find(
+                (s) => s.id === disponibilidades.find((d) => d.id === data.disponibilidadId)?.servicioId,
+              ),
+              franja: franjas.find(
+                (f) => f.id === disponibilidades.find((d) => d.id === data.disponibilidadId)?.franjaId,
+              ),
+            },
+          };
+        }
+        return reservation;
+      },
       async count({ where }: any) {
         let list = [...reservas];
         if (where?.disponibilidad?.servicioId) {
