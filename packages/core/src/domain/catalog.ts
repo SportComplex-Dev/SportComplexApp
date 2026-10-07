@@ -371,3 +371,9 @@ export const defaultSchedules: Record<string, {
   },
 };
 
+export const sedes = ['Poblado', 'Laureles'] as const;
+
+export function makeId(name: string): string {
+  const base = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${base || 'item'}-${Math.random().toString(36).slice(2, 7)}`;
+}

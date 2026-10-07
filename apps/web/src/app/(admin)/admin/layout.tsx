@@ -1,104 +1,144 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowLeft,
-  Calendar,
-  Layers,
-  LayoutDashboard,
+  Activity,
+  ArrowRight,
+  BadgeCheck,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Home,
   Moon,
-  ShieldAlert,
+  Search,
+  ShieldCheck,
   Sun,
+  Ticket,
   Users,
+  type LucideIcon,
 } from 'lucide-react'
+import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
+import { UserMenu } from '@/components/user-menu'
+import { useApp } from '@/components/app-provider'
+import { useBookings } from '@/lib/stores'
+import { useToday } from '@/lib/persistent-state'
+import { ToastMessage } from '@/components/toast-message'
 
-const adminNav = [
-  { name: 'Catálogo & Aforos', href: '/admin/services', icon: Layers },
-  { name: 'Panel Gerencial', href: '/admin/dashboard', icon: LayoutDashboard },
-  { name: 'Empleados & Roles', href: '/admin/employees', icon: Users },
-  { name: 'Contingencias', href: '/admin/incident', icon: ShieldAlert },
+const navigation: { name: string; icon: LucideIcon; href: string }[] = [
+  { name: 'Resumen', icon: Home, href: '/admin' },
+  { name: 'Catálogo', icon: Ticket, href: '/admin/catalog' },
+  { name: 'Empleados', icon: Users, href: '/admin/employees' },
+  { name: 'Reservas', icon: CalendarDays, href: '/admin/bookings' },
+  { name: 'Membresías', icon: BadgeCheck, href: '/admin/memberships' },
+  { name: 'Configuración', icon: Activity, href: '/admin/settings' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [dark, setDark] = useState(false)
+  const { session, notify, toast, closeToast, dark, setDark } = useApp()
+  const [bookings] = useBookings()
+  const today = useToday()
 
-  useEffect(() => {
-    const isDark =
-      document.documentElement.classList.contains('dark') ||
-      localStorage.getItem('akros_theme') === 'dark'
-    setDark(isDark)
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    if (next) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('akros_theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('akros_theme', 'light')
-    }
-  }
+  const active =
+    navigation.find((item) => pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href)))
+      ?.name ?? 'Catálogo'
+  const pending = bookings.filter((booking) => booking.status === 'Pendiente').length
+  const initials = session?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'AD'
 
   return (
-    <div className="club-app min-h-screen flex flex-col bg-[var(--surface)] text-app">
-      {/* TopBar Administrativo */}
-      <header className="topbar sticky top-0 z-50 backdrop-blur-md border-b border-[var(--line)]">
-        <div className="topbar-inner">
-          <div className="flex items-center gap-3">
-            <Link href="/" aria-label="Ir al inicio de AKROS">
-              <Brand />
-            </Link>
-            <Badge variant="outline" className="border-brand-accent text-brand-accent font-bold text-[10px]">
-              ADMIN CONSOLE
-            </Badge>
+    <main className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-brand">
+          <Link href="/admin" aria-label="Ir al resumen">
+            <Brand />
+          </Link>
+          <Badge variant="admin">ADMIN</Badge>
+        </div>
+        <div className="admin-workspace">
+          <span>ESPACIO DE TRABAJO</span>
+          <button type="button" onClick={() => notify('Altura Club · Medellín, Colombia')}>
+            <span className="workspace-icon">A</span>
+            <span>
+              Altura Club<small>Medellín, Colombia</small>
+            </span>
+            <ChevronDown size={14} />
+          </button>
+        </div>
+        <nav className="admin-nav" aria-label="Menú de administración">
+          <span className="admin-nav-label">GESTIÓN</span>
+          {navigation.map(({ name, icon: Icon, href }) => {
+            const isCurrent =
+              pathname === href || (href === '/admin/catalog' && pathname === '/admin/services')
+            return (
+              <Link key={href} href={href} className={isCurrent ? 'admin-nav-active' : ''}>
+                <Icon size={17} />
+                {name}
+                {name === 'Reservas' && pending > 0 && <i>{pending}</i>}
+              </Link>
+            )
+          })}
+        </nav>
+        <div className="admin-sidebar-bottom">
+          <div className="admin-help">
+            <span className="admin-help-icon">
+              <ShieldCheck size={17} />
+            </span>
+            <b>¿Necesitas ayuda?</b>
+            <small>Consulta nuestro centro de soporte.</small>
+            <button type="button" onClick={() => notify('El centro de soporte estará disponible pronto.')}>
+              Ir al soporte <ArrowRight size={13} />
+            </button>
           </div>
+          <UserMenu variant="sidebar" />
+        </div>
+      </aside>
 
-          <nav className="hidden md:flex items-center gap-6" aria-label="Navegación administrativa">
-            {adminNav.map(({ name, href, icon: Icon }) => {
-              const isActive = pathname === href || pathname.startsWith(`${href}/`)
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`nav-link flex items-center gap-1.5 text-xs font-semibold ${
-                    isActive ? 'nav-active text-brand-accent' : 'text-subtle'
-                  }`}
-                >
-                  <Icon size={14} />
-                  <span>{name}</span>
-                </Link>
-              )
-            })}
-          </nav>
-
-          <div className="flex items-center gap-3">
+      <section className="admin-main">
+        <header className="admin-topbar">
+          <div className="admin-crumb">
+            <span>Altura Club</span>
+            <ChevronRight size={14} />
+            <b>{active}</b>
+          </div>
+          <div className="admin-top-actions">
+            <span className="admin-today">
+              <CalendarDays size={14} />{' '}
+              {today ? formatDate(today, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+            </span>
             <button
               type="button"
-              className="theme-toggle"
+              className="admin-icon-button"
               aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              onClick={toggleTheme}
+              onClick={() => setDark(!dark)}
             >
-              {dark ? <Sun size={16} /> : <Moon size={16} />}
+              {dark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-            <Link href="/" className="text-xs text-link flex items-center gap-1 font-semibold">
-              <ArrowLeft size={13} /> Salir a la Web
-            </Link>
+            <button
+              type="button"
+              className="admin-icon-button"
+              aria-label="Buscar"
+              onClick={() => notify('La búsqueda estará disponible pronto.')}
+            >
+              <Search size={17} />
+            </button>
+            <button
+              type="button"
+              className="admin-icon-button notification-button"
+              aria-label="Notificaciones"
+              onClick={() => notify('No tienes notificaciones nuevas')}
+            >
+              <Activity size={17} />
+              <i />
+            </button>
+            <span className="admin-avatar">{initials}</span>
           </div>
-        </div>
-      </header>
-
-      {/* Contenido Principal */}
-      <main className="flex-1">{children}</main>
-    </div>
+        </header>
+        <div className="admin-content">{children}</div>
+      </section>
+      <ToastMessage message={toast.message} kind={toast.kind} close={closeToast} />
+    </main>
   )
 }
