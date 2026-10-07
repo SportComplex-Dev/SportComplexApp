@@ -32,7 +32,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 
     // 1. Validación en cliente con los contratos Zod de @sportcomplex/validation
     const parsed = register
-      ? registerSchema.safeParse({ name, email, password })
+      ? registerSchema.safeParse({ nombre: name, email, password })
       : loginSchema.safeParse({ email, password })
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Por favor verifica los datos ingresados.')
@@ -138,7 +138,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder={register ? 'Mínimo 8 caracteres' : 'Mínimo 6 caracteres'}
                   autoComplete={register ? 'new-password' : 'current-password'}
                   required
                 />
