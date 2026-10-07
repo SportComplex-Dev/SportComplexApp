@@ -47,8 +47,8 @@ export async function GET(request: Request) {
 
     return ok({ services, categories });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al consultar servicios";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error en GET /api/admin/services:", error);
+    return fail("SERVER_ERROR", "Error al consultar servicios", 500);
   }
 }
 
@@ -90,15 +90,30 @@ export async function POST(request: Request) {
         const categoria = await createCategoria(parsed.data);
         return created(categoria);
       } catch (err: unknown) {
-        const error = err as { name?: string; code?: string; message?: string };
-        if (error.name === "DuplicateError" || error.code === "P2002") {
+        const error = err as {
+          name?: string;
+          code?: string;
+          message?: string;
+          meta?: { target?: string[] | string };
+        };
+        const isDuplicateCategory =
+          error.name === "DuplicateError" ||
+          (error.code === "P2002" &&
+            (Array.isArray(error.meta?.target)
+              ? error.meta.target.includes("nombre")
+              : typeof error.meta?.target === "string" &&
+                (error.meta.target.includes("nombre") ||
+                  error.meta.target.includes("categoria_servicio_nombre_key"))));
+
+        if (isDuplicateCategory) {
           return fail(
             "DUPLICATE_CATEGORY",
-            error.message || "Ya existe una categoría con este nombre",
+            `Ya existe una categoría con el nombre "${parsed.data.nombre}".`,
             409,
           );
         }
-        throw err;
+        console.error("Error al crear categoría:", err);
+        return fail("SERVER_ERROR", "Error al procesar la categoría", 500);
       }
     }
 
@@ -119,21 +134,40 @@ export async function POST(request: Request) {
       const servicio = await createServicio(parsed.data);
       return created(servicio);
     } catch (err: unknown) {
-      const error = err as { name?: string; code?: string; message?: string };
-      if (error.name === "DuplicateNameError" || error.code === "P2002") {
+      const error = err as {
+        name?: string;
+        code?: string;
+        message?: string;
+        meta?: { target?: string[] | string };
+      };
+
+      // Solo el duplicado REAL de nombre de servicio debe ser 409
+      const isDuplicateServiceName =
+        error.name === "DuplicateNameError" ||
+        (error.code === "P2002" &&
+          (Array.isArray(error.meta?.target)
+            ? error.meta.target.includes("nombre")
+            : typeof error.meta?.target === "string" &&
+              (error.meta.target.includes("nombre") ||
+                error.meta.target.includes("servicio_nombre_key"))));
+
+      if (isDuplicateServiceName) {
         return fail(
           "DUPLICATE_INSTANCE_NAME",
-          error.message || `Ya existe un servicio con el nombre "${parsed.data.nombre}" en el complejo.`,
+          `Ya existe un servicio con el nombre "${parsed.data.nombre}" en el complejo.`,
           409,
         );
       }
+
       if (error.name === "NotFoundError") {
         return fail("CATEGORY_NOT_FOUND", error.message || "Categoría no encontrada", 404);
       }
-      throw err;
+
+      console.error("Error de base de datos al crear servicio:", err);
+      return fail("SERVER_ERROR", "Error al procesar el servicio", 500);
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al procesar la solicitud";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error en POST /api/admin/services:", error);
+    return fail("SERVER_ERROR", "Error al procesar la solicitud", 500);
   }
 }

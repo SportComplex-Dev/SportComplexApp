@@ -32,8 +32,8 @@ export async function GET(request: Request, context: RouteContext) {
 
     return ok(servicio);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al obtener el servicio";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error al obtener el servicio:", error);
+    return fail("SERVER_ERROR", "Error al obtener el servicio", 500);
   }
 }
 
@@ -70,18 +70,39 @@ async function handleUpdate(request: Request, context: RouteContext) {
       const updated = await updateServicio(numId, parsed.data);
       return ok(updated);
     } catch (err: unknown) {
-      const error = err as { name?: string; code?: string; message?: string };
+      const error = err as {
+        name?: string;
+        code?: string;
+        message?: string;
+        meta?: { target?: string[] | string };
+      };
       if (error.name === "NotFoundError") {
         return fail("NOT_FOUND", error.message || "Servicio no encontrado", 404);
       }
-      if (error.name === "DuplicateNameError" || error.code === "P2002") {
-        return fail("DUPLICATE_NAME", error.message || "Ya existe otro servicio con ese nombre", 409);
+      const isDuplicateName =
+        error.name === "DuplicateNameError" ||
+        (error.code === "P2002" &&
+          (Array.isArray(error.meta?.target)
+            ? error.meta.target.includes("nombre")
+            : typeof error.meta?.target === "string" &&
+              (error.meta.target.includes("nombre") ||
+                error.meta.target.includes("servicio_nombre_key"))));
+
+      if (isDuplicateName) {
+        return fail(
+          "DUPLICATE_NAME",
+          parsed.data.nombre
+            ? `Ya existe otro servicio con el nombre "${parsed.data.nombre}" en el complejo.`
+            : "Ya existe otro servicio con ese nombre",
+          409,
+        );
       }
-      throw err;
+      console.error("Error al actualizar el servicio:", err);
+      return fail("SERVER_ERROR", "Error al actualizar el servicio", 500);
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al actualizar el servicio";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error al actualizar el servicio:", error);
+    return fail("SERVER_ERROR", "Error al actualizar el servicio", 500);
   }
 }
 
@@ -136,7 +157,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       throw err;
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al eliminar el servicio";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error al eliminar el servicio:", error);
+    return fail("SERVER_ERROR", "Error al eliminar el servicio", 500);
   }
 }

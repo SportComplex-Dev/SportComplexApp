@@ -200,3 +200,61 @@ test("API: CRUD Actualización y eliminación segura con respeto de reservas", a
   const resDelC2 = await serviceDetailRoute.DELETE(reqDelC2, { params: Promise.resolve({ id: "2" }) });
   assert.equal(resDelC2.status, 200);
 });
+
+test("API: Manejo seguro de errores — solo duplicado real de nombre es 409, otros errores son 500 sin exponer rutas internas", async () => {
+  // 1. Duplicado real de nombre devuelve 409 con mensaje limpio sin rutas locales
+  const reqDup = new Request("http://localhost:3000/api/admin/services", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      nombre: "Cancha 1",
+      categoriaId: 1,
+      capacidadMaxima: 10,
+      tarifa: 75000,
+      modalidad: "EXCLUSIVA",
+    }),
+  });
+  const resDup = await servicesRoute.POST(reqDup);
+  assert.equal(resDup.status, 409);
+  const jsonDup = await resDup.json();
+  assert.equal(jsonDup.error.code, "DUPLICATE_INSTANCE_NAME");
+  assert.ok(!jsonDup.error.message.includes("\\"), "No debe exponer rutas locales de Windows");
+  assert.ok(!jsonDup.error.message.includes("/"), "No debe exponer rutas de archivo");
+  assert.ok(!jsonDup.error.message.includes("schema.prisma"), "No debe exponer schema");
+
+  // 2. Otro error de BD (simulando error interno o P2002 en otra tabla/columna) debe ser 500 con mensaje genérico
+  const origCreate = mock.servicio.create;
+  mock.servicio.create = async () => {
+    const dbErr = Object.assign(
+      new Error(
+        "Unique constraint failed on the fields: (`id`) at C:\\Users\\josed\\SportComplex\\schema.prisma:197",
+      ),
+      { code: "P2002", meta: { target: ["id"] } },
+    );
+    throw dbErr;
+  };
+
+  try {
+    const reqDbErr = new Request("http://localhost:3000/api/admin/services", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: "Cancha Error DB Test",
+        categoriaId: 1,
+        capacidadMaxima: 10,
+        tarifa: 75000,
+        modalidad: "EXCLUSIVA",
+      }),
+    });
+    const resDbErr = await servicesRoute.POST(reqDbErr);
+    assert.equal(resDbErr.status, 500, "Cualquier otro error de BD debe ser 500, no 409");
+    const jsonDbErr = await resDbErr.json();
+    assert.equal(jsonDbErr.error.code, "SERVER_ERROR");
+    assert.equal(jsonDbErr.error.message, "Error al procesar el servicio");
+    assert.ok(!jsonDbErr.error.message.includes("C:\\"), "No debe exponer rutas internas");
+    assert.ok(!jsonDbErr.error.message.includes("schema.prisma"), "No debe exponer detalles internos");
+  } finally {
+    mock.servicio.create = origCreate;
+  }
+});
+

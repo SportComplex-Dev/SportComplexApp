@@ -53,13 +53,41 @@ export function createMockPrisma() {
   let franjaIdSeq = 1;
   let dispIdSeq = 1n;
 
-  return {
+  const mock: any = {
     _state: {
       categorias,
       servicios,
       franjas,
       disponibilidades,
       reservas,
+    },
+    $transaction: async (arg: any) => {
+      if (typeof arg === "function") {
+        const snapCategorias = [...categorias];
+        const snapServicios = [...servicios];
+        const snapFranjas = [...franjas];
+        const snapDisponibilidades = [...disponibilidades];
+        const snapReservas = [...reservas];
+        try {
+          return await arg(mock);
+        } catch (err) {
+          categorias.length = 0;
+          categorias.push(...snapCategorias);
+          servicios.length = 0;
+          servicios.push(...snapServicios);
+          franjas.length = 0;
+          franjas.push(...snapFranjas);
+          disponibilidades.length = 0;
+          disponibilidades.push(...snapDisponibilidades);
+          reservas.length = 0;
+          reservas.push(...snapReservas);
+          throw err;
+        }
+      }
+      if (Array.isArray(arg)) {
+        return Promise.all(arg);
+      }
+      return arg;
     },
     categoriaServicio: {
       async findUnique({ where }: any) {
@@ -295,4 +323,5 @@ export function createMockPrisma() {
       },
     },
   };
+  return mock;
 }

@@ -146,3 +146,42 @@ test("Constraints: Protección de reservas existentes contra borrado accidental"
   const deletedCancha2 = await deleteServicio(2, false);
   assert.equal(deletedCancha2.nombre, "Cancha 2");
 });
+
+test("Atomicidad: Si falla la generación de disponibilidades, el servicio y franjas se revierten (rollback)", async () => {
+  // Guardar cantidad inicial de servicios y franjas
+  const servsBefore = (await getServicios()).length;
+  const franjasBefore = mock._state.franjas.length;
+
+  // Provocar fallo en disponibilidad.upsert
+  const origUpsert = mock.disponibilidad.upsert;
+  mock.disponibilidad.upsert = async () => {
+    throw new Error("Simulated database failure during disponibilidad generation");
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await createServicio({
+          nombre: "Cancha Fallida Rollback",
+          categoriaId: 1,
+          capacidadMaxima: 10,
+          tarifa: 50000,
+          modalidad: "EXCLUSIVA",
+          franjasHorarias: [
+            { diaSemana: 1, horaInicio: "10:00", horaFin: "11:00" },
+          ],
+        });
+      },
+      (err: any) => err.message.includes("Simulated database failure"),
+    );
+
+    // Verificar que NO quedó servicio ni franjas huérfanas
+    const servsAfter = (await getServicios()).length;
+    const franjasAfter = mock._state.franjas.length;
+    assert.equal(servsAfter, servsBefore, "No deben quedar servicios huérfanos tras rollback");
+    assert.equal(franjasAfter, franjasBefore, "No deben quedar franjas huérfanas tras rollback");
+  } finally {
+    mock.disponibilidad.upsert = origUpsert;
+  }
+});
+

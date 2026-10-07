@@ -11,8 +11,8 @@ export async function GET() {
     const categories = await getCategorias();
     return ok(categories);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al consultar categorías";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error en GET /api/admin/services/categories:", error);
+    return fail("SERVER_ERROR", "Error al consultar categorías", 500);
   }
 }
 
@@ -38,18 +38,33 @@ export async function POST(request: Request) {
       const categoria = await createCategoria(parsed.data);
       return created(categoria);
     } catch (err: unknown) {
-      const error = err as { name?: string; code?: string; message?: string };
-      if (error.name === "DuplicateError" || error.code === "P2002") {
+      const error = err as {
+        name?: string;
+        code?: string;
+        message?: string;
+        meta?: { target?: string[] | string };
+      };
+      const isDuplicate =
+        error.name === "DuplicateError" ||
+        (error.code === "P2002" &&
+          (Array.isArray(error.meta?.target)
+            ? error.meta.target.includes("nombre")
+            : typeof error.meta?.target === "string" &&
+              (error.meta.target.includes("nombre") ||
+                error.meta.target.includes("categoria_servicio_nombre_key"))));
+
+      if (isDuplicate) {
         return fail(
           "DUPLICATE_CATEGORY",
-          error.message || "Ya existe una categoría con este nombre",
+          `Ya existe una categoría con el nombre "${parsed.data.nombre}".`,
           409,
         );
       }
-      throw err;
+      console.error("Error al crear categoría:", err);
+      return fail("SERVER_ERROR", "Error al crear la categoría", 500);
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error al crear la categoría";
-    return fail("SERVER_ERROR", message, 500);
+    console.error("Error en POST /api/admin/services/categories:", error);
+    return fail("SERVER_ERROR", "Error al crear la categoría", 500);
   }
 }

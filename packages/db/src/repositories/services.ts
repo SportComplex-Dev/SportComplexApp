@@ -191,8 +191,10 @@ export async function deleteCategoria(id: number) {
 export async function generateDisponibilidadesForServicio(
   servicioId: number,
   windowDays = 15,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any = prisma,
 ) {
-  const servicio = await prisma.servicio.findUnique({
+  const servicio = await db.servicio.findUnique({
     where: { id: servicioId },
     include: { franjasHorarias: true },
   });
@@ -215,11 +217,11 @@ export async function generateDisponibilidadesForServicio(
     const diaSemana = targetDate.getDay() === 0 ? 7 : targetDate.getDay();
 
     const franjasDelDia = servicio.franjasHorarias.filter(
-      (f) => f.diaSemana === diaSemana,
+      (f: { diaSemana: number }) => f.diaSemana === diaSemana,
     );
 
     for (const franja of franjasDelDia) {
-      await prisma.disponibilidad.upsert({
+      await db.disponibilidad.upsert({
         where: {
           servicioId_franjaId_fecha: {
             servicioId: servicio.id,
@@ -243,71 +245,73 @@ export async function generateDisponibilidadesForServicio(
 
 /**
  * Da de alta un nuevo servicio verificando la unicidad de su nombre en el complejo deportivo
- * y aprovisionando su calendario autónomo.
+ * y aprovisionando su calendario autónomo de manera atómica (RF-03, TSK-BE-04).
  */
 export async function createServicio(data: CreateServicioData) {
   const trimmedName = data.nombre.trim();
 
-  // Validación de unicidad de nombre de instancia por complejo (RF-03, TSK-BE-04)
-  const existing = await prisma.servicio.findUnique({
-    where: { nombre: trimmedName },
+  return prisma.$transaction(async (tx) => {
+    // Validación de unicidad de nombre de instancia por complejo (RF-03, TSK-BE-04)
+    const existing = await tx.servicio.findUnique({
+      where: { nombre: trimmedName },
+    });
+
+    if (existing) {
+      const error = new Error(
+        `Ya existe un servicio con el nombre "${trimmedName}" en el complejo.`,
+      );
+      error.name = "DuplicateNameError";
+      throw error;
+    }
+
+    // Verificar que la categoría exista
+    const categoria = await tx.categoriaServicio.findUnique({
+      where: { id: data.categoriaId },
+    });
+
+    if (!categoria) {
+      const error = new Error(
+        `La categoría con id ${data.categoriaId} no existe.`,
+      );
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    const franjas = data.franjasHorarias ?? [];
+
+    const nuevoServicio = await tx.servicio.create({
+      data: {
+        nombre: trimmedName,
+        categoriaId: data.categoriaId,
+        capacidadMaxima: data.capacidadMaxima,
+        tarifa: data.tarifa,
+        modalidad: data.modalidad,
+        tipoPiscina: data.tipoPiscina ?? null,
+        estado: data.estado ?? "ACTIVO",
+        franjasHorarias:
+          franjas.length > 0
+            ? {
+                create: franjas.map((f) => ({
+                  diaSemana: f.diaSemana,
+                  horaInicio: parseTimeToDate(f.horaInicio),
+                  horaFin: parseTimeToDate(f.horaFin),
+                })),
+              }
+            : undefined,
+      },
+      include: {
+        categoria: true,
+        franjasHorarias: true,
+      },
+    });
+
+    // Generar disponibilidad inicial para su calendario propio de forma atómica
+    if (franjas.length > 0) {
+      await generateDisponibilidadesForServicio(nuevoServicio.id, 15, tx);
+    }
+
+    return nuevoServicio;
   });
-
-  if (existing) {
-    const error = new Error(
-      `Ya existe un servicio con el nombre "${trimmedName}" en el complejo.`,
-    );
-    error.name = "DuplicateNameError";
-    throw error;
-  }
-
-  // Verificar que la categoría exista
-  const categoria = await prisma.categoriaServicio.findUnique({
-    where: { id: data.categoriaId },
-  });
-
-  if (!categoria) {
-    const error = new Error(
-      `La categoría con id ${data.categoriaId} no existe.`,
-    );
-    error.name = "NotFoundError";
-    throw error;
-  }
-
-  const franjas = data.franjasHorarias ?? [];
-
-  const nuevoServicio = await prisma.servicio.create({
-    data: {
-      nombre: trimmedName,
-      categoriaId: data.categoriaId,
-      capacidadMaxima: data.capacidadMaxima,
-      tarifa: data.tarifa,
-      modalidad: data.modalidad,
-      tipoPiscina: data.tipoPiscina ?? null,
-      estado: data.estado ?? "ACTIVO",
-      franjasHorarias:
-        franjas.length > 0
-          ? {
-              create: franjas.map((f) => ({
-                diaSemana: f.diaSemana,
-                horaInicio: parseTimeToDate(f.horaInicio),
-                horaFin: parseTimeToDate(f.horaFin),
-              })),
-            }
-          : undefined,
-    },
-    include: {
-      categoria: true,
-      franjasHorarias: true,
-    },
-  });
-
-  // Generar disponibilidad inicial para su calendario propio
-  if (franjas.length > 0) {
-    await generateDisponibilidadesForServicio(nuevoServicio.id);
-  }
-
-  return nuevoServicio;
 }
 
 export async function getServicios(options?: ServiceFilterOptions) {
