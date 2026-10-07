@@ -67,7 +67,7 @@ export function TopBar() {
           </button>
           <span className="topbar-action-divider" aria-hidden="true" />
           <Link href="/login" className="action-button nav-access">
-            Acceso al complejo <ArrowRight size={15} />
+            Accede al club <ArrowRight size={15} />
           </Link>
           <button
             type="button"
@@ -89,12 +89,8 @@ export function TopBar() {
               <ArrowRight size={15} />
             </Link>
           ))}
-          <Link href="/login" onClick={close}>
-            Iniciar sesión
-            <ArrowRight size={15} />
-          </Link>
-          <Link href="/register" onClick={close}>
-            Crear cuenta de socio
+          <Link href="/login" onClick={close} className="font-semibold">
+            Accede al club
             <ArrowRight size={15} />
           </Link>
           <button

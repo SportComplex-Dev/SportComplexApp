@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { Clock, MapPin, MessageCircle, Phone, ShieldCheck } from 'lucide-react'
 
@@ -45,12 +46,13 @@ export function InstitutionalFooter() {
         <div className="footer-main-grid">
           <div className="footer-brand-col">
             <div className="footer-brand-lockup">
-              <img
+              <Image
                 src="/images/Akros-logo.png"
                 alt="AKROS Active Lifestyle Club"
                 width={36}
                 height={30}
                 className="footer-brand-logo"
+                style={{ width: 'auto', height: 'auto' }}
               />
               <div>
                 <b className="footer-brand-title">AKROS</b>

@@ -1,9 +1,9 @@
-'use client';
-
-// RF-00 Landing institucional. LCP < 1.5s, sin CPU por petición.
+// RF-00 Landing institucional estática (SSG) conforme a ARCHITECTURE §4. LCP < 1.5s.
+export const dynamic = 'force-static';
 
 import Link from "next/link";
-import { ArrowRight, MapPin, Sparkles, Star } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, MapPin, Star } from "lucide-react";
 import { formatMoney, minPrice, serviceCategories, initialCatalog } from "@sportcomplex/core";
 import { categoryIcons } from "@/components/category-icons";
 import { IconBox } from "@/components/icon-box";
@@ -14,6 +14,7 @@ import { MembershipsSection } from "@/components/home/memberships-section";
 import { ClubEvents } from "@/components/home/club-events";
 import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital-pass";
 import { TestimonialsSection } from "@/components/home/testimonials-section";
+import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 
 export default function HomePage() {
@@ -45,6 +46,9 @@ export default function HomePage() {
             </Link>
             <Link href="/portal/book" className="hero-secondary">
               Explorar servicios
+            </Link>
+            <Link href="/register" className="hero-secondary">
+              Hazte socio
             </Link>
           </div>
           <div className="hero-proof">
@@ -99,21 +103,35 @@ export default function HomePage() {
         </div>
 
         <div className="category-grid">
-          {serviceCategories.map(({ slug, name, description, icon, tone }, index) => {
+          {serviceCategories.map(({ slug, name, description, icon, tone, image }, index) => {
             const from = minPrice(initialCatalog, slug);
             return (
               <Link className="category-card" key={slug} href="/portal/book">
-                <div className="category-top">
-                  <IconBox icon={categoryIcons[icon]} tone={tone} />
-                  <span className="category-index">0{index + 1}</span>
+                <div className="category-media">
+                  {image && (
+                    <Image
+                      src={image}
+                      alt={name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      className="category-img"
+                    />
+                  )}
+                  <div className="category-media-overlay" />
+                  <div className="category-badge-floating">
+                    <IconBox icon={categoryIcons[icon]} tone={tone} />
+                  </div>
+                  <span className="category-index-badge">0{index + 1}</span>
                 </div>
-                <h3>{name}</h3>
-                <p>{description}</p>
-                <div className="category-bottom">
-                  <span>{from ? `Desde ${formatMoney(from)}` : "Próximamente"}</span>
-                  <span className="round-arrow">
-                    <ArrowRight size={15} className="-rotate-45" />
-                  </span>
+                <div className="category-body">
+                  <h3>{name}</h3>
+                  <p>{description}</p>
+                  <div className="category-bottom">
+                    <span>{from ? `Desde ${formatMoney(from)}` : "Próximamente"}</span>
+                    <span className="round-arrow">
+                      <ArrowRight size={15} className="-rotate-45" />
+                    </span>
+                  </div>
                 </div>
               </Link>
             );
@@ -157,19 +175,10 @@ export default function HomePage() {
       {/* Sección 9: Testimonios de Atletas & Socios */}
       <TestimonialsSection />
 
-      {/* CTA Final */}
-      <section className="cta-strip">
-        <div className="cta-spark">
-          <Sparkles size={20} />
-        </div>
-        <div>
-          <h3>El siguiente partido empieza contigo.</h3>
-          <p>Reserva hoy. Tu espacio te está esperando con modelo 100% cashless.</p>
-        </div>
-        <Link href="/portal/book" className="action-button">
-          Reservar ahora <ArrowRight size={16} />
-        </Link>
-      </section>
+      {/* Sección 10: Preguntas Frecuentes y Políticas */}
+      <FaqSection />
+
+      
 
       {/* Footer Institucional Completo */}
       <InstitutionalFooter />

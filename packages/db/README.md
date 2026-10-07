@@ -174,3 +174,12 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
    ```
    El mismo string del pooler sirve para integraciones externas (ej. n8n).
 4. **Seguridad:** `.env` contiene secretos — nunca lo subas al repo. Si una contraseña queda expuesta (chat, logs, commits), **rótala** en Supabase Dashboard → Database → Password y actualiza el `.env`.
+
+---
+
+### 8. Reserva transaccional TSK-BD-07 (Overbooking = 0)
+
+- **Qué:** `src/repositories/availability.ts` expone `reserveDisponibilidad()` — reserva atómica con `SELECT ... FOR UPDATE`, ventana `[hoy, hoy+15]` en `America/Bogota` y `reserva` en `PENDIENTE_PAGO` (`expira_en = now + 15 min`).
+- **Backend:** llamar siempre a `reserveDisponibilidad()` desde la API route; mapear con `isAvailabilityError(err) → err.httpStatus` (`404` not found, `409` sin cupo/bloqueada, `422` fuera de ventana, `400` cantidad inválida).
+- **Frontend:** ante `409` mostrar "cupo agotado" y refrescar slots (no reintentar a ciegas); ante `422` "fuera de ventana 15 días"; con `201` iniciar checkout con countdown de `expiraEn`.
+- **Regla de oro:** ningún código que ocupe cupos (`cupos_ocupados`) puede bypasear este repo. Detalle, ejemplos y auditoría: `src/repositories/README.md`.
