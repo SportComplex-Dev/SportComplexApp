@@ -63,6 +63,21 @@ export function parseTimeToDate(timeStr: string): Date {
   return new Date(Date.UTC(1970, 0, 1, hours, minutes, seconds));
 }
 
+function getCuposTotales(servicio: {
+  modalidad: string;
+  capacidadMaxima: number;
+}): number {
+  return servicio.modalidad === "EXCLUSIVA" ? 1 : servicio.capacidadMaxima;
+}
+
+function assertValidCapacity(capacidadMaxima: number): void {
+  if (!Number.isInteger(capacidadMaxima) || capacidadMaxima <= 0) {
+    const error = new Error("La capacidad máxima debe ser un entero mayor a 0.");
+    error.name = "ValidationError";
+    throw error;
+  }
+}
+
 /**
  * Convierte un objeto Date devuelto por Prisma para un campo @db.Time a cadena "HH:mm".
  */
@@ -203,11 +218,28 @@ export async function generateDisponibilidadesForServicio(
     return;
   }
 
+  assertValidCapacity(servicio.capacidadMaxima);
+  if (!Number.isInteger(windowDays) || windowDays < 0) {
+    throw new RangeError("La ventana de disponibilidad debe ser un entero no negativo.");
+  }
+
+  const cuposTotales = getCuposTotales(servicio);
+  const disponibilidadSobreAforo = await db.disponibilidad.findFirst({
+    where: {
+      servicioId,
+      cuposOcupados: { gt: cuposTotales },
+    },
+  });
+  if (disponibilidadSobreAforo) {
+    const error = new Error(
+      "La capacidad no puede ser menor que los cupos ya ocupados en una franja.",
+    );
+    error.name = "CapacityConflictError";
+    throw error;
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  const cuposTotales =
-    servicio.modalidad === "EXCLUSIVA" ? 1 : servicio.capacidadMaxima;
 
   for (let offset = 0; offset <= windowDays; offset++) {
     const targetDate = new Date(today);
@@ -229,7 +261,7 @@ export async function generateDisponibilidadesForServicio(
             fecha: targetDate,
           },
         },
-        update: {},
+        update: { cuposTotales },
         create: {
           servicioId: servicio.id,
           franjaId: franja.id,
@@ -248,6 +280,7 @@ export async function generateDisponibilidadesForServicio(
  * y aprovisionando su calendario autónomo de manera atómica (RF-03, TSK-BE-04).
  */
 export async function createServicio(data: CreateServicioData) {
+  assertValidCapacity(data.capacidadMaxima);
   const trimmedName = data.nombre.trim();
 
   return prisma.$transaction(async (tx) => {
@@ -361,76 +394,106 @@ export async function getServicioByNombre(nombre: string) {
 }
 
 export async function updateServicio(id: number, data: UpdateServicioData) {
-  const current = await prisma.servicio.findUnique({ where: { id } });
-  if (!current) {
-    const error = new Error("Servicio no encontrado");
-    error.name = "NotFoundError";
-    throw error;
+  if (data.capacidadMaxima !== undefined) {
+    assertValidCapacity(data.capacidadMaxima);
   }
 
-  if (data.nombre) {
-    const trimmedName = data.nombre.trim();
-    const existing = await prisma.servicio.findUnique({
-      where: { nombre: trimmedName },
-    });
-    if (existing && existing.id !== id) {
-      const error = new Error(
-        `Ya existe otro servicio con el nombre "${trimmedName}" en el complejo.`,
-      );
-      error.name = "DuplicateNameError";
-      throw error;
-    }
-  }
-
-  if (data.categoriaId) {
-    const categoria = await prisma.categoriaServicio.findUnique({
-      where: { id: data.categoriaId },
-    });
-    if (!categoria) {
-      const error = new Error("La categoría indicada no existe");
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.servicio.findUnique({ where: { id } });
+    if (!current) {
+      const error = new Error("Servicio no encontrado");
       error.name = "NotFoundError";
       throw error;
     }
-  }
 
-  // Si se modifican las franjas horarias, actualizarlas
-  if (data.franjasHorarias !== undefined) {
-    await prisma.disponibilidad.deleteMany({
-      where: {
-        servicioId: id,
-        reservas: { none: {} }, // Proteger disponibilidades con reservas asociadas
+    if (data.nombre) {
+      const trimmedName = data.nombre.trim();
+      const existing = await tx.servicio.findUnique({
+        where: { nombre: trimmedName },
+      });
+      if (existing && existing.id !== id) {
+        const error = new Error(
+          `Ya existe otro servicio con el nombre "${trimmedName}" en el complejo.`,
+        );
+        error.name = "DuplicateNameError";
+        throw error;
+      }
+    }
+
+    if (data.categoriaId) {
+      const categoria = await tx.categoriaServicio.findUnique({
+        where: { id: data.categoriaId },
+      });
+      if (!categoria) {
+        const error = new Error("La categoría indicada no existe");
+        error.name = "NotFoundError";
+        throw error;
+      }
+    }
+
+    const modalidad = data.modalidad ?? current.modalidad;
+    const capacidadMaxima = data.capacidadMaxima ?? current.capacidadMaxima;
+    const cuposTotales = getCuposTotales({ modalidad, capacidadMaxima });
+    if (data.capacidadMaxima !== undefined || data.modalidad !== undefined) {
+      const disponibilidadSobreAforo = await tx.disponibilidad.findFirst({
+        where: { servicioId: id, cuposOcupados: { gt: cuposTotales } },
+      });
+      if (disponibilidadSobreAforo) {
+        const error = new Error(
+          "La capacidad no puede ser menor que los cupos ya ocupados en una franja.",
+        );
+        error.name = "CapacityConflictError";
+        throw error;
+      }
+    }
+
+    await tx.servicio.update({
+      where: { id },
+      data: {
+        ...(data.nombre ? { nombre: data.nombre.trim() } : {}),
+        ...(data.categoriaId ? { categoriaId: data.categoriaId } : {}),
+        ...(data.capacidadMaxima !== undefined ? { capacidadMaxima: data.capacidadMaxima } : {}),
+        ...(data.tarifa !== undefined ? { tarifa: data.tarifa } : {}),
+        ...(data.modalidad ? { modalidad: data.modalidad } : {}),
+        ...(data.tipoPiscina !== undefined ? { tipoPiscina: data.tipoPiscina } : {}),
+        ...(data.estado ? { estado: data.estado } : {}),
       },
     });
-    await prisma.franjaHoraria.deleteMany({ where: { servicioId: id } });
 
-    if (data.franjasHorarias.length > 0) {
-      await prisma.franjaHoraria.createMany({
-        data: data.franjasHorarias.map((f) => ({
+    if (data.franjasHorarias !== undefined) {
+      await tx.disponibilidad.deleteMany({
+        where: {
           servicioId: id,
-          diaSemana: f.diaSemana,
-          horaInicio: parseTimeToDate(f.horaInicio),
-          horaFin: parseTimeToDate(f.horaFin),
-        })),
+          reservas: { none: {} },
+        },
       });
-      await generateDisponibilidadesForServicio(id);
-    }
-  }
+      await tx.franjaHoraria.deleteMany({ where: { servicioId: id } });
 
-  return prisma.servicio.update({
-    where: { id },
-    data: {
-      ...(data.nombre ? { nombre: data.nombre.trim() } : {}),
-      ...(data.categoriaId ? { categoriaId: data.categoriaId } : {}),
-      ...(data.capacidadMaxima ? { capacidadMaxima: data.capacidadMaxima } : {}),
-      ...(data.tarifa !== undefined ? { tarifa: data.tarifa } : {}),
-      ...(data.modalidad ? { modalidad: data.modalidad } : {}),
-      ...(data.tipoPiscina !== undefined ? { tipoPiscina: data.tipoPiscina } : {}),
-      ...(data.estado ? { estado: data.estado } : {}),
-    },
-    include: {
-      categoria: true,
-      franjasHorarias: true,
-    },
+      if (data.franjasHorarias.length > 0) {
+        await tx.franjaHoraria.createMany({
+          data: data.franjasHorarias.map((f) => ({
+            servicioId: id,
+            diaSemana: f.diaSemana,
+            horaInicio: parseTimeToDate(f.horaInicio),
+            horaFin: parseTimeToDate(f.horaFin),
+          })),
+        });
+        await generateDisponibilidadesForServicio(id, 15, tx);
+      }
+    } else if (data.capacidadMaxima !== undefined || data.modalidad !== undefined) {
+      await tx.disponibilidad.updateMany({
+        where: { servicioId: id },
+        data: { cuposTotales },
+      });
+    }
+
+    return tx.servicio.findUnique({
+      where: { id },
+      include: {
+        categoria: true,
+        franjasHorarias: true,
+      },
+    });
   });
 }
 

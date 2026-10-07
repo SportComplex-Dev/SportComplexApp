@@ -27,6 +27,11 @@ export type EstadoServicioInput = z.infer<typeof estadoServicioSchema>;
 
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
+function timeToSeconds(time: string): number {
+  const [hours, minutes, seconds = "0"] = time.split(":");
+  return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+}
+
 export const franjaHorariaSchema = z
   .object({
     diaSemana: z.coerce
@@ -39,8 +44,7 @@ export const franjaHorariaSchema = z
   })
   .refine(
     (data) => {
-      // Validar que horaFin sea estrictamente posterior a horaInicio
-      return data.horaFin > data.horaInicio;
+      return timeToSeconds(data.horaFin) > timeToSeconds(data.horaInicio);
     },
     {
       message: "horaFin debe ser posterior a horaInicio",

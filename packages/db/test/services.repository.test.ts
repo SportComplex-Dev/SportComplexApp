@@ -14,6 +14,7 @@ const {
   getServicioById,
   updateServicio,
   deleteServicio,
+  generateDisponibilidadesForServicio,
 } = await import("../src/repositories/services.ts");
 
 test("CRUD de Categoría: creación y rechazo de nombres duplicados", async () => {
@@ -86,6 +87,50 @@ test("TSK-BE-04 / RF-03: Coexistencia y validación de unicidad de nombre de ins
   const nombres = servicios.map((s: any) => s.nombre);
   assert.ok(nombres.includes("Cancha 1"), "Cancha 1 debe existir");
   assert.ok(nombres.includes("Cancha 2"), "Cancha 2 debe existir");
+});
+
+test("TSK-BE-05: las disponibilidades AFORO respetan la capacidad y los cambios seguros", async () => {
+  await assert.rejects(
+    () =>
+      createServicio({
+        nombre: "Servicio con capacidad inválida",
+        categoriaId: 1,
+        capacidadMaxima: 0,
+        tarifa: 100,
+        modalidad: "AFORO",
+      }),
+    (error: any) => error.name === "ValidationError",
+  );
+
+  const servicio = await createServicio({
+    nombre: "Piscina aforo 25",
+    categoriaId: 1,
+    capacidadMaxima: 25,
+    tarifa: 100,
+    modalidad: "AFORO",
+    franjasHorarias: [{ diaSemana: 1, horaInicio: "08:00", horaFin: "09:00" }],
+  });
+  const disponibilidades = mock._state.disponibilidades.filter(
+    (disponibilidad: any) => disponibilidad.servicioId === servicio.id,
+  );
+  assert.ok(disponibilidades.length > 0);
+  assert.ok(disponibilidades.every((d: any) => d.cuposTotales === 25));
+
+  disponibilidades[0].cuposOcupados = 20;
+  await assert.rejects(
+    () => updateServicio(servicio.id, { capacidadMaxima: 18 }),
+    (error: any) => error.name === "CapacityConflictError",
+  );
+  assert.equal(mock._state.servicios.find((s: any) => s.id === servicio.id).capacidadMaxima, 25);
+  assert.ok(disponibilidades.every((d: any) => d.cuposTotales === 25));
+
+  disponibilidades[0].cuposOcupados = 0;
+  const updated = await updateServicio(servicio.id, { capacidadMaxima: 18 });
+  assert.equal(updated?.capacidadMaxima, 18);
+  assert.ok(disponibilidades.every((d: any) => d.cuposTotales === 18));
+
+  await generateDisponibilidadesForServicio(servicio.id);
+  assert.ok(disponibilidades.every((d: any) => d.cuposTotales === 18));
 });
 
 test("Criterio Clave: Reservar en Cancha 1 no altera la disponibilidad de Cancha 2", async () => {
@@ -184,4 +229,3 @@ test("Atomicidad: Si falla la generación de disponibilidades, el servicio y fra
     mock.disponibilidad.upsert = origUpsert;
   }
 });
-

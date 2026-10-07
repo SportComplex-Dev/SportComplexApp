@@ -61,6 +61,20 @@ test("franjaHorariaSchema valida horarios y orden cronológico", () => {
   });
   assert.equal(validFranja.success, true);
 
+  const equivalentTimeFormats = franjaHorariaSchema.safeParse({
+    diaSemana: 1,
+    horaInicio: "08:00",
+    horaFin: "08:00:00",
+  });
+  assert.equal(equivalentTimeFormats.success, false);
+
+  const secondAfterStart = franjaHorariaSchema.safeParse({
+    diaSemana: 1,
+    horaInicio: "08:00",
+    horaFin: "08:00:01",
+  });
+  assert.equal(secondAfterStart.success, true);
+
   // Franja con horaFin anterior a horaInicio debe fallar
   const invalidOrder = franjaHorariaSchema.safeParse({
     diaSemana: 1,
