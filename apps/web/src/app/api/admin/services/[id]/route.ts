@@ -1,0 +1,142 @@
+import { fail, ok } from "@/lib/api-response";
+import {
+  updateServicioSchema,
+  normalizeServicePayload,
+} from "@sportcomplex/validation";
+import {
+  getServicioById,
+  updateServicio,
+  deleteServicio,
+} from "@sportcomplex/db";
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+/**
+ * GET /api/admin/services/[id]
+ * Obtiene el detalle de una instancia de servicio con su calendario.
+ */
+export async function GET(request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const numId = parseInt(id, 10);
+    if (isNaN(numId) || numId <= 0) {
+      return fail("INVALID_ID", "El ID del servicio debe ser un número entero positivo", 400);
+    }
+
+    const servicio = await getServicioById(numId);
+    if (!servicio) {
+      return fail("NOT_FOUND", "Servicio no encontrado", 404);
+    }
+
+    return ok(servicio);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error al obtener el servicio";
+    return fail("SERVER_ERROR", message, 500);
+  }
+}
+
+/**
+ * PUT / PATCH /api/admin/services/[id]
+ * Actualiza una instancia de servicio, sus franjas y disponibilidad.
+ */
+async function handleUpdate(request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const numId = parseInt(id, 10);
+    if (isNaN(numId) || numId <= 0) {
+      return fail("INVALID_ID", "El ID del servicio debe ser un número entero positivo", 400);
+    }
+
+    const rawBody = await request.json().catch(() => ({}));
+    if (typeof rawBody !== "object" || rawBody === null) {
+      return fail("INVALID_PAYLOAD", "El cuerpo de la solicitud debe ser un objeto JSON", 400);
+    }
+
+    const normalized = normalizeServicePayload(rawBody);
+    const parsed = updateServicioSchema.safeParse(normalized);
+
+    if (!parsed.success) {
+      return fail(
+        "VALIDATION_ERROR",
+        "Datos de actualización inválidos",
+        400,
+        parsed.error.flatten(),
+      );
+    }
+
+    try {
+      const updated = await updateServicio(numId, parsed.data);
+      return ok(updated);
+    } catch (err: unknown) {
+      const error = err as { name?: string; code?: string; message?: string };
+      if (error.name === "NotFoundError") {
+        return fail("NOT_FOUND", error.message || "Servicio no encontrado", 404);
+      }
+      if (error.name === "DuplicateNameError" || error.code === "P2002") {
+        return fail("DUPLICATE_NAME", error.message || "Ya existe otro servicio con ese nombre", 409);
+      }
+      throw err;
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error al actualizar el servicio";
+    return fail("SERVER_ERROR", message, 500);
+  }
+}
+
+export async function PUT(request: Request, context: RouteContext) {
+  return handleUpdate(request, context);
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  return handleUpdate(request, context);
+}
+
+/**
+ * DELETE /api/admin/services/[id]
+ * Elimina una instancia de servicio respetando reservas activas existentes.
+ * Soporta query param ?forceInactivate=true para inactivación preventiva.
+ */
+export async function DELETE(request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const numId = parseInt(id, 10);
+    if (isNaN(numId) || numId <= 0) {
+      return fail("INVALID_ID", "El ID del servicio debe ser un número entero positivo", 400);
+    }
+
+    const { searchParams } = new URL(request.url);
+    const forceInactivate =
+      searchParams.get("forceInactivate") === "true" ||
+      searchParams.get("inactivate") === "true";
+
+    try {
+      const result = await deleteServicio(numId, forceInactivate);
+      return ok({
+        message:
+          "estado" in result && result.estado === "INHABILITADO"
+            ? "El servicio fue inhabilitado para proteger reservas activas"
+            : "Servicio eliminado exitosamente",
+        servicio: result,
+      });
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      if (error.name === "NotFoundError") {
+        return fail("NOT_FOUND", error.message || "Servicio no encontrado", 404);
+      }
+      if (error.name === "ServiceHasReservationsError") {
+        return fail(
+          "ACTIVE_RESERVATIONS",
+          error.message || "El servicio tiene reservas activas",
+          409,
+          { canInactivate: true },
+        );
+      }
+      throw err;
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error al eliminar el servicio";
+    return fail("SERVER_ERROR", message, 500);
+  }
+}
