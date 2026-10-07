@@ -90,3 +90,85 @@ export function validateServiceCapacity(capacity: number): {
   return { valid: true };
 }
 
+/** Representación de un día del calendario con validación de ventana de 15 días (TSK-FE-06 / RN-01) */
+export interface BookingCalendarDay {
+  dateISO: string;
+  dayNumber: number;
+  weekdayShort: string;
+  weekdayFull: string;
+  monthShort: string;
+  monthFull: string;
+  year: number;
+  isToday: boolean;
+  isPast: boolean;
+  isWithinWindow: boolean;
+  isBeyondWindow: boolean;
+  daysAhead: number;
+}
+
+/**
+ * Obtiene la fecha actual en formato YYYY-MM-DD calculada en la zona horaria del complejo (America/Bogota) (RNF-02).
+ */
+export function getBogotaTodayISO(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+/**
+ * Genera la secuencia de días para el selector de fechas con restricción de ventana de 15 días (TSK-FE-06 / RF-05).
+ * Los días donde daysAhead > 15 quedan marcados con isBeyondWindow = true (deshabilitados y no clickeables).
+ */
+export function getBookingCalendarDays(
+  windowDays: number = BOOKING_WINDOW_DAYS,
+  totalDaysToShow: number = 20,
+  now: Date = new Date()
+): BookingCalendarDay[] {
+  const todayISO = getBogotaTodayISO(now);
+  const [yearStr, monthStr, dayStr] = todayISO.split("-");
+  const baseDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr), 12, 0, 0));
+
+  const days: BookingCalendarDay[] = [];
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  const weekdayFormatterShort = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", weekday: "short" });
+  const weekdayFormatterFull = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", weekday: "long" });
+  const monthFormatterShort = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", month: "short" });
+  const monthFormatterFull = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", month: "long" });
+
+  for (let offset = 0; offset < totalDaysToShow; offset++) {
+    const cur = new Date(baseDate.getTime() + offset * 86_400_000);
+    const y = cur.getUTCFullYear();
+    const m = cur.getUTCMonth();
+    const d = cur.getUTCDate();
+    const dateISO = `${y}-${pad(m + 1)}-${pad(d)}`;
+
+    const isToday = offset === 0;
+    const isPast = offset < 0;
+    const isWithinWindow = offset >= 0 && offset <= windowDays;
+    const isBeyondWindow = offset > windowDays;
+
+    days.push({
+      dateISO,
+      dayNumber: d,
+      weekdayShort: weekdayFormatterShort.format(cur).replace(".", ""),
+      weekdayFull: weekdayFormatterFull.format(cur),
+      monthShort: monthFormatterShort.format(cur).replace(".", ""),
+      monthFull: monthFormatterFull.format(cur),
+      year: y,
+      isToday,
+      isPast,
+      isWithinWindow,
+      isBeyondWindow,
+      daysAhead: offset,
+    });
+  }
+
+  return days;
+}
+

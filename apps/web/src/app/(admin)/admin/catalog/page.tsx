@@ -172,6 +172,24 @@ function CatalogForm({
             placeholder="Breve descripción de las características técnicas del espacio"
           />
         </label>
+        {form.category === 'piscinas' && (
+          <label className="demo-field">
+            Modalidad de piscina (TSK-FE-08 / RF-07)
+            <select
+              value={form.poolType ?? 'PUBLICA'}
+              onChange={(e) => {
+                const val = e.target.value as 'PUBLICA' | 'PRIVADA'
+                set('poolType', val)
+                if (val === 'PRIVADA') {
+                  set('capacity', 1)
+                }
+              }}
+            >
+              <option value="PUBLICA">Pública (Aforo masivo compartido)</option>
+              <option value="PRIVADA">Privada (Alquiler exclusivo completo)</option>
+            </select>
+          </label>
+        )}
         <div className="form-row">
           <label className="demo-field">
             Precio base (COP)
@@ -539,13 +557,20 @@ export default function AdminCatalogPage() {
                     <td>{item.sede}</td>
                     <td>{formatMoney(item.price)} COP</td>
                     <td>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={isShared ? 'success' : 'secondary'} className="text-[11px] font-semibold">
-                          {isShared ? 'Compartido' : 'Exclusivo'}
-                        </Badge>
-                        <span className="text-xs text-subtle">
-                          <b>{capacityValue}</b> {capacityValue === 1 ? 'cupo' : 'personas'}
-                        </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={isShared ? 'success' : 'secondary'} className="text-[11px] font-semibold">
+                            {isShared ? 'Compartido' : 'Exclusivo'}
+                          </Badge>
+                          <span className="text-xs text-subtle">
+                            <b>{capacityValue}</b> {capacityValue === 1 ? 'cupo' : 'personas'}
+                          </span>
+                        </div>
+                        {item.category === 'piscinas' && (
+                          <span className="text-[10px] text-brand-accent font-semibold">
+                            {item.poolType === 'PRIVADA' ? '🏊 Privada (Exclusiva)' : '🏊 Pública (Aforo)'}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>

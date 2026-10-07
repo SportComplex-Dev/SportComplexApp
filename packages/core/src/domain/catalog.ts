@@ -83,6 +83,7 @@ export interface CatalogItem {
   capacity: number;
   status: CatalogStatus;
   image?: string;
+  poolType?: 'PUBLICA' | 'PRIVADA';
 }
 
 export const initialCatalog: CatalogItem[] = [
@@ -157,6 +158,7 @@ export const initialCatalog: CatalogItem[] = [
     capacity: 6,
     status: 'Disponible',
     image: 'https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534?auto=format&fit=crop&w=800&q=80',
+    poolType: 'PUBLICA',
   },
   {
     id: 'piscina-carril-entrenamiento',
@@ -169,6 +171,7 @@ export const initialCatalog: CatalogItem[] = [
     capacity: 2,
     status: 'Disponible',
     image: 'https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=800&q=80',
+    poolType: 'PRIVADA',
   },
   {
     id: 'piscina-infantil',
