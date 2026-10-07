@@ -6,3 +6,7 @@ export function applyMembershipDiscount(amountCents: number, hasActiveMembership
   if (!hasActiveMembership) return amountCents;
   return Math.round(amountCents * (1 - MEMBERSHIP_DISCOUNT_RATE));
 }
+
+export function formatMoney(amount: number): string {
+  return `$${amount.toLocaleString('es-CO')}`;
+}

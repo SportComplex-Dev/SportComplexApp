@@ -266,7 +266,10 @@ model Reserva {
   ticketQr       TicketQr?
 
   @@index([titularId, estado])
-  @@index([expiraEn])
+  // TSK-BD-08: índice parcial TTL vive en SQL raw (migración reserva_ttl_partial_index):
+  //   CREATE INDEX "reserva_expira_ttl_idx" ON "reserva"("expira_en")
+  //     WHERE "estado" = 'PENDIENTE_PAGO';
+  // Prisma no expresa WHERE parcial; no declarar @@index([expiraEn]) genérico.
   @@map("reserva")
 }
 
