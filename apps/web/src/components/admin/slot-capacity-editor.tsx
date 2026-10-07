@@ -25,7 +25,7 @@ import {
   type GeneratedOperatingSlot,
   type OperatingScheduleConfig,
 } from '@sportcomplex/core'
-import { Badge, Button, Card, Input } from '@sportcomplex/ui'
+import { Badge, Button, Card } from '@sportcomplex/ui'
 
 interface SlotCapacityEditorProps {
   service: CatalogItem

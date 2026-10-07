@@ -3,17 +3,12 @@
 import { useState } from 'react'
 import {
   CalendarDays,
-  CheckCircle2,
-  Clock,
-  Filter,
-  Layers,
   Pencil,
   Plus,
   Search,
   SlidersHorizontal,
   Tag,
   Trash2,
-  Users,
 } from 'lucide-react'
 import {
   defaultSchedules,
