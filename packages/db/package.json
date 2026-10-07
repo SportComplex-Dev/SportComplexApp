@@ -13,7 +13,9 @@
     "db:seed": "prisma db seed",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "lint": "eslint .",
+    "test": "tsx --test test/**/*.test.ts",
     "clean": "rm -rf dist"
   },
   "prisma": {
