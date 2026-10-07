@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { signIn } from 'next-auth/react'
 import { roleHome, type Role } from '@sportcomplex/core'
 import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
@@ -35,10 +36,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('error') === 'google') {
+    const authError = params.get('error')
+    if (
+      authError === 'google' ||
+      authError === 'OAuthSignin' ||
+      authError === 'OAuthCallback' ||
+      authError === 'OAuthCreateAccount' ||
+      authError === 'OAuthAccountNotLinked'
+    ) {
       setError('No se pudo completar el acceso con Google. Inténtalo nuevamente.')
-    } else if (params.get('error') === 'configuration') {
+    } else if (authError === 'configuration' || authError === 'Configuration') {
       setError('El proveedor de autenticación todavía no está configurado.')
+    } else if (authError) {
+      setError('Ocurrió un error al iniciar sesión. Inténtalo nuevamente.')
     }
 
     if (!isSupabaseAuthConfigured()) {
@@ -80,29 +90,11 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setError(null)
-    if (!isSupabaseAuthConfigured()) {
-      setError('El proveedor de autenticación todavía no está configurado.')
-      return
-    }
-
     setLoading(true)
     try {
-      const callbackUrl = new URL('/auth/callback', window.location.origin)
-      callbackUrl.searchParams.set('flow', 'oauth')
-      const next = getSafeNextPath()
-      if (next) callbackUrl.searchParams.set('next', next)
-
-      const { error: oauthError } = await createSupabaseBrowserClient().auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: callbackUrl.toString() },
-      })
-
-      if (oauthError) {
-        setError(oauthError.message || 'No se pudo iniciar sesión con Google.')
-        setLoading(false)
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Google.')
+      await signIn('google', { redirectTo: getSafeNextPath() ?? '/' })
+    } catch {
+      setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
       setLoading(false)
     }
   }
