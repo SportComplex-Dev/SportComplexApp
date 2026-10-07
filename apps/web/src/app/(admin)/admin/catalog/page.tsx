@@ -5,10 +5,13 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Filter,
   Layers,
   Pencil,
   Plus,
+  Search,
   SlidersHorizontal,
+  Tag,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -42,12 +45,89 @@ const blank: CatalogItem = {
   status: 'Disponible',
 }
 
+interface CustomCategory {
+  slug: string
+  name: string
+  unit: string
+  description?: string
+}
+
+function CategoryForm({
+  onSave,
+  onClose,
+}: {
+  onSave: (cat: CustomCategory) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState('')
+  const [unit, setUnit] = useState('hora')
+  const [desc, setDesc] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    onSave({ slug, name: name.trim(), unit, description: desc.trim() })
+  }
+
+  return (
+    <Modal
+      title="Crear Nueva Categoría"
+      description="Define una nueva categoría para agrupar instancias de servicios deportivos (RF-03)."
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit}>
+        <label className="demo-field">
+          Nombre de la Categoría
+          <Input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej. Squash, Crossfit, Artes Marciales"
+          />
+        </label>
+        <label className="demo-field">
+          Unidad de cobro estándar
+          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            <option value="hora">Por hora (hora)</option>
+            <option value="sesión">Por sesión (sesión)</option>
+            <option value="entrada">Por entrada (entrada)</option>
+            <option value="acceso">Por acceso (acceso)</option>
+          </select>
+        </label>
+        <label className="demo-field">
+          Descripción general
+          <Input
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            placeholder="Breve descripción del tipo de instalación o disciplina"
+          />
+        </label>
+        <div className="form-actions">
+          <ActionButton secondary onClick={onClose}>
+            Cancelar
+          </ActionButton>
+          <ActionButton type="submit">Crear Categoría</ActionButton>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 function CatalogForm({
   initial,
+  categories,
   onSave,
   onClose,
 }: {
   initial: CatalogItem
+  categories: CustomCategory[]
   onSave: (item: CatalogItem) => void
   onClose: () => void
 }) {
@@ -57,8 +137,8 @@ function CatalogForm({
 
   return (
     <Modal
-      title={initial.id ? 'Editar servicio' : 'Agregar al catálogo'}
-      description="Este espacio aparecerá en el catálogo que ven los clientes."
+      title={initial.id ? 'Editar servicio / instancia' : 'Agregar servicio al catálogo'}
+      description="Crea instancias independientes (ej. Cancha 1, Cancha 2) con identificador y calendario autónomo (RF-03)."
       onClose={onClose}
     >
       <form
@@ -68,12 +148,12 @@ function CatalogForm({
         }}
       >
         <label className="demo-field">
-          Nombre
+          Nombre de la instancia
           <Input
             required
             value={form.name}
             onChange={(event) => set('name', event.target.value)}
-            placeholder="Ej. Cancha de pádel · Cancha 2"
+            placeholder="Ej. Cancha de tenis · Cancha 3 o Piscina Semi-olímpica"
           />
         </label>
         <label className="demo-field">
@@ -82,7 +162,7 @@ function CatalogForm({
             value={form.category}
             onChange={(event) => set('category', event.target.value as CatalogItem['category'])}
           >
-            {serviceCategories.map((category) => (
+            {categories.map((category) => (
               <option key={category.slug} value={category.slug}>
                 {category.name}
               </option>
@@ -94,12 +174,12 @@ function CatalogForm({
           <Input
             value={form.description}
             onChange={(event) => set('description', event.target.value)}
-            placeholder="Breve descripción del espacio"
+            placeholder="Breve descripción de las características técnicas del espacio"
           />
         </label>
         <div className="form-row">
           <label className="demo-field">
-            Precio (COP)
+            Precio base (COP)
             <Input
               required
               type="number"
@@ -146,7 +226,7 @@ function CatalogForm({
           <ActionButton secondary onClick={onClose}>
             Cancelar
           </ActionButton>
-          <ActionButton type="submit">{initial.id ? 'Guardar cambios' : 'Agregar'}</ActionButton>
+          <ActionButton type="submit">{initial.id ? 'Guardar cambios' : 'Agregar instancia'}</ActionButton>
         </div>
       </form>
     </Modal>
@@ -156,6 +236,21 @@ function CatalogForm({
 export default function AdminCatalogPage() {
   const { notify } = useApp()
   const [catalog, setCatalog] = useCatalog()
+
+  // Lista de categorías (base + dinámicas creadas por el admin) - TSK-FE-04
+  const [categories, setCategories] = useState<CustomCategory[]>(() =>
+    serviceCategories.map((c) => ({
+      slug: c.slug,
+      name: c.name,
+      unit: c.unit,
+      description: c.description,
+    }))
+  )
+
+  // Filtros de consola de alta densidad (RNF-04)
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('todas')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>('todos')
 
   // Estado para programaciones operativas y aforos (TSK-FE-05 / RF-04)
   const [schedules, setSchedules] = useState<Record<string, OperatingScheduleConfig>>(() => {
@@ -189,12 +284,27 @@ export default function AdminCatalogPage() {
     catalog[0]?.id ?? 'gimnasio-sesion-individual'
   )
   const [editing, setEditing] = useState<CatalogItem | null>(null)
+  const [creatingCategory, setCreatingCategory] = useState<boolean>(false)
   const [editingSchedule, setEditingSchedule] = useState<CatalogItem | null>(null)
   const [deleting, setDeleting] = useState<CatalogItem | null>(null)
   const [selectedDayOffset, setSelectedDayOffset] = useState<number>(0)
 
+  // Filtrado de servicios para la tabla de alta densidad
+  const filteredServices = catalog.filter((item) => {
+    const matchesCategory =
+      selectedCategoryFilter === 'todas' || item.category === selectedCategoryFilter
+    const matchesStatus =
+      statusFilter === 'todos' || item.status === statusFilter
+    const matchesSearch =
+      searchQuery.trim() === '' ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sede.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesStatus && matchesSearch
+  })
+
   const selectedService =
-    catalog.find((item) => item.id === selectedServiceId) ?? catalog[0]
+    catalog.find((item) => item.id === selectedServiceId) ?? filteredServices[0] ?? catalog[0]
+
   const selectedConfig: OperatingScheduleConfig = selectedService
     ? schedules[selectedService.id] ?? {
         serviceId: selectedService.id,
@@ -221,11 +331,11 @@ export default function AdminCatalogPage() {
 
   const generatedSlots: GeneratedOperatingSlot[] = generateOperatingSlots(selectedConfig)
 
-  // Guardar datos básicos
+  // Guardar datos básicos de servicio / instancia
   const save = (item: CatalogItem) => {
     if (item.id) {
       setCatalog(catalog.map((entry) => (entry.id === item.id ? item : entry)))
-      notify('Servicio actualizado.', 'success')
+      notify('Servicio actualizado con éxito.', 'success')
     } else {
       const newId = makeId(item.name)
       const newItem = { ...item, id: newId }
@@ -236,15 +346,16 @@ export default function AdminCatalogPage() {
           serviceId: newId,
           serviceName: item.name,
           categorySlug: item.category,
-          capacity: item.capacity > 0 ? item.capacity : 10,
-          isShared: false,
+          capacity: item.capacity > 0 ? item.capacity : 4,
+          isShared: item.category === 'gimnasio' || item.category === 'piscinas',
           startHour: 6,
           endHour: 22,
           slotDurationMinutes: 60,
           disabledSlots: [],
         },
       }))
-      notify('Servicio agregado al catálogo.', 'success')
+      setSelectedServiceId(newId)
+      notify(`Instancia «${item.name}» agregada con calendario independiente.`, 'success')
     }
     setEditing(null)
   }
@@ -269,6 +380,17 @@ export default function AdminCatalogPage() {
     )
   }
 
+  // Guardar nueva Categoría (TSK-FE-04 / HU-04)
+  const handleSaveCategory = (newCat: CustomCategory) => {
+    if (categories.some((c) => c.slug === newCat.slug)) {
+      notify(`La categoría «${newCat.name}» ya existe.`, 'error')
+      return
+    }
+    setCategories((prev) => [...prev, newCat])
+    setCreatingCategory(false)
+    notify(`Categoría «${newCat.name}» creada correctamente.`, 'success')
+  }
+
   // Días de la semana para previsualizar el calendario
   const weekDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date()
@@ -284,24 +406,90 @@ export default function AdminCatalogPage() {
   return (
     <main className="section-shell app-page demo-page">
       <PageHeading
-        eyebrow="ADMINISTRACIÓN"
+        eyebrow="ADMINISTRACIÓN DE CATÁLOGO"
         title="Catálogo & Aforo"
-        description="Parametriza la capacidad máxima (CHECK capacity > 0) y turnos de 60 min entre las 06:00 y las 22:00."
+        description="Gestión integral de categorías, instancias independientes y parametrización de turnos operativos de 60 min (RF-03, RF-04)."
         action={
-          <ActionButton onClick={() => setEditing(blank)}>
-            <Plus size={16} /> Agregar al catálogo
-          </ActionButton>
+          <div className="flex items-center gap-2">
+            <ActionButton secondary onClick={() => setCreatingCategory(true)}>
+              <Tag size={15} /> Nueva Categoría
+            </ActionButton>
+            <ActionButton onClick={() => setEditing(blank)}>
+              <Plus size={16} /> Agregar Servicio
+            </ActionButton>
+          </div>
         }
       />
 
-      {/* Tarjeta del Catálogo Principal */}
+      {/* Consola de Filtros de Alta Densidad (RNF-04) */}
+      <section className="demo-card mb-6 p-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Pestañas de categoría (Tabs) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <button
+              type="button"
+              className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                selectedCategoryFilter === 'todas'
+                  ? 'bg-brand-accent text-content-on-accent border-brand-accent shadow-xs'
+                  : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink'
+              }`}
+              onClick={() => setSelectedCategoryFilter('todas')}
+            >
+              Todas ({catalog.length})
+            </button>
+            {categories.map((cat) => {
+              const count = catalog.filter((c) => c.category === cat.slug).length
+              return (
+                <button
+                  key={cat.slug}
+                  type="button"
+                  className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                    selectedCategoryFilter === cat.slug
+                      ? 'bg-brand-accent text-content-on-accent border-brand-accent shadow-xs'
+                      : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink'
+                  }`}
+                  onClick={() => setSelectedCategoryFilter(cat.slug)}
+                >
+                  {cat.name} ({count})
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Buscador y filtro de estado */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 md:w-56">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar instancia o sede..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface)] text-ink outline-none focus:border-brand-accent"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="py-1.5 px-2.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface)] text-ink outline-none focus:border-brand-accent"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="Disponible">Disponibles</option>
+              <option value="Mantenimiento">Mantenimiento</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* Tabla del Catálogo de Instancias (RF-03, TSK-FE-04) */}
       <section className="demo-card">
         <div className="demo-card-heading">
           <div>
-            <h2>Servicios del catálogo</h2>
+            <h2>Instancias de Servicios ({filteredServices.length})</h2>
             <p>
-              {catalog.length} {catalog.length === 1 ? 'servicio' : 'servicios'} registrados.
-              Haz clic en cualquier servicio para ver su calendario operativo.
+              Cada instancia coexiste con su identificador y calendario independiente (Criterio Clave HU-04).
+              Haz clic en cualquier fila para ver su matriz de disponibilidad.
             </p>
           </div>
         </div>
@@ -310,7 +498,7 @@ export default function AdminCatalogPage() {
           <table className="demo-table">
             <thead>
               <tr>
-                <th>Servicio</th>
+                <th>Instancia / Servicio</th>
                 <th>Categoría</th>
                 <th>Sede</th>
                 <th>Precio</th>
@@ -320,16 +508,19 @@ export default function AdminCatalogPage() {
               </tr>
             </thead>
             <tbody>
-              {catalog.length === 0 && (
+              {filteredServices.length === 0 && (
                 <tr>
-                  <td colSpan={7}>Aún no hay servicios. Agrega el primero.</td>
+                  <td colSpan={7} className="text-center py-8 text-subtle">
+                    No se encontraron servicios con los filtros aplicados.
+                  </td>
                 </tr>
               )}
-              {catalog.map((item) => {
+              {filteredServices.map((item) => {
                 const config = schedules[item.id]
                 const capacityValue = config?.capacity ?? item.capacity
                 const isShared = config?.isShared ?? (item.category === 'gimnasio' || item.category === 'piscinas')
                 const isSelected = selectedService?.id === item.id
+                const categoryObj = categories.find((c) => c.slug === item.category)
 
                 return (
                   <tr
@@ -342,11 +533,13 @@ export default function AdminCatalogPage() {
                     <td>
                       <div className="flex items-center gap-2">
                         {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />}
-                        <span>{item.name}</span>
+                        <span className="font-semibold text-ink">{item.name}</span>
                       </div>
                     </td>
                     <td>
-                      {serviceCategories.find((category) => category.slug === item.category)?.name}
+                      <span className="text-xs text-subtle">
+                        {categoryObj?.name ?? item.category}
+                      </span>
                     </td>
                     <td>{item.sede}</td>
                     <td>{formatMoney(item.price)} COP</td>
@@ -391,8 +584,8 @@ export default function AdminCatalogPage() {
                             )
                             notify(
                               item.status === 'Disponible'
-                                ? 'Servicio pausado.'
-                                : 'Servicio activado.',
+                                ? 'Instancia pausada.'
+                                : 'Instancia activada.',
                               'success'
                             )
                           }}
@@ -425,18 +618,18 @@ export default function AdminCatalogPage() {
         </div>
       </section>
 
-      {/* Calendario Operativo del Servicio Seleccionado (Criterio Clave de Aceptación Jira TSK-FE-05) */}
+      {/* Calendario Operativo del Servicio Seleccionado (Criterio Clave HU-04 y HU-05) */}
       {selectedService && (
         <section className="demo-card mt-8">
           <div className="demo-card-heading flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <CalendarDays size={18} className="text-brand-accent" />
-                <h2>Calendario Operativo del Servicio — {selectedService.name}</h2>
+                <h2>Calendario Operativo Autónomo — {selectedService.name}</h2>
               </div>
               <p>
-                Criterio Clave HU-05: El calendario refleja de forma inmediata el aforo configurado (
-                <b>{selectedConfig.capacity} personas</b>) y las ranuras operativas de 60 min (06:00 a 22:00).
+                Criterios Clave: Dispone de su propio calendario independiente (HU-04) con franjas de 60 min (06:00 a 22:00)
+                y aforo parametrizado (<b>{selectedConfig.capacity} personas</b>) reflejado al instante tras guardar (HU-05).
               </p>
             </div>
             <ActionButton
@@ -517,9 +710,22 @@ export default function AdminCatalogPage() {
         </section>
       )}
 
-      {/* Modal de Edición Básica */}
+      {/* Modal de Creación de Categorías (TSK-FE-04) */}
+      {creatingCategory && (
+        <CategoryForm
+          onSave={handleSaveCategory}
+          onClose={() => setCreatingCategory(false)}
+        />
+      )}
+
+      {/* Modal de Edición Básica de Servicio / Instancia (TSK-FE-04) */}
       {editing && (
-        <CatalogForm initial={editing} onSave={save} onClose={() => setEditing(null)} />
+        <CatalogForm
+          initial={editing}
+          categories={categories}
+          onSave={save}
+          onClose={() => setEditing(null)}
+        />
       )}
 
       {/* Modal Especializado de Aforo y Franjas Horarias (TSK-FE-05) */}
@@ -535,13 +741,13 @@ export default function AdminCatalogPage() {
       {/* Diálogo de Confirmación para Eliminar */}
       {deleting && (
         <ConfirmDialog
-          title="Eliminar servicio"
-          message={`¿Eliminar «${deleting.name}» del catálogo? Dejará de mostrarse a los clientes.`}
+          title="Eliminar servicio / instancia"
+          message={`¿Eliminar «${deleting.name}» del catálogo? Dejará de mostrarse a los clientes y no se podrán agendar reservas en su calendario.`}
           onCancel={() => setDeleting(null)}
           onConfirm={() => {
             setCatalog(catalog.filter((entry) => entry.id !== deleting.id))
             setDeleting(null)
-            notify('Servicio eliminado.', 'success')
+            notify('Instancia eliminada del catálogo.', 'success')
           }}
         />
       )}

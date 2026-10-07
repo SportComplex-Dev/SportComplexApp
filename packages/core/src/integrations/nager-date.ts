@@ -1,5 +1,13 @@
 import ky from "ky";
-import { findFestivosByYear, upsertManyFestivos } from "@sportcomplex/db";
+
+async function getDbFns() {
+  if (typeof window !== "undefined") return null;
+  try {
+    return await import("@sportcomplex/db");
+  } catch {
+    return null;
+  }
+}
 
 // Cliente Nager.Date CO con timeout estricto de 2.5s + fallback a tabla FESTIVO (ARCHITECTURE §9.4 / SCRUM-103)
 const BASE = process.env.NAGER_DATE_BASE_URL ?? "https://date.nager.at/api/v3";
@@ -53,7 +61,9 @@ function normalizeToNagerHoliday(
 export const dbHolidayCacheStore: HolidayCacheStore = {
   async getByYear(year: number): Promise<NagerHoliday[]> {
     try {
-      const records = await findFestivosByYear(year);
+      const db = await getDbFns();
+      if (!db) return [];
+      const records = await db.findFestivosByYear(year);
       return records.map((r) => normalizeToNagerHoliday(r));
     } catch (error) {
       console.warn(
@@ -67,7 +77,9 @@ export const dbHolidayCacheStore: HolidayCacheStore = {
   async saveHolidays(holidays: NagerHoliday[], year: number): Promise<void> {
     if (!holidays || holidays.length === 0) return;
     try {
-      await upsertManyFestivos(
+      const db = await getDbFns();
+      if (!db) return;
+      await db.upsertManyFestivos(
         holidays.map((h) => ({
           fecha: h.date,
           nombre: h.localName || h.name,
