@@ -70,11 +70,8 @@ export function TopBar() {
             {dark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
           <span className="topbar-action-divider" aria-hidden="true" />
-          <Link href="/login" className="nav-login hidden md:inline-flex items-center gap-1.5 px-2">
-            Iniciar sesión
-          </Link>
-          <Link href="/register" className="action-button nav-access">
-            Crear cuenta <ArrowRight size={15} />
+          <Link href="/login" className="action-button nav-access">
+            Accede al club <ArrowRight size={15} />
           </Link>
           <button
             type="button"
@@ -96,12 +93,8 @@ export function TopBar() {
               <ArrowRight size={15} />
             </Link>
           ))}
-          <Link href="/login" onClick={close}>
-            Iniciar sesión
-            <ArrowRight size={15} />
-          </Link>
-          <Link href="/register" onClick={close}>
-            Crear cuenta de socio
+          <Link href="/login" onClick={close} className="font-semibold">
+            Accede al club
             <ArrowRight size={15} />
           </Link>
           <button

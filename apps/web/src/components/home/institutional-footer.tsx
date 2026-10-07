@@ -52,6 +52,7 @@ export function InstitutionalFooter() {
                 width={36}
                 height={30}
                 className="footer-brand-logo"
+                style={{ width: 'auto', height: 'auto' }}
               />
               <div>
                 <b className="footer-brand-title">AKROS</b>

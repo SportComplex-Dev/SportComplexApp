@@ -78,7 +78,7 @@ export function LifestyleAndDigitalPass() {
           <div className="digital-ticket-mockup">
             <div className="ticket-mockup-header">
               <div className="ticket-brand-chip">
-                <Image src="/images/Akros-logo.png" alt="AKROS" width={22} height={20} />
+                <Image src="/images/Akros-logo.png" alt="AKROS" width={22} height={20} style={{ width: 'auto', height: 'auto' }} />
                 <span>AKROS PASS</span>
               </div>
               <span className="ticket-status-pill">
@@ -106,11 +106,8 @@ export function LifestyleAndDigitalPass() {
           </div>
 
           <div className="tech-actions">
-            <Link href="/scanner" className="action-button">
-              <ScanLine size={16} /> Probar Escáner de Taquilla
-            </Link>
-            <Link href="/portal/tickets" className="hero-secondary text-sm">
-              Ver mis tiquetes activos
+            <Link href="/portal/tickets" className="action-button">
+              <QrCode size={16} /> Ver mis tiquetes activos
             </Link>
           </div>
         </div>

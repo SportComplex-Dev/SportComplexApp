@@ -189,7 +189,6 @@ export function FacilityShowcase() {
             fill
             sizes="(max-width: 1024px) 100vw, 65vw"
             className="facility-display-img object-cover"
-            priority={activeId === 'padel'}
           />
           <div className="facility-media-overlay" />
           <div className="facility-floating-badges">
@@ -256,7 +255,7 @@ export function FacilityShowcase() {
               </Link>
               <Link
                 href="/portal/book"
-                className="hero-secondary text-sm"
+                className="action-secondary text-sm"
               >
                 Ver todos los turnos
               </Link>
