@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
-import { signIn } from 'next-auth/react'
-import { roleHome, type Role } from '@sportcomplex/core'
+import { getSession, signIn } from 'next-auth/react'
+import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
 import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
-import { TopBar } from '@/components/top-bar'
+import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
-import { createSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 
@@ -28,6 +27,7 @@ function getSafeNextPath() {
 
 export default function LoginPage() {
   const router = useRouter()
+  const { dark, toggleTheme } = useThemeToggle()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -51,25 +51,12 @@ export default function LoginPage() {
       setError('Ocurrió un error al iniciar sesión. Inténtalo nuevamente.')
     }
 
-    if (!isSupabaseAuthConfigured()) {
-      setCheckingSession(false)
-      return
-    }
-
     let active = true
-    const supabase = createSupabaseBrowserClient()
-
-    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+    void getSession().then((session) => {
       if (!active) return
-      if (sessionError) {
-        setError('No se pudo verificar tu sesión. Inténtalo nuevamente.')
-        setCheckingSession(false)
-        return
-      }
 
-      const user = data.session?.user
-      if (user) {
-        const role = getUserRole(user.app_metadata.role)
+      if (session?.user) {
+        const role = getUserRole(session.user.role)
         router.replace(getSafeNextPath() ?? roleHome[role])
         router.refresh()
         return
@@ -138,7 +125,7 @@ export default function LoginPage() {
 
   return (
     <div className="club-app">
-      <TopBar />
+      <ThemeToggle dark={dark} onToggle={toggleTheme} floating />
       <main className="auth-page">
         {/* Panel de marca (izquierda) */}
         <div className="auth-art">
@@ -209,10 +196,6 @@ export default function LoginPage() {
                   required
                 />
               </label>
-
-              <Link href="/forgot-password" className="forgot-link">
-                ¿Olvidaste tu contraseña?
-              </Link>
 
               {error && (
                 <p id="login-error" role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600">
