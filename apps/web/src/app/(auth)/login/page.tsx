@@ -1,5 +1,7 @@
 "use client";
 
+import { signIn } from "next-auth/react";
+
 export default function LoginPage() {
   return (
     <main>
@@ -14,7 +16,12 @@ export default function LoginPage() {
         </label>
         <button type="submit">Entrar</button>
       </form>
-      <button type="button">Continuar con Google</button>
+      <button
+        type="button"
+        onClick={() => void signIn("google", { redirectTo: "/portal" })}
+      >
+        Continuar con Google
+      </button>
     </main>
   );
 }

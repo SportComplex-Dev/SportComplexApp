@@ -10,6 +10,9 @@ export default function RegisterPage() {
           Correo <input name="email" type="email" required />
         </label>
         <label>
+          Nombre <input name="nombre" type="text" required maxLength={120} />
+        </label>
+        <label>
           Contraseña <input name="password" type="password" required />
         </label>
         <button type="submit">Crear cuenta</button>
