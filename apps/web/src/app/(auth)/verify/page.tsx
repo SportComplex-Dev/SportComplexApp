@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Activity, ArrowLeft, ArrowRight, Mail, RotateCw, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail, RotateCw, CheckCircle2 } from 'lucide-react'
+import { Brand } from '@/components/brand'
 
 type VerificationTiming = {
   expiresAt: string
@@ -68,6 +69,10 @@ function VerifyPageContent() {
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
   const expiresAtRef = useRef<number | null>(null)
   const resendAvailableAtRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    document.title = 'Verificación de cuenta | AKROS'
+  }, [])
 
   const applyServerTiming = useCallback((timing: VerificationTiming, requestStartedAt: number) => {
     const elapsedMs = performance.now() - requestStartedAt
@@ -236,13 +241,9 @@ function VerifyPageContent() {
 
   return (
     <div className="flex min-h-screen w-full bg-white font-sans antialiased text-neutral-900">
-      {/* Columna lateral izquierda (Verde deportivo con ondas concéntricas) */}
-      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[#0d3b2e] p-12 text-white lg:flex lg:p-16">
-        <div className="z-10 flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#bef264] text-neutral-950 shadow-sm">
-            <Activity size={20} strokeWidth={2.5} />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">SportComplex</span>
+      <aside className="auth-art verify-auth-art relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[#0d3b2e] p-12 text-white lg:flex lg:p-16">
+        <div className="relative z-10">
+          <Brand light />
         </div>
 
         <div className="z-10 my-auto py-10">
@@ -252,17 +253,13 @@ function VerifyPageContent() {
           <h2 className="mt-4 text-5xl font-black leading-[1.1] tracking-tight text-white xl:text-6xl">
             Verifica tu<br />cuenta en <span className="text-[#bef264]">segundos.</span>
           </h2>
-          <p className="mt-4 text-base font-normal leading-relaxed text-emerald-100/70 max-w-sm">
+          <p className="mt-4 max-w-sm text-base font-normal leading-relaxed text-emerald-100/70">
             Protegemos tus reservas y transacciones garantizando un acceso seguro.
           </p>
         </div>
 
-        {/* Ondas concéntricas de fondo */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="absolute h-[520px] w-[520px] rounded-full border border-white/5 opacity-40" />
-          <div className="absolute h-[380px] w-[380px] rounded-full border border-white/10 opacity-30" />
-          <div className="absolute h-[240px] w-[240px] rounded-full border border-white/10 opacity-20" />
-          <Activity size={220} strokeWidth={0.8} className="text-[#bef264] opacity-20" />
+        <div className="verify-auth-decoration" aria-hidden="true">
+          <img src="/images/Akros-full-logo.png" alt="" width="360" height="240" />
         </div>
 
         <div className="z-10 text-xs italic text-emerald-200/50">
@@ -377,27 +374,28 @@ function VerifyPageContent() {
             </form>
           )}
 
-          {/* Reenviar código con bloqueo de 60s */}
-          <div className="mt-8 text-center text-xs text-neutral-500">
-            ¿No recibiste el correo?{' '}
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={syncing || loading || resendCooldown === null || resendCooldown > 0 || !emailParam}
-              className={`inline-flex items-center gap-1.5 font-semibold transition ${
-                syncing || resendCooldown === null || resendCooldown > 0 || loading
-                  ? 'cursor-not-allowed text-neutral-400'
-                  : 'text-neutral-950 hover:underline'
-              }`}
-            >
-              <RotateCw size={12} className={resendCooldown !== null && resendCooldown > 0 ? 'animate-spin' : ''} />
-              {syncing || resendCooldown === null
-                ? 'Sincronizando…'
-                : resendCooldown > 0
-                  ? `Reenviar código (${resendCooldown}s)`
-                  : 'Reenviar código'}
-            </button>
-          </div>
+          {!verified && (
+            <div className="mt-8 text-center text-xs text-neutral-500">
+              ¿No recibiste el correo?{' '}
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={syncing || loading || resendCooldown === null || resendCooldown > 0 || !emailParam}
+                className={`inline-flex items-center gap-1.5 font-semibold transition ${
+                  syncing || resendCooldown === null || resendCooldown > 0 || loading
+                    ? 'cursor-not-allowed text-neutral-400'
+                    : 'text-neutral-950 hover:underline'
+                }`}
+              >
+                <RotateCw size={12} className={resendCooldown !== null && resendCooldown > 0 ? 'animate-spin' : ''} />
+                {syncing || resendCooldown === null
+                  ? 'Sincronizando…'
+                  : resendCooldown > 0
+                    ? `Reenviar código (${resendCooldown}s)`
+                    : 'Reenviar código'}
+              </button>
+            </div>
+          )}
         </div>
       </main>
     </div>

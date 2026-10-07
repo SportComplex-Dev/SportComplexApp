@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { registerSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
@@ -58,7 +58,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="club-app">
+    <div className="club-app auth-shell">
       <TopBar />
       <main className="auth-page">
         {/* Panel de marca (izquierda) */}
@@ -69,11 +69,11 @@ export default function RegisterPage() {
               <div className="eyebrow hero-eyebrow">TU ESPACIO, TU MOMENTO</div>
               <h2>El movimiento<br />cambia <span>todo.</span></h2>
               <p>Bienvenido a una comunidad que se mueve contigo.</p>
-              <div className="auth-decoration" aria-hidden="true">
-                <Activity size={152} strokeWidth={0.8} aria-hidden="true" />
-              </div>
             </div>
             <div className="auth-quote">“La mejor inversión es la que haces en ti.”</div>
+          </div>
+          <div className="auth-decoration auth-decoration-circle" aria-hidden="true">
+            <img src="/images/Akros-logo.png" alt="" width="220" height="220" />
           </div>
         </div>
 
