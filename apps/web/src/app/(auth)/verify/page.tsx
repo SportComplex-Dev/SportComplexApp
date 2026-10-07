@@ -1,10 +1,48 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Mail, RotateCw, CheckCircle2 } from 'lucide-react'
-import { roleHome, type Role } from '@sportcomplex/core'
+
+type VerificationTiming = {
+  expiresAt: string
+  resendAvailableAt: string
+  serverNow: string
+}
+
+type VerificationTimingResponse = {
+  success: true
+  data: VerificationTiming
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isVerificationTiming(value: unknown): value is VerificationTimingResponse {
+  if (!isRecord(value) || typeof value.data !== 'object' || value.data === null) {
+    return false
+  }
+
+  const data = value.data as Record<string, unknown>
+  return (
+    value.success === true &&
+    typeof data.expiresAt === 'string' &&
+    Number.isFinite(Date.parse(data.expiresAt)) &&
+    typeof data.resendAvailableAt === 'string' &&
+    Number.isFinite(Date.parse(data.resendAvailableAt)) &&
+    typeof data.serverNow === 'string' &&
+    Number.isFinite(Date.parse(data.serverNow))
+  )
+}
+
+function getApiErrorMessage(payload: unknown, fallback: string) {
+  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
+    return payload.error.message
+  }
+  return fallback
+}
 
 export default function VerifyPage() {
   return (
@@ -15,38 +53,78 @@ export default function VerifyPage() {
 }
 
 function VerifyPageContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
-  const emailParam = searchParams.get('email') || 'tu correo'
+  const emailParam = searchParams.get('email') ?? ''
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [verified, setVerified] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(900) // 15 minutos (900 segundos) según RF-02.
-
-  // Estado para el temporizador de 60 segundos del botón de reenvío
-  const [resendCooldown, setResendCooldown] = useState(60)
+  const [syncing, setSyncing] = useState(true)
+  const [syncAttempt, setSyncAttempt] = useState(0)
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [resendCooldown, setResendCooldown] = useState<number | null>(null)
 
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
+  const expiresAtRef = useRef<number | null>(null)
+  const resendAvailableAtRef = useRef<number | null>(null)
 
-  // Temporizador de 15 minutos (RF-02)
+  const applyServerTiming = useCallback((timing: VerificationTiming, requestStartedAt: number) => {
+    const elapsedMs = performance.now() - requestStartedAt
+    const serverNow = Date.parse(timing.serverNow)
+    const now = performance.now()
+    const expiresAt = now + Math.max(0, Date.parse(timing.expiresAt) - serverNow - elapsedMs)
+    const resendAvailableAt = now + Math.max(0, Date.parse(timing.resendAvailableAt) - serverNow - elapsedMs)
+
+    expiresAtRef.current = expiresAt
+    resendAvailableAtRef.current = resendAvailableAt
+    setTimeLeft(Math.ceil(Math.max(0, expiresAt - now) / 1000))
+    setResendCooldown(Math.ceil(Math.max(0, resendAvailableAt - now) / 1000))
+  }, [])
+
   useEffect(() => {
-    if (timeLeft <= 0) return
+    if (!emailParam) {
+      setError('Falta el correo asociado a la verificación. Vuelve al registro para intentarlo de nuevo.')
+      setSyncing(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const requestStartedAt = performance.now()
+
+    void fetch(`/api/auth/verify?email=${encodeURIComponent(emailParam)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload: unknown = await response.json()
+        if (!response.ok || !isVerificationTiming(payload)) {
+          throw new Error(getApiErrorMessage(payload, 'No se pudo consultar la vigencia del código.'))
+        }
+        applyServerTiming(payload.data, requestStartedAt)
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return
+        setError(requestError instanceof Error ? requestError.message : 'No se pudo consultar la vigencia del código.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSyncing(false)
+      })
+
+    return () => controller.abort()
+  }, [applyServerTiming, emailParam, syncAttempt])
+
+  useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1)
-    }, 1000)
+      const now = performance.now()
+      if (expiresAtRef.current !== null) {
+        setTimeLeft(Math.ceil(Math.max(0, expiresAtRef.current - now) / 1000))
+      }
+      if (resendAvailableAtRef.current !== null) {
+        setResendCooldown(Math.ceil(Math.max(0, resendAvailableAtRef.current - now) / 1000))
+      }
+    }, 250)
     return () => clearInterval(timer)
-  }, [timeLeft])
-
-  // Temporizador regresivo de 60 segundos para el botón de reenvío
-  useEffect(() => {
-    if (resendCooldown <= 0) return
-    const cooldownTimer = setInterval(() => {
-      setResendCooldown((prev) => prev - 1)
-    }, 1000)
-    return () => clearInterval(cooldownTimer)
-  }, [resendCooldown])
+  }, [])
 
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -100,18 +178,26 @@ function VerifyPageContent() {
       return
     }
 
-    if (timeLeft <= 0) {
+    if (syncing || expiresAtRef.current === null || performance.now() >= expiresAtRef.current) {
+      setTimeLeft(0)
       setError('El token ha expirado. Por favor solicita un nuevo código.')
       return
     }
 
     setLoading(true)
     try {
+      const response = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailParam, code: token }),
+      })
+      const payload: unknown = await response.json()
+      if (!response.ok || !isRecord(payload) || payload.success !== true) {
+        throw new Error(getApiErrorMessage(payload, 'No se pudo verificar el código. Inténtalo nuevamente.'))
+      }
+
       setVerified(true)
-      setTimeout(() => {
-        const role: Role = 'Cliente'
-        router.push(roleHome[role])
-      }, 1500)
+      setCode(['', '', '', '', '', ''])
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Código de verificación incorrecto.'
       setError(message)
@@ -120,14 +206,32 @@ function VerifyPageContent() {
     }
   }
 
-  const handleResend = () => {
-    if (resendCooldown > 0) return
+  const handleResend = async () => {
+    if (syncing || loading || resendAvailableAtRef.current === null || performance.now() < resendAvailableAtRef.current) return
 
-    setTimeLeft(900)
-    setResendCooldown(60)
-    setCode(['', '', '', '', '', ''])
     setError(null)
-    inputsRef.current[0]?.focus()
+    setLoading(true)
+    const requestStartedAt = performance.now()
+
+    try {
+      const response = await fetch('/api/auth/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailParam }),
+      })
+      const payload: unknown = await response.json()
+      if (!response.ok || !isVerificationTiming(payload)) {
+        throw new Error(getApiErrorMessage(payload, 'No se pudo reenviar el código. Inténtalo nuevamente.'))
+      }
+
+      applyServerTiming(payload.data, requestStartedAt)
+      setCode(['', '', '', '', '', ''])
+      inputsRef.current[0]?.focus()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo reenviar el código. Inténtalo nuevamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -190,13 +294,26 @@ function VerifyPageContent() {
             </h1>
             <p className="mt-1.5 text-xs text-neutral-500 leading-relaxed">
               Hemos enviado un código numérico de 6 dígitos a{' '}
-              <strong className="text-neutral-800">{emailParam}</strong>.
+              <strong className="text-neutral-800">{emailParam || 'tu correo'}</strong>.
             </p>
           </div>
 
           {error && (
             <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-600">
               {error}
+              {!syncing && timeLeft === null && emailParam && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null)
+                    setSyncing(true)
+                    setSyncAttempt((attempt) => attempt + 1)
+                  }}
+                  className="ml-2 font-bold underline"
+                >
+                  Reintentar
+                </button>
+              )}
             </div>
           )}
 
@@ -204,7 +321,13 @@ function VerifyPageContent() {
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
               <CheckCircle2 size={40} className="mx-auto text-emerald-600 mb-2" />
               <h3 className="text-sm font-bold text-emerald-950">¡Cuenta verificada con éxito!</h3>
-              <p className="text-xs text-emerald-700 mt-1">Redirigiendo a tu espacio...</p>
+              <p className="text-xs text-emerald-700 mt-1">Ya puedes iniciar sesión con tu correo y contraseña.</p>
+              <Link
+                href="/login"
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d3b2e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#14513f]"
+              >
+                Ir a iniciar sesión <ArrowRight size={16} />
+              </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -223,6 +346,8 @@ function VerifyPageContent() {
                     onChange={(e) => handleChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     onPaste={handlePaste}
+                    disabled={syncing || loading || timeLeft === null || timeLeft <= 0}
+                    aria-label={`Dígito ${index + 1} del código de verificación`}
                     className="h-13 w-12 sm:h-14 sm:w-14 rounded-xl border border-neutral-200 bg-[#f9fafb] text-center text-xl font-bold text-neutral-900 outline-none transition focus:border-neutral-900 focus:bg-white focus:ring-1 focus:ring-neutral-900"
                   />
                 ))}
@@ -233,17 +358,17 @@ function VerifyPageContent() {
                 <span>Vigencia del código:</span>
                 <span
                   className={`font-semibold ${
-                    timeLeft < 120 ? 'text-red-500' : 'text-neutral-900'
+                    timeLeft !== null && timeLeft < 120 ? 'text-red-500' : 'text-neutral-900'
                   }`}
                 >
-                  {formatTimer(timeLeft)}
+                  {syncing || timeLeft === null ? '--:--' : formatTimer(timeLeft)}
                 </span>
               </div>
 
               {/* Botón principal */}
               <button
                 type="submit"
-                disabled={loading || timeLeft <= 0}
+                disabled={syncing || loading || timeLeft === null || timeLeft <= 0}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#bef264] py-3.5 text-sm font-bold text-neutral-950 shadow-sm transition hover:bg-[#aee74e] active:scale-[0.99] disabled:opacity-50"
               >
                 {loading ? 'Verificando...' : 'Confirmar código'}{' '}
@@ -258,15 +383,19 @@ function VerifyPageContent() {
             <button
               type="button"
               onClick={handleResend}
-              disabled={resendCooldown > 0}
+              disabled={syncing || loading || resendCooldown === null || resendCooldown > 0 || !emailParam}
               className={`inline-flex items-center gap-1.5 font-semibold transition ${
-                resendCooldown > 0
+                syncing || resendCooldown === null || resendCooldown > 0 || loading
                   ? 'cursor-not-allowed text-neutral-400'
                   : 'text-neutral-950 hover:underline'
               }`}
             >
-              <RotateCw size={12} className={resendCooldown > 0 ? 'animate-spin' : ''} />
-              {resendCooldown > 0 ? `Reenviar código (${resendCooldown}s)` : 'Reenviar código'}
+              <RotateCw size={12} className={resendCooldown !== null && resendCooldown > 0 ? 'animate-spin' : ''} />
+              {syncing || resendCooldown === null
+                ? 'Sincronizando…'
+                : resendCooldown > 0
+                  ? `Reenviar código (${resendCooldown}s)`
+                  : 'Reenviar código'}
             </button>
           </div>
         </div>
