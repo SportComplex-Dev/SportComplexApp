@@ -4,6 +4,7 @@ import {
   hashSecret,
   generateVerificationCode,
   TOKEN_TTL_MS,
+  RESEND_COOLDOWN_MS,
   isResendAllowed,
 } from "@sportcomplex/core/src/security/token";
 import { sendVerificationCodeEmail } from "@sportcomplex/core/src/integrations/email";
@@ -45,12 +46,17 @@ export async function POST(request: Request) {
     await markUsed(latestToken.id);
   }
 
-  await createToken(usuario.id, tokenHash, expiraEn);
+  const token = await createToken(usuario.id, tokenHash, expiraEn);
 
   // El código en claro nunca se persiste; se envía al webhook de correo (TSK-AU-01).
   await sendVerificationCodeEmail({ usuarioId: usuario.id, to: email, nombre: usuario.nombre, code, expiraEn });
 
   return ok({
     message: "Código reenviado. Verifica tu correo con el código de 6 dígitos.",
+    expiresAt: token.expiraEn.toISOString(),
+    resendAvailableAt: new Date(
+      token.creadoEn.getTime() + RESEND_COOLDOWN_MS,
+    ).toISOString(),
+    serverNow: token.creadoEn.toISOString(),
   });
 }

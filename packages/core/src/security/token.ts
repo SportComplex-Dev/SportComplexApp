@@ -68,13 +68,13 @@ export async function verifySecret(hash: string, plain: string): Promise<boolean
 
 /**
  * Comprueba si un token ha expirado comparando `expiraEn` con `now`.
- * Un código de hace 15:01 minutos retorna `true` (expirado).
+ * Retorna `true` al alcanzar o superar la fecha de expiración.
  * @param {Date} expiraEn - Fecha de expiración del token
  * @param {Date} [now=new Date()] - Instante de referencia (inyectable para tests)
  * @returns {boolean} `true` si expiró, `false` si aún vigente
  */
 export function isTokenExpired(expiraEn: Date, now = new Date()): boolean {
-  return now.getTime() > expiraEn.getTime();
+  return now.getTime() >= expiraEn.getTime();
 }
 
 /**
