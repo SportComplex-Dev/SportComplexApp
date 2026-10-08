@@ -101,9 +101,9 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
   }, [stopScanner]);
 
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-brand-surface/95 p-2 shadow-[0_30px_80px_rgba(9,15,12,0.7)]">
-      <div className="relative overflow-hidden rounded-[22px] border border-brand-accent/20 bg-[#0b1410]">
-        <div id={`reader-${readerId}`} ref={scannerRef} className="h-[420px] w-full bg-[#09120f] sm:h-[520px]" />
+    <div className="relative overflow-hidden rounded-[28px] border border-brand-border bg-brand-surface p-2 shadow-[0_30px_80px_rgba(9,15,12,0.22)]">
+      <div className="relative overflow-hidden rounded-[22px] border border-brand-accent/30 bg-[#0b1410]">
+        <div id={`reader-${readerId}`} ref={scannerRef} className="scanner-reader h-[420px] w-full bg-[#09120f] sm:h-[520px]" />
 
         <AnimatePresence>
           {error ? (
@@ -111,13 +111,13 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-x-4 top-4 z-20 rounded-2xl border border-red-500/40 bg-red-500/15 p-3 text-sm text-red-100"
+              className="absolute inset-x-4 top-4 z-20 rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-3 text-sm text-brand-danger-text"
             >
               <div className="flex items-center gap-2 font-medium">
                 <ShieldAlert className="h-4 w-4" />
                 Error de cámara
               </div>
-              <p className="mt-1 text-red-100/90">{error}</p>
+              <p className="mt-1">{error}</p>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -136,13 +136,13 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
           </div>
         </div>
 
-        <div className="absolute inset-x-4 bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-sm text-slate-200">
+        <div className="absolute inset-x-4 bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-black/60 px-3 py-2 text-white backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-white">
             {cameraReady ? <QrCode className="h-4 w-4 text-brand-accent" /> : <CameraOff className="h-4 w-4 text-slate-400" />}
             <span>{cameraReady ? "Escaneando" : "Esperando cámara"}</span>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-limeSoft">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
             {facingMode === "environment" ? "Trasera" : "Frontal"}
           </div>
         </div>

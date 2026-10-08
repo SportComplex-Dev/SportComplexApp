@@ -9,28 +9,51 @@ import { ScannerHeader } from "@/components/scanner/scanner-header";
 import { ShiftSelector } from "@/components/scanner/shift-selector";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
 import {
-  type ResolvedTicket,
   type ScannerFlowState,
   type ShiftOption,
-  redeemTicketAccess,
-  scannerShiftOptions,
-  validateTicketForShift,
-} from "@/components/scanner/mock-access";
+  type TicketValidationResponse,
+  scannerService,
+} from "@/components/scanner/scanner.service";
 import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
 
 export default function ScannerPage() {
   const [flowState, setFlowState] = useState<ScannerFlowState>("idle");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [shiftOptions, setShiftOptions] = useState<ShiftOption[]>([]);
+  const [isLoadingShifts, setIsLoadingShifts] = useState(true);
+  const [shiftLoadError, setShiftLoadError] = useState<string | null>(null);
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<ShiftOption | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [ticket, setTicket] = useState<ResolvedTicket | null>(null);
+  const [ticket, setTicket] = useState<TicketValidationResponse | null>(null);
   const [modalMessage, setModalMessage] = useState("Se debe validar el QR para confirmar acceso.");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
 
   const { playSuccess, playError } = useAudioFeedback(audioEnabled);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    scannerService.getShiftOptions()
+      .then((options) => {
+        if (isCurrent) setShiftOptions(options);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setShiftLoadError(error instanceof Error ? error.message : "No se pudieron cargar los puestos de turno.");
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingShifts(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   const setStateAndMessage = useCallback((nextState: ScannerFlowState, nextMessage: string) => {
     setFlowState(nextState);
@@ -104,30 +127,42 @@ export default function ScannerPage() {
       setModalMessage("Validando QR del ticket y comprobando coincidencia de turno...");
       setIsModalOpen(true);
 
-      const result = await validateTicketForShift(rawQr, activeShift);
-
-      if (!result.ok) {
-        const nextState = result.reason === "wrong-court" ? "access-denied" : "ticket-invalid";
-        setStateAndMessage(nextState, result.message);
-        setTicket(null);
-        if (audioEnabled) {
-          playError();
+      try {
+        const result = await scannerService.validateTicket(rawQr, activeShift);
+        if (result.isValid && !result.ticketId) {
+          setTicket(null);
+          setStateAndMessage("ticket-invalid", "La respuesta de validación no incluye el identificador requerido para el canje.");
+          if (audioEnabled) playError();
+          return;
         }
-        return;
-      }
 
-      setTicket(result.ticket);
-      setStateAndMessage("ticket-valid", result.message);
-      setModalMessage(result.message);
-      if (audioEnabled) {
-        playSuccess();
+        if (!result.isValid) {
+          const nextState = result.status === "WRONG_COURT" ? "access-denied" : "ticket-invalid";
+          setStateAndMessage(nextState, result.message);
+          setTicket(null);
+          if (audioEnabled) playError();
+          return;
+        }
+
+        setTicket(result);
+        setStateAndMessage("ticket-valid", result.message);
+        if (audioEnabled) {
+          playSuccess();
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error
+          ? `No se pudo validar el ticket: ${error.message}`
+          : "No se pudo validar el ticket por un error de conexión.";
+        setTicket(null);
+        setStateAndMessage("ticket-invalid", message);
+        if (audioEnabled) playError();
       }
     },
     [activeShift, audioEnabled, playError, playSuccess, setStateAndMessage],
   );
 
   const handleRedeem = useCallback(async () => {
-    if (!ticket || !activeShift) {
+    if (!ticket?.isValid || !ticket.ticketId || !activeShift) {
       return;
     }
 
@@ -136,22 +171,24 @@ export default function ScannerPage() {
     setModalMessage("Registrando acceso y confirmando el paso del cliente...");
 
     try {
-      const result = await redeemTicketAccess(ticket, activeShift);
-      if (!result.ok) {
-        setStateAndMessage("redeem-error", "No se pudo registrar el canje del ticket.");
+      const result = await scannerService.redeemTicket(ticket.ticketId, activeShift);
+      if (!result.success) {
+        setStateAndMessage("redeem-error", result.message);
         if (audioEnabled) {
           playError();
         }
         return;
       }
 
-      setStateAndMessage("access-granted", `Acceso concedido para ${ticket.holderName}.`);
-      setModalMessage(`Acceso concedido para ${ticket.holderName}.`);
+      setStateAndMessage("access-granted", result.message);
       if (audioEnabled) {
         playSuccess();
       }
-    } catch {
-      setStateAndMessage("redeem-error", "Se produjo un error durante el canje del ticket.");
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? `No se pudo registrar el canje: ${error.message}`
+        : "No se pudo registrar el canje por un error de conexión.";
+      setStateAndMessage("redeem-error", message);
       if (audioEnabled) {
         playError();
       }
@@ -179,41 +216,49 @@ export default function ScannerPage() {
   const canStartCamera = Boolean(activeShift) && (flowState === "starting-camera" || flowState === "scanning" || flowState === "validating-ticket");
 
   return (
-    <main className="min-h-screen bg-brand-dark text-white">
+    <main data-scanner-theme={theme} className="min-h-screen bg-brand-dark text-brand-text">
       <ScannerHeader
         activeShift={activeShift}
         audioEnabled={audioEnabled}
+        theme={theme}
         onToggleAudio={() => setAudioEnabled((current) => !current)}
+        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
         onChangeShift={handleChangeShift}
       />
 
       {!activeShift ? (
         <section className="px-4 pb-10 pt-8 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            <ShiftSelector options={scannerShiftOptions} selectedId={selectedShiftId} onSelect={handleSelectShift} />
+            <ShiftSelector
+              options={shiftOptions}
+              selectedId={selectedShiftId}
+              isLoading={isLoadingShifts}
+              loadError={shiftLoadError}
+              onSelect={handleSelectShift}
+            />
           </div>
         </section>
       ) : (
         <section className="px-4 pb-10 pt-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            <div className="mb-5 flex flex-col gap-3 rounded-[26px] border border-white/10 bg-brand-surface/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-5 flex flex-col gap-3 rounded-[26px] border border-brand-border bg-brand-surface p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent/80">Puesto confirmado</p>
-                <h2 className="mt-1 text-xl font-bold text-white">{activeShift.label} · {activeShift.courtName}</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent">Puesto confirmado</p>
+                <h2 className="mt-1 text-xl font-bold text-brand-text">{activeShift.label} · {activeShift.courtName}</h2>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setFacingMode((current) => (current === "environment" ? "user" : "environment"))}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-brand-accent/40 hover:text-brand-accent"
+                  className="rounded-full border border-brand-border bg-brand-control px-3 py-2 text-xs font-semibold text-brand-text transition hover:border-brand-accent hover:text-brand-accent"
                 >
                   Cambiar cámara
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenCamera}
-                  className="rounded-full bg-brand-accent px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-accent/90"
+                  className="rounded-full bg-brand-accent px-4 py-2 text-xs font-bold text-brand-on-accent transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
                 >
                   {flowState === "scanning" ? "Cámara activa" : "Iniciar cámara"}
                 </button>
@@ -221,7 +266,7 @@ export default function ScannerPage() {
             </div>
 
             {cameraToast ? (
-              <div className="mb-4 flex items-center gap-2 rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              <div role="alert" className="mb-4 flex items-center gap-2 rounded-2xl border border-brand-danger-border bg-brand-danger-bg px-4 py-3 text-sm text-brand-danger-text">
                 <WifiOff className="h-4 w-4" />
                 {cameraToast}
               </div>
@@ -240,34 +285,34 @@ export default function ScannerPage() {
               <motion.aside
                 initial={{ opacity: 0, x: 18 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="rounded-[28px] border border-white/10 bg-brand-surface/90 p-5"
+                className="rounded-[28px] border border-brand-border bg-brand-surface p-5"
               >
                 <div className="mb-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent/80">Estado del turno</p>
-                  <h3 className="mt-2 text-xl font-bold text-white">{activeShift.courtName}</h3>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent">Estado del turno</p>
+                  <h3 className="mt-2 text-xl font-bold text-brand-text">{activeShift.courtName}</h3>
                 </div>
 
-                <div className="space-y-3 text-sm text-slate-300">
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
+                <div className="space-y-3 text-sm text-brand-muted">
+                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
                     <span>Horario</span>
-                    <span className="font-semibold text-white">{activeShift.startTime} - {activeShift.endTime}</span>
+                    <span className="font-semibold text-brand-text">{activeShift.startTime} - {activeShift.endTime}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
+                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
                     <span>Instalación</span>
-                    <span className="font-semibold text-white">{activeShift.venueName}</span>
+                    <span className="font-semibold text-brand-text">{activeShift.venueName}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
+                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
                     <span>Validación</span>
                     <span className="font-semibold text-brand-accent">{flowState}</span>
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-brand-accent/25 bg-brand-accent/10 p-4">
+                <div className="mt-5 rounded-2xl border border-brand-accent/30 bg-brand-accent/10 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-brand-accent">
                     {flowState === "scanning" ? <CheckCircle2 className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
                     {flowState === "scanning" ? "Escaneando activo" : "Esperando QR"}
                   </div>
-                  <p className="mt-2 text-sm text-slate-200">
+                  <p className="mt-2 text-sm text-brand-text">
                     {flowState === "scanning"
                       ? "Apunte al código del ticket para validar el acceso del cliente."
                       : "Confirme el turno y active la cámara para iniciar lectura."}
@@ -275,7 +320,7 @@ export default function ScannerPage() {
                 </div>
 
                 {flowState === "validating-ticket" ? (
-                  <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-200">
+                  <div className="mt-5 flex items-center gap-2 rounded-2xl border border-brand-border bg-brand-control px-3 py-3 text-sm text-brand-text">
                     <Loader2 className="h-4 w-4 animate-spin text-brand-accent" />
                     Validando reserva y comprobando coincidencia con el puesto activo...
                   </div>

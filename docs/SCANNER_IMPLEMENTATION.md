@@ -1,165 +1,124 @@
 # TSK-FE-14 — Escáner QR con selección de puesto de turno
 
-## 1) Resumen de la tarea y objetivo RNF-04
+## Alcance y estado
 
-La tarea TSK-FE-14 aborda la experiencia de control de acceso para empleados del rol `Empleado_Lector` en AKROS Club. El objetivo principal es permitir:
+La ruta `/scanner` permite seleccionar un puesto, iniciar la cámara bajo demanda, validar un QR contra la cancha activa y solicitar el canje de un ticket. La UI está desacoplada de la red por un adapter tipado. Mientras TSK-BE-14 no publique sus rutas y contrato definitivo, el adapter conectado es una implementación de demostración local; no representa validación ni canje persistentes.
 
-- Seleccionar un puesto de turno activo.
-- Inicializar la cámara solo después de confirmar el puesto.
-- Escanear QR de reserva o ticket.
-- Validar la correspondencia entre el ticket y la cancha/puesto actual.
-- Rechazar accesos inválidos, caducados, ya usados o con cancha incorrecta.
-- Registrar un canje seguro con feedback visual y auditivo.
+> ## ⚠️ BLOQUEANTE — información que necesitamos de TSK-BE-14
+>
+> **La conexión real no se puede activar hasta recibir y acordar lo siguiente con backend:**
+>
+> - [ ] **Endpoints y entorno:** URL base por entorno, método HTTP y ruta para consultar puestos asignados, validar QR y canjear acceso. Indicar si el endpoint de puestos ya existe o si la asignación llega en el contexto de sesión.
+> - [ ] **Autenticación y autorización:** mecanismo de autenticación requerido y cómo obtiene backend al empleado autenticado. Confirmar si `empleadoId`, `venueId` y `courtId` se derivan de sesión/asignación en servidor o cuáles campos acepta el payload.
+> - [ ] **Contrato de turnos:** JSON real de una asignación, identificadores que corresponden a puesto, empleado, instalación y servicio/cancha, nombres y horas de turno; reglas de asignación vigente y zona horaria.
+> - [ ] **Formato y seguridad del QR:** contenido exacto del QR (UUID de `TicketQr.id`, `codigoUuid`, URL u otro), firma/token requerido y procedimiento de verificación. No enviar secretos al frontend.
+> - [ ] **Contrato de validación:** payload y respuesta JSON completos, incluyendo la fuente de titular/cancha, y correspondencia de errores HTTP/códigos de dominio con `VALID`, `WRONG_COURT`, `EXPIRED`, `ALREADY_USED` e `INVALID`. El esquema actual solo tiene estados de ticket `EMITIDO | USADO`; backend debe definir cómo identifica expiración y ticket inexistente/QR inválido.
+> - [ ] **Contrato de canje:** payload y respuesta JSON, incluidos formato y origen autoritativo de `redeemedAt`; acordar si se registra `LecturaAcceso`, cómo se relaciona la asignación y cómo responde un ticket ya canjeado.
+> - [ ] **Atomicidad e idempotencia:** garantías ante doble lectura, reintentos, latencia o pérdida de respuesta, además del resultado que el frontend debe mostrar en cada caso.
+> - [ ] **Errores de red y negocio:** estructura JSON estable para errores, códigos y mensajes recuperables; confirmar política para timeout, sesión vencida y falta de conectividad.
+>
+> **Punto de conexión:** implementar el adapter HTTP en `apps/web/src/components/scanner/scanner.service.ts`, validar allí las respuestas de red y sustituir `scannerAdapter = mockScannerAdapter` por el adapter real. La UI no debe llamar endpoints ni reinterpretar respuestas. Hasta que se complete este checklist, la demostración local no debe usarse para conceder accesos reales.
 
-El objetivo de rendimiento RNF-04 indica que la decodificación debe estar por debajo de 400 ms en condiciones normales. Se implementó una configuración agresiva de `html5-qrcode` con `fps` y `qrbox` ajustados para reducir latencia, pero el cumplimiento real depende del hardware, iluminción y navegador del dispositivo, por lo que no se declara como garantía empírica garantizada.
+El modelo Prisma ya contiene `TicketQr`, `Reserva`, `AsignacionPuesto` y `LecturaAcceso`. `TicketQr.id` es UUID, su estado de persistencia es `EMITIDO | USADO` y `LecturaAcceso` registra el empleado, el modo, resultado y fecha/hora. La respuesta del servicio de frontend normaliza estos datos al contrato de validación de TSK-FE-14. El backend es responsable de verificar autenticidad/firma, vigencia, estado, cancha, permisos y atomicidad del canje.
 
-## 2) Tecnologías aplicadas
+## Componentes
 
-- `html5-qrcode`: lectura de QR desde la cámara del dispositivo.
-- `framer-motion`: animaciones suaves para transiciones, modal, overlays y láser de mira.
-- Web Audio API nativa: feedback acústico de éxito y error, con toggle de audio.
-- `lucide-react`: iconografía consistente con la identidad visual del producto.
-- Tailwind CSS: sistema visual y paleta AKROS Club.
+- `apps/web/src/app/(staff)/scanner/page.tsx`: coordina turnos, cámara, validación, canje y feedback.
+- `apps/web/src/components/scanner/scanner.service.ts`: contratos públicos, adapter activo y traducción del contexto de turno a payloads. Es el único módulo de la UI que debe conocer la implementación de integración.
+- `apps/web/src/components/scanner/shift-selector.tsx`: selección del puesto antes de permitir iniciar la cámara.
+- `apps/web/src/components/scanner/scanner-header.tsx`: contexto de turno, control de audio, cambio de puesto y alternancia de tema.
+- `apps/web/src/components/scanner/qr-camera-viewport.tsx`: ciclo de vida de `html5-qrcode`, permisos y marco de lectura.
+- `apps/web/src/components/scanner/ticket-validation-modal.tsx`: estados de validación, rechazo, carga y canje.
+- `apps/web/src/components/scanner/use-audio-feedback.ts`: feedback acústico opcional.
 
-## 3) Componentes creados y responsabilidades
+## Diseño claro y oscuro
 
-### `apps/web/src/app/(staff)/scanner/page.tsx`
+No había un proveedor de tema ni configuración JavaScript de Tailwind en la aplicación. La app usa Tailwind CSS 4; los tokens se definen como variables semánticas con `@theme inline` en `apps/web/src/styles/globals.css`, y el escáner selecciona la paleta mediante `data-scanner-theme="dark|light"`. El control de tema del header alterna ambos modos; por defecto se conserva el diseño oscuro original.
 
-Ruta principal del flujo de escáner. Coordina:
+| Token semántico | Oscuro | Claro |
+|---|---|---|
+| Fondo (`brand-dark`) | `#111815` | `#f4f7f1` |
+| Superficie (`brand-surface`) | `#17211b` | `#ffffff` |
+| Superficie secundaria | `#202b24` | `#f0f4ed` |
+| Texto (`brand-text`) | `#f5f7f4` | `#17211a` |
+| Texto secundario (`brand-muted`) | `#b5c0b7` | `#4b5d50` |
+| Acento | `#c9ef75` | `#496817` |
 
-- selector de turno
-- apertura/cierre de cámara
-- estados del ciclo de vida
-- feedback auditivo
-- validación de ticket
-- modal de confirmación
-- canje de acceso
+Tarjetas, controles, bordes, cabecera, modal, estados de error y botón de canje utilizan tokens de color Tailwind semánticos. Los colores de texto para mensajes de error y el color de texto sobre botones se adaptan por tema. El feed de cámara permanece oscuro en ambos modos porque muestra la imagen del dispositivo; el HUD conserva texto blanco sobre fondo oscuro y el marco de enfoque conserva el acento de marca.
 
-### `apps/web/src/components/scanner/shift-selector.tsx`
+Los pares principales de texto/fondo de ambas paletas superan WCAG AA para texto normal. Los controles interactivos tienen foco visible y los mensajes de error usan borde, fondo, icono y texto, no solo color.
 
-Selector visual de puestos de turno para elegir la cancha y horario activos antes de abrir la cámara.
+## Contratos del servicio
 
-### `apps/web/src/components/scanner/scanner-header.tsx`
+`scanner.service.ts` exporta los contratos usados por el frontend:
 
-Cabecera sticky con:
+```ts
+export interface ShiftContext {
+  empleadoId: string;
+  venueId: string;
+  courtId: string;
+}
 
-- nombre del turno activo
-- estado de la cámara
-- toggle de audio
-- opción para cambiar de puesto
+export interface TicketValidationPayload {
+  qrCode: string;
+  courtId: string;
+}
 
-### `apps/web/src/components/scanner/qr-camera-viewport.tsx`
+export interface TicketValidationResponse {
+  isValid: boolean;
+  ticketId?: string;
+  userName?: string;
+  targetCourtName?: string;
+  status: "VALID" | "WRONG_COURT" | "EXPIRED" | "ALREADY_USED" | "INVALID";
+  message: string;
+}
 
-Contenedor principal del visor QR. Encargado de:
+export interface RedeemTicketPayload {
+  ticketId: string;
+  empleadoId: string;
+  courtId: string;
+  venueId: string;
+  scannedAt: string;
+}
 
-- crear la instancia de `Html5Qrcode`
-- iniciar y detener la cámara
-- evitar streams duplicados
-- evitar múltiples instancias
-- configurar `qrbox` y FPS adaptados
-- manejar error de acceso a cámara / permisos
-
-### `apps/web/src/components/scanner/ticket-validation-modal.tsx`
-
-Modal accesible para:
-
-- mostrar datos del ticket validado
-- revisar titular, cancha, horario y asistentes
-- ejecutar “Dar Acceso” con estado de carga
-- manejar rechazos con texto + icono + color
-- soportar Escape para cerrar y navegación por teclado
-
-### `apps/web/src/components/scanner/use-audio-feedback.ts`
-
-Hook con Web Audio API para sonidos de éxito y error. Respeta el toggle de audio y evita fallos por restricciones de autoplay.
-
-### `apps/web/src/components/scanner/mock-access.ts`
-
-Adaptador temporal para completar el flujo de validación/canje cuando la integración real con TSK-BE-14 no está disponible en frontend.
-
-## 4) Estado de la integración con TSK-BE-14
-
-No existe una integración backend real en este monorepo para la validación de QR de acceso. Por ello, se implementó un mock frontend temporal claramente identificado en:
-
-- `apps/web/src/components/scanner/mock-access.ts`
-
-El payload esperado para el canje real (si el backend lo expone más adelante) debería seguir la forma:
-
-```json
-{
-  "ticketId": "string",
-  "empleadoId": "string",
-  "venueId": "string",
-  "courtId": "string",
-  "scannedAt": "ISO-8601"
+export interface RedeemTicketResponse {
+  success: boolean;
+  redeemedAt: string;
+  message: string;
 }
 ```
 
-El adaptador mock simula:
+`ShiftOption` extiende `ShiftContext` con propiedades exclusivamente de presentación: identificador y etiqueta del puesto, nombres de instalación/cancha y horas de turno. El adapter debe poblar esas propiedades desde la asignación real del usuario autenticado. No se debe considerar confiable el `empleadoId`, `venueId` ni `courtId` enviado por el cliente: el backend debe validar la asignación del empleado y derivar o comprobar los identificadores permitidos.
 
-- ticket válido
-- ticket inválido o malformado
-- ticket inexistente
-- ticket expirado
-- ticket usado
-- ticket asociado a otra cancha
+## Conexión a TSK-BE-14
 
-La implementación actual usa esos contratos en frontend para completar el flujo UX sin inventar endpoints ni tocar backend compartido.
+No se presupone una URL ni se crean endpoints de frontend mientras el contrato del backend siga pendiente. Cuando TSK-BE-14 esté disponible:
 
-## 5) Guía de pruebas paso a paso
+1. Implementar un `ScannerServiceAdapter` HTTP en `apps/web/src/components/scanner/scanner.service.ts` usando los endpoints acordados con backend y el cliente HTTP estándar de la app.
+2. Implementar `getShiftOptions`, `validateTicket` y `redeemTicket` en ese adapter. Serializar los payloads tipados, validar la forma de las respuestas en el límite de red y propagar códigos/mensajes de error como errores visibles para el usuario.
+3. Cambiar únicamente la asignación `scannerAdapter` de `mockScannerAdapter` al adapter HTTP. Los componentes y la página solo consumen `scannerService`.
+4. Mapear el contrato real de TSK-BE-14 al contrato estable del scanner: estados Prisma `EMITIDO/USADO` y resultados de lectura a `VALID`, `WRONG_COURT`, `EXPIRED`, `ALREADY_USED` o `INVALID`. Acordar explícitamente cómo se comunica expiración, ya que el enum actual `EstadoTicket` solo distingue emitido y usado.
+5. Comprobar que `redeemedAt` venga del backend y que el canje sea atómico/idempotente. El backend debe volver a validar la firma del QR, turno vigente, estado del ticket, cancha/instalación y permisos antes de escribir `LecturaAcceso` y marcar el ticket como usado.
 
-### Prueba 1 — selección de puesto
+Contrato esperado:
 
-1. Abrir `/scanner`.
-2. Verificar que la cámara permanece apagada al entrar.
-3. Seleccionar un puesto de turno.
-4. Confirmar que aparece el visor y que el estado cambia a `starting-camera` / `scanning`.
+| Operación | Entrada | Salida |
+|---|---|---|
+| Listar turnos | Contexto autenticado | `ShiftOption[]` |
+| Validar QR | `TicketValidationPayload` | `TicketValidationResponse` |
+| Canjear acceso | `RedeemTicketPayload` | `RedeemTicketResponse` |
 
-### Prueba 2 — inicio de cámara
+La respuesta de validación debe incluir `ticketId` cuando `isValid` sea `true`; de lo contrario la UI no permitirá solicitar el canje. Un error de red no debe convertirse en una respuesta `INVALID`: debe propagarse para mostrar un error de conexión recuperable.
 
-1. Pulsar “Iniciar cámara”.
-2. Confirmar que no aparecen múltiples streams.
-3. Verificar que la cámara se activa solo después de confirmar el puesto.
-4. Mover entre cámaras frontal y trasera y comprobar que no se dupliquen instancias.
+## Adapter local y pruebas manuales
 
-### Prueba 3 — QR válido
+El adapter de demostración está encapsulado en `scanner.service.ts`; no hay store, parser QR ni simulación de red en los componentes. Los códigos locales son `AKR-1001` (válido para Puesto 01), `AKR-1002` (válido para Puesto 02), `AKR-1003` (expirado) y `AKR-1004` (usado). Para probar cancha incorrecta, usar `AKR-1001` en Puesto 02. Estos identificadores son fixtures de demostración y no corresponden al UUID de `TicketQr.id`.
 
-1. Escanear un código que corresponda a un ticket válido del mismo puesto.
-2. Comprobar que la lectura se pausa inmediatamente.
-3. Verificar modal con Código de reserva, Titular, Cancha/Instalación, Horario y Asistentes.
-4. Pulsar “Dar Acceso”.
-5. Confirmar que aparece feedback de éxito y que el estado pasa a `access-granted`.
+1. Entrar a `/scanner`, confirmar que cámara permanece apagada y alternar claro/oscuro.
+2. Elegir el puesto, iniciar cámara y comprobar que el viewport y el marco focal se mantienen legibles en ambos temas.
+3. Validar tickets válidos, expirados, usados, inexistentes y de otra cancha; comprobar que los estados dan mensajes diferenciados.
+4. Canjear un ticket válido y confirmar que el botón pasa a confirmación y no permite un segundo canje desde el mismo modal.
+5. Denegar permisos de cámara, comprobar el error y cambiar de cámara/puesto.
+6. Probar el audio en éxito/error con el control activado y desactivado.
 
-### Prueba 4 — QR invalido / no reconocido
-
-1. Escanear un QR malformado o inexistente.
-2. Confirmar feedback rojo + iconografía + texto explicativo.
-3. Verificar que no se cuelga la vista.
-4. Pulsar “Escanear siguiente”.
-
-### Prueba 5 — ticket de otra cancha
-
-1. Escanear un ticket asignado a una cancha distinta a la del turno activo.
-2. Confirmar que se muestra `ACCESO DENEGADO`.
-3. Verificar que no se emite canje exitoso.
-
-### Prueba 6 — ticket usado o expirado
-
-1. Probar ticket expirado y ticket ya usado desde el mock.
-2. Confirmar que se muestran mensajes de rechazo y se devuelve a la espera del siguiente QR.
-
-### Prueba 7 — errores de cámara
-
-1. Denegar permisos de cámara en el navegador.
-2. Verificar mensaje de error con acción de recuperación.
-3. Confirmar que el visor no queda en estado inconsistente.
-
-### Prueba 8 — audio
-
-1. Activar el audio desde el header.
-2. Escanear un QR exitoso y uno inválido.
-3. Confirmar que el audio reproduce el patrón correcto sin bloquear la UI.
-
-## 6) Estado final del cumplimiento
-
-La implementación frontend de la tarea TSK-FE-14 queda completada en interfaz, flujo UX, estados, estilos visuales y flujo de acceso con mock temporal. La integración efectiva con TSK-BE-14 deberá conectarse cuando el backend exponga el contrato real y se podrá reemplazar el adaptador mock sin alterar la capa UI.
+La decodificación inferior a 400 ms (RNF-04) depende del dispositivo, iluminación y navegador; no se declara garantizada solo por la configuración de `html5-qrcode`.
