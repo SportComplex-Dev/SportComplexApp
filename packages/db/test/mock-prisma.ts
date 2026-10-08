@@ -611,6 +611,8 @@ export function createMockPrisma() {
               res[key] = nested ? pickDisponibilidad(fullDisponibilidad, nested) : fullDisponibilidad;
             } else if (key === "ticketQr") {
               res[key] = tickets.find((t) => t.reservaId === reservation.id);
+            } else if (key === "titular") {
+              res[key] = usuarios.find((u) => u.id === reservation.titularId);
             }
           }
           return res;
