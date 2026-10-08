@@ -285,6 +285,25 @@ curl -X POST http://localhost:3000/api/access -H "Content-Type: application/json
 - [x] *Firma QR validada antes de consultar la BD* → test "firma HMAC inválida
       se rechaza ANTES de tocar la BD (400, 0 auditorías)".
 
+**Nota para SCRUM-112 (no bloquea el cierre):**
+
+El CA clave del ticket pide *"`asignacion_id` nula **en modo consulta**"* →
+cumplido y testeado. En modo TURNO la fila se llena solo si el lector tiene una
+asignación vigente en `asignacion_puesto`; si no, queda `NULL` (columna
+nullable), porque **hoy nada crea filas en esa tabla** — el alta de turnos es
+alcance de otra task. El ticket **no** exige `asignacion_id` no-nula en TURNO,
+así que esto no impide cerrar SCRUM-112. Si el negocio quiere ese registro
+siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
+
+**Supuestos de implementación (revisión humana, no bloquean):**
+
+1. **Ventana horaria** `[inicio, fin] = fecha + franja` con offset `-05:00`
+   (Bogotá) — mismo criterio que ya usa el módulo de reservas para los holds;
+   se asume que `hora_inicio`/`hora_fin` guardan hora local de Bogotá.
+2. **Ruta `POST /api/access` con `auth()`** no tiene test unitario (NextAuth no
+   corre en `node --test`); se probó el orquestador `procesarEscaneo()`. El
+   `401`/`403` queda cubierto por el QA manual de arriba.
+
 **QA manual sugerido (checklist):**
 
 1. `pnpm --filter @sportcomplex/db test && pnpm --filter web test` → verdes.
@@ -298,5 +317,7 @@ curl -X POST http://localhost:3000/api/access -H "Content-Type: application/json
 
 - UI del escáner (selector de puesto, decoder, alertas) → `feature/scanner-access-modes`.
 - `POST /api/payments/intent` y checkout con Stripe Elements → `feature/pos-stripe-cashless`.
-- Flujo de turnos/asignación de puestos (hoy `asignacion_id` es best-effort).
+- Alta de filas en `ASIGNACION_PUESTO` (quién cubre qué turno): nadie las crea
+  hoy; en TURNO la auditoría queda con `asignacion_id = NULL` sin bloquear el
+  canje. Si el negocio lo pide, es una task aparte.
 - Notificación al usuario al confirmar pago o al denegar acceso.
