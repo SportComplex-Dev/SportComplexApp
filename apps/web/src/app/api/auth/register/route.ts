@@ -47,12 +47,6 @@ export async function POST(request: Request) {
 
     await createToken(usuario.id, tokenHash, expiraEn);
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`\n========================================`);
-      console.log(`[AUTH-DEV] Código de verificación para ${email}: ${code}`);
-      console.log(`========================================\n`);
-    }
-
     // El código en claro nunca se persiste; se envía al webhook de correo (TSK-AU-01).
     await sendVerificationCodeEmail({ usuarioId: usuario.id, to: email, nombre, code, expiraEn });
 
