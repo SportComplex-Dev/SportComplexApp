@@ -1,5 +1,11 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig } from '@prisma/config';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../apps/web/.env') });
+dotenv.config();
 
 export default defineConfig({ 
   datasource: { 
@@ -10,3 +16,4 @@ export default defineConfig({
     seed: 'tsx ./prisma/seed.ts',
   },
 });
+

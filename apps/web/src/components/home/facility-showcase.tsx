@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Clock, Flame, Lightbulb, Shield, Sparkles, SunMedium, Trophy } from 'lucide-react'
 
@@ -182,11 +183,12 @@ export function FacilityShowcase() {
       {/* Tarjeta de Exhibición Panorámica */}
       <div className="facility-display-card">
         <div className="facility-display-media">
-          <img
+          <Image
             src={facility.image}
             alt={facility.title}
-            className="facility-display-img"
-            loading="lazy"
+            fill
+            sizes="(max-width: 1024px) 100vw, 65vw"
+            className="facility-display-img object-cover"
           />
           <div className="facility-media-overlay" />
           <div className="facility-floating-badges">
@@ -253,7 +255,7 @@ export function FacilityShowcase() {
               </Link>
               <Link
                 href="/portal/book"
-                className="hero-secondary text-sm"
+                className="action-secondary text-sm"
               >
                 Ver todos los turnos
               </Link>

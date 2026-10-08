@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
-import { roleHome, type Role } from '@sportcomplex/core'
+import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
 import { loginSchema, registerSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
@@ -143,12 +143,6 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
                   required
                 />
               </label>
-
-              {!register && (
-                <Link href="/forgot-password" className="forgot-link">
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              )}
 
               {error && (
                 <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600">

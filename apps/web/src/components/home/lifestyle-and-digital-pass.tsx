@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Coffee, QrCode, ScanLine, ShieldCheck, Utensils, Wifi, Zap } from 'lucide-react'
 
@@ -10,11 +11,12 @@ export function LifestyleAndDigitalPass() {
         {/* Columna Izquierda: El Tercer Tiempo (Gastronomía & Coworking) */}
         <div className="lifestyle-card">
           <div className="lifestyle-media">
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1000&q=80"
               alt="AKROS Club Lounge y Café Saludable"
-              className="lifestyle-img"
-              loading="lazy"
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="lifestyle-img object-cover"
             />
             <div className="lifestyle-media-overlay" />
             <div className="lifestyle-media-badge">
@@ -76,7 +78,7 @@ export function LifestyleAndDigitalPass() {
           <div className="digital-ticket-mockup">
             <div className="ticket-mockup-header">
               <div className="ticket-brand-chip">
-                <img src="/images/Akros-logo.png" alt="AKROS" width={22} height={20} />
+                <Image src="/images/Akros-logo.png" alt="AKROS" width={22} height={20} style={{ width: 'auto', height: 'auto' }} />
                 <span>AKROS PASS</span>
               </div>
               <span className="ticket-status-pill">
@@ -104,11 +106,8 @@ export function LifestyleAndDigitalPass() {
           </div>
 
           <div className="tech-actions">
-            <Link href="/scanner" className="action-button">
-              <ScanLine size={16} /> Probar Escáner de Taquilla
-            </Link>
-            <Link href="/portal/tickets" className="hero-secondary text-sm">
-              Ver mis tiquetes activos
+            <Link href="/portal/tickets" className="action-button">
+              <QrCode size={16} /> Ver mis tiquetes activos
             </Link>
           </div>
         </div>

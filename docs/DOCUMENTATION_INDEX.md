@@ -241,22 +241,22 @@ export async function fireContingencyWebhook()
 
 ## 🆘 Preguntas Frecuentes Mapeadas
 
-**P: Por dónde empiezo?**
+**P: Por dónde empiezo?**  
 R: [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) secciones 1-4
 
-**P: ¿Cuál es la URL del webhook?**
+**P: ¿Cuál es la URL del webhook?**  
 R: [AUTOMATION.md](./AUTOMATION.md) sección "Integración con Backend" + [N8N_WORKFLOWS.md](./N8N_WORKFLOWS.md)
 
-**P: ¿Qué datos envío?**
+**P: ¿Qué datos envío?**  
 R: [N8N_WORKFLOWS.md](./N8N_WORKFLOWS.md) sección "Entrada Esperada" + [packages/automation/IMPLEMENTATION_EXAMPLES.ts](../packages/automation/IMPLEMENTATION_EXAMPLES.ts)
 
-**P: ¿Cómo hago validación?**
+**P: ¿Cómo hago validación?**  
 R: [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) sección 2, paso 4
 
-**P: ¿El email no llega?**
+**P: ¿El email no llega?**  
 R: [packages/automation/README.md](../packages/automation/README.md) Troubleshooting
 
-**P: ¿Cómo agrego otro workflow?**
+**P: ¿Cómo agrego otro workflow?**  
 R: [AUTOMATION.md](./AUTOMATION.md) sección "Tipos de Workflows"
 
 ---

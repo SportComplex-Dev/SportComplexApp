@@ -264,7 +264,7 @@ interface SendVerificationCodePayload {
 
 ```typescript
 import {
-  validateSendVerificationCode,
+  validateSendVerificationCode, 
   trySendVerificationCode,
   createTestVerificationCodePayload,
   ColombianHolidaySyncPayloadSchema,
@@ -458,3 +458,4 @@ n8n → Executions (Tab)
 - [Schemas de validación](../packages/validation/src/automation.schema.ts)
 - [n8n Official Docs](https://docs.n8n.io/)
 - [Resend Email API](https://resend.com/docs)
+

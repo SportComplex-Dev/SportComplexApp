@@ -7,12 +7,13 @@ import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { registerSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
-import { TopBar } from '@/components/top-bar'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
+import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { dark, toggleTheme } = useThemeToggle()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -58,8 +59,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="club-app auth-shell">
-      <TopBar />
+    <div className="club-app">
+      <ThemeToggle dark={dark} onToggle={toggleTheme} floating />
       <main className="auth-page">
         {/* Panel de marca (izquierda) */}
         <div className="auth-art">
