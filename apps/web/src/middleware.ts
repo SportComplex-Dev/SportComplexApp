@@ -72,9 +72,12 @@ function createForbiddenResponse(req: NextRequest, message: string) {
 
 export default withAuth((req) => {
   const { pathname } = req.nextUrl;
-  const queryRole = req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole");
-  const cookieRole = req.cookies.get("sc-role")?.value;
-  const effectiveOverride = queryRole || cookieRole;
+  const isDev = process.env.NODE_ENV !== "production";
+  const queryRole = isDev
+    ? (req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole"))
+    : null;
+  const cookieRole = isDev ? req.cookies.get("sc-role")?.value : null;
+  const effectiveOverride = isDev ? (queryRole || cookieRole) : null;
 
   const authUser = req.auth?.user;
   const authRole = normalizeRole(authUser?.role);
