@@ -50,7 +50,8 @@ export default function RegisterPage() {
         setError(result?.error?.message || 'No se pudo conectar con el servidor o la base de datos.')
         return
       }
-      router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
+      const codeParam = result?.data?.devCode ? `&code=${encodeURIComponent(result.data.devCode)}` : ''
+      router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}${codeParam}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al registrar la cuenta.')
     } finally {
