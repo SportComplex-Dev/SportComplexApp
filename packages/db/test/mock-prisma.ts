@@ -39,10 +39,11 @@ export interface MockReserva {
   id: string;
   disponibilidadId: bigint;
   estado: string;
+  titularId?: string;
   cantidadCupos?: number;
   expiraEn?: Date | null;
   pagoId?: string | null;
-  titularId?: string;
+  creadoEn?: Date;
 }
 
 export interface MockPago {
@@ -472,8 +473,8 @@ export function createMockPrisma() {
         if (where.id === undefined) return null;
         return reservas.find((reservation) => reservation.id === where.id) ?? null;
       },
-      async findMany({ where }: any = {}) {
-        return reservas.filter((reservation) => {
+      async findMany({ where, orderBy, take }: any = {}) {
+        let list = reservas.filter((reservation) => {
           if (
             typeof where?.id === "string" &&
             reservation.id !== where.id
@@ -483,12 +484,34 @@ export function createMockPrisma() {
             reservation.disponibilidadId !== where.disponibilidadId
           ) return false;
           if (where?.estado && reservation.estado !== where.estado) return false;
+          if (where?.titularId && reservation.titularId !== where.titularId) return false;
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
           ) return false;
+          if (where?.OR) {
+            const createdAt = reservation.creadoEn;
+            if (!createdAt) return false;
+            const matchesCursor = where.OR.some((condition: any) => {
+              if (condition.creadoEn?.lt) return createdAt < condition.creadoEn.lt;
+              return (
+                condition.creadoEn instanceof Date &&
+                createdAt.getTime() === condition.creadoEn.getTime() &&
+                reservation.id < condition.id.lt
+              );
+            });
+            if (!matchesCursor) return false;
+          }
           return true;
         });
+        if (orderBy) {
+          list = [...list].sort((a, b) => {
+            const createdAtDifference =
+              (b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0);
+            return createdAtDifference || b.id.localeCompare(a.id);
+          });
+        }
+        return typeof take === "number" ? list.slice(0, take) : list;
       },
       async updateMany({ where, data }: any) {
         let count = 0;
