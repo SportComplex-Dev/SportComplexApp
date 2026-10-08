@@ -41,6 +41,25 @@ export interface MockReserva {
   estado: string;
   cantidadCupos?: number;
   expiraEn?: Date | null;
+  pagoId?: string | null;
+  titularId?: string;
+}
+
+export interface MockPago {
+  id: string;
+  usuarioId: string;
+  membresiaId?: number | null;
+  tipo: string;
+  stripePaymentIntentId: string;
+  monto: string | number;
+  estado: string;
+  creadoEn?: Date;
+}
+
+export interface MockMembresia {
+  id: number;
+  usuarioId: string;
+  estado: string;
 }
 
 export function createMockPrisma() {
@@ -49,12 +68,15 @@ export function createMockPrisma() {
   const franjas: MockFranja[] = [];
   const disponibilidades: MockDisponibilidad[] = [];
   const reservas: MockReserva[] = [];
+  const pagos: MockPago[] = [];
+  const membresias: MockMembresia[] = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
   let franjaIdSeq = 1;
   let dispIdSeq = 1n;
   let reservaIdSeq = 1;
+  let pagoIdSeq = 1;
   let transactionQueue = Promise.resolve();
 
   const mock: any = {
@@ -64,6 +86,8 @@ export function createMockPrisma() {
       franjas,
       disponibilidades,
       reservas,
+      pagos,
+      membresias,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -78,6 +102,8 @@ export function createMockPrisma() {
         const snapFranjas = [...franjas];
         const snapDisponibilidades = [...disponibilidades];
         const snapReservas = [...reservas];
+        const snapPagos = [...pagos];
+        const snapMembresias = [...membresias];
         try {
           return await arg(mock);
         } catch (err) {
@@ -91,6 +117,10 @@ export function createMockPrisma() {
           disponibilidades.push(...snapDisponibilidades);
           reservas.length = 0;
           reservas.push(...snapReservas);
+          pagos.length = 0;
+          pagos.push(...snapPagos);
+          membresias.length = 0;
+          membresias.push(...snapMembresias);
           throw err;
         } finally {
           releaseTransaction();
@@ -383,8 +413,16 @@ export function createMockPrisma() {
       },
     },
     reserva: {
+      async findUnique({ where }: any) {
+        if (where.id === undefined) return null;
+        return reservas.find((reservation) => reservation.id === where.id) ?? null;
+      },
       async findMany({ where }: any = {}) {
         return reservas.filter((reservation) => {
+          if (
+            typeof where?.id === "string" &&
+            reservation.id !== where.id
+          ) return false;
           if (
             where?.disponibilidadId !== undefined &&
             reservation.disponibilidadId !== where.disponibilidadId
@@ -400,6 +438,7 @@ export function createMockPrisma() {
       async updateMany({ where, data }: any) {
         let count = 0;
         for (const reservation of reservas) {
+          if (typeof where?.id === "string" && reservation.id !== where.id) continue;
           if (where?.id?.in && !where.id.in.includes(reservation.id)) continue;
           if (
             where?.disponibilidadId !== undefined &&
@@ -409,7 +448,9 @@ export function createMockPrisma() {
           if (where?.expiraEn?.lte && (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)) {
             continue;
           }
-          reservation.estado = data.estado;
+          if (data.estado !== undefined) reservation.estado = data.estado;
+          if (data.pagoId !== undefined) reservation.pagoId = data.pagoId;
+          if (data.expiraEn !== undefined) reservation.expiraEn = data.expiraEn;
           count++;
         }
         return { count };
@@ -447,6 +488,70 @@ export function createMockPrisma() {
           list = list.filter((r) => where.estado.in.includes(r.estado));
         }
         return list.length;
+      },
+    },
+    pago: {
+      async findUnique({ where }: any) {
+        if (where.id !== undefined) {
+          return pagos.find((p) => p.id === where.id) ?? null;
+        }
+        if (where.stripePaymentIntentId !== undefined) {
+          return (
+            pagos.find((p) => p.stripePaymentIntentId === where.stripePaymentIntentId) ?? null
+          );
+        }
+        return null;
+      },
+      async create({ data }: any) {
+        // Respeta el UNIQUE "pago_stripe_payment_intent_id_key" (TSK-BD-06).
+        if (
+          pagos.some((p) => p.stripePaymentIntentId === data.stripePaymentIntentId)
+        ) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`stripe_payment_intent_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
+        const item: MockPago = {
+          id: `payment-${pagoIdSeq++}`,
+          usuarioId: data.usuarioId,
+          membresiaId: data.membresiaId ?? null,
+          tipo: data.tipo,
+          stripePaymentIntentId: data.stripePaymentIntentId,
+          monto: data.monto,
+          estado: data.estado,
+          creadoEn: new Date(),
+        };
+        pagos.push(item);
+        return item;
+      },
+      async update({ where, data }: any) {
+        const pago = pagos.find((p) => p.id === where.id);
+        if (!pago) throw new Error("Not found");
+        if (data.estado !== undefined) pago.estado = data.estado;
+        if (data.monto !== undefined) pago.monto = data.monto;
+        return pago;
+      },
+    },
+    membresia: {
+      async findUnique({ where }: any) {
+        return membresias.find((m) => m.id === where.id) ?? null;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const membresia of membresias) {
+          if (where?.id !== undefined && membresia.id !== where.id) continue;
+          if (where?.estado?.not !== undefined && membresia.estado === where.estado.not) {
+            continue;
+          }
+          if (where?.estado !== undefined && typeof where.estado === "string") {
+            if (membresia.estado !== where.estado) continue;
+          }
+          if (data.estado !== undefined) membresia.estado = data.estado;
+          count++;
+        }
+        return { count };
       },
     },
   };

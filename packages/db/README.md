@@ -26,6 +26,22 @@ Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM*
 
 ---
 
+## 🔁 Idempotencia de pagos (TSK-BD-09)
+
+El repositorio `src/repositories/payments.ts` exporta `procesarPagoWebhook`,
+punto de entrada único del webhook de Stripe (`POST /api/payments`):
+
+- Upsert de `PAGO` por `stripe_payment_intent_id` (UNIQUE desde `TSK-BD-06`);
+  reintenta la transacción ante `P2002` (carreras concurrentes).
+- Confirmación condicional `PENDIENTE_PAGO → CONFIRMADA` y activación
+  idempotente de membresías, todo en la misma transacción.
+- Reenviar el mismo webhook N veces deja **una sola** fila en `pago` y **una
+  sola** reserva `CONFIRMADA`.
+
+Guía completa para backend y frontend: [`docs/TSK-BD-09-idempotencia-pagos-stripe.md`](../../docs/TSK-BD-09-idempotencia-pagos-stripe.md).
+
+---
+
 ## 📋 Guía de Uso e Indicaciones para el Equipo (Partners)
 
 ### 1. Variables de Entorno (`.env`)
