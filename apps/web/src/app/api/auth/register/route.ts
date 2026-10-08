@@ -59,7 +59,6 @@ export async function POST(request: Request) {
     return ok({
       usuarioId: usuario.id,
       message: "Registro exitoso. Verifica tu correo con el código de 6 dígitos.",
-      devCode: process.env.NODE_ENV !== "production" ? code : undefined,
     });
   } catch (error: unknown) {
     console.error("Error en /api/auth/register:", error);

@@ -57,8 +57,7 @@ function VerifyPageContent() {
   const searchParams = useSearchParams()
 
   const emailParam = searchParams.get('email') ?? ''
-  const codeParam = searchParams.get('code') ?? ''
-  const [code, setCode] = useState(() => (codeParam && /^\d{6}$/.test(codeParam) ? codeParam.split('') : ['', '', '', '', '', '']))
+  const [code, setCode] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [verified, setVerified] = useState(false)
@@ -295,21 +294,6 @@ function VerifyPageContent() {
               <strong className="text-neutral-800">{emailParam || 'tu correo'}</strong>.
             </p>
           </div>
-
-          {codeParam && (
-            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 flex items-center justify-between">
-              <span>
-                💡 <strong>Código para pruebas:</strong> <code className="font-mono font-bold bg-amber-100 px-1.5 py-0.5 rounded text-amber-950">{codeParam}</code>
-              </span>
-              <button
-                type="button"
-                onClick={() => setCode(codeParam.split(''))}
-                className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline ml-2 cursor-pointer"
-              >
-                Autocompletar
-              </button>
-            </div>
-          )}
 
           {error && (
             <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-600">
