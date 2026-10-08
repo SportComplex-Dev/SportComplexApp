@@ -1,4 +1,4 @@
-import { BOOKING_WINDOW_DAYS } from "../domain/index";
+import { BOOKING_WINDOW_DAYS, CHECKOUT_TTL_MINUTES } from "../domain/index";
 
 // RN-01 ventana 15 días + RN-11 prohibición de pasado. Todo en America/Bogota.
 export function isWithinBookingWindow(now: Date, start: Date): boolean {
@@ -9,7 +9,7 @@ export function isWithinBookingWindow(now: Date, start: Date): boolean {
 }
 
 export function checkoutExpiresAt(from: Date = new Date()): Date {
-  return new Date(from.getTime() + 15 * 60 * 1000); // RN-04 TTL 15 min
+  return new Date(from.getTime() + CHECKOUT_TTL_MINUTES * 60 * 1000); // RN-04 TTL 30 min
 }
 
 /** Configuración de horario y aforo para un servicio específico (RF-04 / HU-05) */
