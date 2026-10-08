@@ -62,6 +62,39 @@ export interface MockMembresia {
   estado: string;
 }
 
+export interface MockUsuario {
+  id: string;
+  nombre: string;
+  correo?: string;
+}
+
+export interface MockTicketQr {
+  id: string;
+  reservaId: string;
+  codigoUuid: string;
+  usadoPor: string | null;
+  estado: string;
+  usadoEn: Date | null;
+}
+
+export interface MockLecturaAcceso {
+  id: bigint;
+  ticketId: string;
+  empleadoId: string;
+  asignacionId: number | null;
+  modo: string;
+  resultado: string;
+  fechaHora: Date;
+}
+
+export interface MockAsignacionPuesto {
+  id: number;
+  empleadoId: string;
+  servicioId: number;
+  inicioTurno: Date;
+  finTurno: Date;
+}
+
 export function createMockPrisma() {
   const categorias: MockCategoria[] = [];
   const servicios: MockServicio[] = [];
@@ -70,6 +103,10 @@ export function createMockPrisma() {
   const reservas: MockReserva[] = [];
   const pagos: MockPago[] = [];
   const membresias: MockMembresia[] = [];
+  const usuarios: MockUsuario[] = [];
+  const tickets: MockTicketQr[] = [];
+  const lecturas: MockLecturaAcceso[] = [];
+  const asignaciones: MockAsignacionPuesto[] = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
@@ -77,6 +114,8 @@ export function createMockPrisma() {
   let dispIdSeq = 1n;
   let reservaIdSeq = 1;
   let pagoIdSeq = 1;
+  let lecturaIdSeq = 1n;
+  let asignacionIdSeq = 1;
   let transactionQueue = Promise.resolve();
 
   const mock: any = {
@@ -88,6 +127,10 @@ export function createMockPrisma() {
       reservas,
       pagos,
       membresias,
+      usuarios,
+      tickets,
+      lecturas,
+      asignaciones,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -104,6 +147,10 @@ export function createMockPrisma() {
         const snapReservas = [...reservas];
         const snapPagos = [...pagos];
         const snapMembresias = [...membresias];
+        const snapUsuarios = [...usuarios];
+        const snapTickets = [...tickets];
+        const snapLecturas = [...lecturas];
+        const snapAsignaciones = [...asignaciones];
         try {
           return await arg(mock);
         } catch (err) {
@@ -121,6 +168,14 @@ export function createMockPrisma() {
           pagos.push(...snapPagos);
           membresias.length = 0;
           membresias.push(...snapMembresias);
+          usuarios.length = 0;
+          usuarios.push(...snapUsuarios);
+          tickets.length = 0;
+          tickets.push(...snapTickets);
+          lecturas.length = 0;
+          lecturas.push(...snapLecturas);
+          asignaciones.length = 0;
+          asignaciones.push(...snapAsignaciones);
           throw err;
         } finally {
           releaseTransaction();
@@ -552,6 +607,111 @@ export function createMockPrisma() {
           count++;
         }
         return { count };
+      },
+    },
+    usuario: {
+      async findUnique({ where }: any) {
+        if (where.id !== undefined) return usuarios.find((u) => u.id === where.id) ?? null;
+        if (where.correo !== undefined) return usuarios.find((u) => u.correo === where.correo) ?? null;
+        return null;
+      },
+    },
+    ticketQr: {
+      async findUnique({ where, include, select }: any) {
+        let ticket: MockTicketQr | undefined;
+        if (where.id !== undefined) ticket = tickets.find((t) => t.id === where.id);
+        else if (where.codigoUuid !== undefined) {
+          ticket = tickets.find((t) => t.codigoUuid === where.codigoUuid);
+        }
+        if (!ticket) return null;
+        if (select) {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(select)) {
+            if (select[key]) picked[key] = (ticket as any)[key];
+          }
+          return picked;
+        }
+        const res: any = { ...ticket };
+        if (include?.reserva) {
+          const reserva = reservas.find((r) => r.id === ticket!.reservaId);
+          const disp = reserva
+            ? disponibilidades.find((d) => d.id === reserva.disponibilidadId)
+            : undefined;
+          res.reserva = {
+            ...reserva,
+            titular: reserva ? usuarios.find((u) => u.id === (reserva as any).titularId) : undefined,
+            disponibilidad: disp
+              ? {
+                  ...disp,
+                  servicio: servicios.find((s) => s.id === disp.servicioId),
+                  franja: franjas.find((f) => f.id === disp.franjaId),
+                }
+              : undefined,
+          };
+        }
+        return res;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const ticket of tickets) {
+          if (where?.id !== undefined && ticket.id !== where.id) continue;
+          if (where?.estado !== undefined && ticket.estado !== where.estado) continue;
+          if (where?.codigoUuid !== undefined && ticket.codigoUuid !== where.codigoUuid) continue;
+          Object.assign(ticket, data);
+          count++;
+        }
+        return { count };
+      },
+    },
+    lecturaAcceso: {
+      async create({ data }: any) {
+        const item: MockLecturaAcceso = {
+          id: lecturaIdSeq++,
+          ticketId: data.ticketId,
+          empleadoId: data.empleadoId,
+          asignacionId: data.asignacionId ?? null,
+          modo: data.modo,
+          resultado: data.resultado,
+          fechaHora: data.fechaHora ?? new Date(),
+        };
+        lecturas.push(item);
+        return item;
+      },
+      async findMany({ where }: any = {}) {
+        return lecturas.filter((lectura) => {
+          if (where?.ticketId !== undefined && lectura.ticketId !== where.ticketId) return false;
+          if (where?.empleadoId !== undefined && lectura.empleadoId !== where.empleadoId) return false;
+          if (where?.modo !== undefined && lectura.modo !== where.modo) return false;
+          if (where?.resultado !== undefined && lectura.resultado !== where.resultado) return false;
+          return true;
+        });
+      },
+    },
+    asignacionPuesto: {
+      async create({ data }: any) {
+        const item: MockAsignacionPuesto = {
+          id: asignacionIdSeq++,
+          empleadoId: data.empleadoId,
+          servicioId: data.servicioId,
+          inicioTurno: data.inicioTurno,
+          finTurno: data.finTurno,
+        };
+        asignaciones.push(item);
+        return item;
+      },
+      async findFirst({ where }: any = {}) {
+        const candidatas = asignaciones
+          .filter((a) => {
+            if (where?.empleadoId !== undefined && a.empleadoId !== where.empleadoId) return false;
+            if (where?.servicioId !== undefined && a.servicioId !== where.servicioId) return false;
+            if (where?.inicioTurno?.lte !== undefined && a.inicioTurno > where.inicioTurno.lte) {
+              return false;
+            }
+            if (where?.finTurno?.gte !== undefined && a.finTurno < where.finTurno.gte) return false;
+            return true;
+          })
+          .sort((a, b) => b.inicioTurno.getTime() - a.inicioTurno.getTime());
+        return candidatas[0] ?? null;
       },
     },
   };
