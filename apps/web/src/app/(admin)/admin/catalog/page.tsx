@@ -76,6 +76,35 @@ function mapDbCategory(c: { id: number; nombre: string; tipo: string; descriptio
   }
 }
 
+interface DbFranjaHoraria {
+  id?: number
+  servicioId?: number
+  diaSemana: number
+  horaInicio: string | Date
+  horaFin: string | Date
+}
+
+interface DbCategory {
+  id: number
+  nombre: string
+  tipo: string
+  description?: string
+}
+
+interface DbService {
+  id: number
+  nombre: string
+  categoriaId: number
+  capacidadMaxima: number
+  tarifa: number | string
+  modalidad: 'EXCLUSIVA' | 'AFORO'
+  tipoPiscina?: 'PUBLICA' | 'PRIVADA' | null
+  estado: 'ACTIVO' | 'INHABILITADO'
+  description?: string
+  franjasHorarias?: DbFranjaHoraria[]
+  categoria?: DbCategory
+}
+
 function parseHour(timeValue: string | Date | unknown): number {
   if (typeof timeValue === 'string') {
     const parts = timeValue.split(':')
@@ -87,7 +116,7 @@ function parseHour(timeValue: string | Date | unknown): number {
   return 6
 }
 
-function mapDbService(s: any, categoriesList: CustomCategory[]): CatalogItem {
+function mapDbService(s: DbService, categoriesList: CustomCategory[]): CatalogItem {
   const cat = categoriesList.find((c) => c.id === s.categoriaId)
   const catSlug = (cat?.slug || 'canchas') as CatalogItem['category']
 
@@ -103,7 +132,7 @@ function mapDbService(s: any, categoriesList: CustomCategory[]): CatalogItem {
   }
 }
 
-function mapDbSchedule(s: any, categoriesList: CustomCategory[]): OperatingScheduleConfig {
+function mapDbSchedule(s: DbService, categoriesList: CustomCategory[]): OperatingScheduleConfig {
   const cat = categoriesList.find((c) => c.id === s.categoriaId)
   const catSlug = (cat?.slug || 'canchas') as CatalogItem['category']
   const isShared = s.modalidad === 'AFORO' || cat?.tipo === 'GIMNASIO' || cat?.tipo === 'PISCINA'
@@ -112,7 +141,7 @@ function mapDbSchedule(s: any, categoriesList: CustomCategory[]): OperatingSched
   const disabledSlots: string[] = []
   if (Array.isArray(s.franjasHorarias) && s.franjasHorarias.length > 0) {
     const activeHours = new Set<number>()
-    s.franjasHorarias.forEach((f: any) => {
+    s.franjasHorarias.forEach((f) => {
       const h = parseHour(f.horaInicio)
       activeHours.add(h)
     })
@@ -179,7 +208,10 @@ function CategoryForm({
         </label>
         <label className="demo-field">
           Tipo de Disciplina / Recinto
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as any)}>
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as NonNullable<CustomCategory['tipo']>)}
+          >
             <option value="CANCHA">Canchas y Deportes de Raqueta / Balón (CANCHA)</option>
             <option value="PISCINA">Zona Acuática / Piscinas (PISCINA)</option>
             <option value="GIMNASIO">Gimnasio y Fitness (GIMNASIO)</option>
@@ -380,8 +412,8 @@ export default function AdminCatalogPage() {
         throw new Error(json.error?.message || 'Error en respuesta de la API')
       }
 
-      const dbCategories: any[] = json.data.categories || []
-      const dbServices: any[] = json.data.services || []
+      const dbCategories = (json.data.categories || []) as DbCategory[]
+      const dbServices = (json.data.services || []) as DbService[]
 
       let mappedCategories: CustomCategory[] = dbCategories.map(mapDbCategory)
       if (mappedCategories.length === 0) {
