@@ -3,11 +3,9 @@ import { verifySchema } from "@sportcomplex/validation";
 import {
   verifySecret,
   isTokenExpired,
-} from "@sportcomplex/core/src/security/token";
-import {
   consumeRateLimit,
   resetRateLimit,
-} from "@sportcomplex/core/src/security/rate-limit";
+} from "@sportcomplex/core/server";
 import { prisma, findLatestByUsuarioId, markUsed } from "@sportcomplex/db";
 
 /** Intentos máximos de verificación por token antes de invalidarlo. */

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { getSession, signIn } from 'next-auth/react'
-import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
+import { roleHome, type Role } from '@sportcomplex/core'
 import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
@@ -99,21 +99,20 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      // 2. Petición real al endpoint /api/auth
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
+      // 2. Auth.js verifica las credenciales y establece la sesión firmada.
+      const result = await signIn('credentials', {
+        ...parsed.data,
+        redirect: false,
       })
-      const result = await res.json()
 
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'Correo o contraseña incorrectos.')
+      if (!result?.ok || result.error) {
+        setError('Correo o contraseña incorrectos, o cuenta inactiva.')
         return
       }
 
-      // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
-      const role: Role = result.data.user.role
+      // 3. Leer el rol desde la sesión ya emitida por Auth.js.
+      const session = await getSession()
+      const role = getUserRole(session?.user?.role)
       router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
     } catch (err: unknown) {
