@@ -105,10 +105,10 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const result = await res.json()
+      const result = await res.json().catch(() => null)
 
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'Correo o contraseña incorrectos.')
+      if (!res.ok || !result?.success) {
+        setError(result?.error?.message || 'Correo o contraseña incorrectos.')
         return
       }
 
