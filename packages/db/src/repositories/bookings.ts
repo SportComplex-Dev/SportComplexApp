@@ -4,6 +4,8 @@ import { prisma } from "../client";
 const BOOKING_WINDOW_DAYS = 15;
 const HOLD_TTL_MINUTES = 15;
 const BOGOTA_TIME_ZONE = "America/Bogota";
+// TSK-BE-06 — mensaje contractual RN-01 (duplicado de @sportcomplex/core: db no puede importar core).
+const BOOKING_WINDOW_EXCEEDED_MESSAGE = "La reserva excede la ventana máxima permitida de 15 días";
 
 export class BookingError extends Error {
   constructor(
@@ -57,11 +59,7 @@ function validateBookingDate(date: string, now: Date): void {
   const today = dateInBogota(now);
   const daysAhead = daysBetween(today, date);
   if (daysAhead < 0 || daysAhead > BOOKING_WINDOW_DAYS) {
-    throw new BookingError(
-      "La fecha solicitada está fuera de la ventana de reserva de 15 días.",
-      "OUTSIDE_BOOKING_WINDOW",
-      400,
-    );
+    throw new BookingError(BOOKING_WINDOW_EXCEEDED_MESSAGE, "OUTSIDE_BOOKING_WINDOW", 400);
   }
 }
 
