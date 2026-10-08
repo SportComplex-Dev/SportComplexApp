@@ -21,7 +21,7 @@ import {
  *     - Administrador     → /admin
  *
  * Restricciones de rutas protegidas:
- * - /portal/*               → Cliente (o Administrador)
+ * - /portal/*               → Cliente activo
  * - /pos/* y /api/pos/*     → Administrador | Empleado Vendedor
  * - /scanner/* y /api/access/* → Administrador | Empleado Lector
  * - /admin/* y /api/admin/* → Administrador
@@ -163,7 +163,7 @@ export default withAuth((req) => {
     if (!isActive) {
       return createForbiddenResponse(req, "La cuenta no está activa");
     }
-    if (role !== "Cliente" && role !== "Administrador") {
+    if (role !== "Cliente") {
       return createForbiddenResponse(req, "Acceso exclusivo para clientes");
     }
     return NextResponse.next();

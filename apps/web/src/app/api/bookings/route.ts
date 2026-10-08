@@ -1,7 +1,7 @@
-import { auth } from "@/auth";
 import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
 import { created, fail, ok } from "@/lib/api-response";
+import { getAuthorizedApiUser } from "@/lib/api-auth";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,13 +26,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para reservar.", 401);
-    }
-    if (session.user.role?.toUpperCase() !== "CLIENTE" || session.user.estado !== "ACTIVO") {
-      return fail("FORBIDDEN", "Solo una cuenta de cliente activa puede reservar en línea.", 403);
-    }
+    const authorization = await getAuthorizedApiUser(["Cliente"]);
+    if (authorization instanceof Response) return authorization;
 
     let body: unknown;
     try {
@@ -47,7 +42,7 @@ export async function POST(request: Request) {
 
     const reservation = await createBookingHold({
       ...parsed.data,
-      userId: session.user.id,
+      userId: authorization.userId,
     });
     return created(reservation);
   } catch (error: unknown) {

@@ -39,8 +39,18 @@ export interface MockReserva {
   id: string;
   disponibilidadId: bigint;
   estado: string;
+  titularId?: string;
   cantidadCupos?: number;
   expiraEn?: Date | null;
+  creadoEn?: Date;
+  inhabilitacionId?: number | null;
+}
+
+export interface MockUsuario {
+  id: string;
+  estado: string;
+  deletedAt: Date | null;
+  rol: { nombre: string };
 }
 
 export function createMockPrisma() {
@@ -49,6 +59,10 @@ export function createMockPrisma() {
   const franjas: MockFranja[] = [];
   const disponibilidades: MockDisponibilidad[] = [];
   const reservas: MockReserva[] = [];
+  const usuarios: MockUsuario[] = [];
+  const pagos: Array<{ usuarioId: string }> = [];
+  const lecturasAcceso: Array<{ empleadoId: string }> = [];
+  const inhabilitaciones: Array<Record<string, unknown>> = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
@@ -64,6 +78,10 @@ export function createMockPrisma() {
       franjas,
       disponibilidades,
       reservas,
+      usuarios,
+      pagos,
+      lecturasAcceso,
+      inhabilitaciones,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -78,6 +96,7 @@ export function createMockPrisma() {
         const snapFranjas = [...franjas];
         const snapDisponibilidades = [...disponibilidades];
         const snapReservas = [...reservas];
+        const snapInhabilitaciones = [...inhabilitaciones];
         try {
           return await arg(mock);
         } catch (err) {
@@ -91,6 +110,8 @@ export function createMockPrisma() {
           disponibilidades.push(...snapDisponibilidades);
           reservas.length = 0;
           reservas.push(...snapReservas);
+          inhabilitaciones.length = 0;
+          inhabilitaciones.push(...snapInhabilitaciones);
           throw err;
         } finally {
           releaseTransaction();
@@ -383,33 +404,86 @@ export function createMockPrisma() {
       },
     },
     reserva: {
-      async findMany({ where }: any = {}) {
-        return reservas.filter((reservation) => {
+      async findMany({ where, orderBy, take, include }: any = {}) {
+        let list = reservas.filter((reservation) => {
           if (
-            where?.disponibilidadId !== undefined &&
+            typeof where?.disponibilidadId === "bigint" &&
             reservation.disponibilidadId !== where.disponibilidadId
           ) return false;
-          if (where?.estado && reservation.estado !== where.estado) return false;
+          if (typeof where?.estado === "string" && reservation.estado !== where.estado) return false;
+          if (where?.estado?.in && !where.estado.in.includes(reservation.estado)) return false;
+          if (
+            where?.disponibilidadId?.in &&
+            !where.disponibilidadId.in.includes(reservation.disponibilidadId)
+          ) return false;
+          if (where?.titularId && reservation.titularId !== where.titularId) return false;
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
           ) return false;
+          if (where?.OR) {
+            const createdAt = reservation.creadoEn;
+            if (!createdAt) return false;
+            const matches = where.OR.some((condition: any) => {
+              if (condition.creadoEn?.lt) return createdAt < condition.creadoEn.lt;
+              return (
+                condition.creadoEn?.equals
+                  ? createdAt.getTime() === condition.creadoEn.equals.getTime()
+                  : condition.creadoEn instanceof Date &&
+                    createdAt.getTime() === condition.creadoEn.getTime()
+              ) && reservation.id < condition.id.lt;
+            });
+            if (!matches) return false;
+          }
           return true;
         });
+        if (orderBy) {
+          list = [...list].sort((a, b) => {
+            const createdAtDifference =
+              (b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0);
+            return createdAtDifference || b.id.localeCompare(a.id);
+          });
+        }
+        const selected = typeof take === "number" ? list.slice(0, take) : list;
+        return selected.map((reservation) => ({
+          ...reservation,
+          ...(include?.titular
+            ? {
+                titular: usuarios.find((usuario) => usuario.id === reservation.titularId),
+              }
+            : {}),
+          ...(include?.disponibilidad
+            ? {
+                disponibilidad: {
+                  ...disponibilidades.find(
+                    (item) => item.id === reservation.disponibilidadId,
+                  ),
+                  franja: franjas.find(
+                    (item) =>
+                      item.id ===
+                      disponibilidades.find(
+                        (availability) => availability.id === reservation.disponibilidadId,
+                      )?.franjaId,
+                  ),
+                },
+              }
+            : {}),
+        }));
       },
       async updateMany({ where, data }: any) {
         let count = 0;
         for (const reservation of reservas) {
           if (where?.id?.in && !where.id.in.includes(reservation.id)) continue;
           if (
-            where?.disponibilidadId !== undefined &&
+            typeof where?.disponibilidadId === "bigint" &&
             reservation.disponibilidadId !== where.disponibilidadId
           ) continue;
-          if (where?.estado && reservation.estado !== where.estado) continue;
+          if (typeof where?.estado === "string" && reservation.estado !== where.estado) continue;
+          if (where?.estado?.in && !where.estado.in.includes(reservation.estado)) continue;
           if (where?.expiraEn?.lte && (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)) {
             continue;
           }
-          reservation.estado = data.estado;
+          Object.assign(reservation, data);
           count++;
         }
         return { count };
@@ -447,6 +521,30 @@ export function createMockPrisma() {
           list = list.filter((r) => where.estado.in.includes(r.estado));
         }
         return list.length;
+      },
+    },
+    usuario: {
+      async findUnique({ where }: any) {
+        return usuarios.find((usuario) => usuario.id === where.id) ?? null;
+      },
+      async update({ where, data }: any) {
+        const usuario = usuarios.find((item) => item.id === where.id);
+        if (!usuario) throw new Error("Not found");
+        Object.assign(usuario, data);
+        return usuario;
+      },
+    },
+    inhabilitacionServicio: {
+      async create({ data }: any) {
+        const entry = { id: inhabilitaciones.length + 1, ...data };
+        inhabilitaciones.push(entry);
+        return entry;
+      },
+      async update({ where, data }: any) {
+        const entry = inhabilitaciones.find((item) => item.id === where.id);
+        if (!entry) throw new Error("Not found");
+        Object.assign(entry, data);
+        return entry;
       },
     },
   };

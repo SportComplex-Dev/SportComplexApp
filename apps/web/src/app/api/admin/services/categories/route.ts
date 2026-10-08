@@ -1,4 +1,5 @@
 import { fail, ok, created } from "@/lib/api-response";
+import { authorizeApiRoles } from "@/lib/api-auth";
 import { createCategoriaSchema } from "@sportcomplex/validation";
 import { createCategoria, getCategorias } from "@sportcomplex/db";
 
@@ -8,6 +9,9 @@ import { createCategoria, getCategorias } from "@sportcomplex/db";
  */
 export async function GET() {
   try {
+    const denied = await authorizeApiRoles(["Administrador"]);
+    if (denied) return denied;
+
     const categories = await getCategorias();
     return ok(categories);
   } catch (error: unknown) {
@@ -22,6 +26,9 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    const denied = await authorizeApiRoles(["Administrador"]);
+    if (denied) return denied;
+
     const rawBody = await request.json().catch(() => ({}));
     const parsed = createCategoriaSchema.safeParse(rawBody);
 

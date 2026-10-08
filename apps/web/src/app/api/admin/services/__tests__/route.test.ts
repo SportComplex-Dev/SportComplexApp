@@ -4,11 +4,21 @@ import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-
 
 const mock = createMockPrisma();
 (globalThis as unknown as { __scPrisma: unknown }).__scPrisma = mock;
+(process.env as Record<string, string | undefined>).NODE_ENV = "test";
+const adminId = "00000000-0000-4000-8000-000000000051";
+(globalThis as typeof globalThis & { __scApiAuthUserId: string }).__scApiAuthUserId = adminId;
+mock._state.usuarios.push({
+  id: adminId,
+  estado: "ACTIVO",
+  deletedAt: null,
+  rol: { nombre: "ADMIN" },
+});
 
 // Import route handlers
 const servicesRoute = await import("../route");
 const serviceDetailRoute = await import("../[id]/route");
 const categoriesRoute = await import("../categories/route");
+const bookingHistoryRoute = await import("../../../bookings/history/route");
 
 test("API: POST y GET /api/admin/services/categories", async () => {
   // 1. Alta de categoría vía sub-endpoint
@@ -175,6 +185,7 @@ test("API: CRUD Actualización y eliminación segura con respeto de reservas", a
       capacidadMaxima: 14,
     }),
   });
+
   const resUpdate = await serviceDetailRoute.PUT(reqUpdate, { params: Promise.resolve({ id: "2" }) });
   assert.equal(resUpdate.status, 200);
   const jsonUpdate = await resUpdate.json();
@@ -199,6 +210,75 @@ test("API: CRUD Actualización y eliminación segura con respeto de reservas", a
   const reqDelC2 = new Request("http://localhost:3000/api/admin/services/2", { method: "DELETE" });
   const resDelC2 = await serviceDetailRoute.DELETE(reqDelC2, { params: Promise.resolve({ id: "2" }) });
   assert.equal(resDelC2.status, 200);
+});
+
+test("API: RBAC de Route Handler rechaza LECTOR en rutas de administración", async () => {
+  const admin = mock._state.usuarios.find((user: { id: string }) => user.id === adminId);
+  assert.ok(admin);
+  admin.rol.nombre = "LECTOR";
+
+  try {
+    const response = await servicesRoute.GET(
+      new Request("http://localhost:3000/api/admin/services"),
+    );
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error.code, "FORBIDDEN");
+  } finally {
+    admin.rol.nombre = "ADMIN";
+  }
+});
+
+test("API: RBAC rechaza inmediatamente una cuenta inactiva en Route Handler", async () => {
+  const admin = mock._state.usuarios.find((user: { id: string }) => user.id === adminId);
+  assert.ok(admin);
+  admin.estado = "INACTIVO";
+
+  try {
+    const response = await servicesRoute.GET(
+      new Request("http://localhost:3000/api/admin/services"),
+    );
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error.code, "FORBIDDEN");
+  } finally {
+    admin.estado = "ACTIVO";
+  }
+});
+
+test("API: GET /api/bookings/history exige un estado válido y devuelve solo el estado solicitado", async () => {
+  const account = mock._state.usuarios.find((user: { id: string }) => user.id === adminId);
+  assert.ok(account);
+  const originalRole = account.rol.nombre;
+  account.rol.nombre = "CLIENTE";
+  mock._state.reservas.push({
+    id: "00000000-0000-4000-8000-000000000061",
+    titularId: adminId,
+    disponibilidadId: 1n,
+    estado: "CONFIRMADA",
+    cantidadCupos: 1,
+    creadoEn: new Date("2026-10-08T10:00:00Z"),
+  });
+
+  try {
+    const response = await bookingHistoryRoute.GET(
+      new Request("http://localhost:3000/api/bookings/history?status=CONFIRMADA"),
+    );
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(
+      body.data.items.map((booking: { estado: string }) => booking.estado),
+      ["CONFIRMADA"],
+    );
+
+    const invalidFilter = await bookingHistoryRoute.GET(
+      new Request("http://localhost:3000/api/bookings/history?status=CANCELADA"),
+    );
+    assert.equal(invalidFilter.status, 400);
+  } finally {
+    account.rol.nombre = originalRole;
+    mock._state.reservas.length = 0;
+  }
 });
 
 test("API: Manejo seguro de errores — solo duplicado real de nombre es 409, otros errores son 500 sin exponer rutas internas", async () => {
@@ -257,4 +337,3 @@ test("API: Manejo seguro de errores — solo duplicado real de nombre es 409, ot
     mock.servicio.create = origCreate;
   }
 });
-
