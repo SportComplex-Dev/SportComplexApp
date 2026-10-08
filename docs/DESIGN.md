@@ -12,7 +12,7 @@
 El sistema digitaliza íntegramente la experiencia del club a través de cuatro frentes unificados:
 1. **Vitrina Pública y Experiencia del Cliente (`apps/web/src/app/(public)` y `(customer)`):**
    - Catálogo interactivo de instalaciones de alto rendimiento: Pádel panorámico con vidrio continuo, Tenis en polvo de ladrillo ITF, Campo de fútbol sintético certificado, Natación semiolímpica climatizada a 28°C, Gimnasio con biomecánica avanzada y Circuito de recuperación/zona húmeda (sauna finlandés y baño turco).
-   - Reserva horaria con bloqueo anti-colisión de 15 minutos (RN-01, RN-07) y ventana máxima de 15 días calendario.
+   - Reserva horaria con bloqueo anti-colisión de 30 minutos (RN-01, RN-07) y ventana máxima de 15 días calendario.
    - Pasarela 100% Cashless mediante Stripe (RN-13) con descuento automático del 30% para socios con membresía vigente (RN-08).
    - Emisión instantánea de pases digitales con QR criptográfico antifraude y comprobante PDF descargable (RN-14, RNF-05).
 2. **Control de Acceso en Portería y Torniquetes (`apps/web/src/app/(staff)/scanner`):**
@@ -167,7 +167,7 @@ Conforme a `ARCHITECTURE.md` §6.2 y `SRS.md`, el sistema implementa una matriz 
 ## 7. Modelo de Datos y Concurrencia de Reservas (Prisma + PostgreSQL)
 
 ### 7.1 Reglas Clave de Negocio (RN)
-- **RN-01 / RN-07:** Bloqueo provisional de turno con TTL de 15 minutos en estado `BLOQUEADA_TTL`. Si la pasarela Stripe no confirma la sesión dentro de los 15 minutos, el turno se libera automáticamente.
+- **RN-01 / RN-07:** Bloqueo provisional de turno con TTL de 30 minutos en estado `BLOQUEADA_TTL`. Si la pasarela Stripe no confirma la sesión dentro de los 30 minutos, el turno se libera automáticamente. *(Revisado en TSK-BE-09: 30 min = mínimo de plataforma de Stripe Checkout Sessions.)*
 - **RN-02:** Los lunes no festivos las piscinas entran en mantenimiento obligatorio. Si el lunes es festivo nacional (consultado mediante cliente Nager.Date Colombia), el mantenimiento se traslada al martes siguiente.
 - **RN-08:** Todo socio con suscripción activa en tabla `Membership` con estado `VIGENTE` recibe un 30% de descuento automático en checkout y taquilla.
 - **RN-13:** Modelo 100% Cashless. Cero recepción de efectivo. Todos los cobros se tramitan vía Stripe (tarjetas, débito digital) y se concilian mediante Webhooks idempotentes.
