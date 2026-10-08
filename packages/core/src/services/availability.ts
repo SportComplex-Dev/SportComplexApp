@@ -1,6 +1,6 @@
 import { addDays } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { BOOKING_WINDOW_DAYS, TIMEZONE } from "../domain/index";
+import { BOOKING_WINDOW_DAYS, CHECKOUT_TTL_MINUTES, TIMEZONE } from "../domain/index";
 
 /**
  * TSK-BE-06 — RN-01 ventana máxima 15 días + RN-11 prohibición de pasado.
@@ -32,7 +32,6 @@ export function maxBookingDateString(now: Date = new Date()): string {
   const today = bogotaDateString(now);
   return bogotaDateString(addDays(new Date(`${today}T12:00:00-05:00`), BOOKING_WINDOW_DAYS));
 }
-
 export function isWithinBookingWindow(now: Date, start: Date): boolean {
   if (start.getTime() <= now.getTime()) return false; // RN-11
   return bogotaDateString(start) <= maxBookingDateString(now); // RN-01
@@ -52,5 +51,5 @@ export function validateBookingWindow(start: Date, now: Date = new Date()): void
 }
 
 export function checkoutExpiresAt(from: Date = new Date()): Date {
-  return new Date(from.getTime() + 15 * 60 * 1000); // RN-04 TTL 15 min
+  return new Date(from.getTime() + CHECKOUT_TTL_MINUTES * 60 * 1000); // RN-04 TTL 30 min
 }

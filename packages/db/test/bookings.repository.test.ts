@@ -36,7 +36,7 @@ function addAforoSlot(capacity: number) {
     capacidadMaxima: capacity,
     tarifa: 2500,
     modalidad: "AFORO",
-    tipoPiscina: null,
+    tipoPiscina: "PUBLICA",
     estado: "ACTIVO",
   });
   mock._state.franjas.push({
@@ -63,6 +63,44 @@ function addAforoSlot(capacity: number) {
     startsAt,
     endsAt,
   };
+}
+
+function addPrivatePoolSlot(capacity: number) {
+  const serviceId = mock._state.servicios.length + 1;
+  const franjaId = mock._state.franjas.length + 1;
+  const availabilityId = BigInt(mock._state.disponibilidades.length + 1);
+  const date = tomorrowInBogota(new Date());
+  const startsAt = new Date(`${date}T10:00:00-05:00`);
+  const endsAt = new Date(`${date}T11:00:00-05:00`);
+
+  mock._state.servicios.push({
+    id: serviceId,
+    categoriaId: 1,
+    nombre: `Piscina privada ${capacity}`,
+    capacidadMaxima: capacity,
+    tarifa: 2500,
+    modalidad: "EXCLUSIVA",
+    tipoPiscina: "PRIVADA",
+    estado: "ACTIVO",
+  });
+  mock._state.franjas.push({
+    id: franjaId,
+    servicioId: serviceId,
+    diaSemana: startsAt.getUTCDay() === 0 ? 7 : startsAt.getUTCDay(),
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 10)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 11)),
+  });
+  mock._state.disponibilidades.push({
+    id: availabilityId,
+    servicioId: serviceId,
+    franjaId,
+    fecha: new Date(`${date}T00:00:00.000Z`),
+    cuposTotales: 1,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+
+  return { serviceId, availabilityId, date, startsAt, endsAt };
 }
 
 function requestFor(
@@ -157,4 +195,30 @@ test("TSK-BE-05: la consulta de disponibilidad entrega el saldo de cupos", async
   assert.equal(hold.cantidadCupos, 4);
   assert.equal(availability.length, 1);
   assert.equal(availability[0].cuposDisponibles, 21);
+});
+
+test("TSK-BE-08: piscina pública de aforo 30 conserva 28 cupos al reservar 2", async () => {
+  const slot = addAforoSlot(30);
+  await createBookingHold(requestFor(slot, 2));
+
+  const availability = await getBookableAvailability(slot.serviceId, slot.date);
+  assert.equal(availability[0].cuposTotales, 30);
+  assert.equal(availability[0].cuposOcupados, 2);
+  assert.equal(availability[0].cuposDisponibles, 28);
+});
+
+test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja completa", async () => {
+  const slot = addPrivatePoolSlot(30);
+  const availabilityBefore = await getBookableAvailability(slot.serviceId, slot.date);
+
+  assert.equal(availabilityBefore[0].cuposTotales, 1);
+  await createBookingHold(requestFor(slot));
+
+  const availabilityAfter = await getBookableAvailability(slot.serviceId, slot.date);
+  assert.equal(availabilityAfter[0].cuposDisponibles, 0);
+  await assert.rejects(
+    createBookingHold(requestFor(slot)),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
+  );
 });

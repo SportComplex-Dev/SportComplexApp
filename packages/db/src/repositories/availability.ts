@@ -18,7 +18,7 @@ import { prisma } from "../client";
  *  3. Verificar `fecha BETWEEN hoy AND hoy+15` en `America/Bogota`
  *  4. Verificar `cupos_ocupados + cantidad <= cupos_totales`
  *  5. `UPDATE cupos_ocupados += cantidad` condicional (defensa en profundidad)
- *  6. `INSERT reserva` en `PENDIENTE_PAGO` con `expira_en = now + 15 min`
+ *  6. `INSERT reserva` en `PENDIENTE_PAGO` con `expira_en = now + 30 min`
  *
  * Concurrencia: N transacciones sobre la misma fila se serializan por el
  * row-lock; exactamente 1 gana y el resto recibe `SlotNoCapacityError` (HTTP 409).
@@ -28,7 +28,7 @@ import { prisma } from "../client";
 const BOOKING_WINDOW_EXCEEDED_MESSAGE = "La reserva excede la ventana máxima permitida de 15 días";
 
 export const BOOKING_WINDOW_DAYS = 15 as const;
-export const CHECKOUT_TTL_MINUTES = 15 as const;
+export const CHECKOUT_TTL_MINUTES = 30 as const;
 export const BOOKING_TIMEZONE = "America/Bogota" as const;
 
 /** Patrón auditado: ningún write sobre disponibilidad puede omitirlo. */
@@ -189,7 +189,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
       throw new AvailabilityError("SLOT_NO_CAPACITY", "Sin cupo (condición de carrera detectada)");
     }
 
-    // 6. Reserva en PENDIENTE_PAGO con TTL 15 min (RN-04).
+    // 6. Reserva en PENDIENTE_PAGO con TTL 30 min (RN-04: alineado al mínimo de Stripe).
     return tx.reserva.create({
       data: {
         disponibilidadId,
