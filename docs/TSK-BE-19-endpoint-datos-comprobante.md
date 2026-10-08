@@ -94,5 +94,6 @@ Checklist:
 - **Estado:** En Desarrollo → Resuelto al merge
 - **Task:** TSK-BE-19 (Endpoint de datos del comprobante · HU-19 / RF-17 / RNF-05 · 1 pt) — depende de TSK-BE-13
 - **Jira:** SCRUM-135
-- **PR:** ver el PR asociado a esta rama
+- **PR:** [#30](https://github.com/SportComplex-Dev/SportComplexApp/pull/30) hacia `develop`
+- **Commits:** `f699749` (feat: endpoint de datos del comprobante) + merge de `develop`
 - **Docs:** este archivo
