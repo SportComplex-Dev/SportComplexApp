@@ -1,8 +1,9 @@
 import { fail, ok } from "@/lib/api-response";
-import { verifySchema } from "@sportcomplex/validation";
+import { resendSchema, verifySchema } from "@sportcomplex/validation";
 import {
   verifySecret,
   isTokenExpired,
+  RESEND_COOLDOWN_MS,
 } from "@sportcomplex/core/src/security/token";
 import {
   consumeRateLimit,
@@ -16,6 +17,46 @@ const VERIFY_MAX_ATTEMPTS_PER_TOKEN = 5;
 /** Techo de peticiones de verificación por IP por minuto (defensa DoS Argon2id). */
 const VERIFY_IP_LIMIT_PER_MIN = 30;
 const VERIFY_IP_WINDOW_MS = 60 * 1000;
+
+export async function GET(request: Request) {
+  const serverNow = new Date();
+  const requestUrl = new URL(request.url);
+  const parsed = resendSchema.safeParse({
+    email: requestUrl.searchParams.get("email"),
+  });
+
+  if (!parsed.success) {
+    return fail("VALIDATION_ERROR", "Email requerido", 400, parsed.error.flatten());
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { correo: parsed.data.email },
+    select: { id: true, estado: true },
+  });
+
+  if (!usuario) {
+    return fail("NOT_FOUND", "Usuario no encontrado", 404);
+  }
+
+  if (usuario.estado === "ACTIVO") {
+    return fail("ALREADY_VERIFIED", "La cuenta ya está activa", 400);
+  }
+
+  const latestToken = await findLatestByUsuarioId(usuario.id);
+  if (!latestToken) {
+    return fail("TOKEN_NOT_FOUND", "No hay token de verificación pendiente", 400);
+  }
+
+  const resendAvailableAt = new Date(
+    latestToken.creadoEn.getTime() + RESEND_COOLDOWN_MS,
+  );
+
+  return ok({
+    expiresAt: latestToken.expiraEn.toISOString(),
+    resendAvailableAt: resendAvailableAt.toISOString(),
+    serverNow: serverNow.toISOString(),
+  });
+}
 
 /**
  * Extrae la IP del cliente desde `x-forwarded-for` (proxy/Docker) con

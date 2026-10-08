@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { getSession, signIn } from 'next-auth/react'
 import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
 import { loginSchema } from '@sportcomplex/validation'
@@ -135,11 +135,11 @@ export default function LoginPage() {
               <div className="eyebrow hero-eyebrow">TU ESPACIO, TU MOMENTO</div>
               <h2>El movimiento<br />cambia <span>todo.</span></h2>
               <p>Bienvenido a una comunidad que se mueve contigo.</p>
-              <div className="auth-decoration" aria-hidden="true">
-                <Activity size={152} strokeWidth={0.8} aria-hidden="true" />
-              </div>
             </div>
             <div className="auth-quote">“La mejor inversión es la que haces en ti.”</div>
+          </div>
+          <div className="auth-decoration auth-decoration-circle" aria-hidden="true">
+            <img src="/images/Akros-logo.png" alt="" width="220" height="220" />
           </div>
         </div>
 

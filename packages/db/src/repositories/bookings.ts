@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../client";
 
 const BOOKING_WINDOW_DAYS = 15;
-const HOLD_TTL_MINUTES = 15;
+const HOLD_TTL_MINUTES = 30;
 const BOGOTA_TIME_ZONE = "America/Bogota";
 
 export class BookingError extends Error {
