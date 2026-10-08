@@ -1,11 +1,18 @@
-export default function PortalLayout({ children }: { children: React.ReactNode }) {
+import { auth } from "@/auth";
+import { TopBar } from "@/components/top-bar";
+
+export default async function PortalLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+
   return (
-    <>
-      <nav aria-label="Portal cliente">
-        <a href="/portal">Reservas</a> · <a href="/portal/history">Historial</a> ·{" "}
-        <a href="/portal/membership">Membresía</a>
-      </nav>
-      {children}
-    </>
+    <div className="club-app min-h-screen flex flex-col">
+      <TopBar
+        customer={{
+          name: session?.user?.name ?? "",
+          email: session?.user?.email ?? "",
+        }}
+      />
+      <div className="flex-1">{children}</div>
+    </div>
   );
 }
