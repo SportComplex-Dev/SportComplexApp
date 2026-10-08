@@ -42,7 +42,58 @@ export interface MockReserva {
   titularId?: string;
   cantidadCupos?: number;
   expiraEn?: Date | null;
+  pagoId?: string | null;
   creadoEn?: Date;
+}
+
+export interface MockPago {
+  id: string;
+  usuarioId: string;
+  membresiaId?: number | null;
+  tipo: string;
+  stripePaymentIntentId: string;
+  monto: string | number;
+  estado: string;
+  creadoEn?: Date;
+}
+
+export interface MockMembresia {
+  id: number;
+  usuarioId: string;
+  estado: string;
+}
+
+export interface MockUsuario {
+  id: string;
+  nombre: string;
+  correo?: string;
+}
+
+export interface MockTicketQr {
+  id: string;
+  reservaId: string;
+  codigoUuid: string;
+  usadoPor: string | null;
+  estado: string;
+  usadoEn: Date | null;
+}
+
+export interface MockLecturaAcceso {
+  id: bigint;
+  ticketId: string;
+  empleadoId: string;
+  asignacionId: number | null;
+  modo: string;
+  resultado: string;
+  fechaHora: Date;
+}
+
+export interface MockAsignacionPuesto {
+  id: number;
+  empleadoId: string;
+  servicioId: number;
+  inicioTurno: Date;
+  finTurno: Date;
 }
 
 export function createMockPrisma() {
@@ -51,12 +102,21 @@ export function createMockPrisma() {
   const franjas: MockFranja[] = [];
   const disponibilidades: MockDisponibilidad[] = [];
   const reservas: MockReserva[] = [];
+  const pagos: MockPago[] = [];
+  const membresias: MockMembresia[] = [];
+  const usuarios: MockUsuario[] = [];
+  const tickets: MockTicketQr[] = [];
+  const lecturas: MockLecturaAcceso[] = [];
+  const asignaciones: MockAsignacionPuesto[] = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
   let franjaIdSeq = 1;
   let dispIdSeq = 1n;
   let reservaIdSeq = 1;
+  let pagoIdSeq = 1;
+  let lecturaIdSeq = 1n;
+  let asignacionIdSeq = 1;
   let transactionQueue = Promise.resolve();
 
   const mock: any = {
@@ -66,6 +126,12 @@ export function createMockPrisma() {
       franjas,
       disponibilidades,
       reservas,
+      pagos,
+      membresias,
+      usuarios,
+      tickets,
+      lecturas,
+      asignaciones,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -80,6 +146,12 @@ export function createMockPrisma() {
         const snapFranjas = [...franjas];
         const snapDisponibilidades = [...disponibilidades];
         const snapReservas = [...reservas];
+        const snapPagos = [...pagos];
+        const snapMembresias = [...membresias];
+        const snapUsuarios = [...usuarios];
+        const snapTickets = [...tickets];
+        const snapLecturas = [...lecturas];
+        const snapAsignaciones = [...asignaciones];
         try {
           return await arg(mock);
         } catch (err) {
@@ -93,6 +165,18 @@ export function createMockPrisma() {
           disponibilidades.push(...snapDisponibilidades);
           reservas.length = 0;
           reservas.push(...snapReservas);
+          pagos.length = 0;
+          pagos.push(...snapPagos);
+          membresias.length = 0;
+          membresias.push(...snapMembresias);
+          usuarios.length = 0;
+          usuarios.push(...snapUsuarios);
+          tickets.length = 0;
+          tickets.push(...snapTickets);
+          lecturas.length = 0;
+          lecturas.push(...snapLecturas);
+          asignaciones.length = 0;
+          asignaciones.push(...snapAsignaciones);
           throw err;
         } finally {
           releaseTransaction();
@@ -385,8 +469,16 @@ export function createMockPrisma() {
       },
     },
     reserva: {
+      async findUnique({ where }: any) {
+        if (where.id === undefined) return null;
+        return reservas.find((reservation) => reservation.id === where.id) ?? null;
+      },
       async findMany({ where, orderBy, take }: any = {}) {
         let list = reservas.filter((reservation) => {
+          if (
+            typeof where?.id === "string" &&
+            reservation.id !== where.id
+          ) return false;
           if (
             where?.disponibilidadId !== undefined &&
             reservation.disponibilidadId !== where.disponibilidadId
@@ -424,6 +516,7 @@ export function createMockPrisma() {
       async updateMany({ where, data }: any) {
         let count = 0;
         for (const reservation of reservas) {
+          if (typeof where?.id === "string" && reservation.id !== where.id) continue;
           if (where?.id?.in && !where.id.in.includes(reservation.id)) continue;
           if (
             where?.disponibilidadId !== undefined &&
@@ -433,7 +526,9 @@ export function createMockPrisma() {
           if (where?.expiraEn?.lte && (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)) {
             continue;
           }
-          reservation.estado = data.estado;
+          if (data.estado !== undefined) reservation.estado = data.estado;
+          if (data.pagoId !== undefined) reservation.pagoId = data.pagoId;
+          if (data.expiraEn !== undefined) reservation.expiraEn = data.expiraEn;
           count++;
         }
         return { count };
@@ -471,6 +566,175 @@ export function createMockPrisma() {
           list = list.filter((r) => where.estado.in.includes(r.estado));
         }
         return list.length;
+      },
+    },
+    pago: {
+      async findUnique({ where }: any) {
+        if (where.id !== undefined) {
+          return pagos.find((p) => p.id === where.id) ?? null;
+        }
+        if (where.stripePaymentIntentId !== undefined) {
+          return (
+            pagos.find((p) => p.stripePaymentIntentId === where.stripePaymentIntentId) ?? null
+          );
+        }
+        return null;
+      },
+      async create({ data }: any) {
+        // Respeta el UNIQUE "pago_stripe_payment_intent_id_key" (TSK-BD-06).
+        if (
+          pagos.some((p) => p.stripePaymentIntentId === data.stripePaymentIntentId)
+        ) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`stripe_payment_intent_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
+        const item: MockPago = {
+          id: `payment-${pagoIdSeq++}`,
+          usuarioId: data.usuarioId,
+          membresiaId: data.membresiaId ?? null,
+          tipo: data.tipo,
+          stripePaymentIntentId: data.stripePaymentIntentId,
+          monto: data.monto,
+          estado: data.estado,
+          creadoEn: new Date(),
+        };
+        pagos.push(item);
+        return item;
+      },
+      async update({ where, data }: any) {
+        const pago = pagos.find((p) => p.id === where.id);
+        if (!pago) throw new Error("Not found");
+        if (data.estado !== undefined) pago.estado = data.estado;
+        if (data.monto !== undefined) pago.monto = data.monto;
+        return pago;
+      },
+    },
+    membresia: {
+      async findUnique({ where }: any) {
+        return membresias.find((m) => m.id === where.id) ?? null;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const membresia of membresias) {
+          if (where?.id !== undefined && membresia.id !== where.id) continue;
+          if (where?.estado?.not !== undefined && membresia.estado === where.estado.not) {
+            continue;
+          }
+          if (where?.estado !== undefined && typeof where.estado === "string") {
+            if (membresia.estado !== where.estado) continue;
+          }
+          if (data.estado !== undefined) membresia.estado = data.estado;
+          count++;
+        }
+        return { count };
+      },
+    },
+    usuario: {
+      async findUnique({ where }: any) {
+        if (where.id !== undefined) return usuarios.find((u) => u.id === where.id) ?? null;
+        if (where.correo !== undefined) return usuarios.find((u) => u.correo === where.correo) ?? null;
+        return null;
+      },
+    },
+    ticketQr: {
+      async findUnique({ where, include, select }: any) {
+        let ticket: MockTicketQr | undefined;
+        if (where.id !== undefined) ticket = tickets.find((t) => t.id === where.id);
+        else if (where.codigoUuid !== undefined) {
+          ticket = tickets.find((t) => t.codigoUuid === where.codigoUuid);
+        }
+        if (!ticket) return null;
+        if (select) {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(select)) {
+            if (select[key]) picked[key] = (ticket as any)[key];
+          }
+          return picked;
+        }
+        const res: any = { ...ticket };
+        if (include?.reserva) {
+          const reserva = reservas.find((r) => r.id === ticket!.reservaId);
+          const disp = reserva
+            ? disponibilidades.find((d) => d.id === reserva.disponibilidadId)
+            : undefined;
+          res.reserva = {
+            ...reserva,
+            titular: reserva ? usuarios.find((u) => u.id === (reserva as any).titularId) : undefined,
+            disponibilidad: disp
+              ? {
+                  ...disp,
+                  servicio: servicios.find((s) => s.id === disp.servicioId),
+                  franja: franjas.find((f) => f.id === disp.franjaId),
+                }
+              : undefined,
+          };
+        }
+        return res;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const ticket of tickets) {
+          if (where?.id !== undefined && ticket.id !== where.id) continue;
+          if (where?.estado !== undefined && ticket.estado !== where.estado) continue;
+          if (where?.codigoUuid !== undefined && ticket.codigoUuid !== where.codigoUuid) continue;
+          Object.assign(ticket, data);
+          count++;
+        }
+        return { count };
+      },
+    },
+    lecturaAcceso: {
+      async create({ data }: any) {
+        const item: MockLecturaAcceso = {
+          id: lecturaIdSeq++,
+          ticketId: data.ticketId,
+          empleadoId: data.empleadoId,
+          asignacionId: data.asignacionId ?? null,
+          modo: data.modo,
+          resultado: data.resultado,
+          fechaHora: data.fechaHora ?? new Date(),
+        };
+        lecturas.push(item);
+        return item;
+      },
+      async findMany({ where }: any = {}) {
+        return lecturas.filter((lectura) => {
+          if (where?.ticketId !== undefined && lectura.ticketId !== where.ticketId) return false;
+          if (where?.empleadoId !== undefined && lectura.empleadoId !== where.empleadoId) return false;
+          if (where?.modo !== undefined && lectura.modo !== where.modo) return false;
+          if (where?.resultado !== undefined && lectura.resultado !== where.resultado) return false;
+          return true;
+        });
+      },
+    },
+    asignacionPuesto: {
+      async create({ data }: any) {
+        const item: MockAsignacionPuesto = {
+          id: asignacionIdSeq++,
+          empleadoId: data.empleadoId,
+          servicioId: data.servicioId,
+          inicioTurno: data.inicioTurno,
+          finTurno: data.finTurno,
+        };
+        asignaciones.push(item);
+        return item;
+      },
+      async findFirst({ where }: any = {}) {
+        const candidatas = asignaciones
+          .filter((a) => {
+            if (where?.empleadoId !== undefined && a.empleadoId !== where.empleadoId) return false;
+            if (where?.servicioId !== undefined && a.servicioId !== where.servicioId) return false;
+            if (where?.inicioTurno?.lte !== undefined && a.inicioTurno > where.inicioTurno.lte) {
+              return false;
+            }
+            if (where?.finTurno?.gte !== undefined && a.finTurno < where.finTurno.gte) return false;
+            return true;
+          })
+          .sort((a, b) => b.inicioTurno.getTime() - a.inicioTurno.getTime());
+        return candidatas[0] ?? null;
       },
     },
   };
