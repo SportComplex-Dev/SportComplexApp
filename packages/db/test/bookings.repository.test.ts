@@ -163,6 +163,30 @@ test("TSK-BE-05: el TTL expira y libera cupos antes de la siguiente reserva", as
   );
 });
 
+test("TSK-BE-06: una petición manipulada con T + 16 días recibe 400 y el mensaje contractual", async () => {
+  const now = new Date("2026-10-08T12:00:00.000Z"); // 08/Oct 07:00 Bogota.
+  const date = "2026-10-25"; // T + 17 días calendario en Bogota: fuera de ventana.
+  const start = new Date(`${date}T10:00:00-05:00`);
+  const end = new Date(`${date}T11:00:00-05:00`);
+
+  await assert.rejects(
+    () => createBookingHold({ serviceId: 1, startTime: start.toISOString(), endTime: end.toISOString(), cantidadCupos: 1, userId: "u-1" }, now),
+    (err: unknown) =>
+      err instanceof BookingError &&
+      err.status === 400 &&
+      err.code === "OUTSIDE_BOOKING_WINDOW" &&
+      err.message === "La reserva excede la ventana máxima permitida de 15 días",
+  );
+
+  await assert.rejects(
+    () => getBookableAvailability(1, date, now),
+    (err: unknown) =>
+      err instanceof BookingError &&
+      err.status === 400 &&
+      err.message === "La reserva excede la ventana máxima permitida de 15 días",
+  );
+});
+
 test("TSK-BE-05: la consulta de disponibilidad entrega el saldo de cupos", async () => {
   const slot = addAforoSlot(25);
   const hold = await createBookingHold(requestFor(slot, 4));

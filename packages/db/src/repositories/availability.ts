@@ -24,6 +24,9 @@ import { prisma } from "../client";
  * row-lock; exactamente 1 gana y el resto recibe `SlotNoCapacityError` (HTTP 409).
  */
 
+// TSK-BE-06 — mensaje contractual RN-01 (duplicado de @sportcomplex/core: db no puede importar core).
+const BOOKING_WINDOW_EXCEEDED_MESSAGE = "La reserva excede la ventana máxima permitida de 15 días";
+
 export const BOOKING_WINDOW_DAYS = 15 as const;
 export const CHECKOUT_TTL_MINUTES = 30 as const;
 export const BOOKING_TIMEZONE = "America/Bogota" as const;
@@ -51,7 +54,7 @@ export class AvailabilityError extends Error {
       code === "SLOT_NOT_FOUND"
         ? 404
         : code === "SLOT_OUT_OF_WINDOW"
-          ? 422
+          ? 400 // TSK-BE-06: petición manipulada debe recibir HTTP 400.
           : code === "INVALID_QUANTITY"
             ? 400
             : 409; // SLOT_BLOCKED, SLOT_NO_CAPACITY -> 409
@@ -131,7 +134,7 @@ function toBigintId(id: bigint | number | string): bigint {
  * Reserva atómica de cupos. Serializa competidores con row-lock.
  *
  * @throws AvailabilityError `SLOT_NOT_FOUND`(404) | `SLOT_BLOCKED`(409)
- * | `SLOT_OUT_OF_WINDOW`(422) | `SLOT_NO_CAPACITY`(409) | `INVALID_QUANTITY`(400)
+ * | `SLOT_OUT_OF_WINDOW`(400) | `SLOT_NO_CAPACITY`(409) | `INVALID_QUANTITY`(400)
  */
 export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): Promise<Reserva> {
   const cantidad = input.cantidadCupos ?? 1;
@@ -164,10 +167,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
     const fechaStr = toFechaString(slot.fecha);
     const { min, max } = getBookingWindow(now);
     if (fechaStr < min || fechaStr > max) {
-      throw new AvailabilityError(
-        "SLOT_OUT_OF_WINDOW",
-        `Fecha ${fechaStr} fuera de ventana [${min}, ${max}] (${BOOKING_TIMEZONE})`,
-      );
+      throw new AvailabilityError("SLOT_OUT_OF_WINDOW", BOOKING_WINDOW_EXCEEDED_MESSAGE);
     }
 
     // 4. Aforo bajo lock.
@@ -208,7 +208,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
   });
 }
 
-/** Type-guard para mapear a HTTP en la capa API (`err.httpStatus`: 404/409/422). */
+/** Type-guard para mapear a HTTP en la capa API (`err.httpStatus`: 400/404/409). */
 export function isAvailabilityError(err: unknown): err is AvailabilityError {
   return err instanceof AvailabilityError;
 }
