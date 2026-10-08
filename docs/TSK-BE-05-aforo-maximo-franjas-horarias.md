@@ -24,7 +24,7 @@ La definición de esos constraints se encuentra en `packages/db/prisma/migration
 
 ## Límite de alcance: reserva concurrente
 
-La consulta `GET /api/bookings?serviceId=<id>&date=YYYY-MM-DD` entrega las franjas futuras con su saldo de cupos. La creación `POST /api/bookings` requiere sesión activa de cliente y recibe `serviceId`, `startTime`, `endTime` y `cantidadCupos` (opcional, predeterminado a 1). El endpoint crea un bloqueo `PENDIENTE_PAGO` de 15 minutos, incrementa los cupos ocupados dentro de una transacción y usa `SELECT ... FOR UPDATE` sobre la disponibilidad antes de validar el aforo.
+La consulta `GET /api/bookings?serviceId=<id>&date=YYYY-MM-DD` entrega las franjas futuras con su saldo de cupos. La creación `POST /api/bookings` requiere sesión activa de cliente y recibe `serviceId`, `startTime`, `endTime` y `cantidadCupos` (opcional, predeterminado a 1). El endpoint crea un bloqueo `PENDIENTE_PAGO` de 30 minutos, incrementa los cupos ocupados dentro de una transacción y usa `SELECT ... FOR UPDATE` sobre la disponibilidad antes de validar el aforo.
 
 Los bloqueos vencidos se marcan `EXPIRADA` y liberan cupos dentro de la transacción de consulta o de un nuevo bloqueo para esa franja. Esto es liberación bajo demanda; no se añadió un proceso cron ni una migración. La creación de intents y confirmación de pagos Stripe (`RF-09`), así como la emisión de tickets, permanecen fuera de esta tarea.
 
