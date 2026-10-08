@@ -253,7 +253,8 @@ curl -X POST http://localhost:3000/api/access -H "Content-Type: application/json
 - **Commits:** `fa6e25c` (feat: TSK-BD-09 idempotencia de pagos con Stripe),
   `5ce020e` (feat: TSK-BD-10 canje de ticket y pista de auditoría),
   más el commit de esta documentación (ver PR para el detalle exacto)
-- **PR:** hacia `develop`, cubre **TSK-BD-09 + TSK-BD-10** (misma rama)
+- **PR:** [#25](https://github.com/SportComplex-Dev/SportComplexApp/pull/25)
+  hacia `develop`, cubre **TSK-BD-09 + TSK-BD-10** (misma rama; cierra el #22)
 - **Docs:** `docs/TSK-BD-09-idempotencia-pagos-stripe.md` y este archivo
 
 **TSK-BD-09 — Criterios de aceptación (evidencia):**
