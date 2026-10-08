@@ -4,8 +4,8 @@ import {
   hashSecret,
   generateVerificationCode,
   TOKEN_TTL_MS,
-} from "@sportcomplex/core/src/security/token";
-import { sendVerificationCodeEmail } from "@sportcomplex/core/src/integrations/email";
+  sendVerificationCodeEmail,
+} from "@sportcomplex/core/server";
 import { prisma, createToken } from "@sportcomplex/db";
 
 export async function POST(request: Request) {

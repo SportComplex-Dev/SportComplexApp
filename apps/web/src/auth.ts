@@ -1,11 +1,88 @@
 import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@sportcomplex/db";
+import type { Role } from "@sportcomplex/core";
+import { verifySecret } from "@sportcomplex/core/server";
+import { loginSchema } from "@sportcomplex/validation";
 import { authConfig } from "./auth.config";
+import {
+  createSupabaseServerClient,
+  isSupabaseAuthConfigured,
+} from "./lib/supabase/server";
+import { normalizeRole } from "./lib/session";
 
 type UsuarioTransaction = Pick<typeof prisma, "usuario">;
 
+const supportedRoles = [
+  "Administrador",
+  "Empleado_Vendedor",
+  "Empleado_Lector",
+  "Cliente",
+] satisfies readonly Role[];
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  providers: [
+    ...authConfig.providers,
+    Credentials({
+      credentials: {
+        email: { type: "email" },
+        password: { type: "password" },
+      },
+      async authorize(credentials) {
+        const validation = loginSchema.safeParse(credentials);
+        if (!validation.success) return null;
+
+        const { email, password } = validation.data;
+
+        if (isSupabaseAuthConfigured()) {
+          const supabase = await createSupabaseServerClient();
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error || !data.user) return null;
+
+          const metadata = data.user.user_metadata;
+          const role = supportedRoles.find(
+            (supportedRole) => supportedRole === metadata.role,
+          ) ?? "Cliente";
+          const metadataName = metadata.name ?? metadata.full_name;
+          const name =
+            typeof metadataName === "string" && metadataName.trim()
+              ? metadataName.trim()
+              : data.user.email?.split("@")[0] ?? "Usuario";
+
+          return {
+            id: data.user.id,
+            email: data.user.email ?? email,
+            name,
+            role,
+            estado: "ACTIVO",
+          };
+        }
+
+        const user = await prisma.usuario.findUnique({
+          where: { correo: email.toLowerCase().trim() },
+          include: { rol: true },
+        });
+        const passwordOk =
+          !!user?.passwordHash &&
+          !user.deletedAt &&
+          (await verifySecret(user.passwordHash, password));
+
+        if (!user || !passwordOk || user.estado !== "ACTIVO") return null;
+
+        return {
+          id: user.id,
+          email: user.correo,
+          name: user.nombre,
+          role: normalizeRole(user.rol.nombre) ?? "Cliente",
+          estado: user.estado,
+        };
+      },
+    }),
+  ],
   callbacks: {
     ...authConfig.callbacks,
     async signIn({ account, profile }) {
@@ -93,7 +170,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return true;
       });
     },
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
+      if (account?.provider === "credentials" && user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.estado = user.estado;
+        return token;
+      }
+
       if (account?.provider === "google") {
         const user = await prisma.usuario.findUnique({
           where: { googleSub: account.providerAccountId },

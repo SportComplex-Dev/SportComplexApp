@@ -5,8 +5,8 @@ import {
   generateVerificationCode,
   TOKEN_TTL_MS,
   isResendAllowed,
-} from "@sportcomplex/core/src/security/token";
-import { sendVerificationCodeEmail } from "@sportcomplex/core/src/integrations/email";
+  sendVerificationCodeEmail,
+} from "@sportcomplex/core/server";
 import { prisma, createToken, findLatestByUsuarioId, markUsed } from "@sportcomplex/db";
 
 export async function POST(request: Request) {
