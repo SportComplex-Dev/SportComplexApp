@@ -410,7 +410,7 @@ function formatSlotTime(raw: string | undefined): string {
                               ? 'secondary'
                               : 'destructive'
                           }
-                          className="text-[11px] px-2 py-0.5"
+                          className="text-[11px] px-2 py-0.5 shrink-0"
                         >
                           {booking.status}
                         </Badge>
@@ -588,7 +588,7 @@ function formatSlotTime(raw: string | undefined): string {
               <span>Pase transferible sin biometría. Acerca la pantalla al lector óptico del torniquete.</span>
             </div>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="qr-modal-actions">
               <button
                 type="button"
                 className="action-button text-xs py-2 px-4 gap-2"
