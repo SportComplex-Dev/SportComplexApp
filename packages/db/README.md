@@ -26,6 +26,39 @@ Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM*
 
 ---
 
+## 🔁 Idempotencia de pagos (TSK-BD-09)
+
+El repositorio `src/repositories/payments.ts` exporta `procesarPagoWebhook`,
+punto de entrada único del webhook de Stripe (`POST /api/payments`):
+
+- Upsert de `PAGO` por `stripe_payment_intent_id` (UNIQUE desde `TSK-BD-06`);
+  reintenta la transacción ante `P2002` (carreras concurrentes).
+- Confirmación condicional `PENDIENTE_PAGO → CONFIRMADA` y activación
+  idempotente de membresías, todo en la misma transacción.
+- Reenviar el mismo webhook N veces deja **una sola** fila en `pago` y **una
+  sola** reserva `CONFIRMADA`.
+
+Guía completa para backend y frontend: [`docs/TSK-BD-09-idempotencia-pagos-stripe.md`](../../docs/TSK-BD-09-idempotencia-pagos-stripe.md).
+
+---
+
+## 🎫 Canje de ticket y auditoría de accesos (TSK-BD-10)
+
+El repositorio `src/repositories/tickets.ts` exporta `getTicketForScan`,
+`getAsignacionVigente` y `ejecutarLectura`, el único punto de escritura de
+`ticket_qr` + `lectura_acceso` (`POST /api/access`):
+
+- Canje transaccional `EMITIDO → USADO` con `WHERE estado='EMITIDO'` (RN-05:
+  un boleto `USADO` jamás vuelve a `EMITIDO`).
+- Exactamente **1 fila** en `lectura_acceso` por escaneo (concedido, denegado
+  o consulta); el modo CONSULTA audita con `asignacion_id = NULL` y no altera
+  el boleto.
+
+Guía única de ambas tasks (backend, frontend y docketeo Jira):
+[`docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md`](../../docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md).
+
+---
+
 ## 📋 Guía de Uso e Indicaciones para el Equipo (Partners)
 
 ### 1. Variables de Entorno (`.env`)
@@ -179,7 +212,36 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
 
 ### 8. Reserva transaccional TSK-BD-07 (Overbooking = 0)
 
-- **Qué:** `src/repositories/availability.ts` expone `reserveDisponibilidad()` — reserva atómica con `SELECT ... FOR UPDATE`, ventana `[hoy, hoy+15]` en `America/Bogota` y `reserva` en `PENDIENTE_PAGO` (`expira_en = now + 15 min`).
+  - **Qué:** `src/repositories/availability.ts` expone `reserveDisponibilidad()` — reserva atómica con `SELECT ... FOR UPDATE`, ventana `[hoy, hoy+15]` en `America/Bogota` y `reserva` en `PENDIENTE_PAGO` (`expira_en = now + 30 min`, RN-04 rev.).
 - **Backend:** llamar siempre a `reserveDisponibilidad()` desde la API route; mapear con `isAvailabilityError(err) → err.httpStatus` (`404` not found, `409` sin cupo/bloqueada, `422` fuera de ventana, `400` cantidad inválida).
 - **Frontend:** ante `409` mostrar "cupo agotado" y refrescar slots (no reintentar a ciegas); ante `422` "fuera de ventana 15 días"; con `201` iniciar checkout con countdown de `expiraEn`.
 - **Regla de oro:** ningún código que ocupe cupos (`cupos_ocupados`) puede bypasear este repo. Detalle, ejemplos y auditoría: `src/repositories/README.md`.
+
+---
+
+### 9. Checkout con bloqueo temporal TSK-BE-09 (HU-09 / RF-08 / RN-04 rev.)
+
+- **Qué:** `src/repositories/checkout.ts` contiene:
+  - `compensateFailedCheckout(reservaId, db?)` — si Stripe falla tras TX1,
+    ejecuta `PENDIENTE_PAGO → EXPIRADA` + `cupos_ocupados = GREATEST(0, -N)`
+    con las mismas guardas idempotentes que `expirations.ts`. Nunca degrada
+    una reserva `CONFIRMADA` y nunca crea `PAGO`.
+  - `attachPendingPagoToReserva(input, db?)` — helper para el webhook **RF-09**
+    (no usar desde el lock): crea `PAGO` (`tipo=RESERVA`, `estado=PENDIENTE`)
+    con el `pi_...` real y enlaza `RESERVA.pagoId` de forma condicional
+    (`estado='PENDIENTE_PAGO'`). Idempotente por `stripe_payment_intent_id`
+    (UNIQUE + captura `P2002`).
+- **Opción C (aprobada):** TSK-BE-09 no crea `PAGO` en el lock — la API de
+  Stripe (`2026-08-26.dahlia`) no expone el `pi_...` hasta
+  `checkout.session.completed`. El webhook RF-09 localizará la reserva por
+  `checkout.session.metadata.bookingId` y usará el helper anterior.
+- **Restricción de esquema:** `PAGO.stripe_payment_intent_id NOT NULL UNIQUE`
+  se mantiene intacta (documentada en el MER como idempotencia del webhook).
+- **Único TTL:** `RESERVA.expira_en = now + 30 min` (decisión 6 revisada:
+  mínimo de plataforma de Stripe). No existe ni debe crearse columna `locked_at`.
+- **Endpoint:** `POST /api/bookings/lock` (`apps/web`) = TX1
+  (`createBookingHold`) → Stripe Checkout Session (30 min) → respuesta
+  `{ reserva, checkout.url }`; compensación automática ante fallo de Stripe.
+- **Smoke test real:** `pnpm --filter @sportcomplex/db smoke:be09` (requiere
+  `STRIPE_SECRET_KEY` en `apps/web/.env.local` y disponibilidad futura;
+  ver `scripts/db-seed-availability.mts` para sembrarla).

@@ -1,6 +1,11 @@
 import { fail, ok } from "@/lib/api-response";
 import { registerSchema } from "@sportcomplex/validation";
-import { hashSecret, generateVerificationCode, TOKEN_TTL_MS, sendVerificationCodeEmail } from "@sportcomplex/core";
+import {
+  hashSecret,
+  generateVerificationCode,
+  TOKEN_TTL_MS,
+} from "@sportcomplex/core/src/security/token";
+import { sendVerificationCodeEmail } from "@sportcomplex/core/src/integrations/email";
 import { prisma, createToken } from "@sportcomplex/db";
 
 export async function POST(request: Request) {

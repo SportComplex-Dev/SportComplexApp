@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowRight, Menu, Moon, Sun, X } from 'lucide-react'
 import { Brand } from '@/components/brand'
+import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 
 const publicNav = [
   { label: 'Inicio', href: '/' },
@@ -15,28 +16,7 @@ const publicNav = [
 export function TopBar() {
   const pathname = usePathname()
   const [openMenu, setOpenMenu] = useState(false)
-  const [dark, setDark] = useState(false)
-
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark') ||
-      localStorage.getItem('akros_theme') === 'dark'
-    setDark(isDark)
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    if (next) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('akros_theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('akros_theme', 'light')
-    }
-  }
+  const { dark, toggleTheme } = useThemeToggle()
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`))
   const close = () => setOpenMenu(false)
@@ -61,14 +41,7 @@ export function TopBar() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="theme-toggle"
-            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            onClick={toggleTheme}
-          >
-            {dark ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
+          <ThemeToggle dark={dark} onToggle={toggleTheme} />
           <span className="topbar-action-divider" aria-hidden="true" />
           <Link href="/login" className="action-button nav-access">
             Accede al club <ArrowRight size={15} />
