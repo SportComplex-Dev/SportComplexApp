@@ -52,3 +52,29 @@ test("accessScanSchema rechaza ticketId no-UUID y firma corta", () => {
     false,
   );
 });
+
+test("TSK-BE-11: la firma debe ser exactamente 64 hex (HMAC-SHA256)", () => {
+  // Longitud correcta pero caracteres no hexadecimales.
+  assert.equal(
+    accessScanSchema.safeParse({ ticketId: UUID, signature: "z".repeat(64), postServiceId: null })
+      .success,
+    false,
+  );
+  // 63 y 65 hex quedan fuera.
+  assert.equal(
+    accessScanSchema.safeParse({ ticketId: UUID, signature: "a".repeat(63), postServiceId: null })
+      .success,
+    false,
+  );
+  assert.equal(
+    accessScanSchema.safeParse({ ticketId: UUID, signature: "a".repeat(65), postServiceId: null })
+      .success,
+    false,
+  );
+  // Mayúsculas válidas.
+  assert.equal(
+    accessScanSchema.safeParse({ ticketId: UUID, signature: "A".repeat(64), postServiceId: null })
+      .success,
+    true,
+  );
+});

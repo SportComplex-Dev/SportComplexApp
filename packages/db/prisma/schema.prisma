@@ -60,6 +60,7 @@ enum EstadoReserva {
   CONFIRMADA
   EXPIRADA
   CANCELADA_ADMINISTRATIVA
+  CANCELADA_PAGO
 }
 
 enum EstadoTicket {

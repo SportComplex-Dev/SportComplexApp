@@ -113,6 +113,28 @@ test("TSK-BD-10 API: firma HMAC inválida se rechaza ANTES de tocar la BD (400, 
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
 });
 
+test("TSK-BE-11 (CRITERIO): UUID alterado con firma válida de otro código se rechaza sin tocar la BD", async () => {
+  seed();
+  // UUID con formato válido pero distinto del que firmó el QR: la firma ya no
+  // corresponde. Debe fallar en la verificación HMAC, ANTES de consultar la BD.
+  const alterado = "9f0d6f4e-0000-4000-8000-00000000beef";
+  await assert.rejects(
+    () =>
+      procesarEscaneo(
+        {
+          ticketId: alterado,
+          signature: signTicket(CODIGO, SECRET),
+          postServiceId: 1,
+        },
+        { empleadoId: EMPLEADO, qrSecret: SECRET, now: ADENTRO },
+      ),
+    (err: unknown) =>
+      err instanceof AccessError && err.code === "INVALID_SIGNATURE" && err.status === 400,
+  );
+  assert.equal(mock._state.lecturas.length, 0);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+});
+
 test("TSK-BD-10 API: escaneo TURNO válido concede, canjea EMITIDO→USADO y audita con su asignación", async () => {
   seed();
   const res = await scan(1);

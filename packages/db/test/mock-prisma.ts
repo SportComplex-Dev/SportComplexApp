@@ -1,5 +1,7 @@
 // Mock en memoria de PrismaClient para pruebas unitarias de repositorios
 
+import { randomUUID } from "node:crypto";
+
 export interface MockCategoria {
   id: number;
   nombre: string;
@@ -825,6 +827,27 @@ export function createMockPrisma() {
       },
     },
     ticketQr: {
+      async create({ data }: any) {
+        // Respeta el UNIQUE "ticket_qr_reserva_id_key" (TSK-BE-10).
+        if (tickets.some((t) => t.reservaId === data.reservaId)) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`reserva_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
+        const item: MockTicketQr = {
+          id: `ticket-${tickets.length + 1}`,
+          reservaId: data.reservaId,
+          codigoUuid: data.codigoUuid ?? randomUUID(),
+          usadoPor: null,
+          estado: data.estado ?? "EMITIDO",
+          usadoEn: null,
+          emitidoEn: new Date(),
+        };
+        tickets.push(item);
+        return item;
+      },
       async findUnique({ where, include, select }: any) {
         let ticket: MockTicketQr | undefined;
         if (where.id !== undefined) ticket = tickets.find((t) => t.id === where.id);

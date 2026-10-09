@@ -228,3 +228,39 @@ pnpm --filter web dev
 - Membresías: aquí solo se registra el pago y se activa de forma idempotente;
   el CRUD de planes/membresías continúa en `TSK-BD-11` (doc:
   `docs/TSK-BD-11-membresias.md`).
+
+## 7. Anexo TSK-BE-10 — QR, pago fallido y alias de ruta
+
+Cambios incorporados para cerrar el alcance de `TSK-BE-10` (HU-10 / RF-09):
+
+1. **Alias de ruta**: el handler canónico sigue en `POST /api/payments`; se
+   añadió `POST /api/webhooks/stripe` como alias de compatibilidad con el
+   contrato del ticket (`apps/web/src/app/api/webhooks/stripe/route.ts`
+   reexporta el handler, sin duplicar lógica).
+2. **`payment_intent.succeeded` → emisión del QR**: la misma transacción que
+   confirma la reserva (`PENDIENTE_PAGO → CONFIRMADA`) crea la fila
+   `TICKET_QR` en estado `EMITIDO`. Es idempotente por
+   `UNIQUE(reserva_id)`: reenviar el webhook no duplica el boleto
+   (`ticketQrEmitido: true` solo en la corrida que gana).
+3. **`payment_intent.payment_failed` → cancelación + restitución**: se
+   transiciona la reserva `PENDIENTE_PAGO → CANCELADA_PAGO` (nuevo valor del
+   enum `EstadoReserva`, migración
+   `20261009120000_reserva_cancelada_pago_enum`) y se restituye la franja
+   (`cupos_ocupados -= cantidad`). Todo con update condicional: el webhook
+   actúa de inmediato y el job TTL (`TSK-BD-08`) queda como red de seguridad
+   para checkouts abandonados, **sin doble liberación** (quien no gana ve
+   `count = 0`). El campo `franjaRestituida` indica si esta corrida liberó.
+4. **Alerta de fallo**: `/api/payments` dispara el webhook de contingencia
+   (n8n) de forma *fire-and-forget* ante un pago `FALLIDO`, sin bloquear ni
+   revertir la respuesta a Stripe.
+
+Contrato de respuesta extendido (200 procesado):
+
+```jsonc
+{ "received": true, "pagoId": "…", "duplicado": false, "estado": "APROBADO",
+  "reservaConfirmada": true, "reservaEstado": "CONFIRMADA",
+  "ticketQrEmitido": true, "franjaRestituida": false, "membresiaActivada": false }
+```
+
+> Nota: los conteos de pruebas de la §5 quedan actualizados a **8 tests** en
+> `@sportcomplex/db` y **6 tests** en `web` tras este anexo.
