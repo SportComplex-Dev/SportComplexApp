@@ -42,6 +42,7 @@ export interface MockReserva {
   titularId?: string;
   cantidadCupos?: number;
   expiraEn?: Date | null;
+  inhabilitacionId?: number | null;
   pagoId?: string | null;
   creadoEn?: Date;
   canal?: string;
@@ -138,6 +139,7 @@ export function createMockPrisma() {
   const tickets: MockTicketQr[] = [];
   const lecturas: MockLecturaAcceso[] = [];
   const asignaciones: MockAsignacionPuesto[] = [];
+  const inhabilitaciones: Array<Record<string, unknown>> = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
@@ -185,6 +187,7 @@ export function createMockPrisma() {
       tickets,
       lecturas,
       asignaciones,
+      inhabilitaciones,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -205,6 +208,7 @@ export function createMockPrisma() {
         const snapTickets = [...tickets];
         const snapLecturas = [...lecturas];
         const snapAsignaciones = [...asignaciones];
+        const snapInhabilitaciones = [...inhabilitaciones];
         try {
           return await arg(mock);
         } catch (err) {
@@ -230,6 +234,8 @@ export function createMockPrisma() {
           lecturas.push(...snapLecturas);
           asignaciones.length = 0;
           asignaciones.push(...snapAsignaciones);
+          inhabilitaciones.length = 0;
+          inhabilitaciones.push(...snapInhabilitaciones);
           throw err;
         } finally {
           releaseTransaction();
@@ -545,12 +551,17 @@ export function createMockPrisma() {
           ) return false;
           if (
             where?.disponibilidadId !== undefined &&
+            typeof where.disponibilidadId !== "object" &&
             reservation.disponibilidadId !== where.disponibilidadId
           ) return false;
           if (typeof where?.estado === "string" && reservation.estado !== where.estado) return false;
           if (Array.isArray(where?.estado?.in) && !where.estado.in.includes(reservation.estado)) {
             return false;
           }
+          if (
+            where?.disponibilidadId?.in &&
+            !where.disponibilidadId.in.includes(reservation.disponibilidadId)
+          ) return false;
           if (where?.titularId && reservation.titularId !== where.titularId) return false;
           if (where?.disponibilidad) {
             const disp = disponibilidades.find((d) => d.id === reservation.disponibilidadId);
@@ -589,10 +600,19 @@ export function createMockPrisma() {
           return true;
         });
         if (orderBy) {
+          const createdDirection = Array.isArray(orderBy)
+            ? orderBy[0]?.creadoEn
+            : orderBy.creadoEn;
+          const idDirection = Array.isArray(orderBy)
+            ? orderBy[1]?.id
+            : orderBy.id;
+          const createdMultiplier = createdDirection === "asc" ? 1 : -1;
+          const idMultiplier = idDirection === "asc" ? 1 : -1;
           list = [...list].sort((a, b) => {
             const createdAtDifference =
-              (b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0);
-            return createdAtDifference || b.id.localeCompare(a.id);
+              ((a.creadoEn?.getTime() ?? 0) - (b.creadoEn?.getTime() ?? 0)) *
+              createdMultiplier;
+            return createdAtDifference || a.id.localeCompare(b.id) * idMultiplier;
           });
         }
         if (typeof take === "number") list = list.slice(0, take);
@@ -631,6 +651,8 @@ export function createMockPrisma() {
               res[key] = nested ? pickDisponibilidad(fullDisponibilidad, nested) : fullDisponibilidad;
             } else if (key === "ticketQr") {
               res[key] = tickets.find((t) => t.reservaId === reservation.id);
+            } else if (key === "titular") {
+              res[key] = usuarios.find((u) => u.id === reservation.titularId);
             }
           }
           return res;
@@ -644,15 +666,20 @@ export function createMockPrisma() {
           if (where?.id?.in && !where.id.in.includes(reservation.id)) continue;
           if (
             where?.disponibilidadId !== undefined &&
+            typeof where.disponibilidadId !== "object" &&
             reservation.disponibilidadId !== where.disponibilidadId
           ) continue;
-          if (where?.estado && reservation.estado !== where.estado) continue;
+          if (typeof where?.estado === "string" && reservation.estado !== where.estado) continue;
+          if (where?.estado?.in && !where.estado.in.includes(reservation.estado)) continue;
           if (where?.expiraEn?.lte && (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)) {
             continue;
           }
           if (data.estado !== undefined) reservation.estado = data.estado;
           if (data.pagoId !== undefined) reservation.pagoId = data.pagoId;
           if (data.expiraEn !== undefined) reservation.expiraEn = data.expiraEn;
+          if (data.inhabilitacionId !== undefined) {
+            reservation.inhabilitacionId = data.inhabilitacionId;
+          }
           count++;
         }
         return { count };
@@ -859,6 +886,19 @@ export function createMockPrisma() {
           })
           .sort((a, b) => b.inicioTurno.getTime() - a.inicioTurno.getTime());
         return candidatas[0] ?? null;
+      },
+    },
+    inhabilitacionServicio: {
+      async create({ data }: any) {
+        const entry = { id: inhabilitaciones.length + 1, ...data };
+        inhabilitaciones.push(entry);
+        return entry;
+      },
+      async update({ where, data }: any) {
+        const entry = inhabilitaciones.find((item) => item.id === where.id);
+        if (!entry) throw new Error("Not found");
+        Object.assign(entry, data);
+        return entry;
       },
     },
   };
