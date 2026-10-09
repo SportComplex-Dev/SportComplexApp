@@ -774,7 +774,7 @@ export default function AdminCatalogPage() {
   })
 
   return (
-    <main className="section-shell app-page demo-page">
+    <div className="space-y-6">
       <PageHeading
         eyebrow="ADMINISTRACIÓN DE CATÁLOGO"
         title="Catálogo & Aforo"
@@ -807,13 +807,13 @@ export default function AdminCatalogPage() {
       <section className="demo-card mb-6 p-4">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Pestañas de categoría (Tabs) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               type="button"
               className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                 selectedCategoryFilter === 'todas'
-                  ? 'bg-brand-accent text-content-on-accent border-brand-accent shadow-xs'
-                  : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink'
+                  ? 'bg-[var(--brand-accent)] text-[#111815] font-bold border-[var(--brand-accent)] shadow-xs'
+                  : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink hover:border-[var(--brand-accent)]/50'
               }`}
               onClick={() => setSelectedCategoryFilter('todas')}
             >
@@ -827,8 +827,8 @@ export default function AdminCatalogPage() {
                   type="button"
                   className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                     selectedCategoryFilter === cat.slug
-                      ? 'bg-brand-accent text-content-on-accent border-brand-accent shadow-xs'
-                      : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink'
+                      ? 'bg-[var(--brand-accent)] text-[#111815] font-bold border-[var(--brand-accent)] shadow-xs'
+                      : 'bg-[var(--surface)] text-subtle border-[var(--line)] hover:text-ink hover:border-[var(--brand-accent)]/50'
                   }`}
                   onClick={() => setSelectedCategoryFilter(cat.slug)}
                 >
@@ -892,9 +892,9 @@ export default function AdminCatalogPage() {
                     <th>Categoría</th>
                     <th>Sede</th>
                     <th>Precio</th>
-                    <th>Aforo & Modalidad (RF-04)</th>
+                    <th>Aforo & Modalidad</th>
                     <th>Disponibilidad</th>
-                    <th>Acciones</th>
+                    <th className="text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -922,7 +922,7 @@ export default function AdminCatalogPage() {
                       >
                         <td>
                           <div className="flex items-center gap-2">
-                            {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />}
+                            {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-accent)] shrink-0" />}
                             <span className="font-semibold text-ink">{item.name}</span>
                           </div>
                         </td>
@@ -931,11 +931,17 @@ export default function AdminCatalogPage() {
                             {categoryObj?.name ?? item.category}
                           </span>
                         </td>
-                        <td>{item.sede}</td>
-                        <td>{formatMoney(item.price)} COP</td>
                         <td>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant={isShared ? 'success' : 'secondary'} className="text-[11px] font-semibold">
+                          <span className="text-xs text-subtle whitespace-nowrap">{item.sede}</span>
+                        </td>
+                        <td>
+                          <span className="text-xs font-semibold text-ink whitespace-nowrap">
+                            {formatMoney(item.price)} COP
+                          </span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <Badge variant={isShared ? 'success' : 'secondary'} className="text-[10px] font-semibold">
                               {isShared ? 'Compartido' : 'Exclusivo'}
                             </Badge>
                             <span className="text-xs text-subtle">
@@ -944,45 +950,52 @@ export default function AdminCatalogPage() {
                           </div>
                         </td>
                         <td>
-                          <Badge variant={item.status === 'Disponible' ? 'success' : 'warning'}>
+                          <Badge
+                            variant={item.status === 'Disponible' ? 'success' : 'warning'}
+                            className="whitespace-nowrap"
+                          >
                             {item.status}
                           </Badge>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div className="row-actions">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                             {/* Botón especializado para editar Aforo y Franjas (TSK-FE-05) */}
                             <button
                               type="button"
-                              className="action-secondary text-xs flex items-center gap-1 py-1 px-2.5 rounded-md border border-[var(--line)] hover:bg-[var(--surface-soft)] font-medium"
+                              className="inline-flex items-center gap-1 py-1 px-2.5 rounded-md text-xs font-semibold border border-[var(--line)] bg-[var(--surface-soft)] text-ink hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] transition-all cursor-pointer"
                               title={`Editar aforo y franjas de ${item.name}`}
                               onClick={() => setEditingSchedule(item)}
                             >
-                              <SlidersHorizontal size={13} className="text-brand-accent" />
-                              <span>Aforo & Franjas</span>
+                              <SlidersHorizontal size={13} className="text-[var(--brand-accent)] shrink-0" />
+                              <span>Aforo</span>
                             </button>
 
                             <button
                               type="button"
-                              className="text-link"
+                              className={`text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer ${
+                                item.status === 'Disponible'
+                                  ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/10'
+                                  : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10'
+                              }`}
                               onClick={() => handleToggleStatus(item)}
                             >
                               {item.status === 'Disponible' ? 'Pausar' : 'Activar'}
                             </button>
                             <button
                               type="button"
-                              className="icon-action"
+                              className="icon-action size-7 min-w-7 min-h-7 flex items-center justify-center rounded-md border border-[var(--line)] hover:bg-[var(--surface-soft)] text-subtle hover:text-ink transition-colors cursor-pointer"
                               aria-label={`Editar ${item.name}`}
                               onClick={() => setEditing(item)}
                             >
-                              <Pencil size={15} />
+                              <Pencil size={13} />
                             </button>
                             <button
                               type="button"
-                              className="icon-action icon-danger"
+                              className="icon-action icon-danger size-7 min-w-7 min-h-7 flex items-center justify-center rounded-md border border-[var(--line)] hover:bg-red-500/15 text-subtle hover:text-red-500 transition-colors cursor-pointer"
                               aria-label={`Eliminar ${item.name}`}
                               onClick={() => setDeleting(item)}
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -1000,7 +1013,7 @@ export default function AdminCatalogPage() {
               <div className="demo-card-heading flex-wrap gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <CalendarDays size={18} className="text-brand-accent" />
+                    <CalendarDays size={18} className="text-[var(--brand-accent)]" />
                     <h2>Calendario Operativo Autónomo — {selectedService.name}</h2>
                   </div>
                   <p>
@@ -1018,14 +1031,14 @@ export default function AdminCatalogPage() {
               </div>
 
               {/* Selector de días de la semana */}
-              <div className="flex gap-2 overflow-x-auto pb-3 mb-4 border-b border-[var(--line)]">
+              <div className="flex gap-2 overflow-x-auto pb-3 mb-4 border-b border-[var(--line)] no-scrollbar">
                 {weekDays.map((day) => (
                   <button
                     key={day.offset}
                     type="button"
                     className={`py-2 px-3 rounded-lg text-xs font-semibold flex flex-col items-center min-w-[70px] border transition-all ${
                       selectedDayOffset === day.offset
-                        ? 'border-brand-accent bg-[var(--surface-soft)] text-brand-accent shadow-sm'
+                        ? 'border-[var(--brand-accent)] bg-[var(--surface-soft)] text-[var(--brand-accent)] shadow-sm'
                         : 'border-[var(--line)] text-subtle hover:text-ink'
                     }`}
                     onClick={() => setSelectedDayOffset(day.offset)}
@@ -1033,7 +1046,7 @@ export default function AdminCatalogPage() {
                     <span className="uppercase text-[10px] tracking-wider">{day.name}</span>
                     <span className="font-bold text-sm">{day.dateStr}</span>
                     {day.isToday && (
-                      <span className="text-[9px] text-brand-accent font-medium mt-0.5">Hoy</span>
+                      <span className="text-[9px] text-[var(--brand-accent)] font-medium mt-0.5">Hoy</span>
                     )}
                   </button>
                 ))}
@@ -1125,6 +1138,6 @@ export default function AdminCatalogPage() {
           onConfirm={() => handleDelete(deleting)}
         />
       )}
-    </main>
+    </div>
   )
 }

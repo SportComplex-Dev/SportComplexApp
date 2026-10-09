@@ -231,7 +231,7 @@ export function SlotCapacityEditor({
                       </button>
                     </div>
 
-                    <div className="capacity-meta-box">
+                    <div className="capacity-meta-box flex flex-col gap-0.5">
                       <span className="text-xs font-bold text-app">Cupos por franja</span>
                       <small className="text-[11px] text-subtle">
                         {isShared ? 'Aforo concurrente por persona' : 'Cancha completa (máx. jugadores)'}
