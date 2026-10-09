@@ -9,3 +9,5 @@ export * from "./repositories/payments";
 export * from "./repositories/tickets";
 export * from "./repositories/checkout";
 export * from "./repositories/contingencies";
+export * from "./repositories/analytics";
+export * from "./repositories/receipts";

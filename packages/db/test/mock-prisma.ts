@@ -45,6 +45,10 @@ export interface MockReserva {
   inhabilitacionId?: number | null;
   pagoId?: string | null;
   creadoEn?: Date;
+  canal?: string;
+  subtotal?: number | string;
+  descuentoPct?: number | string;
+  total?: number | string;
 }
 
 export interface MockPago {
@@ -77,6 +81,8 @@ export interface MockTicketQr {
   usadoPor: string | null;
   estado: string;
   usadoEn: Date | null;
+  /** Opcional: solo lo siembran las pruebas que leen el comprobante. */
+  emitidoEn?: Date;
 }
 
 export interface MockLecturaAcceso {
@@ -144,6 +150,29 @@ export function createMockPrisma() {
   let lecturaIdSeq = 1n;
   let asignacionIdSeq = 1;
   let transactionQueue = Promise.resolve();
+
+  /**
+   * Proyecta una reserva con sus relaciones (TSK-BE-19): disponibilidad +
+   * franja + servicio, titular y boleto emitido. Alimenta
+   * `reserva.findUnique` simulando `include`/`select` anidado SIN restrictor
+   * de campos, para que un repositorio que se pase de selects quede expuesto
+   * en las pruebas.
+   */
+  function reservaEnriquecida(reserva: MockReserva): Record<string, unknown> {
+    const disponibilidad = disponibilidades.find((d) => d.id === reserva.disponibilidadId);
+    return {
+      ...reserva,
+      disponibilidad: disponibilidad
+        ? {
+            ...disponibilidad,
+            franja: franjas.find((f) => f.id === disponibilidad.franjaId),
+            servicio: servicios.find((s) => s.id === disponibilidad.servicioId),
+          }
+        : null,
+      titular: usuarios.find((u) => u.id === reserva.titularId) ?? null,
+      ticketQr: tickets.find((t) => t.reservaId === reserva.id) ?? null,
+    };
+  }
 
   const mock: any = {
     _state: {
@@ -499,9 +528,20 @@ export function createMockPrisma() {
       },
     },
     reserva: {
-      async findUnique({ where }: any) {
+      async findUnique({ where, select }: any) {
         if (where.id === undefined) return null;
-        return reservas.find((reservation) => reservation.id === where.id) ?? null;
+        const base = reservas.find((reservation) => reservation.id === where.id) ?? null;
+        if (!base) return null;
+        // TSK-BE-19: se enriquece con las relaciones del comprobante. El mock
+        // devuelve MÁS campos de los que pide `select` en las relaciones
+        // (pagoId incluido): el repositorio debe descartar lo que no pide.
+        const full = reservaEnriquecida(base);
+        if (!select) return full;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (key in full) picked[key] = (full as any)[key];
+        }
+        return picked;
       },
       async findMany({ where, orderBy, take, include, select }: any = {}) {
         let list = reservas.filter((reservation) => {
