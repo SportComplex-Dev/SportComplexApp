@@ -441,7 +441,7 @@ export function createMockPrisma() {
       },
     },
     disponibilidad: {
-      async findMany({ where }: any = {}) {
+      async findMany({ where, include }: any = {}) {
         return disponibilidades
           .filter((d) => {
             if (where?.servicioId !== undefined && d.servicioId !== where.servicioId) return false;
@@ -451,11 +451,31 @@ export function createMockPrisma() {
             ) return false;
             return true;
           })
-          .map((d) => ({
-            ...d,
-            servicio: servicios.find((s) => s.id === d.servicioId),
-            franja: franjas.find((f) => f.id === d.franjaId),
-          }));
+          .map((d) => {
+            const result: Record<string, unknown> = {
+              ...d,
+              servicio: servicios.find((s) => s.id === d.servicioId),
+              franja: franjas.find((f) => f.id === d.franjaId),
+            };
+            if (include?.reservas) {
+              const relationWhere = include.reservas.where;
+              result.reservas = reservas
+                .filter((reservation) => {
+                  if (reservation.disponibilidadId !== d.id) return false;
+                  if (
+                    relationWhere?.estado !== undefined &&
+                    reservation.estado !== relationWhere.estado
+                  ) return false;
+                  const expiresAt = relationWhere?.expiraEn?.lte;
+                  if (expiresAt && (!reservation.expiraEn || reservation.expiraEn > expiresAt)) {
+                    return false;
+                  }
+                  return true;
+                })
+                .map(({ cantidadCupos }) => ({ cantidadCupos }));
+            }
+            return result;
+          });
       },
       async findUnique({ where, include }: any) {
         const disp = disponibilidades.find((d) => d.id === where.id);
