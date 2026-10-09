@@ -18,6 +18,7 @@ export const CHECKOUT_TTL_MINUTES = 30 as const;
 export const MEMBERSHIP_DISCOUNT_RATE = 0.3 as const;
 
 export * from "./catalog";
+export * from "./analytics";
 
 export const roleHome: Record<Role, string> = {
   Administrador: '/admin/dashboard',
