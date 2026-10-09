@@ -8,10 +8,20 @@ export const bookingRequestSchema = z.object({
   cantidadCupos: z.coerce.number().int().positive().default(1),
 });
 
+export const cartCheckoutSchema = z.object({
+  items: z.array(z.object({
+    serviceId: z.coerce.number().int().positive(),
+    startTime: z.iso.datetime(),
+    endTime: z.iso.datetime(),
+    cantidadCupos: z.coerce.number().int().positive().default(1),
+  })).min(2),
+});
+
 export const availabilityQuerySchema = z.object({
   serviceId: z.coerce.number().int().positive(),
   date: z.iso.date(),
 });
 
 export type BookingRequest = z.infer<typeof bookingRequestSchema>;
+export type CartCheckoutRequest = z.infer<typeof cartCheckoutSchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;

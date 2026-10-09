@@ -86,12 +86,18 @@ export function toStripeAmountCents(
   return cents;
 }
 
-export interface CheckoutSessionInput {
+export interface CheckoutSessionItem {
   reservaId: string;
+  servicioNombre: string;
+  cantidadCupos: number;
+  subtotal: number;
+}
+
+export interface CheckoutSessionInput {
+  reservaIds: string[];
   userId: string;
   total: number | string | { toString(): string };
-  cantidadCupos?: number;
-  servicioNombre?: string;
+  items: CheckoutSessionItem[];
   /** Inyectable para tests; por defecto `new Date()`. */
   now?: Date;
   successUrl?: string;
@@ -123,26 +129,28 @@ export function buildCheckoutSessionParams(
   const now = input.now ?? new Date();
   const unitAmount = toStripeAmountCents(input.total);
   const metadata = buildPaymentMetadata({
-    bookingId: input.reservaId,
+    bookingId: input.reservaIds.join(","),
     userId: input.userId,
   });
-  const productName =
-    input.servicioNombre && input.servicioNombre.trim().length > 0
-      ? `Reserva ${input.servicioNombre.trim()} x${input.cantidadCupos ?? 1}`
-      : `Reserva ${input.reservaId} x${input.cantidadCupos ?? 1}`;
+
+  const lineItems = input.items.map((item) => {
+    const productName = item.servicioNombre.trim().length > 0
+      ? `Reserva ${item.servicioNombre.trim()} x${item.cantidadCupos}`
+      : `Reserva ${item.reservaId} x${item.cantidadCupos}`;
+    const itemAmount = toStripeAmountCents(item.subtotal);
+    return {
+      price_data: {
+        currency: STRIPE_CURRENCY,
+        product_data: { name: productName },
+        unit_amount: itemAmount,
+      },
+      quantity: 1,
+    };
+  });
 
   return {
     mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: STRIPE_CURRENCY,
-          product_data: { name: productName },
-          unit_amount: unitAmount,
-        },
-        quantity: 1,
-      },
-    ],
+    line_items: lineItems,
     metadata,
     payment_intent_data: { metadata },
     expires_at: stripeSessionExpiresAtSec(now),
@@ -150,7 +158,7 @@ export function buildCheckoutSessionParams(
       input.successUrl ?? `${appUrl}/portal/tickets?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:
       input.cancelUrl ??
-      `${appUrl}/portal/book?cancelled=${encodeURIComponent(input.reservaId)}`,
+      `${appUrl}/portal/book?cancelled=${encodeURIComponent(input.reservaIds[0])}`,
   };
 }
 
@@ -190,17 +198,17 @@ function stripeError(code: string, detail: string, extra: Record<string, unknown
 }
 
 /**
- * Crea la Checkout Session (30 min) con `metadata { bookingId, userId }`.
+ * Crea la Checkout Session (30 min) con `metadata { bookingIds: "id1,id2,...", userId }`.
  * `expiresAt` del resultado = expiración enviada a Stripe (coincide con el
  * TTL del hold `RESERVA.expira_en`, devuelto por TX1).
  *
- * NO toca la DB y NO crea `PAGO`: la reserva queda identificada por
- * `metadata.bookingId` y el `PAGO` se crea/asocia exclusivamente en el
+ * NO toca la DB y NO crea `PAGO`: las reservas quedan identificadas por
+ * `metadata.bookingIds` y el `PAGO` se crea/asocia exclusivamente en el
  * webhook RF-09 (`checkout.session.completed` / `payment_intent.succeeded`),
  * cuando el `pi_...` realmente existe.
  *
- * Si esta función lanza, el llamador debe compensar el hold con
- * `compensateFailedCheckout(reservaId)`.
+ * Si esta función lanza, el llamador debe compensar los holds con
+ * `compensateFailedCheckout(reservaId)` para cada reserva.
  */
 export async function createStripeCheckoutSession(
   input: CheckoutSessionInput,
