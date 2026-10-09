@@ -30,7 +30,7 @@ import { Badge, Button, Card } from '@sportcomplex/ui'
 interface SlotCapacityEditorProps {
   service: CatalogItem
   initialConfig?: OperatingScheduleConfig
-  onSave: (updatedService: CatalogItem, updatedConfig: OperatingScheduleConfig) => void
+  onSave: (updatedService: CatalogItem, updatedConfig: OperatingScheduleConfig) => Promise<void> | void
   onClose: () => void
 }
 
@@ -59,6 +59,8 @@ export function SlotCapacityEditor({
   const [disabledSlots, setDisabledSlots] = useState<string[]>(defaultConfig.disabledSlots)
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
   const [selectedDayOffset, setSelectedDayOffset] = useState<number>(0)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Validación de negocio: CHECK capacity > 0 (RF-04)
   const capacityValidation = validateServiceCapacity(capacity)
@@ -84,12 +86,14 @@ export function SlotCapacityEditor({
   const disabledSlotsCount = totalSlotsCount - activeSlotsCount
 
   const handleToggleSlot = (time: string) => {
+    setSaveError(null)
     setDisabledSlots((prev) =>
       prev.includes(time) ? prev.filter((item) => item !== time) : [...prev, time]
     )
   }
 
   const handleToggleAllSlots = (enableAll: boolean) => {
+    setSaveError(null)
     if (enableAll) {
       setDisabledSlots([])
     } else {
@@ -98,19 +102,32 @@ export function SlotCapacityEditor({
   }
 
   const handleCapacityChange = (delta: number) => {
+    setSaveError(null)
     const next = Math.max(1, capacity + delta)
     setCapacity(next)
   }
 
-  const handleSave = () => {
-    if (!isCapacityValid) return
+  const handleSave = async () => {
+    if (!isCapacityValid || isSaving) return
+    setSaveError(null)
+    setIsSaving(true)
 
-    const updatedService: CatalogItem = {
-      ...service,
-      capacity,
+    try {
+      const updatedService: CatalogItem = {
+        ...service,
+        capacity,
+      }
+
+      await onSave(updatedService, currentConfig)
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Error al persistir los parámetros de aforo y franjas en el servidor.'
+      setSaveError(message)
+    } finally {
+      setIsSaving(false)
     }
-
-    onSave(updatedService, currentConfig)
   }
 
   // Días de previsualización para el calendario semanal
@@ -214,7 +231,7 @@ export function SlotCapacityEditor({
                       </button>
                     </div>
 
-                    <div className="capacity-meta-box">
+                    <div className="capacity-meta-box flex flex-col gap-0.5">
                       <span className="text-xs font-bold text-app">Cupos por franja</span>
                       <small className="text-[11px] text-subtle">
                         {isShared ? 'Aforo concurrente por persona' : 'Cancha completa (máx. jugadores)'}
@@ -451,25 +468,30 @@ export function SlotCapacityEditor({
         </div>
 
         {/* Pie del Editor con Acciones */}
-        <footer className="slot-editor-footer">
+        <footer className="slot-editor-footer flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="text-xs text-subtle">
-            {isCapacityValid ? (
+            {saveError ? (
+              <div className="flex items-center gap-1.5 text-red-500 font-semibold">
+                <AlertCircle size={15} />
+                <span>{saveError}</span>
+              </div>
+            ) : isCapacityValid ? (
               <span>✓ Parámetros listos para guardar ({activeSlotsCount} franjas operativas activas)</span>
             ) : (
               <span className="text-red-500 font-bold">Corrige la capacidad para poder guardar</span>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={onClose}>
+          <div className="flex items-center gap-3 justify-end">
+            <Button variant="secondary" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
             <Button
               variant="default"
               onClick={handleSave}
-              disabled={!isCapacityValid}
+              disabled={!isCapacityValid || isSaving}
               className="action-button"
             >
-              <Save size={16} /> Guardar Parámetros de Aforo y Franjas
+              <Save size={16} /> {isSaving ? 'Guardando en BD...' : 'Guardar Parámetros de Aforo y Franjas'}
             </Button>
           </div>
         </footer>

@@ -6,6 +6,11 @@ import {
 } from '@sportcomplex/core'
 import { usePersistentState } from '@/lib/persistent-state'
 
+/**
+ * @deprecated El catálogo de administración ahora persiste directamente contra la base de datos relacional
+ * mediante los endpoints /api/admin/services y /api/admin/services/categories (TSK-FE-04, TSK-FE-05).
+ * Se mantiene este hook exclusivamente para retrocompatibilidad con componentes locales legacy.
+ */
 export const useCatalog = () => usePersistentState<CatalogItem[]>('altura:catalog', initialCatalog)
 
 export type Booking = {
