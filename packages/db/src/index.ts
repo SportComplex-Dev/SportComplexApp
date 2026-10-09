@@ -10,3 +10,4 @@ export * from "./repositories/tickets";
 export * from "./repositories/checkout";
 export * from "./repositories/analytics";
 export * from "./repositories/receipts";
+export * from "./repositories/employees";

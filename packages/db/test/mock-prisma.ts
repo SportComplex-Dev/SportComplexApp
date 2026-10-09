@@ -71,6 +71,10 @@ export interface MockUsuario {
   id: string;
   nombre: string;
   correo?: string;
+  estado?: string;
+  deletedAt?: Date | null;
+  rolId?: number;
+  rolNombre?: string;
 }
 
 export interface MockTicketQr {
@@ -757,10 +761,40 @@ export function createMockPrisma() {
       },
     },
     usuario: {
-      async findUnique({ where }: any) {
-        if (where.id !== undefined) return usuarios.find((u) => u.id === where.id) ?? null;
-        if (where.correo !== undefined) return usuarios.find((u) => u.correo === where.correo) ?? null;
-        return null;
+      async findUnique({ where, select }: any) {
+        const usuario = where.id !== undefined
+          ? usuarios.find((u) => u.id === where.id)
+          : where.correo !== undefined
+            ? usuarios.find((u) => u.correo === where.correo)
+            : undefined;
+        if (!usuario) return null;
+        if (!select) return usuario;
+
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (!select[key]) continue;
+          if (key === "rol") {
+            picked.rol = { nombre: usuario.rolNombre };
+          } else {
+            picked[key] = (usuario as any)[key];
+          }
+        }
+        return picked;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const usuario of usuarios) {
+          if (where.id !== undefined && usuario.id !== where.id) continue;
+          if (where.rolId !== undefined && usuario.rolId !== where.rolId) continue;
+          if (where.estado !== undefined && usuario.estado !== where.estado) continue;
+          if (
+            where.deletedAt !== undefined &&
+            usuario.deletedAt?.getTime() !== where.deletedAt?.getTime()
+          ) continue;
+          Object.assign(usuario, data);
+          count++;
+        }
+        return { count };
       },
     },
     ticketQr: {

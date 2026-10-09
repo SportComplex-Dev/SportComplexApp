@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
+import { prisma } from "@sportcomplex/db";
 import { authConfig } from "@/auth.config";
 import {
   extractSession,
@@ -8,6 +9,7 @@ import {
   ROLE_HOME,
   type SessionUser,
 } from "@/lib/session";
+import { isRoleAllowedForPath } from "@/lib/route-access";
 
 /**
  * RBAC perimetral y redirección de landing — ARCHITECTURE §4.1 y §8.3
@@ -21,13 +23,24 @@ import {
  *     - Administrador     → /admin
  *
  * Restricciones de rutas protegidas:
- * - /portal/*               → Cliente (o Administrador)
+ * - /portal/*               → Cliente activo
  * - /pos/* y /api/pos/*     → Administrador | Empleado Vendedor
  * - /scanner/* y /api/access/* → Administrador | Empleado Lector
  * - /admin/* y /api/admin/* → Administrador
  */
 
 const { auth: withAuth } = NextAuth(authConfig);
+const protectedRoutePrefixes = [
+  "/admin",
+  "/pos",
+  "/scanner",
+  "/portal",
+  "/api/admin",
+  "/api/pos",
+  "/api/access",
+  "/api/tickets/verify",
+  "/api/pdf/receipt",
+];
 
 function createForbiddenResponse(req: NextRequest, message: string) {
   const acceptsHtml = req.headers.get("accept")?.includes("text/html");
@@ -70,7 +83,7 @@ function createForbiddenResponse(req: NextRequest, message: string) {
   );
 }
 
-export default withAuth((req) => {
+export default withAuth(async (req) => {
   const { pathname } = req.nextUrl;
   const isDev = process.env.NODE_ENV !== "production";
   const queryRole = isDev
@@ -99,9 +112,90 @@ export default withAuth((req) => {
         }
       : extractSession(req));
 
-  const status = session?.status ?? "ACTIVO";
-  const isActive = session !== null && isAccountActive(status);
-  const role = isActive ? session.role : null;
+  const isProtectedRoute = protectedRoutePrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  const needsFreshAccount =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    [
+      "/admin",
+      "/pos",
+      "/scanner",
+      "/portal",
+      "/api/admin",
+      "/api/pos",
+      "/api/access",
+      "/api/tickets/verify",
+      "/api/pdf/receipt",
+    ]
+      .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  let currentSession = session;
+  if (
+    isProtectedRoute &&
+    !authUser &&
+    process.env.NODE_ENV === "production"
+  ) {
+    currentSession = null;
+  }
+  if (
+    needsFreshAccount &&
+    currentSession &&
+    currentSession.userId !== "dev-override"
+  ) {
+    const sessionToRefresh = currentSession;
+    if (!sessionToRefresh.userId) {
+      currentSession = null;
+    } else {
+      let account;
+      try {
+        account = await prisma.usuario.findUnique({
+          where: { id: sessionToRefresh.userId },
+          select: {
+            estado: true,
+            deletedAt: true,
+            rol: { select: { nombre: true } },
+          },
+        });
+      } catch (error: unknown) {
+        console.error("Error al validar el estado de la sesión:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "AUTHORIZATION_UNAVAILABLE",
+              message: "No se pudo verificar el estado de la cuenta.",
+            },
+          },
+          { status: 503 },
+        );
+      }
+
+      const currentRole = normalizeRole(account?.rol?.nombre);
+      const isAuthenticationLanding =
+        pathname === "/" || pathname === "/login" || pathname === "/register";
+      if (
+        !account ||
+        account.deletedAt ||
+        (account.estado !== "ACTIVO" &&
+          !(isAuthenticationLanding && account.estado === "PENDIENTE")) ||
+        !currentRole
+      ) {
+        currentSession = null;
+      } else {
+        currentSession = {
+          ...sessionToRefresh,
+          role: currentRole,
+          status: account.estado,
+        };
+      }
+    }
+  }
+
+  const status = currentSession?.status ?? "ACTIVO";
+  const isActive = currentSession !== null && isAccountActive(status);
+  const role = currentSession && isActive ? currentSession.role : null;
 
   // 1. Landing pública (/) y páginas de login/registro (/login, /register):
   // Si el usuario ya está autenticado, redirigir con 307 a su portal según rol (o a /verify si su cuenta está PENDIENTE)
@@ -126,7 +220,7 @@ export default withAuth((req) => {
         { status: 401 },
       );
     }
-    if (role !== "Administrador") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Administrador" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -142,7 +236,7 @@ export default withAuth((req) => {
         { status: 401 },
       );
     }
-    if (role !== "Administrador" && role !== "Empleado_Vendedor") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Vendedor" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -158,7 +252,7 @@ export default withAuth((req) => {
         { status: 401 },
       );
     }
-    if (role !== "Administrador" && role !== "Empleado_Lector") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Lector" }, timestamp: new Date().toISOString() },
         { status: 403 },
@@ -167,9 +261,41 @@ export default withAuth((req) => {
     return NextResponse.next();
   }
 
+  if (pathname.startsWith("/api/tickets/verify")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Lector" }, timestamp: new Date().toISOString() },
+        { status: 403 },
+      );
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/api/pdf/receipt")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Cliente o personal de taquilla" }, timestamp: new Date().toISOString() },
+        { status: 403 },
+      );
+    }
+    return NextResponse.next();
+  }
+
   // 3. Control perimetral para páginas protegidas (Web Views)
   if (pathname.startsWith("/portal")) {
-    if (!session) {
+    if (!currentSession) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }
     if (status.toUpperCase() === "PENDIENTE") {
@@ -178,7 +304,7 @@ export default withAuth((req) => {
     if (!isActive) {
       return createForbiddenResponse(req, "La cuenta no está activa");
     }
-    if (role !== "Cliente" && role !== "Administrador") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return createForbiddenResponse(req, "Acceso exclusivo para clientes");
     }
     return NextResponse.next();
@@ -188,7 +314,7 @@ export default withAuth((req) => {
     if (!role) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }
-    if (role !== "Administrador") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return createForbiddenResponse(req, "Requiere rol Administrador");
     }
     const res = NextResponse.next();
@@ -202,7 +328,7 @@ export default withAuth((req) => {
     if (!role) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }
-    if (role !== "Administrador" && role !== "Empleado_Vendedor") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return createForbiddenResponse(req, "Requiere rol Vendedor");
     }
     return NextResponse.next();
@@ -212,7 +338,7 @@ export default withAuth((req) => {
     if (!role) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }
-    if (role !== "Administrador" && role !== "Empleado_Lector") {
+    if (!isRoleAllowedForPath(pathname, role)) {
       return createForbiddenResponse(req, "Requiere rol Lector");
     }
     return NextResponse.next();

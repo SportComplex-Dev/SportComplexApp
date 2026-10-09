@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import { AccessError, procesarEscaneo } from "@/lib/access";
 import { accessScanSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
@@ -15,14 +15,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para escanear.", 401);
-    }
-    const role = session.user.role?.toUpperCase();
-    if (role !== "ADMINISTRADOR" && role !== "EMPLEADO_LECTOR") {
-      return fail("FORBIDDEN", "Solo un lector de accesos puede escanear tickets.", 403);
-    }
+    const authorization = await authorizeApiRequest(["Administrador", "Empleado_Lector"]);
+    if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
     try {
@@ -36,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     const resultado = await procesarEscaneo(parsed.data, {
-      empleadoId: session.user.id,
+      empleadoId: authorization.actor.id,
       qrSecret,
     });
     return ok(resultado);

@@ -2,8 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
 
+Reflect.set(process.env, "NODE_ENV", "test");
 const mock = createMockPrisma();
 (globalThis as unknown as { __scPrisma: unknown }).__scPrisma = mock;
+(globalThis as typeof globalThis & {
+  __scAuthSession: { user: { id: string } };
+}).__scAuthSession = { user: { id: "admin-test" } };
+mock._state.usuarios.push({
+  id: "admin-test",
+  nombre: "Admin de prueba",
+  estado: "ACTIVO",
+  deletedAt: null,
+  rolId: 1,
+  rolNombre: "ADMINISTRADOR",
+});
 
 // Import route handlers
 const servicesRoute = await import("../route");
@@ -257,4 +269,3 @@ test("API: Manejo seguro de errores — solo duplicado real de nombre es 409, ot
     mock.servicio.create = origCreate;
   }
 });
-
