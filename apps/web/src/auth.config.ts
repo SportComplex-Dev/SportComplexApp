@@ -25,7 +25,7 @@ export const authConfig = {
   },
   callbacks: {
     authorized() {
-      // La política granular de acceso se aplica en src/proxy.ts.
+      // La política granular de acceso se aplica en src/middleware.ts.
       return true;
     },
     session({ session, token }) {
