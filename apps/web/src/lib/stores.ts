@@ -3,6 +3,7 @@
 import {
   initialCatalog,
   type CatalogItem,
+  type Booking,
 } from '@sportcomplex/core'
 import { usePersistentState } from '@/lib/persistent-state'
 
@@ -13,19 +14,7 @@ import { usePersistentState } from '@/lib/persistent-state'
  */
 export const useCatalog = () => usePersistentState<CatalogItem[]>('altura:catalog', initialCatalog)
 
-export type Booking = {
-  id: string
-  code: string
-  client: string
-  category: string
-  service: string
-  sede: string
-  date: string
-  time: string
-  attendees: number
-  amount: number
-  status: 'Confirmada' | 'Pendiente' | 'Cancelada' | 'Usada'
-}
+export type { Booking }
 
 export const initialBookings: Booking[] = [
   { id: 'b1', code: 'ALT-2909-1837', client: 'María Camila Restrepo', category: 'canchas', service: 'Cancha de tenis · Cancha 2', sede: 'Poblado', date: '2026-10-02', time: '6:30 p. m.', attendees: 1, amount: 48000, status: 'Confirmada' },
@@ -36,6 +25,12 @@ export const initialBookings: Booking[] = [
 ]
 
 export const useBookings = () => usePersistentState<Booking[]>('altura:bookings', initialBookings)
+
+export type Draft = { itemId: string; date: string; time: string; attendees: number }
+export const useDraft = () => usePersistentState<Draft | null>('altura:draft', null)
+
+/** Código del último tiquete generado, para mostrar la confirmación. */
+export const useLastCode = () => usePersistentState<string | null>('altura:last-code', null)
 
 export type Session = {
   name: string

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import {
   BookingError,
@@ -17,12 +18,30 @@ const historyStates = new Set<BookingHistoryState>([
 export async function GET(request: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
+    let userId = session?.user?.id;
+
+    if (!userId) {
+      const cookieStore = await cookies();
+      const scSession = cookieStore.get("sc-session")?.value;
+      if (scSession) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(scSession));
+          userId = parsed.userId || parsed.id;
+        } catch {
+          try {
+            const parsed = JSON.parse(scSession);
+            userId = parsed.userId || parsed.id;
+          } catch {}
+        }
+      }
+    }
+
+    if (!userId) {
       return fail("UNAUTHORIZED", "Debes iniciar sesión.", 401);
     }
 
     const account = await prisma.usuario.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         estado: true,
         deletedAt: true,
@@ -60,7 +79,7 @@ export async function GET(request: Request) {
 
     return ok(
       await getBookingHistory({
-        userId: session.user.id,
+        userId,
         estado: estado as BookingHistoryState,
         cursor: searchParams.get("cursor") ?? undefined,
         limit,

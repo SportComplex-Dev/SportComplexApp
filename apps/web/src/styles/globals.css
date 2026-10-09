@@ -3916,3 +3916,1089 @@ button { cursor: pointer; }
 /* Utility: Hide scrollbar */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ==========================================================================
+   Customer Portal, Dashboard, Checkout & Confirmation (TSK-FE-13 & HU-13)
+   ========================================================================== */
+
+.app-page {
+  min-height: calc(100svh - 62px);
+  padding-top: 30px;
+  padding-bottom: 70px;
+}
+
+.welcome-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.welcome-row h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.welcome-row h1 svg {
+  color: var(--brand-accent);
+}
+.welcome-row p {
+  color: var(--subtle);
+  font-size: 14px;
+  margin: 0;
+}
+.calendar-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.calendar-shortcut:hover {
+  background: var(--surface-soft);
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+}
+
+/* Dashboard upcoming appointment card */
+.dashboard-appointment {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 18px 20px;
+  border: 1px solid #dce6d1;
+  border-radius: 14px;
+  background: linear-gradient(105deg, #eff5e8, #f6f7f2);
+  color: #21372c;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+}
+.dark .dashboard-appointment {
+  border-color: #384a3c;
+  background: #1a251e;
+  color: var(--ink);
+}
+.appointment-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: #dcebc9;
+  color: #49703e;
+}
+.dark .appointment-icon {
+  background: #283a2d;
+  color: #b8dc83;
+}
+.appointment-info {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+.appointment-info > span {
+  color: #44654b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.dark .appointment-info > span {
+  color: #9cb58b;
+}
+.appointment-info b {
+  font-size: 15px;
+  font-weight: 750;
+}
+.appointment-info small {
+  color: #526058;
+  font-size: 13px;
+}
+.dark .appointment-info small {
+  color: #9ea9a2;
+}
+.appointment-info small i {
+  margin: 0 4px;
+  font-style: normal;
+}
+.appointment-count {
+  padding: 0 20px;
+  border-left: 1px solid #d7dfd1;
+  border-right: 1px solid #d7dfd1;
+  text-align: center;
+}
+.dark .appointment-count {
+  border-color: #384a3c;
+}
+.appointment-count b {
+  display: block;
+  font-size: 19px;
+  letter-spacing: -0.03em;
+}
+.appointment-count small {
+  display: block;
+  margin-top: 3px;
+  color: #526058;
+  font-size: 12px;
+}
+.dark .appointment-count small {
+  color: #9ea9a2;
+}
+.appointment-arrow {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #d7dfd1;
+  border-radius: 50%;
+  background: transparent;
+  color: #4f6855;
+  transition: all 0.2s;
+}
+.dark .appointment-arrow {
+  border-color: #384a3c;
+  color: #9cb58b;
+}
+.appointment-arrow:hover {
+  background: #dcebc9;
+  color: #21372c;
+  transform: translateX(2px);
+}
+
+/* Dashboard empty state */
+.dashboard-empty {
+  display: flex;
+  min-height: 90px;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.empty-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: #64815d;
+}
+.dashboard-empty > div {
+  flex: 1;
+}
+.dashboard-empty b {
+  font-size: 14px;
+  display: block;
+}
+.dashboard-empty p {
+  margin: 3px 0 0;
+  color: var(--subtle);
+  font-size: 13px;
+}
+.dashboard-empty > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-accent);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  transition: all 0.2s;
+}
+.dashboard-empty > a:hover {
+  transform: translateX(2px);
+}
+
+.dashboard-heading {
+  margin-top: 42px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.dashboard-heading h2 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: 4px 0 0;
+}
+.dashboard-heading h2 span {
+  color: var(--brand-accent);
+}
+.open-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.open-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #78bd79;
+  box-shadow: 0 0 0 3px rgba(120, 189, 121, 0.25);
+}
+
+.dashboard-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .dashboard-category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 500px) {
+  .dashboard-category-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.dashboard-category {
+  position: relative;
+  min-height: 175px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.dashboard-category:hover {
+  transform: translateY(-3px);
+  border-color: var(--brand-accent);
+  box-shadow: var(--shadow);
+}
+.dash-card-arrow {
+  position: absolute;
+  top: 22px;
+  right: 20px;
+  color: var(--subtle);
+  transition: transform 0.2s;
+}
+.dashboard-category:hover .dash-card-arrow {
+  transform: translate(2px, -2px);
+  color: var(--brand-accent);
+}
+.dashboard-category h3 {
+  margin: 16px 0 4px;
+  font-size: 16px;
+  font-weight: 750;
+}
+.dashboard-category p {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.dashboard-price {
+  margin-top: 14px;
+  color: var(--brand-accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+.dashboard-price span {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 16px;
+  margin-top: 24px;
+}
+@media (max-width: 768px) {
+  .dashboard-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+.dashboard-promo {
+  position: relative;
+  display: flex;
+  min-height: 160px;
+  align-items: center;
+  overflow: hidden;
+  padding: 24px 28px;
+  border-radius: 14px;
+  background: #143e2f;
+  color: #fff;
+}
+.promo-copy {
+  position: relative;
+  z-index: 1;
+}
+.promo-copy .eyebrow {
+  color: #c9ef75;
+}
+.promo-copy h3 {
+  margin: 8px 0 12px;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+.promo-copy .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c9ef75;
+  font-size: 13px;
+  font-weight: 700;
+}
+.mini-tip {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.mini-tip b {
+  font-size: 14px;
+  display: block;
+}
+.mini-tip p {
+  margin: 3px 0 0;
+  color: var(--subtle);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Demo Cards & Records (Mis Tiquetes & Listados)
+   ========================================================================== */
+.demo-card {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.demo-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+.demo-card-heading h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.demo-card-heading p {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 13px;
+}
+.demo-record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.demo-record > div {
+  display: grid;
+  gap: 4px;
+}
+.demo-record b {
+  font-size: 14.5px;
+}
+.demo-record span {
+  color: var(--subtle);
+  font-size: 12.5px;
+}
+
+/* ==========================================================================
+   Checkout & Confirmation (Pasarela & Pase Digital)
+   ========================================================================== */
+.payment-page {
+  padding-top: 32px;
+  padding-bottom: 90px;
+}
+.checkout-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 auto 32px;
+  color: #9aa49c;
+}
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #969f98;
+  font-size: 12px;
+}
+.progress-step.done {
+  color: #557b53;
+  font-weight: 650;
+}
+.progress-step.active {
+  color: var(--ink);
+  font-weight: 750;
+}
+.checkout-progress > i {
+  width: 50px;
+  border-top: 1px solid var(--line);
+}
+.payment-layout {
+  display: grid;
+  max-width: 960px;
+  grid-template-columns: 1.35fr 0.85fr;
+  align-items: start;
+  gap: 42px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .payment-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+.payment-form h1 {
+  margin: 8px 0 4px;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+.payment-form h1 span {
+  color: var(--brand-accent);
+}
+.payment-form > p {
+  margin: 0 0 20px;
+  color: var(--subtle);
+  font-size: 13.5px;
+}
+.payment-safe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid #dce9d0;
+  border-radius: 10px;
+  background: #f0f5e9;
+  color: #567650;
+}
+.dark .payment-safe {
+  border-color: #3d4d3c;
+  background: #202b24;
+  color: #b8dc83;
+}
+.payment-safe > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+.payment-safe b {
+  font-size: 13px;
+}
+.payment-safe span {
+  color: #526058;
+  font-size: 12px;
+}
+.dark .payment-safe span {
+  color: #9aa99f;
+}
+
+.payment-methods-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+@media (max-width: 640px) {
+  .payment-methods-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.payment-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  min-height: 64px;
+}
+.payment-tab-btn:hover {
+  border-color: var(--brand-accent);
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+.payment-tab-btn.active {
+  border-color: var(--brand-accent);
+  background: #f0f7ea;
+  color: #123e30;
+  font-weight: 750;
+  box-shadow: 0 0 0 1px var(--brand-accent);
+}
+.dark .payment-tab-btn.active {
+  background: #19271e;
+  color: #c9ef75;
+}
+
+.card-visual-preview {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 200px;
+  margin: 0 auto 20px;
+  border-radius: 16px;
+  padding: 22px 24px;
+  background: linear-gradient(135deg, #133e30 0%, #0d281f 65%, #081a14 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(201, 239, 117, 0.2);
+}
+
+.payment-method {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.payment-method-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.payment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.checkbox-line {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  margin-top: 4px;
+  color: var(--subtle) !important;
+  font-size: 12px !important;
+}
+
+.order-card {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.order-card > .eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.order-card h3 {
+  margin: 8px 0 18px;
+  font-size: 16px;
+  font-weight: 750;
+}
+.order-service {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.order-service-thumb {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 10px;
+  background: #edf5dc;
+  color: #537545;
+}
+.dark .order-service-thumb {
+  background: #253328;
+  color: #b8dc83;
+}
+.order-service b {
+  font-size: 14px;
+  display: block;
+}
+.order-service span {
+  color: var(--subtle);
+  font-size: 12px;
+}
+.order-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-item span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--subtle);
+  font-size: 13px;
+}
+.order-price {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  color: var(--subtle);
+  font-size: 13px;
+}
+.order-price b {
+  color: var(--ink);
+}
+.order-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+}
+.order-total b {
+  font-size: 18px;
+}
+
+.payment-processing-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 35px 25px;
+}
+.processing-spinner {
+  width: 58px;
+  height: 58px;
+  border: 4px solid var(--line);
+  border-top-color: var(--brand-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+/* Confirmation Page & Ticket Card */
+.confirmation-page {
+  display: flex;
+  min-height: calc(100vh - 76px);
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px 70px;
+  text-align: center;
+}
+.success-ring {
+  display: grid;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 20px;
+  place-items: center;
+  border: 1px solid #d9e9c5;
+  border-radius: 50%;
+  background: var(--state-success-surface);
+  color: var(--state-success);
+}
+.success-eyebrow {
+  color: #66805a;
+}
+.confirmation-page h1 {
+  margin: 10px 0 6px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+.confirmation-page h1 span {
+  color: var(--brand-accent);
+}
+.confirmation-copy {
+  margin: 0 0 24px;
+  color: var(--subtle);
+  font-size: 13.5px;
+}
+.ticket-card {
+  width: min(100%, 525px);
+  padding: 24px 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.ticket-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ticket-header h2 {
+  margin: 8px 0 4px;
+  font-size: 17px;
+  font-weight: 750;
+}
+.ticket-header p {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 13px;
+}
+.ticket-separator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 20px -24px;
+}
+.ticket-separator > span {
+  width: 100%;
+  border-top: 1px dashed var(--line);
+}
+.ticket-separator > i {
+  position: absolute;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-radius: 50%;
+  background: var(--app-bg);
+}
+.ticket-separator > i:last-child {
+  right: -7px;
+  left: auto;
+  border-right: 0;
+  border-left: 1px solid var(--line);
+}
+.ticket-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ticket-info > div {
+  display: grid;
+  gap: 4px;
+}
+.ticket-info small {
+  color: #526058;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.dark .ticket-info small {
+  color: #9aa99f;
+}
+.ticket-info b {
+  font-size: 14px;
+}
+.ticket-qr {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--app-bg);
+}
+.qr-shell {
+  display: grid;
+  width: 100px;
+  height: 100px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 7px;
+  border: 1px solid #e5e8e3;
+  border-radius: 8px;
+  background: white;
+}
+.qr-grid {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  grid-template-columns: repeat(21, 1fr);
+  grid-template-rows: repeat(21, 1fr);
+  gap: 1px;
+}
+.qr-grid i.qr-on {
+  background: #173b2d;
+}
+.ticket-qr > div:last-child {
+  display: grid;
+  gap: 6px;
+}
+.ticket-qr > div:last-child b {
+  font-size: 14px;
+}
+.ticket-qr > div:last-child span {
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ticket-qr > div:last-child small {
+  color: var(--brand-accent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.ticket-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  color: var(--subtle);
+  font-size: 12px;
+}
+.ticket-footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.email-notice {
+  display: flex;
+  width: min(100%, 525px);
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+}
+.email-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf4e5;
+  color: #638253;
+}
+.confirmation-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* ==========================================================================
+   RF-12: Portal Tabs Navigation, Tickets Wallet & QR HD Modal
+   ========================================================================== */
+.portal-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  width: fit-content;
+  margin-bottom: 22px;
+}
+.portal-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 650;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.portal-tab-btn:hover {
+  color: var(--ink);
+}
+.portal-tab-btn.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 750;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.portal-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--line);
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 700;
+}
+.portal-tab-btn.active .portal-tab-badge {
+  background: var(--brand-accent);
+  color: var(--content-on-accent);
+}
+
+.portal-ticket-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+.portal-ticket-item:hover {
+  border-color: var(--brand-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+@media (max-width: 768px) {
+  .portal-ticket-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+}
+.portal-ticket-info {
+  display: grid;
+  gap: 4px;
+}
+.portal-ticket-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Modal HD QR para Torniquetes */
+.qr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 20, 15, 0.72);
+  backdrop-filter: blur(8px);
+  animation: modal-in 0.2s ease both;
+}
+.qr-modal-dialog {
+  position: relative;
+  width: min(100%, 460px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+.qr-modal-hd {
+  display: grid;
+  width: 210px;
+  height: 210px;
+  margin: 18px auto;
+  place-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 2px solid #e1e7db;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.qr-grid-hd {
+  display: grid;
+  width: 182px;
+  height: 182px;
+  grid-template-columns: repeat(21, 1fr);
+  grid-template-rows: repeat(21, 1fr);
+  gap: 1.5px;
+}
+.qr-grid-hd i.qr-on {
+  background: #091b13;
+  border-radius: 0.5px;
+}
+.qr-turnstile-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--subtle);
+  font-size: 12px;
+  margin: 16px 0 20px;
+}
+
+/* ==========================================================================
+   Impresión de Comprobante / Voucher PDF (RF-12 & RNF-05)
+   ========================================================================== */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-receipt,
+  .printable-receipt * {
+    visibility: visible;
+  }
+  .printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
