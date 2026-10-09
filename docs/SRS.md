@@ -44,7 +44,7 @@ Construida íntegramente sobre **Next.js** (TypeScript) con persistencia relacio
 Desarrollar e implantar una solución web completa, responsiva y de alto rendimiento en Next.js que:
 1. Disponga de una **Landing Page institucional estática** como fachada pública que exponga las instalaciones y canalice a los clientes hacia la autenticación y reservas.
 2. Automatice el ciclo de vida completo de la reserva bajo un modelo **100% Cashless** procesado a través de **Stripe** (tanto para compras web como para ventas presenciales en taquilla).
-3. Asegure la integridad de datos a nivel de base de datos relacional para evitar sobreventas mediante bloqueos transaccionales temporales con TTL de 15 minutos.
+3. Asegure la integridad de datos a nivel de base de datos relacional para evitar sobreventas mediante bloqueos transaccionales temporales con TTL de 30 minutos.
 4. Soporte la emisión de entradas mediante **códigos QR de uso único** y **simulación de impresión en formato PDF** descargable/imprimible sin requerir hardware térmico dedicado.
 5. Provea un módulo de escáner web móvil para empleados con selección de puesto fijo por turno y modo consulta informativo (sin consumir el ticket).
 6. Automatice la consulta de días festivos oficiales en Colombia mediante la API **Nager Holidays (nager.date)** para el traslado dinámico del mantenimiento de piscinas.
@@ -111,7 +111,7 @@ graph TD
 | **Administrador** | Gerente General | Gestión de catálogo, aforos, horarios, empleados (borrado lógico), inhabilitación de instalaciones y analítica. | Panel web administrativo de escritorio/tablet con alta densidad de datos y gráficos ejecutivos. |
 | **Empleado Vendedor** | Taquillero Cashless | Venta presencial asistida, inicio de checkout con Stripe (cero efectivo) y simulación de impresión de boletos en PDF. | Interfaz POS con botones táctiles grandes, integración con Stripe y diálogo de generación de PDF. |
 | **Empleado Lector** | Personal de Control de Acceso | Validación de boletos mediante cámara web móvil. Selecciona puesto de turno (con validación de servicio) o modo consulta sin consumo. | Vista móvil optimizada para cámara web con alertas auditivas y visuales en pantalla completa. |
-| **Cliente** | Usuario / Deportista / Socio | Registro (correo o Google OAuth), reserva con bloqueo de 15 min, pago en Stripe, gestión de membresías y descarga de entradas en PDF/QR. | Portal de clientes responsivo con enfoque visual moderno, autogestión de tiquetes y membresías. |
+| **Cliente** | Usuario / Deportista / Socio | Registro (correo o Google OAuth), reserva con bloqueo de 30 min, pago en Stripe, gestión de membresías y descarga de entradas en PDF/QR. | Portal de clientes responsivo con enfoque visual moderno, autogestión de tiquetes y membresías. |
 
 ---
 
@@ -222,18 +222,18 @@ graph TD
 
 ---
 
-### RF-08: Bloqueo Transaccional Temporal de Franja en Checkout (TTL: 15 Minutos)
+### RF-08: Bloqueo Transaccional Temporal de Franja en Checkout (TTL: 30 Minutos — revisado)
 * **Prioridad:** Must
 * **Actor:** Cliente, Empleado Vendedor, Sistema
-* **Descripción:** Al iniciar el checkout para un horario disponible, el sistema debe aplicar un bloqueo temporal en la base de datos sobre esa franja o cupo durante un temporizador de **15 minutos**. Si el pago en Stripe no se confirma en dicho lapso, la franja se libera atómicamente para otros usuarios.
+* **Descripción:** Al iniciar el checkout para un horario disponible, el sistema debe aplicar un bloqueo temporal en la base de datos sobre esa franja o cupo durante un temporizador de **30 minutos**. Si el pago en Stripe no se confirma en dicho lapso, la franja se libera atómicamente para otros usuarios.
 * **Criterios de Aceptación:**
   * **Dado** que un usuario inicia el proceso de pago para un horario libre,
   * **Cuando** se genera la intención de cobro,
-  * **Entonces** el cupo queda bloqueado con un TTL de 15 minutos impidiendo reservas paralelas.
-  * **Dado** que transcurren 15 minutos sin confirmación exitosa de Stripe,
+  * **Entonces** el cupo queda bloqueado con un TTL de 30 minutos impidiendo reservas paralelas.
+  * **Dado** que transcurren 30 minutos sin confirmación exitosa de Stripe,
   * **Cuando** expira el temporizador,
   * **Entonces** el sistema libera la franja y la restablece a estado disponible en la base de datos.
-* **Fuente:** Gist (*"bloqueo temporal mientras se completa el pago..."*) y Acuerdo: *"15 minutos es mas que suficiente"*.
+* **Fuente:** Gist (*"bloqueo temporal mientras se completa el pago..."*) y Acuerdo: *"15 minutos es mas que suficiente"*. **Revisión TSK-BE-09:** Stripe Checkout Sessions exige `expires_at >= 30 min` (mínimo de plataforma); el TTL se unificó a **30 minutos** para que el link de pago y el bloqueo en DB compartan horizonte y no exista ventana huérfana.
 
 ---
 
@@ -401,11 +401,11 @@ graph TD
 ## 7. Requisitos No Funcionales (RNF)
 
 ### 7.1. RNF-01: Concurrencia Transaccional e Integridad a Nivel de Base de Datos
-* **Descripción:** La gestión de disponibilidad, aforo y el temporizador de 15 minutos deben estar blindados a nivel de motor de base de datos relacional mediante restricciones de unicidad, aislamiento transaccional y bloqueos atómicos (`SELECT ... FOR UPDATE`). Tolerancia a cero colisiones de doble reserva ($Overbooking = 0$).
+* **Descripción:** La gestión de disponibilidad, aforo y el temporizador de 30 minutos deben estar blindados a nivel de motor de base de datos relacional mediante restricciones de unicidad, aislamiento transaccional y bloqueos atómicos (`SELECT ... FOR UPDATE`). Tolerancia a cero colisiones de doble reserva ($Overbooking = 0$).
 * **Fuente:** Gist: *"Toda la lógica de concurrencia [...] validada a nivel de base de datos, no solo en el código."*
 
 ### 7.2. RNF-02: Estandarización de Zona Horaria Oficial
-* **Descripción:** Todo cómputo temporal (apertura de 15 días, festivos de Nager.Date, expiración de 15 minutos y franjas horarias) se calculará bajo la hora legal de Colombia: `America/Bogota` (UTC-5).
+* **Descripción:** Todo cómputo temporal (apertura de 15 días, festivos de Nager.Date, expiración de 30 minutos y franjas horarias) se calculará bajo la hora legal de Colombia: `America/Bogota` (UTC-5).
 * **Fuente:** Gist: *"Zona horaria del sistema: Colombia (America/Bogotá)."*
 
 ### 7.3. RNF-03: Seguridad, Privacidad y Hashing
@@ -450,13 +450,13 @@ flowchart TD
     R7 -- No --> CheckQuota
     R6 -- No --> CheckQuota
     CheckQuota -- No --> Deny5[Rechazar: Agotado / Ocupado]
-    CheckQuota -- Sí --> Allow([Aprobar Bloqueo Temporal: 15 minutos TTL])
+    CheckQuota -- Sí --> Allow([Aprobar Bloqueo Temporal: 30 minutos TTL])
 ```
 
 * **RN-01: Ventana de Anticipación:** Ninguna reserva puede agendarse a más de 15 días calendario de anticipación.
 * **RN-02: Mantenimiento de Piscinas y API Nager.Date:** Las piscinas cierran los lunes por mantenimiento rutinario. Si el lunes es festivo oficial en Colombia según la API Nager.Date, la piscina abre al público y el mantenimiento se traslada obligatoriamente al martes siguiente.
 * **RN-03: Modalidad de Ocupación Acuática:** Pública (cupos concurrentes hasta agotar aforo) o Privada (reserva exclusiva de la franja horaria).
-* **RN-04: Bloqueo Temporal en Checkout (15 Minutos):** La franja seleccionada se retiene durante 15 minutos atómicos; si Stripe no confirma el pago en ese tiempo, se libera automáticamente.
+* **RN-04: Bloqueo Temporal en Checkout (30 Minutos, revisado):** La franja seleccionada se retiene durante 30 minutos atómicos; si Stripe no confirma el pago en ese tiempo, se libera automáticamente. *(Revisión TSK-BE-09: unificado a 30 min por el mínimo de plataforma de Stripe Checkout Sessions; se mantiene `RESERVA.expira_en` como único mecanismo de bloqueo, sin columna `locked_at`.)*
 * **RN-05: Ciclo de Vida del Ticket QR:** Estado inicial `EMITIDO`; pasa a `USADO` de forma irreversible al canjearse en puerta. En Modo Consulta se lee sin alterar su estado `EMITIDO`.
 * **RN-06: Ventana de Acceso:** Ingreso permitido únicamente dentro del rango $[HoraInicio, HoraFin]$ de la reserva.
 * **RN-07: Multirreserva Concurrente:** Un usuario puede ser titular simultáneo de múltiples reservas en diferentes servicios en la misma hora.
@@ -517,15 +517,15 @@ sequenceDiagram
         Motor->>Nager: Consulta si el lunes es festivo oficial en Colombia
         Nager-->>Motor: Retorna listado de festivos
     end
-    Motor->>BD: Aplica bloqueo transaccional temporal (TTL: 15 minutos)
+    Motor->>BD: Aplica bloqueo transaccional temporal (TTL: 30 minutos)
     Web->>Stripe: Inicia sesión de checkout segura
     Cliente->>Stripe: Completa pago con tarjeta
-    alt Pago Aprobado (< 15 minutos)
+    alt Pago Aprobado (< 30 minutos)
         Stripe->>Web: Webhook: payment_intent.succeeded
         Web->>BD: Confirma reserva y emite entrada QR (Estado: EMITIDO)
         Web-->>Cliente: Genera comprobante PDF descargable y muestra QR
-    else Pago Fallido o Expirado (> 15 minutos)
-        Web->>BD: Vence TTL de 15 min o webhook de rechazo
+    else Pago Fallido o Expirado (> 30 minutos)
+        Web->>BD: Vence TTL de 30 min o webhook de rechazo
         BD->>BD: Libera atómicamente la franja a disponible
         Web-->>Cliente: Notifica fallo / tiempo expirado
     end
@@ -655,7 +655,7 @@ sequenceDiagram
 * **Decisión 3 (Simulación de Impresión en PDF):** No se utilizarán impresoras térmicas físicas. Los comprobantes con código QR se generan y descargan como archivos PDF estándar.
 * **Decisión 4 (Integración con Nager.Date API):** La verificación de festivos oficiales en Colombia para el mantenimiento de piscinas se realiza a través de la API externa Nager Holidays.
 * **Decisión 5 (Multirreserva Concurrente):** Un mismo usuario puede contratar múltiples reservas en servicios diferentes durante la misma franja horaria.
-* **Decisión 6 (TTL de Bloqueo Temporal):** El temporizador de retención de franja durante el proceso de pago se fija exactamente en **15 minutos**.
+* **Decisión 6 (TTL de Bloqueo Temporal, revisada):** El temporizador de retención de franja durante el proceso de pago se fija en **30 minutos**, alineado al mínimo de plataforma de Stripe Checkout Sessions (`expires_at >= 30 min`). *(Originalmente 15 minutos; ajustado en TSK-BE-09.)*
 * **Decisión 7 (Membresías Recurrentes):** Las membresías cuentan con renovación periódica automática y otorgan un 30% de descuento directo en todos los servicios.
 * **Decisión 8 (Puesto por Turno y Modo Consulta):** El empleado lector puede seleccionar su puesto de turno (con validación de servicio) o activar el Modo Consulta para leer boletos sin consumirlos.
 
@@ -679,7 +679,7 @@ sequenceDiagram
 | **RF-05** | Ventana Máxima de Reserva a 15 Días | Funcional | Requerimientos Detallados: Sección 1 (*"bloquear reservas > 15 días..."*). | Aprobado |
 | **RF-06** | Mantenimiento de Piscinas con Nager.Date API | Funcional | Requerimientos Detallados (Sección 1) y Refinamiento: *"API Nager Holidays (nager.date)"*. | Aprobado |
 | **RF-07** | Modalidad de Piscina (Pública vs. Privada) | Funcional | Requerimientos Detallados: Sección 1 (*"Pública por aforo individual, Privada por franja completa"*). | Aprobado |
-| **RF-08** | Bloqueo Temporal en Checkout (TTL: 15 min) | Funcional | Gist y Refinamiento: *"15 minutos es mas que suficiente"*. | Aprobado |
+| **RF-08** | Bloqueo Temporal en Checkout (TTL: 30 min, revisado en TSK-BE-09) | Funcional | Gist y Refinamiento: *"15 minutos es mas que suficiente"* (ajustado a 30 min por mínimo de Stripe Checkout). | Aprobado |
 | **RF-09** | Pagos en Línea 100% Cashless con Stripe | Funcional | Gist y Refinamiento: *"todas las ventas se haran a traves de stripe, cero efectivo"*. | Aprobado |
 | **RF-10** | Generación de Entrada QR Transferible | Funcional | Gist y Requerimientos Detallados: Sección 2 (*"QR transferible libremente"*). | Aprobado |
 | **RF-11** | Multirreserva Concurrente de Servicios | Funcional | Requerimientos Detallados (Sección 2) y Refinamiento: *"rigen requerimientos detallados"*. | Aprobado |

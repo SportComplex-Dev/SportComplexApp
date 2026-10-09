@@ -82,7 +82,7 @@ El rendimiento de la plataforma y el aprovechamiento de recursos exigen la delim
 
 ### 4.3. Client-Side Rendering (CSR)
 * **Alcance:** Módulos de interacción dinámica continua y uso de APIs nativas del navegador:
-  * **Motor de Reserva y Checkout:** Selección interactiva de franjas horarias, temporizador visible del TTL de 15 minutos e inyección de campos de pago de Stripe.
+  * **Motor de Reserva y Checkout:** Selección interactiva de franjas horarias, temporizador visible del TTL de 30 minutos e inyección de campos de pago de Stripe.
   * **Taquilla POS Presencial:** Interfaz optimizada para el Empleado Vendedor con selector de productos y orquestación del diálogo de impresión en formato PDF.
   * **Escáner Web Móvil (`/scanner`):** Acceso directo a la cámara del dispositivo vía `MediaDevices.getUserMedia`, decodificación de video en tiempo real (latencia < 400 ms) y selector de puesto por turno.
 * **Comportamiento:**
@@ -136,7 +136,7 @@ sport-complex/
 │       │   │   │   │   └── incident/  # Inhabilitación y webhook n8n (RF-19)
 │       │   │   ├── api/               # API Routes (Backend REST)
 │       │   │   │   ├── auth/          # Callbacks OAuth y verificación
-│       │   │   │   ├── bookings/      # Bloqueo temporal 15 min y confirmaciones
+│       │   │   │   ├── bookings/      # Bloqueo temporal 30 min y confirmaciones
 │       │   │   │   ├── payments/      # Webhook de Stripe y sesiones de pago
 │       │   │   │   ├── access/        # Validación de lectura QR y consumo de tiquetes
 │       │   │   │   ├── pdf/           # Endpoint para emisión de comprobante en PDF
@@ -217,7 +217,7 @@ sport-complex/
 * **Holiday Engine:** Orquesta la verificación de festivos en Colombia con `date.nager.at`, trasladando el mantenimiento rutinario de piscinas de lunes a martes ante días festivos. Mantiene estrategia de contingencia mediante caché relacional local.
 
 
-* **Booking & Lock Engine:** Gobierna la ventana de 15 días, la validación de solapamientos y la gestión del bloqueo temporal atómico de 15 minutos en checkout.
+* **Booking & Lock Engine:** Gobierna la ventana de 15 días, la validación de solapamientos y la gestión del bloqueo temporal atómico de 30 minutos en checkout.
 
 
 * **Cashless Engine:** Administra la creación de intenciones de cobro y suscripciones recurrentes con Stripe, aplicando el 30% de descuento automático a usuarios con membresía vigente.

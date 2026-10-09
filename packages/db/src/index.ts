@@ -5,3 +5,6 @@ export * from "./repositories/verification-tokens";
 export * from "./repositories/festivos";
 export * from "./repositories/services";
 export * from "./repositories/bookings";
+export * from "./repositories/payments";
+export * from "./repositories/tickets";
+export * from "./repositories/checkout";
