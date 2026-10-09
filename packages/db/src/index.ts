@@ -8,3 +8,4 @@ export * from "./repositories/bookings";
 export * from "./repositories/payments";
 export * from "./repositories/tickets";
 export * from "./repositories/checkout";
+export * from "./repositories/analytics";
