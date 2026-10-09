@@ -1,8 +1,7 @@
 # HU-21.DB — Restricciones de integridad y reglas de borrado para empleados
 
-> Rama de trabajo: `feature/hu-21-db-restrict-empleado` (pendiente de crear/PR contra `develop`)
-> Responsable: DBA / Ingeniería de Datos · Fecha de implementación: 2026-10-09
-> Alcance: solo `packages/db` (schema + migración + test). Sin cambios en API, Middleware ni scripts manuales.
+> Rama de trabajo: Backend · Responsable: Ingeniería de Datos y Backend · Fecha de implementación: 2026-10-09
+> Alcance: restricciones de integridad en `packages/db` y controles de acceso/baja lógica en API.
 
 ## 1. Qué se hizo y por qué
 
@@ -53,7 +52,21 @@ Mapeo HU → esquema real (no existen modelos literales `Empleado/Venta/Escaneo`
   `DROP IF EXISTS` + `ADD`, re-ejecutable sin pérdida de datos; **no se ejecutó nada manual**
   en la DB compartida. Evidencia: test `CA-01/CA-04` (idempotencia) + este documento.
 
-## 3. Verificación (cómo reproducir)
+## 3. Integración Backend — TSK-BE-21
+
+La tarea Backend complementa este blindaje con:
+
+- RBAC actualizado en `middleware.ts`, consultando el rol y estado actuales
+  de la cuenta en DB para que una baja surta efecto en la siguiente solicitud.
+- Autorización repetida dentro de los Route Handlers protegidos; no se confía
+  únicamente en el proxy.
+- `PATCH /api/admin/employees/:id` con `{ "estado": "INACTIVO" }`. Solo un
+  Administrador puede dar de baja cuentas Vendedor/Lector. La operación actualiza
+  `estado` y `deleted_at`, no ejecuta `DELETE`, y es idempotente.
+- Ventas, tickets, lecturas de acceso y demás relaciones se conservan; las FKs
+  `ON DELETE RESTRICT` de esta migración siguen siendo la última barrera.
+
+## 4. Verificación (cómo reproducir)
 
 ```bash
 # Desde packages/db
@@ -64,7 +77,7 @@ npm run typecheck  # limpio
 # CA-02 manual: rg "onDelete:" prisma/schema.prisma (ver tabla §2)
 ```
 
-## 4. Notas de despliegue (leer antes del merge)
+## 5. Notas de despliegue (leer antes del merge)
 
 - **No se aplicó `migrate dev` a la DB compartida a propósito** (CA-04): el intento detectó
   *drift* — la DB remota (Supabase) no tiene aplicadas las migraciones
@@ -74,7 +87,6 @@ npm run typecheck  # limpio
   controlado sin tocar datos.
 - **Antes del deploy**, el pipeline (`prisma migrate deploy`) aplicará las 4 migraciones
   pendientes + esta. Si el entorno diverge en nombres de índices, revisar el drift reportado.
-- Fuera de alcance (no tocado): controladores API con borrado físico (tarea Backend),
-  validaciones de roles del Middleware, estados de sesión. La baja lógica sigue siendo la vía
-  oficial (`estado → INACTIVO`); este cambio solo garantiza que el borrado físico falle de
-  forma segura si alguien lo intenta.
+- En la tarea DB quedaron fuera los controladores API y la revocación de sesión;
+  se incorporan en la sección 3 por TSK-BE-21. La baja lógica (`estado → INACTIVO`)
+  es la vía oficial y el motor rechaza borrados físicos con historial.

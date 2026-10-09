@@ -1,21 +1,19 @@
-import { auth } from "@/auth";
 import { AccessError, procesarEscaneo } from "@/lib/access";
 import { fail, ok } from "@/lib/api-response";
 import { TicketError } from "@sportcomplex/db";
 import { accessScanSchema } from "@sportcomplex/validation";
+import { authorizeApiRequest } from "@/lib/api-auth";
 
 interface RouteContext {
   params: Promise<{ code: string }>;
 }
 
-type TicketVerifySession = {
-  user?: { id?: string | null; role?: string | null } | null;
-} | null;
+type TicketVerifySession = { user?: { id?: string | null } | null } | null;
 
 export async function handleTicketVerification(
   request: Request,
   context: RouteContext,
-  authenticate: () => Promise<TicketVerifySession> = auth,
+  authenticate?: () => Promise<TicketVerifySession>,
 ) {
   const qrSecret = process.env.QR_HMAC_SECRET;
   if (!qrSecret) {
@@ -23,14 +21,11 @@ export async function handleTicketVerification(
   }
 
   try {
-    const session = await authenticate();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para consultar tickets.", 401);
-    }
-    const role = session.user.role?.toUpperCase();
-    if (role !== "ADMINISTRADOR" && role !== "EMPLEADO_LECTOR") {
-      return fail("FORBIDDEN", "Solo un lector de accesos puede consultar tickets.", 403);
-    }
+    const authorization = await authorizeApiRequest(
+      ["Administrador", "Empleado_Lector"],
+      authenticate ? { authenticate } : {},
+    );
+    if (!authorization.authorized) return authorization.response;
 
     const signature = request.headers.get("x-ticket-signature");
     if (!signature) {
@@ -48,7 +43,7 @@ export async function handleTicketVerification(
     }
 
     const resultado = await procesarEscaneo(parsed.data, {
-      empleadoId: session.user.id,
+      empleadoId: authorization.actor.id,
       qrSecret,
     });
     return ok(resultado);

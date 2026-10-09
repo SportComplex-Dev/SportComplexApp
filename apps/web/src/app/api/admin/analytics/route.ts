@@ -4,6 +4,7 @@ import {
   normalizeAnalyticsQuery,
 } from "@sportcomplex/validation";
 import { getAnalytics } from "@sportcomplex/db";
+import { authorizeApiRequest } from "@/lib/api-auth";
 
 /**
  * GET /api/admin/analytics
@@ -20,6 +21,9 @@ import { getAnalytics } from "@sportcomplex/db";
  */
 export async function GET(request: Request) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { searchParams } = new URL(request.url);
 
     const rawQuery = {
