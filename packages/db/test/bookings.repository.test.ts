@@ -119,8 +119,14 @@ function requestFor(
 
 test("TSK-BE-05: 40 solicitudes concurrentes nunca exceden aforo 25", async () => {
   const slot = addAforoSlot(25);
+  // Titulares distintos: la prueba mide el aforo, no la regla de unicidad
+  // de titular (TSK-BE-12), que impide al mismo usuario repetir la franja.
   const results = await Promise.allSettled(
-    Array.from({ length: 40 }, () => createBookingHold(requestFor(slot))),
+    Array.from({ length: 40 }, (_, index) =>
+      createBookingHold(
+        requestFor(slot, 1, `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`),
+      ),
+    ),
   );
 
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 25);
@@ -163,6 +169,30 @@ test("TSK-BE-05: el TTL expira y libera cupos antes de la siguiente reserva", as
   );
 });
 
+test("TSK-BE-06: una petición manipulada con T + 16 días recibe 400 y el mensaje contractual", async () => {
+  const now = new Date("2026-10-08T12:00:00.000Z"); // 08/Oct 07:00 Bogota.
+  const date = "2026-10-25"; // T + 17 días calendario en Bogota: fuera de ventana.
+  const start = new Date(`${date}T10:00:00-05:00`);
+  const end = new Date(`${date}T11:00:00-05:00`);
+
+  await assert.rejects(
+    () => createBookingHold({ serviceId: 1, startTime: start.toISOString(), endTime: end.toISOString(), cantidadCupos: 1, userId: "u-1" }, now),
+    (err: unknown) =>
+      err instanceof BookingError &&
+      err.status === 400 &&
+      err.code === "OUTSIDE_BOOKING_WINDOW" &&
+      err.message === "La reserva excede la ventana máxima permitida de 15 días",
+  );
+
+  await assert.rejects(
+    () => getBookableAvailability(1, date, now),
+    (err: unknown) =>
+      err instanceof BookingError &&
+      err.status === 400 &&
+      err.message === "La reserva excede la ventana máxima permitida de 15 días",
+  );
+});
+
 test("TSK-BE-05: la consulta de disponibilidad entrega el saldo de cupos", async () => {
   const slot = addAforoSlot(25);
   const hold = await createBookingHold(requestFor(slot, 4));
@@ -181,6 +211,59 @@ test("TSK-BE-08: piscina pública de aforo 30 conserva 28 cupos al reservar 2", 
   assert.equal(availability[0].cuposTotales, 30);
   assert.equal(availability[0].cuposOcupados, 2);
   assert.equal(availability[0].cuposDisponibles, 28);
+});
+
+test("TSK-BE-12: Cancha 1 y Piscina en la misma franja se confirman sin error de solapamiento", async () => {
+  const cancha = addAforoSlot(10);
+  const piscina = addAforoSlot(20);
+  const userId = "00000000-0000-4000-8000-00000000be12";
+
+  const first = await createBookingHold(requestFor(cancha, 1, userId));
+  const second = await createBookingHold(requestFor(piscina, 1, userId));
+
+  assert.equal(first.estado, "PENDIENTE_PAGO");
+  assert.equal(second.estado, "PENDIENTE_PAGO");
+  assert.notEqual(first.disponibilidad.servicioId, second.disponibilidad.servicioId);
+});
+
+test("TSK-BE-12: el mismo titular no duplica una franja solapada del mismo servicio", async () => {
+  const slot = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000be13";
+
+  await createBookingHold(requestFor(slot, 1, userId));
+
+  await assert.rejects(
+    createBookingHold(requestFor(slot, 1, userId)),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "TITULAR_RESERVATION_OVERLAP",
+  );
+});
+
+test("TSK-BE-12: otro titular sí puede reservar la misma franja del mismo servicio", async () => {
+  const slot = addAforoSlot(10);
+
+  const first = await createBookingHold(
+    requestFor(slot, 1, "00000000-0000-4000-8000-00000000be14"),
+  );
+  const second = await createBookingHold(
+    requestFor(slot, 1, "00000000-0000-4000-8000-00000000be15"),
+  );
+
+  assert.equal(first.estado, "PENDIENTE_PAGO");
+  assert.equal(second.estado, "PENDIENTE_PAGO");
+});
+
+test("TSK-BE-12: un hold vencido libera la unicidad de titular para su franja", async () => {
+  const slot = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000be16";
+
+  const first = await createBookingHold(requestFor(slot, 1, userId));
+  const reopened = await createBookingHold(
+    requestFor(slot, 1, userId),
+    new Date(first.expiraEn),
+  );
+
+  assert.equal(reopened.estado, "PENDIENTE_PAGO");
 });
 
 test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja completa", async () => {

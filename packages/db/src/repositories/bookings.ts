@@ -4,6 +4,8 @@ import { prisma } from "../client";
 const BOOKING_WINDOW_DAYS = 15;
 const HOLD_TTL_MINUTES = 30;
 const BOGOTA_TIME_ZONE = "America/Bogota";
+// TSK-BE-06 — mensaje contractual RN-01 (duplicado de @sportcomplex/core: db no puede importar core).
+const BOOKING_WINDOW_EXCEEDED_MESSAGE = "La reserva excede la ventana máxima permitida de 15 días";
 
 export class BookingError extends Error {
   constructor(
@@ -145,11 +147,7 @@ function validateBookingDate(date: string, now: Date): void {
   const today = dateInBogota(now);
   const daysAhead = daysBetween(today, date);
   if (daysAhead < 0 || daysAhead > BOOKING_WINDOW_DAYS) {
-    throw new BookingError(
-      "La fecha solicitada está fuera de la ventana de reserva de 15 días.",
-      "OUTSIDE_BOOKING_WINDOW",
-      400,
-    );
+    throw new BookingError(BOOKING_WINDOW_EXCEEDED_MESSAGE, "OUTSIDE_BOOKING_WINDOW", 400);
   }
 }
 
@@ -204,6 +202,79 @@ function slotMatchesRequest(
     secondsFromDbTime(availability.franja.horaInicio) === secondsFromInstant(startTime) &&
     secondsFromDbTime(availability.franja.horaFin) === secondsFromInstant(endTime)
   );
+}
+
+/** Estados de `RESERVA` que ocupan la franja para el titular (RN-07). */
+const ESTADOS_OCUPAN_TITULAR = ["PENDIENTE_PAGO", "CONFIRMADA"] as const;
+
+/**
+ * TSK-BE-12 / RF-11 / RN-07 — regla de multirreserva concurrente.
+ *
+ * La unicidad de titular se aplica SOLO dentro de la misma instancia de
+ * servicio: un usuario no puede tener dos reservas vivas que se solapen en el
+ * tiempo para el mismo `servicioId` en la misma fecha. Entre categorías o
+ * instancias distintas el solapamiento horario es válido (Cancha 1 + Piscina
+ * 16:00-17:00 se confirman en paralelo).
+ *
+ * Un hold `PENDIENTE_PAGO` cuyo `expiraEn` ya venció deja de bloquear (el
+ * job TSK-BD-08 o la limpieza perezosa lo liberarán); `EXPIRADA` y
+ * `CANCELADA_ADMINISTRATIVA` nunca bloquean.
+ *
+ * @throws BookingError `TITULAR_RESERVATION_OVERLAP`(409).
+ */
+async function assertNoTitularOverlap(
+  tx: BookingTransaction,
+  input: {
+    titularId: string;
+    servicioId: number;
+    targetDate: Date;
+    startTime: Date;
+    endTime: Date;
+    now: Date;
+  },
+): Promise<void> {
+  const startSeconds = secondsFromInstant(input.startTime);
+  const endSeconds = secondsFromInstant(input.endTime);
+
+  const candidates = await tx.reserva.findMany({
+    where: {
+      titularId: input.titularId,
+      estado: { in: [...ESTADOS_OCUPAN_TITULAR] },
+      disponibilidad: {
+        servicioId: input.servicioId,
+        fecha: input.targetDate,
+      },
+    },
+    select: {
+      id: true,
+      estado: true,
+      expiraEn: true,
+      disponibilidad: { select: { franja: { select: { horaInicio: true, horaFin: true } } } },
+    },
+  });
+
+  const overlaps = candidates.some((reservation) => {
+    if (
+      reservation.estado === "PENDIENTE_PAGO" &&
+      reservation.expiraEn &&
+      reservation.expiraEn.getTime() <= input.now.getTime()
+    ) {
+      return false; // hold vencido: ya no bloquea al titular.
+    }
+    const franja = reservation.disponibilidad?.franja;
+    if (!franja) return false;
+    const otherStart = secondsFromDbTime(franja.horaInicio);
+    const otherEnd = secondsFromDbTime(franja.horaFin);
+    return otherStart < endSeconds && otherEnd > startSeconds;
+  });
+
+  if (overlaps) {
+    throw new BookingError(
+      "Ya tienes una reserva activa de este servicio en una franja que se solapa.",
+      "TITULAR_RESERVATION_OVERLAP",
+      409,
+    );
+  }
 }
 
 export async function getBookableAvailability(serviceId: number, date: string, now = new Date()) {
@@ -319,6 +390,17 @@ export async function createBookingHold(input: {
         400,
       );
     }
+
+    // TSK-BE-12 / RN-07: la unicidad de titular aplica solo dentro de la misma
+    // instancia de servicio; entre servicios distintos el solapamiento es válido.
+    await assertNoTitularOverlap(tx, {
+      titularId: input.userId,
+      servicioId: availability.servicioId,
+      targetDate,
+      startTime,
+      endTime,
+      now,
+    });
 
     await tx.disponibilidad.update({
       where: { id: availability.id },
