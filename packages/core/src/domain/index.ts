@@ -20,6 +20,7 @@ export const MEMBERSHIP_DISCOUNT_RATE = 0.3 as const;
 import type { CategorySlug } from "./catalog";
 
 export * from "./catalog";
+export * from "./analytics";
 
 export type Booking = {
   id: string;
@@ -43,4 +44,4 @@ export const roleHome: Record<Role, string> = {
   Empleado_Vendedor: '/pos',
   Empleado_Lector: '/scanner',
   Cliente: '/portal',
-};
+};

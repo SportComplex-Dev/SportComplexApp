@@ -106,6 +106,13 @@ Sin `QR_HMAC_SECRET`, `/api/access` responde `503 QR_NOT_CONFIGURED` (no rompe).
 |---|---|---|---|
 | `POST` | `/api/payments` | Firma Stripe (no sesión) | Webhook idempotente (BD-09) |
 | `POST` | `/api/access` | Sesión + rol `Administrador` o `Empleado_Lector` | Escaneo de ticket (BD-10) |
+| `GET` | `/api/tickets/verify/{code}` | Sesión + rol `Administrador` o `Empleado_Lector` + `x-ticket-signature` | Consulta de solo lectura; audita `CONSULTA` sin modificar el boleto (BE-15) |
+
+`GET /api/tickets/verify/{code}` recibe la firma HMAC en el header
+`x-ticket-signature`. Registra una fila `LECTURA_ACCESO` con
+`modo=CONSULTA`, `resultado=CONSULTA` y `asignacion_id=NULL`. No cambia el
+estado, `usado_por` ni `usado_en` del ticket. Una firma inválida se rechaza
+antes de consultar la base de datos.
 
 Contrato de `POST /api/access`:
 

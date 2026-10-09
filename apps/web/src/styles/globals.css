@@ -3908,14 +3908,14 @@ button { cursor: pointer; }
   border-top: 1px solid rgba(201, 239, 117, 0.2);
 }
 
+/* Utility: Hide scrollbar */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 .auth-art,
 .auth-art-content {
   min-height: min(650px, 100svh);
 }
-
-/* Utility: Hide scrollbar */
-.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* ==========================================================================
    Customer Portal, Dashboard, Checkout & Confirmation (TSK-FE-13 & HU-13)

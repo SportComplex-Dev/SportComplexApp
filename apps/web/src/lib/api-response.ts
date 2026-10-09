@@ -17,8 +17,11 @@ export function jsonSafe(data: unknown): unknown {
   return copy;
 }
 
-export function ok<T>(data: T) {
-  return Response.json({ success: true, data: jsonSafe(data), timestamp: new Date().toISOString() });
+export function ok<T>(data: T, headers?: HeadersInit) {
+  return Response.json(
+    { success: true, data: jsonSafe(data), timestamp: new Date().toISOString() },
+    headers ? { headers } : undefined,
+  );
 }
 
 export function created<T>(data: T) {
