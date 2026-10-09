@@ -49,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const initials = session?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'AD'
 
   return (
-    <main className="admin-shell">
+    <main className={`admin-shell club-app ${dark ? 'dark' : ''}`}>
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <Link href="/admin" aria-label="Ir al resumen">

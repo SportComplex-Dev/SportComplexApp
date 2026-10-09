@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePersistentState, useHydrated } from '@/lib/persistent-state'
 import { sampleAccounts, useStoredSession, type Session } from '@/lib/stores'
 import type { ToastKind } from '@/components/toast-message'
@@ -32,13 +32,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ message: string; kind: ToastKind }>({ message: '', kind: 'info' })
   const timer = useRef<number | undefined>(undefined)
 
+  useEffect(() => {
+    if (ready && typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', Boolean(dark))
+      try {
+        localStorage.setItem('akros_theme', dark ? 'dark' : 'light')
+      } catch {}
+    }
+  }, [ready, dark])
+
   const setDark = useCallback(
     (value: boolean) => {
       setDarkState(value)
-      if (value) {
-        document.documentElement.classList.add('dark')
-      } else {
-        document.documentElement.classList.remove('dark')
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', value)
+        try {
+          localStorage.setItem('akros_theme', value ? 'dark' : 'light')
+        } catch {}
       }
     },
     [setDarkState]

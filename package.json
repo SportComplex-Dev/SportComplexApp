@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
+    "smoke:be24": "node --experimental-strip-types scripts/smoke-be24.mts",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

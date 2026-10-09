@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import {
   updateServicioSchema,
   normalizeServicePayload,
@@ -19,6 +20,9 @@ interface RouteContext {
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {
@@ -43,6 +47,9 @@ export async function GET(request: Request, context: RouteContext) {
  */
 async function handleUpdate(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {
@@ -78,6 +85,13 @@ async function handleUpdate(request: Request, context: RouteContext) {
       };
       if (error.name === "NotFoundError") {
         return fail("NOT_FOUND", error.message || "Servicio no encontrado", 404);
+      }
+      if (error.name === "CapacityConflictError") {
+        return fail(
+          "CAPACITY_CONFLICT",
+          error.message || "La capacidad no puede ser menor que los cupos ya ocupados en una franja.",
+          409,
+        );
       }
       const isDuplicateName =
         error.name === "DuplicateNameError" ||
@@ -121,6 +135,9 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {
