@@ -182,7 +182,7 @@ Necesarias en la instancia n8n:
 
 El backend envía `POST` a `N8N_CONTINGENCY_WEBHOOK_URL` después de confirmar la transacción de contingencia. El payload incluye `servicioId`, `servicio`, `motivo` y `usuarios` con la reserva y los horarios afectados. El request lleva `X-SportComplex-Signature: sha256=<hex>`, HMAC-SHA-256 del cuerpo JSON exacto, calculado con `N8N_CONTINGENCY_HMAC_SECRET`.
 
-El workflow receptor debe validar esa firma antes de procesar los datos. La llamada tiene timeout de 2.5 segundos; cualquier fallo se reporta al operador, pero no revierte el bloqueo ni las cancelaciones y no dispara reembolsos. Ver [TSK-BE-22](./TSK-BE-22-contingencia-webhook-hmac.md).
+El workflow receptor debe validar esa firma antes de procesar los datos. La llamada tiene timeout de 2.5 segundos; cualquier fallo se reporta al operador, pero no revierte el bloqueo ni las cancelaciones y no dispara reembolsos. Ver [TSK-BE-22](./TSK-BE-22-contingencia-webhook-hmac.md). Para garantizar que no se pierdan eventos si n8n no está disponible, la tarea complementaria **TSK-BE-22b** implementa persistencia y reintentos automáticos (Outbox pattern).
 
 ### Endpoint de Registro que Dispara el Workflow
 

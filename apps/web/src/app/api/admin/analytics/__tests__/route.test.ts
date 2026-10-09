@@ -7,9 +7,37 @@ const { createMockPrisma } = await import(
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
+Reflect.set(process.env, "NODE_ENV", "test");
+const adminId = "00000000-0000-4000-8000-000000000021";
+mock._state.usuarios.push({
+  id: adminId,
+  nombre: "Admin",
+  estado: "ACTIVO",
+  deletedAt: null,
+  rolId: 1,
+  rolNombre: "ADMINISTRADOR",
+});
+(globalThis as any).__scAuthSession = { user: { id: adminId } };
 
 // Import route handler after mocking prisma
 const analyticsRoute = await import("../route");
+
+test("API: GET /api/admin/analytics rechaza rol sin permiso y cuentas inactivas", async () => {
+  const admin = mock._state.usuarios.find((user: { id: string }) => user.id === adminId)!;
+  admin.rolNombre = "LECTOR";
+  const forbidden = await analyticsRoute.GET(
+    new Request("http://localhost:3000/api/admin/analytics"),
+  );
+  assert.equal(forbidden.status, 403);
+
+  admin.rolNombre = "ADMINISTRADOR";
+  admin.estado = "INACTIVO";
+  const inactive = await analyticsRoute.GET(
+    new Request("http://localhost:3000/api/admin/analytics"),
+  );
+  assert.equal(inactive.status, 403);
+  admin.estado = "ACTIVO";
+});
 
 test("API: GET /api/admin/analytics rechaza fechas con formato inválido con 400", async () => {
   const req = new Request("http://localhost:3000/api/admin/analytics?startDate=2026/10/01");

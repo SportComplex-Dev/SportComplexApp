@@ -1,11 +1,10 @@
-import { auth } from "@/auth";
 import { fail, ok } from "@/lib/api-response";
 import {
   construirComprobante,
   validarSolicitudComprobante,
 } from "@/lib/receipt";
-import { normalizeRole } from "@/lib/session";
 import { ReceiptError } from "@sportcomplex/db";
+import { authorizeApiRequest } from "@/lib/api-auth";
 
 // TSK-BE-19 — GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS
 // RNF-05 · RF-17 · HU-19.
@@ -25,13 +24,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para descargar el comprobante.", 401);
-    }
-    if (session.user.estado && session.user.estado !== "ACTIVO") {
-      return fail("FORBIDDEN", "Tu cuenta no está activa.", 403);
-    }
+    const authorization = await authorizeApiRequest([
+      "Cliente",
+      "Empleado_Vendedor",
+      "Administrador",
+    ]);
+    if (!authorization.authorized) return authorization.response;
 
     const qrSecret = process.env.QR_HMAC_SECRET;
     if (!qrSecret) {
@@ -44,9 +42,12 @@ export async function GET(request: Request) {
       destinatario: searchParams.get("destinatario"),
     });
 
-    const role = normalizeRole(session.user.role);
     const comprobante = await construirComprobante(reservaId, {
-      solicitante: { userId: session.user.id, role, destinatario },
+      solicitante: {
+        userId: authorization.actor.id,
+        role: authorization.actor.role,
+        destinatario,
+      },
       qrSecret,
     });
 
