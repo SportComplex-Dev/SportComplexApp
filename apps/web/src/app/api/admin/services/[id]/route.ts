@@ -79,6 +79,13 @@ async function handleUpdate(request: Request, context: RouteContext) {
       if (error.name === "NotFoundError") {
         return fail("NOT_FOUND", error.message || "Servicio no encontrado", 404);
       }
+      if (error.name === "CapacityConflictError") {
+        return fail(
+          "CAPACITY_CONFLICT",
+          error.message || "La capacidad no puede ser menor que los cupos ya ocupados en una franja.",
+          409,
+        );
+      }
       const isDuplicateName =
         error.name === "DuplicateNameError" ||
         (error.code === "P2002" &&

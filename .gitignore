@@ -14,5 +14,6 @@ coverage/
 prisma/*.db
 *.tsbuildinfo
 next-env.d.ts
-.codegraph/
-SCRUM-*.xml
+
+# Exportaciones XML de Jira (SCRUM-*.xml): se generan al leer la incidencia.
+SCRUM-*.xml

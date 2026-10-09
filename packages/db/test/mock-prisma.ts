@@ -44,6 +44,10 @@ export interface MockReserva {
   expiraEn?: Date | null;
   pagoId?: string | null;
   creadoEn?: Date;
+  canal?: string;
+  subtotal?: number | string;
+  descuentoPct?: number | string;
+  total?: number | string;
 }
 
 export interface MockPago {
@@ -76,6 +80,8 @@ export interface MockTicketQr {
   usadoPor: string | null;
   estado: string;
   usadoEn: Date | null;
+  /** Opcional: solo lo siembran las pruebas que leen el comprobante. */
+  emitidoEn?: Date;
 }
 
 export interface MockLecturaAcceso {
@@ -94,6 +100,30 @@ export interface MockAsignacionPuesto {
   servicioId: number;
   inicioTurno: Date;
   finTurno: Date;
+}
+
+function pickDisponibilidad(
+  disp: { franja?: { horaInicio: Date; horaFin: Date } } | undefined,
+  shape: Record<string, any>,
+): Record<string, any> | undefined {
+  if (!disp) return undefined;
+  const picked: Record<string, any> = {};
+  for (const key of Object.keys(shape)) {
+    if (!shape[key]) continue;
+    if (key === "franja") {
+      const franjaShape = shape[key].select ?? shape[key].include;
+      picked[key] = franjaShape
+        ? Object.fromEntries(
+            Object.keys(franjaShape)
+              .filter((fk) => franjaShape[fk])
+              .map((fk) => [fk, (disp.franja as any)?.[fk]]),
+          )
+        : disp.franja;
+    } else {
+      picked[key] = (disp as any)[key];
+    }
+  }
+  return picked;
 }
 
 export function createMockPrisma() {
@@ -118,6 +148,29 @@ export function createMockPrisma() {
   let lecturaIdSeq = 1n;
   let asignacionIdSeq = 1;
   let transactionQueue = Promise.resolve();
+
+  /**
+   * Proyecta una reserva con sus relaciones (TSK-BE-19): disponibilidad +
+   * franja + servicio, titular y boleto emitido. Alimenta
+   * `reserva.findUnique` simulando `include`/`select` anidado SIN restrictor
+   * de campos, para que un repositorio que se pase de selects quede expuesto
+   * en las pruebas.
+   */
+  function reservaEnriquecida(reserva: MockReserva): Record<string, unknown> {
+    const disponibilidad = disponibilidades.find((d) => d.id === reserva.disponibilidadId);
+    return {
+      ...reserva,
+      disponibilidad: disponibilidad
+        ? {
+            ...disponibilidad,
+            franja: franjas.find((f) => f.id === disponibilidad.franjaId),
+            servicio: servicios.find((s) => s.id === disponibilidad.servicioId),
+          }
+        : null,
+      titular: usuarios.find((u) => u.id === reserva.titularId) ?? null,
+      ticketQr: tickets.find((t) => t.reservaId === reserva.id) ?? null,
+    };
+  }
 
   const mock: any = {
     _state: {
@@ -469,11 +522,22 @@ export function createMockPrisma() {
       },
     },
     reserva: {
-      async findUnique({ where }: any) {
+      async findUnique({ where, select }: any) {
         if (where.id === undefined) return null;
-        return reservas.find((reservation) => reservation.id === where.id) ?? null;
+        const base = reservas.find((reservation) => reservation.id === where.id) ?? null;
+        if (!base) return null;
+        // TSK-BE-19: se enriquece con las relaciones del comprobante. El mock
+        // devuelve MÁS campos de los que pide `select` en las relaciones
+        // (pagoId incluido): el repositorio debe descartar lo que no pide.
+        const full = reservaEnriquecida(base);
+        if (!select) return full;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (key in full) picked[key] = (full as any)[key];
+        }
+        return picked;
       },
-      async findMany({ where, orderBy, take }: any = {}) {
+      async findMany({ where, orderBy, take, include, select }: any = {}) {
         let list = reservas.filter((reservation) => {
           if (
             typeof where?.id === "string" &&
@@ -483,8 +547,28 @@ export function createMockPrisma() {
             where?.disponibilidadId !== undefined &&
             reservation.disponibilidadId !== where.disponibilidadId
           ) return false;
-          if (where?.estado && reservation.estado !== where.estado) return false;
+          if (typeof where?.estado === "string" && reservation.estado !== where.estado) return false;
+          if (Array.isArray(where?.estado?.in) && !where.estado.in.includes(reservation.estado)) {
+            return false;
+          }
           if (where?.titularId && reservation.titularId !== where.titularId) return false;
+          if (where?.disponibilidad) {
+            const disp = disponibilidades.find((d) => d.id === reservation.disponibilidadId);
+            if (!disp) return false;
+            if (
+              where.disponibilidad.servicioId !== undefined &&
+              disp.servicioId !== where.disponibilidad.servicioId
+            ) {
+              return false;
+            }
+            if (
+              where.disponibilidad.fecha &&
+              disp.fecha.toISOString().slice(0, 10) !==
+                where.disponibilidad.fecha.toISOString().slice(0, 10)
+            ) {
+              return false;
+            }
+          }
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
@@ -511,7 +595,47 @@ export function createMockPrisma() {
             return createdAtDifference || b.id.localeCompare(a.id);
           });
         }
-        return typeof take === "number" ? list.slice(0, take) : list;
+        if (typeof take === "number") list = list.slice(0, take);
+        const withRelations = (reservation: any) => {
+          const disp = disponibilidades.find((d) => d.id === reservation.disponibilidadId);
+          const fullDisponibilidad = disp
+            ? {
+                ...disp,
+                servicio: servicios.find((s) => s.id === disp.servicioId),
+                franja: franjas.find((f) => f.id === disp.franjaId),
+              }
+            : undefined;
+
+          // `select` estricto (como Prisma): solo los campos escalares pedidos.
+          if (select) {
+            const picked: Record<string, any> = {};
+            for (const key of Object.keys(select)) {
+              if (!select[key]) continue;
+              if (key === "disponibilidad") {
+                const nested = select[key].select ?? select[key].include;
+                picked[key] = nested ? pickDisponibilidad(fullDisponibilidad, nested) : fullDisponibilidad;
+              } else {
+                picked[key] = reservation[key];
+              }
+            }
+            return picked;
+          }
+
+          // Sin `select`: se conservan todos los escalares y se agregan las
+          // relaciones pedidas por `include`.
+          const res: any = { ...reservation };
+          for (const key of Object.keys(include ?? {})) {
+            if (!include[key]) continue;
+            if (key === "disponibilidad") {
+              const nested = include[key].select ?? include[key].include;
+              res[key] = nested ? pickDisponibilidad(fullDisponibilidad, nested) : fullDisponibilidad;
+            } else if (key === "ticketQr") {
+              res[key] = tickets.find((t) => t.reservaId === reservation.id);
+            }
+          }
+          return res;
+        };
+        return list.map(withRelations);
       },
       async updateMany({ where, data }: any) {
         let count = 0;

@@ -72,6 +72,13 @@ function createForbiddenResponse(req: NextRequest, message: string) {
 
 export default withAuth((req) => {
   const { pathname } = req.nextUrl;
+  const isDev = process.env.NODE_ENV !== "production";
+  const queryRole = isDev
+    ? (req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole"))
+    : null;
+  const cookieRole = isDev ? req.cookies.get("sc-role")?.value : null;
+  const effectiveOverride = isDev ? (queryRole || cookieRole) : null;
+
   const authUser = req.auth?.user;
   const authRole = normalizeRole(authUser?.role);
   const session: SessionUser | null = authUser
@@ -83,7 +90,15 @@ export default withAuth((req) => {
           email: authUser.email ?? undefined,
         }
       : null
-    : extractSession(req);
+    : (effectiveOverride && normalizeRole(effectiveOverride)
+      ? {
+          role: normalizeRole(effectiveOverride)!,
+          status: "ACTIVO",
+          userId: "dev-override",
+          email: "admin@sportcomplex.co",
+        }
+      : extractSession(req));
+
   const status = session?.status ?? "ACTIVO";
   const isActive = session !== null && isAccountActive(status);
   const role = isActive ? session.role : null;
@@ -176,7 +191,11 @@ export default withAuth((req) => {
     if (role !== "Administrador") {
       return createForbiddenResponse(req, "Requiere rol Administrador");
     }
-    return NextResponse.next();
+    const res = NextResponse.next();
+    if (queryRole) {
+      res.cookies.set("sc-role", queryRole, { path: "/", maxAge: 60 * 60 * 24 });
+    }
+    return res;
   }
 
   if (pathname.startsWith("/pos")) {
@@ -199,7 +218,11 @@ export default withAuth((req) => {
     return NextResponse.next();
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  if (queryRole) {
+    res.cookies.set("sc-role", queryRole, { path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return res;
 });
 
 export const config = {

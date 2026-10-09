@@ -119,8 +119,14 @@ function requestFor(
 
 test("TSK-BE-05: 40 solicitudes concurrentes nunca exceden aforo 25", async () => {
   const slot = addAforoSlot(25);
+  // Titulares distintos: la prueba mide el aforo, no la regla de unicidad
+  // de titular (TSK-BE-12), que impide al mismo usuario repetir la franja.
   const results = await Promise.allSettled(
-    Array.from({ length: 40 }, () => createBookingHold(requestFor(slot))),
+    Array.from({ length: 40 }, (_, index) =>
+      createBookingHold(
+        requestFor(slot, 1, `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`),
+      ),
+    ),
   );
 
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 25);
@@ -205,6 +211,59 @@ test("TSK-BE-08: piscina pública de aforo 30 conserva 28 cupos al reservar 2", 
   assert.equal(availability[0].cuposTotales, 30);
   assert.equal(availability[0].cuposOcupados, 2);
   assert.equal(availability[0].cuposDisponibles, 28);
+});
+
+test("TSK-BE-12: Cancha 1 y Piscina en la misma franja se confirman sin error de solapamiento", async () => {
+  const cancha = addAforoSlot(10);
+  const piscina = addAforoSlot(20);
+  const userId = "00000000-0000-4000-8000-00000000be12";
+
+  const first = await createBookingHold(requestFor(cancha, 1, userId));
+  const second = await createBookingHold(requestFor(piscina, 1, userId));
+
+  assert.equal(first.estado, "PENDIENTE_PAGO");
+  assert.equal(second.estado, "PENDIENTE_PAGO");
+  assert.notEqual(first.disponibilidad.servicioId, second.disponibilidad.servicioId);
+});
+
+test("TSK-BE-12: el mismo titular no duplica una franja solapada del mismo servicio", async () => {
+  const slot = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000be13";
+
+  await createBookingHold(requestFor(slot, 1, userId));
+
+  await assert.rejects(
+    createBookingHold(requestFor(slot, 1, userId)),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "TITULAR_RESERVATION_OVERLAP",
+  );
+});
+
+test("TSK-BE-12: otro titular sí puede reservar la misma franja del mismo servicio", async () => {
+  const slot = addAforoSlot(10);
+
+  const first = await createBookingHold(
+    requestFor(slot, 1, "00000000-0000-4000-8000-00000000be14"),
+  );
+  const second = await createBookingHold(
+    requestFor(slot, 1, "00000000-0000-4000-8000-00000000be15"),
+  );
+
+  assert.equal(first.estado, "PENDIENTE_PAGO");
+  assert.equal(second.estado, "PENDIENTE_PAGO");
+});
+
+test("TSK-BE-12: un hold vencido libera la unicidad de titular para su franja", async () => {
+  const slot = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000be16";
+
+  const first = await createBookingHold(requestFor(slot, 1, userId));
+  const reopened = await createBookingHold(
+    requestFor(slot, 1, userId),
+    new Date(first.expiraEn),
+  );
+
+  assert.equal(reopened.estado, "PENDIENTE_PAGO");
 });
 
 test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja completa", async () => {
