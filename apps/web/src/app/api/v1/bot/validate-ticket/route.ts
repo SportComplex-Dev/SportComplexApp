@@ -1,11 +1,11 @@
-import { decideAccess, verifyTicketSignature } from "@sportcomplex/core";
+import { validateBotTicket, verifyTicketSignature } from "@sportcomplex/core";
 import { getTicketForScan, TicketError } from "@sportcomplex/db";
 import { botTicketQuerySchema } from "@sportcomplex/validation";
 import { fail, ok } from "@/lib/api-response";
 import { authorizeBotApiKey } from "@/lib/bot-api-auth";
 import { getTicketAccessWindow } from "@/lib/access";
 
-export async function GET(request: Request) {
+export async function handleBotTicketValidation(request: Request, now = new Date()) {
   const unauthorized = authorizeBotApiKey(request);
   if (unauthorized) return unauthorized;
 
@@ -29,20 +29,20 @@ export async function GET(request: Request) {
   try {
     const ticket = await getTicketForScan(parsed.data.ticketId);
     const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
-    const decision = decideAccess({
-      now: new Date(),
+    const validation = validateBotTicket({
+      now,
       start,
       end,
       ticketStatus: ticket.estado,
-      ticketServiceId: String(ticket.reserva.disponibilidad.servicio.id),
-      postServiceId: String(ticket.reserva.disponibilidad.servicio.id),
+      reservationStatus: ticket.reserva.estado,
+      serviceStatus: ticket.reserva.disponibilidad.servicio.estado,
     });
 
     return ok({
       ticketId: ticket.codigoUuid,
       estado: ticket.estado,
-      valido: decision.allowed,
-      ...(decision.allowed ? {} : { motivo: decision.code }),
+      valido: validation.valid,
+      ...(validation.valid ? {} : { motivo: validation.reason }),
       servicio: {
         id: ticket.reserva.disponibilidad.servicio.id,
         nombre: ticket.reserva.disponibilidad.servicio.nombre,
@@ -58,4 +58,8 @@ export async function GET(request: Request) {
     console.error("Error en GET /api/v1/bot/validate-ticket:", error);
     return fail("SERVER_ERROR", "Error al validar el ticket.", 500);
   }
+}
+
+export async function GET(request: Request) {
+  return handleBotTicketValidation(request);
 }

@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { fail } from "@/lib/api-response";
 
 export function authorizeBotApiKey(request: Request): Response | null {
@@ -12,9 +12,9 @@ export function authorizeBotApiKey(request: Request): Response | null {
     return fail("UNAUTHORIZED", "Falta una API key válida.", 401);
   }
 
-  const expected = Buffer.from(expectedKey);
-  const provided = Buffer.from(providedKey);
-  if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+  const expectedDigest = createHash("sha256").update(expectedKey).digest();
+  const providedDigest = createHash("sha256").update(providedKey).digest();
+  if (!timingSafeEqual(expectedDigest, providedDigest)) {
     return fail("UNAUTHORIZED", "Falta una API key válida.", 401);
   }
 

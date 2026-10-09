@@ -10,7 +10,7 @@ process.env.QR_HMAC_SECRET = qrSecret;
 const mock = createMockPrisma();
 Reflect.set(globalThis, "__scPrisma", mock);
 const availabilityRoute = await import("../availability/route");
-const ticketRoute = await import("../validate-ticket/route");
+const { handleBotTicketValidation } = await import("../validate-ticket/route");
 const { signTicket } = await import("@sportcomplex/core");
 
 const ticketId = "9f0d6f4e-0000-4000-8000-000000000023";
@@ -101,7 +101,7 @@ test("bot endpoints require a configured valid x-api-key", async () => {
   const missingKey = await availabilityRoute.GET(
     apiRequest("http://localhost/api/v1/bot/availability?serviceId=1&date=2026-10-10", ""),
   );
-  const invalidKey = await ticketRoute.GET(
+  const invalidKey = await handleBotTicketValidation(
     apiRequest(
       `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signTicket(ticketId, qrSecret)}`,
       "wrong-key",
@@ -111,6 +111,40 @@ test("bot endpoints require a configured valid x-api-key", async () => {
   assert.equal(missingKey.status, 401);
   assert.equal(invalidKey.status, 401);
   assert.deepEqual(mock._state, before);
+});
+
+test("bot endpoints return 503 when required secrets are not configured", async () => {
+  seedData();
+  const savedBotKey = process.env.BOT_API_KEY;
+  const savedQrSecret = process.env.QR_HMAC_SECRET;
+  try {
+    delete process.env.BOT_API_KEY;
+    const keyUnavailable = await availabilityRoute.GET(
+      apiRequest("http://localhost/api/v1/bot/availability?serviceId=1&date=2026-10-10"),
+    );
+    assert.equal(keyUnavailable.status, 503);
+    const ticketKeyUnavailable = await handleBotTicketValidation(
+      apiRequest(
+        `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signTicket(ticketId, qrSecret)}`,
+      ),
+    );
+    assert.equal(ticketKeyUnavailable.status, 503);
+
+    process.env.BOT_API_KEY = savedBotKey;
+    delete process.env.QR_HMAC_SECRET;
+    const qrUnavailable = await handleBotTicketValidation(
+      apiRequest(
+        `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${"a".repeat(64)}`,
+      ),
+    );
+    assert.equal(qrUnavailable.status, 503);
+    assert.equal((await qrUnavailable.json()).error.code, "QR_NOT_CONFIGURED");
+  } finally {
+    if (savedBotKey === undefined) delete process.env.BOT_API_KEY;
+    else process.env.BOT_API_KEY = savedBotKey;
+    if (savedQrSecret === undefined) delete process.env.QR_HMAC_SECRET;
+    else process.env.QR_HMAC_SECRET = savedQrSecret;
+  }
 });
 
 test("bot availability accounts for expired holds without changing database rows", async () => {
@@ -131,53 +165,94 @@ test("bot availability accounts for expired holds without changing database rows
   assert.equal(body.data.length, 1);
   assert.equal(body.data[0].cuposOcupados, 1);
   assert.equal(body.data[0].cuposDisponibles, 9);
+  assert.equal(body.data[0].franja.horaInicio, "10:00:00");
+  assert.equal(body.data[0].franja.horaFin, "11:00:00");
   assert.deepEqual(mock._state.reservas, beforeReservations);
   assert.equal(mock._state.disponibilidades[0].cuposOcupados, beforeOccupancy);
 });
 
-test("bot ticket validation verifies the QR and never changes ticket state", async () => {
-  seedData();
+test("bot ticket validation returns valid for an emitted ticket in its access window", async () => {
+  const date = seedData();
   const beforeTicket = structuredClone(mock._state.tickets[0]);
   const beforeLecturas = structuredClone(mock._state.lecturas);
   const signature = signTicket(ticketId, qrSecret);
 
-  const invalidSignature = await ticketRoute.GET(
+  const invalidSignature = await handleBotTicketValidation(
     apiRequest(
       `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${"0".repeat(64)}`,
     ),
+    new Date(`${date}T10:30:00-05:00`),
   );
   assert.equal(invalidSignature.status, 400);
   assert.deepEqual(mock._state.tickets[0], beforeTicket);
   assert.deepEqual(mock._state.lecturas, beforeLecturas);
 
-  const response = await ticketRoute.GET(
+  const response = await handleBotTicketValidation(
     apiRequest(
       `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
     ),
+    new Date(`${date}T10:30:00-05:00`),
   );
   const body = await response.json();
 
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.data.estado, "EMITIDO");
-  assert.equal(body.data.valido, false);
-  assert.equal(body.data.motivo, "WINDOW_EXPIRED");
+  assert.equal(body.data.valido, true);
+  assert.equal("motivo" in body.data, false);
   assert.deepEqual(mock._state.tickets[0], beforeTicket);
   assert.deepEqual(mock._state.lecturas, beforeLecturas);
 });
 
+test("bot ticket validation rejects cancelled reservations and inactive services", async () => {
+  const date = seedData();
+  const signature = signTicket(ticketId, qrSecret);
+  const now = new Date(`${date}T10:30:00-05:00`);
+
+  mock._state.reservas.find((reservation: { id: string }) => reservation.id === "confirmed-booking")!.estado =
+    "CANCELADA_ADMINISTRATIVA";
+  let response = await handleBotTicketValidation(
+    apiRequest(
+      `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
+    ),
+    now,
+  );
+  let body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.data.valido, false);
+  assert.equal(body.data.motivo, "RESERVATION_CANCELLED");
+
+  mock._state.reservas.find((reservation: { id: string }) => reservation.id === "confirmed-booking")!.estado =
+    "CONFIRMADA";
+  mock._state.servicios[0].estado = "INHABILITADO";
+  response = await handleBotTicketValidation(
+    apiRequest(
+      `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
+    ),
+    now,
+  );
+  body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.data.valido, false);
+  assert.equal(body.data.motivo, "SERVICE_INACTIVE");
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.lecturas.length, 0);
+});
+
 test("bot ticket validation reports used tickets without rewriting them", async () => {
-  seedData();
+  const date = seedData();
   mock._state.tickets[0].estado = "USADO";
   mock._state.tickets[0].usadoPor = "lector-1";
   mock._state.tickets[0].usadoEn = new Date("2026-10-09T10:00:00.000Z");
   const beforeTicket = structuredClone(mock._state.tickets[0]);
   const signature = signTicket(ticketId, qrSecret);
 
-  const response = await ticketRoute.GET(
+  const response = await handleBotTicketValidation(
     apiRequest(
       `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
     ),
+    new Date(`${date}T10:30:00-05:00`),
   );
   const body = await response.json();
 

@@ -13,14 +13,19 @@ La variable debe configurarse en cada entorno; si falta, las rutas responden
 futuras de un servicio activo con cupos ocupados, libres y bloqueo de
 mantenimiento. Los holds pendientes vencidos se descuentan para informar cupos
 vigentes, sin expirar reservas ni actualizar contadores.
+Los horarios se devuelven normalizados como `HH:MM:SS`.
 
 ## Validación de ticket
 
 `GET /api/v1/bot/validate-ticket?ticketId=<uuid>&signature=<hmac-sha256-hex>`
 verifica la firma QR antes de consultar la base de datos. Responde el estado,
 servicio y franja del ticket; `valido` indica si está emitido y dentro de su
-ventana de acceso. Un ticket existente pero usado o fuera de su ventana se
-responde exitosamente con `valido: false`.
+ventana de acceso, siempre que la reserva esté `CONFIRMADA` y el servicio siga
+`ACTIVO`. Un ticket existente con reserva cancelada/no confirmada, servicio
+inhabilitado, ya usado o fuera de su ventana se responde exitosamente con
+`valido: false` y un `motivo` explícito (`RESERVATION_CANCELLED`,
+`RESERVATION_NOT_CONFIRMED`, `SERVICE_INACTIVE`, `ALREADY_USED` o
+`WINDOW_EXPIRED`).
 
 La ruta es estrictamente de consulta: no crea auditorías ni modifica el estado
 del ticket. El canje permanece exclusivo del flujo de escaneo autorizado.

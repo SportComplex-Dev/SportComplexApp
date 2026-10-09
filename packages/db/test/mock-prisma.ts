@@ -445,6 +445,10 @@ export function createMockPrisma() {
         return disponibilidades
           .filter((d) => {
             if (where?.servicioId !== undefined && d.servicioId !== where.servicioId) return false;
+            if (where?.servicio?.estado !== undefined) {
+              const service = servicios.find((item) => item.id === d.servicioId);
+              if (service?.estado !== where.servicio.estado) return false;
+            }
             if (
               where?.fecha &&
               d.fecha.toISOString().slice(0, 10) !== where.fecha.toISOString().slice(0, 10)

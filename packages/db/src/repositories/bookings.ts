@@ -337,6 +337,7 @@ export async function getReadOnlyBookableAvailability(
 ) {
   validateBookingDate(date, now);
   const targetDate = new Date(`${date}T00:00:00.000Z`);
+  const formatTime = (value: Date) => value.toISOString().slice(11, 19);
   const availability = await prisma.disponibilidad.findMany({
     where: {
       servicioId: serviceId,
@@ -375,7 +376,12 @@ export async function getReadOnlyBookableAvailability(
         servicioId: item.servicioId,
         servicioNombre: item.servicio.nombre,
         fecha: item.fecha,
-        franja: item.franja,
+        franja: {
+          id: item.franja.id,
+          diaSemana: item.franja.diaSemana,
+          horaInicio: formatTime(item.franja.horaInicio),
+          horaFin: formatTime(item.franja.horaFin),
+        },
         modalidad: item.servicio.modalidad,
         cuposTotales: item.cuposTotales,
         cuposOcupados,
