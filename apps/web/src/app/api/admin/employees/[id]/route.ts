@@ -4,7 +4,7 @@ import { deactivateEmployee, EmployeeError } from "@sportcomplex/db";
 import { z } from "zod";
 
 interface RouteContext {
-  params: Promise<{ id: string }>;
+  params: Promise<unknown>;
 }
 
 const deactivationSchema = z.object({
@@ -16,7 +16,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     const authorization = await authorizeApiRequest(["Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
-    const { id } = await context.params;
+    const params = await context.params;
+    if (
+      typeof params !== "object" ||
+      params === null ||
+      !("id" in params) ||
+      typeof params.id !== "string"
+    ) {
+      return fail("INVALID_ID", "El ID del empleado debe ser un UUID válido.", 400);
+    }
+    const { id } = params;
     if (!z.uuid().safeParse(id).success) {
       return fail("INVALID_ID", "El ID del empleado debe ser un UUID válido.", 400);
     }

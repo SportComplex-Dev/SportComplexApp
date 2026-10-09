@@ -56,7 +56,7 @@ Mapeo HU → esquema real (no existen modelos literales `Empleado/Venta/Escaneo`
 
 La tarea Backend complementa este blindaje con:
 
-- RBAC actualizado en el proxy perimetral, consultando el rol y estado actuales
+- RBAC actualizado en `middleware.ts`, consultando el rol y estado actuales
   de la cuenta en DB para que una baja surta efecto en la siguiente solicitud.
 - Autorización repetida dentro de los Route Handlers protegidos; no se confía
   únicamente en el proxy.

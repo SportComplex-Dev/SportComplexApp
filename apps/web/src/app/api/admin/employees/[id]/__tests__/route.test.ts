@@ -13,7 +13,8 @@ const db = createMockPrisma();
 
 const route = await import("../route");
 
-test("PATCH employee endpoint deactivates a staff account without deleting audit history", async () => {
+function seedAccounts() {
+  db._state.usuarios.length = 0;
   db._state.usuarios.push(
     {
       id: adminId,
@@ -31,8 +32,22 @@ test("PATCH employee endpoint deactivates a staff account without deleting audit
       rolId: 2,
       rolNombre: "LECTOR",
     },
-    { id: "client-1", nombre: "Cliente" },
   );
+}
+
+function patchEmployee(id: string, payload: unknown) {
+  return route.PATCH(
+    new Request(`http://localhost/api/admin/employees/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+    { params: Promise.resolve({ id }) },
+  );
+}
+
+test("PATCH employee endpoint deactivates a staff account without deleting audit history", async () => {
+  seedAccounts();
   db._state.tickets.push({
     id: "ticket-1",
     reservaId: "reserva-1",
@@ -68,4 +83,62 @@ test("PATCH employee endpoint deactivates a staff account without deleting audit
   assert.equal(db._state.usuarios.find((user: { id: string }) => user.id === empleadoId)?.estado, "INACTIVO");
   assert.deepEqual(db._state.lecturas, readsBefore);
   assert.deepEqual(db._state.tickets, ticketsBefore);
+});
+
+test("PATCH employee endpoint rejects a non-admin with 403", async () => {
+  seedAccounts();
+  (globalThis as typeof globalThis & {
+    __scAuthSession: { user: { id: string } };
+  }).__scAuthSession = { user: { id: empleadoId } };
+
+  const response = await patchEmployee(empleadoId, { estado: "INACTIVO" });
+
+  assert.equal(response.status, 403);
+  assert.equal(db._state.usuarios.find((user: { id: string }) => user.id === empleadoId)?.estado, "ACTIVO");
+});
+
+test("PATCH employee endpoint rejects a malformed UUID with 400", async () => {
+  seedAccounts();
+  (globalThis as typeof globalThis & {
+    __scAuthSession: { user: { id: string } };
+  }).__scAuthSession = { user: { id: adminId } };
+
+  const response = await patchEmployee("not-a-uuid", { estado: "INACTIVO" });
+
+  assert.equal(response.status, 400);
+});
+
+test("PATCH employee endpoint rejects a payload without INACTIVO with 400", async () => {
+  seedAccounts();
+  (globalThis as typeof globalThis & {
+    __scAuthSession: { user: { id: string } };
+  }).__scAuthSession = { user: { id: adminId } };
+
+  const response = await patchEmployee(empleadoId, { estado: "ACTIVO" });
+
+  assert.equal(response.status, 400);
+});
+
+test("PATCH employee endpoint returns 404 for a missing employee", async () => {
+  seedAccounts();
+  (globalThis as typeof globalThis & {
+    __scAuthSession: { user: { id: string } };
+  }).__scAuthSession = { user: { id: adminId } };
+
+  const response = await patchEmployee("00000000-0000-4000-8000-000000000099", {
+    estado: "INACTIVO",
+  });
+
+  assert.equal(response.status, 404);
+});
+
+test("PATCH employee endpoint returns 404 for an account without an employee role", async () => {
+  seedAccounts();
+  (globalThis as typeof globalThis & {
+    __scAuthSession: { user: { id: string } };
+  }).__scAuthSession = { user: { id: adminId } };
+
+  const response = await patchEmployee(adminId, { estado: "INACTIVO" });
+
+  assert.equal(response.status, 404);
 });
