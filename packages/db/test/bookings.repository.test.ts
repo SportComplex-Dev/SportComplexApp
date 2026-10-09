@@ -5,7 +5,12 @@ import { createMockPrisma } from "./mock-prisma.ts";
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
-const { BookingError, createBookingHold, getBookableAvailability } = await import(
+const {
+  BookingError,
+  createBookingHold,
+  getBookableAvailability,
+  getReadOnlyBookableAvailability,
+} = await import(
   "../src/repositories/bookings.ts"
 );
 
@@ -280,4 +285,111 @@ test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja compl
     (error: unknown) =>
       error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
   );
+});
+
+test("TSK-BE-23: read-only availability discounts only expired pending holds", async () => {
+  const slot = addAforoSlot(10);
+  const now = new Date();
+  const availabilityRow = mock._state.disponibilidades.find(
+    (availability: any) => availability.id === slot.availabilityId,
+  );
+  availabilityRow.cuposOcupados = 8;
+  const beforeOccupancy = availabilityRow.cuposOcupados;
+
+  mock._state.reservas.push(
+    {
+      id: "bot-expired-pending",
+      disponibilidadId: slot.availabilityId,
+      estado: "PENDIENTE_PAGO",
+      cantidadCupos: 3,
+      expiraEn: new Date(now.getTime() - 1),
+    },
+    {
+      id: "bot-unexpired-pending",
+      disponibilidadId: slot.availabilityId,
+      estado: "PENDIENTE_PAGO",
+      cantidadCupos: 2,
+      expiraEn: new Date(now.getTime() + 60_000),
+    },
+    {
+      id: "bot-confirmed",
+      disponibilidadId: slot.availabilityId,
+      estado: "CONFIRMADA",
+      cantidadCupos: 3,
+    },
+    {
+      id: "bot-expired-cancelled",
+      disponibilidadId: slot.availabilityId,
+      estado: "CANCELADA_ADMINISTRATIVA",
+      cantidadCupos: 8,
+      expiraEn: new Date(now.getTime() - 1),
+    },
+  );
+  const beforeReservations = structuredClone(
+    mock._state.reservas.filter((reservation: any) =>
+      reservation.id.startsWith("bot-"),
+    ),
+  );
+
+  const result = await getReadOnlyBookableAvailability(slot.serviceId, slot.date, now);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].cuposOcupados, 5);
+  assert.equal(result[0].cuposDisponibles, 5);
+  assert.equal(result[0].franja.horaInicio, "10:00:00");
+  assert.equal(result[0].franja.horaFin, "11:00:00");
+  assert.equal(availabilityRow.cuposOcupados, beforeOccupancy);
+  assert.deepEqual(
+    mock._state.reservas.filter((reservation: any) =>
+      reservation.id.startsWith("bot-"),
+    ),
+    beforeReservations,
+  );
+});
+
+test("TSK-BE-23: read-only availability clamps over-discount and reports maintenance as unavailable", async () => {
+  const now = new Date();
+  const overDiscountedSlot = addAforoSlot(10);
+  const blockedSlot = addAforoSlot(10);
+  const overDiscountedAvailability = mock._state.disponibilidades.find(
+    (availability: any) => availability.id === overDiscountedSlot.availabilityId,
+  );
+  const blockedAvailability = mock._state.disponibilidades.find(
+    (availability: any) => availability.id === blockedSlot.availabilityId,
+  );
+  overDiscountedAvailability.cuposOcupados = 2;
+  blockedAvailability.cuposOcupados = 4;
+  blockedAvailability.bloqueadaMantenimiento = true;
+  mock._state.reservas.push(
+    {
+      id: "bot-over-discount",
+      disponibilidadId: overDiscountedSlot.availabilityId,
+      estado: "PENDIENTE_PAGO",
+      cantidadCupos: 8,
+      expiraEn: new Date(now.getTime() - 1),
+    },
+    {
+      id: "bot-blocked-expired",
+      disponibilidadId: blockedSlot.availabilityId,
+      estado: "PENDIENTE_PAGO",
+      cantidadCupos: 1,
+      expiraEn: new Date(now.getTime() - 1),
+    },
+  );
+
+  const overDiscountedResult = await getReadOnlyBookableAvailability(
+    overDiscountedSlot.serviceId,
+    overDiscountedSlot.date,
+    now,
+  );
+  const blockedResult = await getReadOnlyBookableAvailability(
+    blockedSlot.serviceId,
+    blockedSlot.date,
+    now,
+  );
+
+  assert.equal(overDiscountedResult[0].cuposOcupados, 0);
+  assert.equal(overDiscountedResult[0].cuposDisponibles, 10);
+  assert.equal(blockedResult[0].cuposOcupados, 3);
+  assert.equal(blockedResult[0].cuposDisponibles, 0);
 });

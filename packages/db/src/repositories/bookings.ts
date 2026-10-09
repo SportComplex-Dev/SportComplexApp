@@ -325,6 +325,74 @@ export async function getBookableAvailability(serviceId: number, date: string, n
   });
 }
 
+/**
+ * Read-only availability for integrations that must not trigger lazy hold
+ * expiration. Expired pending holds are accounted for in the returned capacity
+ * without changing their reservation or availability rows.
+ */
+export async function getReadOnlyBookableAvailability(
+  serviceId: number,
+  date: string,
+  now = new Date(),
+) {
+  validateBookingDate(date, now);
+  const targetDate = new Date(`${date}T00:00:00.000Z`);
+  const formatTime = (value: Date) => value.toISOString().slice(11, 19);
+  const availability = await prisma.disponibilidad.findMany({
+    where: {
+      servicioId: serviceId,
+      fecha: targetDate,
+      servicio: { estado: "ACTIVO" },
+    },
+    include: {
+      servicio: true,
+      franja: true,
+      reservas: {
+        where: {
+          estado: "PENDIENTE_PAGO",
+          expiraEn: { lte: now },
+        },
+        select: { cantidadCupos: true },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  return availability
+    .filter((item) => {
+      const slotStart = new Date(
+        `${date}T${item.franja.horaInicio.toISOString().slice(11, 19)}-05:00`,
+      );
+      return slotStart > now;
+    })
+    .map((item) => {
+      const expiredHolds = item.reservas.reduce(
+        (total, hold) => total + hold.cantidadCupos,
+        0,
+      );
+      const cuposOcupados = Math.max(0, item.cuposOcupados - expiredHolds);
+      return {
+        id: item.id,
+        servicioId: item.servicioId,
+        servicioNombre: item.servicio.nombre,
+        fecha: item.fecha,
+        franja: {
+          id: item.franja.id,
+          diaSemana: item.franja.diaSemana,
+          horaInicio: formatTime(item.franja.horaInicio),
+          horaFin: formatTime(item.franja.horaFin),
+        },
+        modalidad: item.servicio.modalidad,
+        cuposTotales: item.cuposTotales,
+        cuposOcupados,
+        cuposDisponibles: item.bloqueadaMantenimiento
+          ? 0
+          : Math.max(0, item.cuposTotales - cuposOcupados),
+        bloqueadaMantenimiento: item.bloqueadaMantenimiento,
+      };
+    });
+}
+
 export async function createBookingHold(input: {
   serviceId: number;
   startTime: string;
