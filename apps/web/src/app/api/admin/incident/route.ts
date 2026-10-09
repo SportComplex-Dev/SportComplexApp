@@ -10,25 +10,57 @@ import { fail, ok } from "@/lib/api-response";
 import { normalizeRole } from "@/lib/session";
 import { sendContingencyWebhook } from "@/lib/contingency-webhook";
 
-export async function POST(request: Request) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión.", 401);
-    }
-    const account = await prisma.usuario.findUnique({
-      where: { id: session.user.id },
+interface IncidentSession {
+  user?: { id?: string | null } | null;
+}
+
+interface IncidentAccount {
+  estado: string;
+  deletedAt: Date | null;
+  rol: { nombre: string } | null;
+}
+
+export interface IncidentDependencies {
+  authenticate: () => Promise<IncidentSession | null>;
+  findAccount: (userId: string) => Promise<IncidentAccount | null>;
+  disableService: typeof disableServiceForContingency;
+  sendWebhook: typeof sendContingencyWebhook;
+  markWebhookSent: typeof markContingencyWebhookSent;
+}
+
+const defaultDependencies: IncidentDependencies = {
+  authenticate: auth,
+  findAccount: (userId) =>
+    prisma.usuario.findUnique({
+      where: { id: userId },
       select: {
         estado: true,
         deletedAt: true,
         rol: { select: { nombre: true } },
       },
-    });
+    }),
+  disableService: disableServiceForContingency,
+  sendWebhook: sendContingencyWebhook,
+  markWebhookSent: markContingencyWebhookSent,
+};
+
+export async function handleIncidentRequest(
+  request: Request,
+  dependencies: IncidentDependencies = defaultDependencies,
+) {
+  try {
+    const session = await dependencies.authenticate();
+    const userId = session?.user?.id;
+    if (!userId) {
+      return fail("UNAUTHORIZED", "Debes iniciar sesión.", 401);
+    }
+
+    const account = await dependencies.findAccount(userId);
     if (
       !account ||
       account.deletedAt ||
       account.estado !== "ACTIVO" ||
-      normalizeRole(account.rol.nombre) !== "Administrador"
+      normalizeRole(account.rol?.nombre) !== "Administrador"
     ) {
       return fail(
         "FORBIDDEN",
@@ -53,16 +85,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const contingency = await disableServiceForContingency({
+    const contingency = await dependencies.disableService({
       serviceId: parsed.data.serviceId,
-      adminId: session.user.id,
+      adminId: userId,
       reason: parsed.data.motivo,
     });
-    const webhook = await sendContingencyWebhook(contingency.webhookPayload);
+    const webhook = await dependencies.sendWebhook(contingency.webhookPayload);
+    let webhookEnviadoRegistrado = false;
     if (webhook.sent) {
-      await markContingencyWebhookSent(contingency.inhabilitacion.id);
+      try {
+        await dependencies.markWebhookSent(contingency.inhabilitacion.id);
+        webhookEnviadoRegistrado = true;
+      } catch (error: unknown) {
+        console.error(
+          "La contingencia quedó aplicada y n8n respondió correctamente, pero no se pudo registrar el despacho:",
+          error,
+        );
+      }
     } else {
-      console.error("La contingencia quedó aplicada, pero falló el despacho a n8n:", webhook.error);
+      console.error(
+        "La contingencia quedó aplicada, pero falló el despacho a n8n:",
+        webhook.error,
+      );
     }
 
     return ok({
@@ -70,6 +114,7 @@ export async function POST(request: Request) {
       inhabilitacion: contingency.inhabilitacion,
       reservasCanceladas: contingency.reservasCanceladas,
       webhook,
+      webhookEnviadoRegistrado,
       reembolsoAutomatico: false,
     });
   } catch (error: unknown) {
@@ -83,4 +128,8 @@ export async function POST(request: Request) {
       500,
     );
   }
+}
+
+export async function POST(request: Request) {
+  return handleIncidentRequest(request);
 }

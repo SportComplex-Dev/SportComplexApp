@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { sendContingencyWebhook } from "./contingency-webhook";
+import { sendContingencyWebhook } from "../contingency-webhook";
 
 test("TSK-BE-22: el webhook firma el JSON con HMAC SHA-256", async () => {
   const previousUrl = process.env.N8N_CONTINGENCY_WEBHOOK_URL;
