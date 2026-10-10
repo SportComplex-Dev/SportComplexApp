@@ -1,86 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDate, formatMoney, type Booking } from "@sportcomplex/core";
+import { formatDate, type Booking } from "@sportcomplex/core";
+import {
+  clasificarReservas,
+  calcularDesgloseComprobante,
+  obtenerProximaReserva,
+  generarQRDataUrl,
+  obtenerSaludoContextual,
+  formatSlotTime,
+} from "@/components/portal/portal-utils";
 
-// TSK-FE-13: Tests de Componentes y Lógica de UI del Portal de Autogestión (SCRUM-123 / HU-13 / RF-12)
+// TSK-FE-13: Suite de Pruebas de Componentes y Lógica de UI del Portal de Autogestión (SCRUM-123 / HU-13 / RF-12)
 
-/**
- * 1. Simulación de la función interna de filtrado de reservas por pestaña del Portal
- * según el requerimiento funcional RF-12 y la implementación real en PortalPage.
- */
-function clasificarReservas(reservas: Booking[]) {
-  const activas = reservas.filter((b) => b.status === "Confirmada");
-  const historial = reservas.filter(
-    (b) => b.status === "Usada" || b.status === "Pendiente"
-  );
-  const canceladas = reservas.filter(
-    (b) => b.status === "Cancelada" || b.status === "CANCELADA_ADMINISTRATIVA"
-  );
-  return { activas, historial, canceladas };
-}
-
-/**
- * 2. Lógica de cálculo financiero del componente PrintableReceipt (Comprobante Digital / Voucher).
- */
-function calcularDesgloseComprobante(amount: number) {
-  const subtotal = Math.round(amount / 1.19);
-  const iva = amount - subtotal;
-  return {
-    subtotal,
-    iva,
-    total: amount,
-    subtotalFormateado: formatMoney(subtotal),
-    ivaFormateado: formatMoney(iva),
-    totalFormateado: formatMoney(amount),
-  };
-}
-
-/**
- * 3. Lógica del componente QRGraphicHD (Generador de matriz de 21x21 para torniquetes ópticos).
- */
-function generarMatrizQRHD(code: string) {
-  const size = 21;
-  const totalBlocks = size * size; // 441
-  const blocks = Array.from({ length: totalBlocks }, (_, i) => {
-    const x = i % size;
-    const y = Math.floor(i / size);
-    const inEye = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-    if (inEye) {
-      const ax = x < 7 ? x : x - 14;
-      const ay = y < 7 ? y : y - 14;
-      return (
-        ax === 0 ||
-        ax === 6 ||
-        ay === 0 ||
-        ay === 6 ||
-        (ax >= 2 && ax <= 4 && ay >= 2 && ay <= 4)
-      );
-    }
-    return (x * 7 + y * 11 + x * y * 3) % 5 < 2;
-  });
-
-  return {
-    totalBlocks,
-    activeBlocksCount: blocks.filter(Boolean).length,
-    labelAria: `Código QR de acceso para ticket ${code}`,
-    blocks,
-  };
-}
-
-/**
- * 4. Lógica de saludo contextual del componente de bienvenida del Portal (Bogotá UTC-5).
- */
-function obtenerSaludoContextual(horaBogota: number): string {
-  if (horaBogota < 12) return "Buenos días";
-  if (horaBogota < 19) return "Buenas tardes";
-  return "Buenas noches";
-}
-
-// ============================================================================
-// SUITE DE TESTS DE COMPONENTES (TSK-FE-13)
-// ============================================================================
-
-test("TSK-FE-13 Componentes: Clasificación de reservas en 3 pestañas (RF-12)", () => {
+test("TSK-FE-13 Componentes: Clasificación de reservas en 3 pestañas según RF-12", () => {
   const mockBookings: Booking[] = [
     {
       id: "res-1",
@@ -164,34 +96,109 @@ test("TSK-FE-13 Componentes: Clasificación de reservas en 3 pestañas (RF-12)",
 
   const { activas, historial, canceladas } = clasificarReservas(mockBookings);
 
-  // Tab Activas (Reservas confirmadas vigentes)
-  assert.equal(activas.length, 1);
+  // Tab Activas: Confirmadas y Pendientes de pago en curso (RF-12)
+  assert.equal(activas.length, 2, "Activas debe incluir reservas Confirmadas y Pendientes");
   assert.ok(activas.some((b) => b.id === "res-1" && b.status === "Confirmada"));
+  assert.ok(activas.some((b) => b.id === "res-2" && b.status === "Pendiente"));
 
-  // Tab Historial (Reservas pasadas usadas o pendientes de pago)
-  assert.equal(historial.length, 3);
-  assert.ok(historial.some((b) => b.id === "res-2" && b.status === "Pendiente"));
+  // Tab Historial: Reservas pasadas usadas o expiradas
+  assert.equal(historial.length, 2, "Historial debe contener reservas Usadas");
   assert.ok(historial.some((b) => b.id === "res-3" && b.status === "Usada"));
   assert.ok(historial.some((b) => b.id === "res-4" && b.status === "Usada"));
 
-  // Tab Canceladas (Canceladas por cliente o administrativas)
-  assert.equal(canceladas.length, 2);
+  // Tab Canceladas: Canceladas por cliente o administrativas
+  assert.equal(canceladas.length, 2, "Canceladas debe contener cancelaciones de cliente y administrativas");
   assert.ok(canceladas.some((b) => b.id === "res-5" && b.status === "Cancelada"));
   assert.ok(canceladas.some((b) => b.id === "res-6" && b.status === "CANCELADA_ADMINISTRATIVA"));
 });
 
-test("TSK-FE-13 Componentes: Matriz de código QR en alta definición (RF-10)", () => {
-  const code = "ALT-2026-XYZ987";
-  const qr = generarMatrizQRHD(code);
+test("TSK-FE-13 Componentes: Banner 'Tu próxima reserva' filtra fechas pasadas y prioriza la más cercana", () => {
+  const hoy = "2026-10-09";
+  const reservas: Booking[] = [
+    {
+      id: "res-vencida-1",
+      code: "ALT-VENCIDA",
+      service: "Cancha Vencida",
+      category: "canchas",
+      date: "2026-10-01", // Fecha pasada
+      time: "10:00 - 11:00",
+      amount: 50000,
+      status: "Confirmada",
+      client: "Carlos Cliente",
+      attendees: 2,
+      sede: "Poblado",
+    },
+    {
+      id: "res-futura-lejana",
+      code: "ALT-FUTURA-2",
+      service: "Piscina Fin de Mes",
+      category: "piscinas",
+      date: "2026-10-25", // Futura lejana
+      time: "08:00 - 09:00",
+      amount: 25000,
+      status: "Confirmada",
+      client: "Carlos Cliente",
+      attendees: 1,
+      sede: "Laureles",
+    },
+    {
+      id: "res-futura-cercana",
+      code: "ALT-FUTURA-1",
+      service: "Gimnasio Próximo",
+      category: "gimnasio",
+      date: "2026-10-10", // Futura más cercana
+      time: "07:00 - 08:00",
+      amount: 30000,
+      status: "Confirmada",
+      client: "Carlos Cliente",
+      attendees: 1,
+      sede: "Envigado",
+    },
+    {
+      id: "res-cancelada",
+      code: "ALT-CANCELADA",
+      service: "Cancha Cancelada",
+      category: "canchas",
+      date: "2026-10-11",
+      time: "14:00 - 15:00",
+      amount: 60000,
+      status: "Cancelada",
+      client: "Carlos Cliente",
+      attendees: 4,
+      sede: "Poblado",
+    },
+  ];
 
-  // La matriz debe ser de 21x21 = 441 celdas
-  assert.equal(qr.totalBlocks, 441);
-  assert.equal(qr.blocks.length, 441);
-  assert.ok(qr.activeBlocksCount > 100, "Debe tener bloques activos para representar el QR");
-  assert.equal(qr.labelAria, `Código QR de acceso para ticket ${code}`);
+  // Debe descartar res-vencida-1 y res-cancelada, y elegir res-futura-cercana
+  const proxima = obtenerProximaReserva(reservas, hoy);
+  assert.ok(proxima, "Debe encontrar una próxima reserva activa");
+  assert.equal(proxima.id, "res-futura-cercana");
+  assert.equal(proxima.date, "2026-10-10");
 
-  // Verificar ojos de alineación (Eye 1: x:0, y:0 debe estar activo)
-  assert.equal(qr.blocks[0], true, "Esquina superior izquierda del ojo debe estar activa");
+  // Si todas las reservas confirmadas son pasadas, el banner debe retornar null
+  const soloPasadas: Booking[] = [
+    { ...reservas[0], date: "2026-10-01" },
+    { ...reservas[0], id: "res-vencida-2", date: "2026-10-05" },
+  ];
+  const sinProxima = obtenerProximaReserva(soloPasadas, hoy);
+  assert.equal(sinProxima, null, "No debe fijar reservas de fechas pasadas");
+});
+
+test("TSK-FE-13 Componentes: Generación de código QR estándar válido para torniquetes ópticos (RF-10 / RF-13)", async () => {
+  const code = "SC1:a5b4c3d2-e1f0-4a8b-9c7d-6e5f4a3b2c1d:mocksignature778899";
+  const dataUrl = await generarQRDataUrl(code, 300);
+
+  // Debe retornar un Data URL de formato PNG
+  assert.ok(dataUrl.startsWith("data:image/png;base64,"), "Debe ser una imagen PNG en base64");
+
+  // Decodificar base64 y verificar magic bytes del formato PNG estándar
+  const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+  const buffer = Buffer.from(base64Data, "base64");
+  assert.ok(buffer.length > 500, "El PNG del código QR debe contener datos válidos");
+
+  // Magic bytes de cabecera PNG: \x89PNG\r\n\x1a\n
+  const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  assert.deepEqual(buffer.subarray(0, 8), pngHeader, "El binario generado debe tener la firma de imagen PNG estándar");
 });
 
 test("TSK-FE-13 Componentes: Cálculo fiscal y desglose del Comprobante / Voucher (RN-14)", () => {
@@ -207,7 +214,7 @@ test("TSK-FE-13 Componentes: Cálculo fiscal y desglose del Comprobante / Vouche
   assert.ok(desglose.totalFormateado.includes("119.000") || desglose.totalFormateado.includes("119,000"));
 });
 
-test("TSK-FE-13 Componentes: Saludo contextual según franja horaria", () => {
+test("TSK-FE-13 Componentes: Saludo contextual según franja horaria en Bogotá (RNF-02)", () => {
   assert.equal(obtenerSaludoContextual(8), "Buenos días");
   assert.equal(obtenerSaludoContextual(11), "Buenos días");
   assert.equal(obtenerSaludoContextual(12), "Buenas tardes");
@@ -216,7 +223,11 @@ test("TSK-FE-13 Componentes: Saludo contextual según franja horaria", () => {
   assert.equal(obtenerSaludoContextual(23), "Buenas noches");
 });
 
-test("TSK-FE-13 Componentes: Formateo de fechas para tarjetas de tickets", () => {
+test("TSK-FE-13 Componentes: Formateo de horario de franja y fechas", () => {
+  assert.equal(formatSlotTime("2026-10-15T08:00:00.000Z"), "8:00 a. m.");
+  assert.equal(formatSlotTime("2026-10-15T16:30:00.000Z"), "4:30 p. m.");
+  assert.equal(formatSlotTime("07:00 a. m."), "07:00 a. m.");
+
   const fechaStr = "2026-10-15";
   const formateada = formatDate(fechaStr);
   assert.ok(formateada.length > 5, "Debe producir una fecha legible en español");

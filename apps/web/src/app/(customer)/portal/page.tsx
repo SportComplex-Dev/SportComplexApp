@@ -28,95 +28,17 @@ import { IconBox } from '@/components/icon-box'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useLastCode } from '@/lib/stores'
 import { useToday } from '@/lib/persistent-state'
+import {
+  clasificarReservas,
+  fetchCustomerBookingHistory,
+  generarQRDataUrl,
+  obtenerProximaReserva,
+} from '@/components/portal/portal-utils'
+import { QRGraphicHD } from '@/components/portal/qr-modal'
+import { PrintableReceipt } from '@/components/portal/printable-receipt'
 
 type TabType = 'activas' | 'historial' | 'canceladas'
 
-function QRGraphicHD({ code }: { code: string }) {
-  const blocks = useMemo(() => Array.from({ length: 441 }, (_, i) => {
-    const x = i % 21
-    const y = Math.floor(i / 21)
-    const inEye = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13)
-    if (inEye) {
-      const ax = x < 7 ? x : x - 14
-      const ay = y < 7 ? y : y - 14
-      return ax === 0 || ax === 6 || ay === 0 || ay === 6 || (ax >= 2 && ax <= 4 && ay >= 2 && ay <= 4)
-    }
-    return (x * 7 + y * 11 + x * y * 3) % 5 < 2
-  }), [])
-
-  return (
-    <div className="qr-modal-hd" aria-label={`Código QR de acceso para ticket ${code}`}>
-      <div className="qr-grid-hd">
-        {blocks.map((active, i) => (
-          <i key={i} className={active ? 'qr-on' : ''} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PrintableReceipt({ ticket }: { ticket: Booking | null }) {
-  if (!ticket) return null
-  const subtotal = Math.round(ticket.amount / 1.19)
-  const iva = ticket.amount - subtotal
-
-  return (
-    <div className="printable-receipt">
-      <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '16px', marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 4px 0' }}>AKROS SPORTCOMPLEX</h2>
-        <p style={{ margin: 0, fontSize: '13px' }}>Complejo Deportivo y Wellness Cashless</p>
-        <p style={{ margin: 0, fontSize: '12px', color: '#555' }}>NIT: 901.458.789-2 · Medellín, Colombia</p>
-        <p style={{ margin: '6px 0 0', fontSize: '14px', fontWeight: 'bold' }}>COMPROBANTE DE RESERVA Y PASE DIGITAL</p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px', fontSize: '13px' }}>
-        <div>
-          <p style={{ margin: '4px 0' }}><strong>Código de Pase:</strong> {ticket.code}</p>
-          <p style={{ margin: '4px 0' }}><strong>Titular:</strong> {ticket.client}</p>
-          <p style={{ margin: '4px 0' }}><strong>Servicio:</strong> {ticket.service}</p>
-          <p style={{ margin: '4px 0' }}><strong>Sede:</strong> Sede {ticket.sede} · Medellín</p>
-        </div>
-        <div>
-          <p style={{ margin: '4px 0' }}><strong>Fecha del Servicio:</strong> {formatDate(ticket.date)}</p>
-          <p style={{ margin: '4px 0' }}><strong>Horario:</strong> {ticket.time}</p>
-          <p style={{ margin: '4px 0' }}><strong>Capacidad / Cupos:</strong> {ticket.attendees} {ticket.attendees === 1 ? 'persona' : 'personas'}</p>
-          <p style={{ margin: '4px 0' }}><strong>Estado:</strong> {ticket.status.toUpperCase()}</p>
-        </div>
-      </div>
-
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '13px' }}>
-        <thead>
-          <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
-            <th style={{ padding: '8px 4px' }}>Descripción</th>
-            <th style={{ padding: '8px 4px', textAlign: 'right' }}>Total (COP)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ padding: '8px 4px' }}>Reserva deportiva: {ticket.service}</td>
-            <td style={{ padding: '8px 4px', textAlign: 'right' }}>{formatMoney(subtotal)}</td>
-          </tr>
-          <tr>
-            <td style={{ padding: '8px 4px' }}>IVA (19%)</td>
-            <td style={{ padding: '8px 4px', textAlign: 'right' }}>{formatMoney(iva)}</td>
-          </tr>
-          <tr style={{ borderTop: '2px solid #000', fontWeight: 'bold', fontSize: '15px' }}>
-            <td style={{ padding: '10px 4px' }}>TOTAL PAGADO</td>
-            <td style={{ padding: '10px 4px', textAlign: 'right' }}>{formatMoney(ticket.amount)} COP</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style={{ textAlign: 'center', marginTop: '30px' }}>
-        <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0 0 8px 0' }}>PRESENTA ESTE CÓDIGO EN EL TORNIQUETE O LECTOR ÓPTICO</p>
-        <p style={{ fontSize: '11px', color: '#666', margin: '4px 0' }}>Código UUID: {ticket.code}</p>
-        <p style={{ fontSize: '10px', color: '#888', marginTop: '16px' }}>
-          * Cancelaciones y reprogramaciones gratuitas hasta 4 horas antes del horario de reserva. Pase transferible (RF-10 / RF-12).
-        </p>
-      </div>
-    </div>
-  )
-}
 
 export default function CustomerDashboardPage() {
   const { session } = useApp()
@@ -134,91 +56,16 @@ export default function CustomerDashboardPage() {
   // Cargar historial real desde el endpoint TSK-BE-13 (/api/bookings/history)
   useEffect(() => {
     let isMounted = true
-    const fetchHistory = async () => {
-      try {
-        const statuses = ['CONFIRMADA', 'EXPIRADA', 'CANCELADA_ADMINISTRATIVA']
-        const requests = statuses.map((status) =>
-          fetch(`/api/bookings/history?status=${status}&limit=20`)
-            .then((res) => (res.ok ? res.json() : null))
-            .catch(() => null)
-        )
-        const results = await Promise.all(requests)
-        if (!isMounted) return
-
-interface ApiBookingHistoryItem {
-  id: string
-  estado: string
-  cantidadCupos?: number
-  total?: number | string
-  ticketQr?: { codigoUuid?: string } | null
-  disponibilidad?: {
-    fecha?: string | Date
-    franja?: { horaInicio: string; horaFin: string } | null
-    servicio?: { nombre: string; tipo: string } | null
-  } | null
-  pago?: { metodo?: string; referenciaExterna?: string } | null
-}
-
-function formatSlotTime(raw: string | undefined): string {
-  if (!raw) return '07:00 a. m.'
-  if (raw.includes('T')) {
-    const timePart = raw.split('T')[1]?.slice(0, 5)
-    if (timePart) {
-      const [h, m] = timePart.split(':').map(Number)
-      const period = h >= 12 ? 'p. m.' : 'a. m.'
-      const hour12 = h % 12 || 12
-      return `${hour12}:${String(m).padStart(2, '0')} ${period}`
-    }
-  }
-  return raw
-}
-
-        const merged: Booking[] = []
-        results.forEach((res) => {
-          if (res?.success && Array.isArray(res.data?.items)) {
-            res.data.items.forEach((item: ApiBookingHistoryItem) => {
-              const statusMap: Record<string, Booking['status']> = {
-                CONFIRMADA: 'Confirmada',
-                EXPIRADA: 'Usada',
-                CANCELADA_ADMINISTRATIVA: 'Cancelada',
-              }
-              const inicio = formatSlotTime(item.disponibilidad?.franja?.horaInicio)
-              const fin = formatSlotTime(item.disponibilidad?.franja?.horaFin)
-              const rawTotal = typeof item.total === 'number' ? item.total : typeof item.total === 'string' ? parseFloat(item.total) : 45000
-              const safeTotal = isNaN(rawTotal) ? 45000 : rawTotal
-
-              merged.push({
-                id: item.id,
-                code: item.ticketQr?.codigoUuid
-                  ? `ALT-${item.ticketQr.codigoUuid.slice(0, 8).toUpperCase()}`
-                  : `ALT-${item.id.slice(0, 8).toUpperCase()}`,
-                client: session?.name ?? 'Cliente',
-                category: item.disponibilidad?.servicio?.tipo?.toLowerCase() ?? 'canchas',
-                service: item.disponibilidad?.servicio?.nombre ?? 'Espacio deportivo',
-                sede: 'Laureles',
-                date: item.disponibilidad?.fecha ? String(item.disponibilidad.fecha).slice(0, 10) : '2026-10-09',
-                time: item.disponibilidad?.franja ? `${inicio} — ${fin}` : '07:00 a. m.',
-                attendees: item.cantidadCupos ?? 1,
-                amount: safeTotal,
-                status: statusMap[item.estado] ?? 'Confirmada',
-                paymentMethod: item.pago?.metodo ?? 'card',
-                transactionRef: item.pago?.referenciaExterna ?? undefined,
-              })
-            })
-          }
-        })
-
-
-
-        if (merged.length > 0) {
-          setDbBookings(merged)
+    fetchCustomerBookingHistory(session?.name ?? 'Cliente')
+      .then((items) => {
+        if (isMounted && items.length > 0) {
+          setDbBookings(items)
         }
-      } catch {
+      })
+      .catch(() => {
         // Fallback transparente a reservas locales
-      }
-    }
+      })
 
-    fetchHistory()
     return () => {
       isMounted = false
     }
@@ -236,25 +83,16 @@ function formatSlotTime(raw: string | undefined): string {
     return combined
   }, [dbBookings, localBookings])
 
-  // Próxima reserva activa para el banner destacado
+  const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
+
+  // Próxima reserva activa para el banner destacado (filtra reservas pasadas)
   const next = useMemo(() => {
-    return allBookings
-      .filter((b) => b.status === 'Confirmada')
-      .sort((a, b) => a.date.localeCompare(b.date))[0]
-  }, [allBookings])
+    return obtenerProximaReserva(allBookings, today)
+  }, [allBookings, today])
 
   // Filtrado según pestañas requeridas en RF-12
-  const activeBookings = useMemo(() => {
-    return allBookings.filter((b) => b.status === 'Confirmada')
-  }, [allBookings])
-
-  const historyBookings = useMemo(() => {
-    return allBookings.filter((b) => b.status === 'Usada' || b.status === 'Pendiente')
-  }, [allBookings])
-
-  const cancelledBookings = useMemo(() => {
-    return allBookings.filter((b) => b.status === 'Cancelada')
-  }, [allBookings])
+  const { activas: activeBookings, historial: historyBookings, canceladas: cancelledBookings } =
+    useMemo(() => clasificarReservas(allBookings), [allBookings])
 
   const currentTabItems = useMemo(() => {
     switch (activeTab) {
@@ -267,8 +105,14 @@ function formatSlotTime(raw: string | undefined): string {
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
-  // Generar / Imprimir comprobante PDF
-  const handlePrintTicket = useCallback((ticket: Booking) => {
+  // Generar / Imprimir comprobante PDF con código QR renderizado
+  const handlePrintTicket = useCallback(async (ticket: Booking) => {
+    try {
+      const qrUrl = await generarQRDataUrl(ticket.code, 260)
+      setPrintingQrUrl(qrUrl)
+    } catch {
+      setPrintingQrUrl(null)
+    }
     setPrintingTicket(ticket)
     setTimeout(() => {
       window.print()
@@ -609,7 +453,7 @@ function formatSlotTime(raw: string | undefined): string {
       )}
 
       {/* Comprobante en formato imprimible PDF */}
-      <PrintableReceipt ticket={printingTicket} />
+      <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} />
     </>
   )
 }
