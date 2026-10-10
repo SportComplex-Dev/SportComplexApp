@@ -18,6 +18,21 @@ function seedReserva(mock: any, overrides: Record<string, unknown> = {}) {
   return reserva;
 }
 
+function seedDisponibilidad(mock: any, overrides: Record<string, unknown> = {}) {
+  const disponibilidad = {
+    id: 1n,
+    servicioId: 1,
+    franjaId: 1,
+    fecha: new Date(),
+    cuposTotales: 5,
+    cuposOcupados: 2,
+    bloqueadaMantenimiento: false,
+    ...overrides,
+  };
+  mock._state.disponibilidades.push(disponibilidad);
+  return disponibilidad;
+}
+
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     stripePaymentIntentId: "pi_tsk_bd_09_1",
@@ -90,20 +105,42 @@ test("TSK-BD-09: carrera por el UNIQUE (P2002) reintenta la transacción sin dup
   assert.equal(mock._state.reservas[0].estado, "CONFIRMADA");
 });
 
-test("TSK-BD-09: pago FALLIDO no confirma la reserva y luego APROBADO sí (un solo registro)", async () => {
+test("TSK-BE-10: pago APROBADO emite el TICKET_QR (EMITIDO) una sola vez", async () => {
   const mock = createMockPrisma();
   seedReserva(mock);
+
+  const primera = await procesarPagoWebhook(baseInput(), { db: mock });
+  assert.equal(primera.reservaConfirmada, true);
+  assert.equal(primera.ticketQrEmitido, true);
+  assert.equal(mock._state.tickets.length, 1);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.tickets[0].reservaId, "reserva-1");
+  assert.ok(mock._state.tickets[0].codigoUuid);
+
+  // Reenvío de Stripe: el boleto no se duplica (UNIQUE reserva_id).
+  const segunda = await procesarPagoWebhook(baseInput(), { db: mock });
+  assert.equal(segunda.ticketQrEmitido, false);
+  assert.equal(mock._state.tickets.length, 1);
+});
+
+test("TSK-BE-10: pago FALLIDO cancela la reserva y restituye la franja (idempotente)", async () => {
+  const mock = createMockPrisma();
+  seedReserva(mock);
+  seedDisponibilidad(mock, { cuposTotales: 5, cuposOcupados: 2 });
 
   const fallido = await procesarPagoWebhook(baseInput({ estado: "FALLIDO" }), { db: mock });
   assert.equal(fallido.estado, "FALLIDO");
   assert.equal(fallido.reservaConfirmada, false);
-  assert.equal(mock._state.reservas[0].estado, "PENDIENTE_PAGO");
+  assert.equal(fallido.reservaEstado, "CANCELADA_PAGO");
+  assert.equal(fallido.franjaRestituida, true);
+  assert.equal(mock._state.reservas[0].estado, "CANCELADA_PAGO");
+  assert.equal(mock._state.disponibilidades[0].cuposOcupados, 1);
 
-  const aprobado = await procesarPagoWebhook(baseInput({ estado: "APROBADO" }), { db: mock });
-  assert.equal(aprobado.estado, "APROBADO");
-  assert.equal(aprobado.reservaConfirmada, true);
+  // Reenvío de Stripe: no vuelve a liberar cupos (guard PENDIENTE_PAGO).
+  const reintento = await procesarPagoWebhook(baseInput({ estado: "FALLIDO" }), { db: mock });
+  assert.equal(reintento.franjaRestituida, false);
+  assert.equal(mock._state.disponibilidades[0].cuposOcupados, 1);
   assert.equal(mock._state.pagos.length, 1);
-  assert.equal(mock._state.reservas[0].estado, "CONFIRMADA");
 });
 
 test("TSK-BD-09: un evento FALLIDO tardío nunca degrada un pago APROBADO", async () => {

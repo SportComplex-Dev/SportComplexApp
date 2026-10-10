@@ -1,7 +1,12 @@
 import Stripe from "stripe";
 import { PaymentError, procesarPagoWebhook } from "@sportcomplex/db";
-import { parsePaymentIntentMetadata, stripeAmountToMonto } from "@sportcomplex/core";
+import {
+  newTicketId,
+  parsePaymentIntentMetadata,
+  stripeAmountToMonto,
+} from "@sportcomplex/core";
 import { ok, fail } from "@/lib/api-response";
+import { sendContingencyWebhook } from "@/lib/contingency-webhook";
 
 // RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09).
 // Endpoint a registrar en el dashboard de Stripe:
@@ -67,7 +72,30 @@ export async function POST(request: Request) {
       tipo: bookingId ? "RESERVA" : "MEMBRESIA",
       reservaId: bookingId,
       membresiaId: membershipId ? Number(membershipId) : undefined,
+      // UUIDv4 no predecible para el TICKET_QR (TSK-BE-11), generado en core.
+      ticketCodigoUuid: newTicketId(),
     });
+    if (resultado.estado === "FALLIDO") {
+      // RF-09: alerta de pago fallido. Fire-and-forget: no bloquea la respuesta
+      // a Stripe ni revierte la cancelación de la reserva ya aplicada.
+      void sendContingencyWebhook({
+        evento: "payment_intent.payment_failed",
+        paymentIntentId: intent.id,
+        usuarioId: userId,
+        reservaId: bookingId ?? null,
+        membresiaId: membershipId ?? null,
+        reservaEstado: resultado.reservaEstado,
+        franjaRestituida: resultado.franjaRestituida,
+        monto: stripeAmountToMonto(intent.amount ?? 0),
+      }).then((webhook) => {
+        if (!webhook.sent) {
+          console.error(
+            "Alerta de pago fallido no enviada a n8n:",
+            webhook.error,
+          );
+        }
+      });
+    }
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
     return ok({ received: true, ...resultado });
   } catch (error: unknown) {

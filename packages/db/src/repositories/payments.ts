@@ -7,9 +7,14 @@ import { prisma } from "../client";
  * `procesarPagoWebhook` ejecuta dentro de UNA transacción:
  *   1. Upsert del registro `PAGO` por `stripe_payment_intent_id`
  *      (UNIQUE desde TSK-BD-06 → `pago_stripe_payment_intent_id_key`).
- *   2. Confirmación condicional de la `RESERVA`
- *      (`PENDIENTE_PAGO → CONFIRMADA`, solo si el pago es `APROBADO`).
- *   3. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
+ * 2. Confirmación condicional de la `RESERVA`
+ *      (`PENDIENTE_PAGO → CONFIRMADA`, solo si el pago es `APROBADO`) y
+ *      emisión del `TICKET_QR` (`EMITIDO`) de esa reserva (TSK-BE-10 / RF-09).
+ * 3. Cancelación condicional de la `RESERVA` en pago `FALLIDO`
+ *      (`PENDIENTE_PAGO → CANCELADA_PAGO`) con restitución de la franja
+ *      (`cupos_ocupados -= cantidad`); el job de TTL (TSK-BD-08) cubre los
+ *      checkouts abandonados sin webhook, sin doble liberación.
+ * 4. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
  *
  * Garantías de idempotencia:
  * - Reenviar el mismo webhook (mismo `payment_intent`) N veces deja SIEMPRE
@@ -62,6 +67,11 @@ export interface ProcesarPagoInput {
   reservaId?: string | undefined;
   /** Si el pago activa una membresía, su id (`membresia.id`). */
   membresiaId?: number | undefined;
+  /**
+   * UUIDv4 del boleto a emitir (`newTicketId()` de `@sportcomplex/core`).
+   * Opcional: si se omite, lo genera la BD con su default `uuid()`.
+   */
+  ticketCodigoUuid?: string | undefined;
 }
 
 export interface ProcesarPagoResultado {
@@ -75,6 +85,10 @@ export interface ProcesarPagoResultado {
   reservaConfirmada: boolean;
   /** Estado final de la reserva referenciada (si se pasó `reservaId`). */
   reservaEstado: string | null;
+  /** true solo si ESTA corrida emitió el `TICKET_QR` (pago APROBADO). */
+  ticketQrEmitido: boolean;
+  /** true solo si ESTA corrida canceló la reserva y liberó la franja (FALLIDO). */
+  franjaRestituida: boolean;
   /** true solo si ESTA corrida ejecutó la activación de la membresía. */
   membresiaActivada: boolean;
 }
@@ -137,6 +151,56 @@ function validateInput(input: ProcesarPagoInput): void {
   }
 }
 
+/**
+ * Emite el `TICKET_QR` (estado `EMITIDO`) de una reserva confirmada.
+ * Idempotente por `UNIQUE(reserva_id)`: un reenvío del mismo webhook choca con
+ * la restricción y se trata como no-op (devuelve `false`), nunca como error.
+ */
+async function emitirTicketQr(
+  tx: DbLike,
+  reservaId: string,
+  codigoUuid?: string,
+): Promise<boolean> {
+  try {
+    await tx.ticketQr.create({
+      data: {
+        reservaId,
+        // UUIDv4 no predecible generado por `@sportcomplex/core` (`newTicketId`).
+        // Si no se provee, la BD aplica su default `uuid()`.
+        ...(codigoUuid ? { codigoUuid } : {}),
+        estado: "EMITIDO",
+      },
+    });
+    return true;
+  } catch (err: unknown) {
+    if (isUniqueViolation(err)) return false;
+    throw err;
+  }
+}
+
+/**
+ * Restituye la franja de una reserva cancelada: descuenta los cupos que había
+ * tomado (`cupos_ocupados -= cantidad`), sin bajar de cero. Se invoca SOLO tras
+ * ganar la transición condicional de estado, de modo que webhook y job TTL
+ * (TSK-BD-08) nunca liberan los mismos cupos dos veces.
+ */
+async function restituirFranja(tx: DbLike, reservaId: string): Promise<boolean> {
+  const reserva = await tx.reserva.findUnique({ where: { id: reservaId } });
+  if (!reserva) return false;
+  const disponibilidadId = reserva.disponibilidadId;
+  const cantidad = reserva.cantidadCupos as number | undefined;
+  if (disponibilidadId == null || !cantidad) return false;
+  const disp = await tx.disponibilidad.findUnique({ where: { id: disponibilidadId } });
+  const actual = (disp?.cuposOcupados as number | undefined) ?? 0;
+  const liberar = Math.min(actual, cantidad);
+  if (liberar <= 0) return false;
+  await tx.disponibilidad.update({
+    where: { id: disponibilidadId },
+    data: { cuposOcupados: { decrement: liberar } },
+  });
+  return true;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
@@ -173,6 +237,8 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
     //    idempotencia: solo gana quien encuentra PENDIENTE_PAGO).
     let reservaConfirmada = false;
     let reservaEstado: string | null = null;
+    let ticketQrEmitido = false;
+    let franjaRestituida = false;
     if (input.reservaId) {
       if (input.estado === "APROBADO") {
         const upd = await tx.reserva.updateMany({
@@ -181,6 +247,28 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
         });
         const count = typeof upd?.count === "number" ? upd.count : 0;
         reservaConfirmada = count === 1;
+        // 2b. Emisión del QR: SOLO la corrida que ganó la confirmación emite el
+        //     boleto, de modo que reenviar el mismo webhook no lo duplica.
+        if (reservaConfirmada) {
+          ticketQrEmitido = await emitirTicketQr(
+            tx,
+            input.reservaId,
+            input.ticketCodigoUuid,
+          );
+        }
+      } else if (input.estado === "FALLIDO") {
+        // 2c. Pago fallido: cancelar la reserva y restituir la franja. Update
+        //     condicional → idempotente y compatible con el TTL (TSK-BD-08):
+        //     quien gane (webhook o job de expiración) libera los cupos una
+        //     sola vez; el otro ve count === 0.
+        const upd = await tx.reserva.updateMany({
+          where: { id: input.reservaId, estado: "PENDIENTE_PAGO" },
+          data: { estado: "CANCELADA_PAGO" },
+        });
+        const count = typeof upd?.count === "number" ? upd.count : 0;
+        if (count === 1) {
+          franjaRestituida = await restituirFranja(tx, input.reservaId);
+        }
       }
       const fila = await tx.reserva.findUnique({ where: { id: input.reservaId } });
       reservaEstado = (fila?.estado as string | undefined) ?? null;
@@ -204,6 +292,8 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       estado: pago.estado as EstadoPagoValor,
       reservaConfirmada,
       reservaEstado,
+      ticketQrEmitido,
+      franjaRestituida,
       membresiaActivada,
     };
   }) as Promise<ProcesarPagoResultado>;

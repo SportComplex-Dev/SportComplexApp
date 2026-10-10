@@ -160,3 +160,48 @@ test("TSK-BD-09 API: 503 si faltan las variables de entorno de Stripe", async ()
     process.env.STRIPE_SECRET_KEY = prevKey;
   }
 });
+
+test("TSK-BE-10 API: pago fallido cancela la reserva y restituye la franja", async () => {
+  mock._state.reservas.push({
+    id: "reserva-fail",
+    disponibilidadId: 9n,
+    estado: "PENDIENTE_PAGO",
+    cantidadCupos: 2,
+    expiraEn: new Date(Date.now() + 15 * 60_000),
+    pagoId: null,
+  });
+  mock._state.disponibilidades.push({
+    id: 9n,
+    servicioId: 1,
+    franjaId: 1,
+    fecha: new Date(),
+    cuposTotales: 5,
+    cuposOcupados: 2,
+    bloqueadaMantenimiento: false,
+  });
+
+  const payload = buildEventPayload({
+    id: "evt_fail_1",
+    type: "payment_intent.payment_failed",
+    object: {
+      id: "pi_fail_1",
+      metadata: { bookingId: "reserva-fail", userId: "user-1" },
+    },
+  });
+  const res = await postWebhook(payload, signPayload(payload));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.data.estado, "FALLIDO");
+  assert.equal(body.data.reservaEstado, "CANCELADA_PAGO");
+  assert.equal(body.data.franjaRestituida, true);
+
+  const reserva = mock._state.reservas.find((r: any) => r.id === "reserva-fail");
+  assert.equal(reserva.estado, "CANCELADA_PAGO");
+  const disp = mock._state.disponibilidades.find((d: any) => d.id === 9n);
+  assert.equal(disp.cuposOcupados, 0);
+});
+
+test("TSK-BE-10 API: /api/webhooks/stripe expone el mismo handler POST", async () => {
+  const alias = await import("../../webhooks/stripe/route");
+  assert.equal(typeof alias.POST, "function");
+});
