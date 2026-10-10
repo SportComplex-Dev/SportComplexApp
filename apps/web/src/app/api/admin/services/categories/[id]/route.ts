@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import { updateCategoriaSchema } from "@sportcomplex/validation";
 import {
   getCategoriaById,
@@ -12,6 +13,9 @@ interface RouteContext {
 
 export async function GET(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {
@@ -32,6 +36,9 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function PUT(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {
@@ -71,6 +78,9 @@ export async function PUT(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { id } = await context.params;
     const numId = parseInt(id, 10);
     if (isNaN(numId) || numId <= 0) {

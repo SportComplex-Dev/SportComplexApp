@@ -76,7 +76,7 @@ Reserva atómica con `SELECT ... FOR UPDATE`, validación de ventana en
 3. Rechaza `fecha` fuera de `[hoy, hoy+15]` Bogota → `SLOT_OUT_OF_WINDOW` (HTTP 422).
 4. Rechaza `cupos_ocupados + cantidad > cupos_totales` → `SLOT_NO_CAPACITY` (HTTP 409).
 5. `UPDATE cupos_ocupados += cantidad` condicional (doble barrera; si `rowCount != 1` → 409).
-6. `reserva.create({ estado: PENDIENTE_PAGO, expira_en: now + 15 min })`.
+6. `reserva.create({ estado: PENDIENTE_PAGO, expira_en: now + 30 min })`.
 
 ### Uso
 ```typescript
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
 Reglas backend:
 - No leer `disponibilidad` y luego escribir fuera de transacción; llamar siempre a `reserveDisponibilidad`.
 - `cantidadCupos` por defecto `1` (modalidad `EXCLUSIVA`); para `AFORO` pasar N y el repo valida contra `cupos_totales`.
-- `PENDIENTE_PAGO` nace con `expira_en = now + 15 min`; el job de expiración libera el cupo, no la API.
+- `PENDIENTE_PAGO` nace con `expira_en = now + 30 min` (TTL unificado con el mínimo de Stripe); el job de expiración libera el cupo, no la API.
 
 ### Guía Frontend (fetch + UX)
 
@@ -157,7 +157,7 @@ if (res.status === 409) {
 } else if (res.status === 422) {
   // SLOT_OUT_OF_WINDOW: mostrar "Solo se puede reservar entre hoy y +15 días (Bogota)".
 } else if (res.status === 201) {
-  // Iniciar checkout: la reserva expira en 15 min (mostrar countdown con `expiraEn`).
+  // Iniciar checkout: la reserva expira en 30 min (mostrar countdown con `expiraEn`).
 }
 ```
 

@@ -61,6 +61,20 @@ test("franjaHorariaSchema valida horarios y orden cronológico", () => {
   });
   assert.equal(validFranja.success, true);
 
+  const equivalentTimeFormats = franjaHorariaSchema.safeParse({
+    diaSemana: 1,
+    horaInicio: "08:00",
+    horaFin: "08:00:00",
+  });
+  assert.equal(equivalentTimeFormats.success, false);
+
+  const secondAfterStart = franjaHorariaSchema.safeParse({
+    diaSemana: 1,
+    horaInicio: "08:00",
+    horaFin: "08:00:01",
+  });
+  assert.equal(secondAfterStart.success, true);
+
   // Franja con horaFin anterior a horaInicio debe fallar
   const invalidOrder = franjaHorariaSchema.safeParse({
     diaSemana: 1,
@@ -117,12 +131,32 @@ test("createServicioSchema valida campos obligatorios y reglas de piscina", () =
   const validPrivatePool = createServicioSchema.safeParse({
     nombre: "Piscina Privada VIP",
     categoriaId: 2,
-    capacidadMaxima: 1,
+    capacidadMaxima: 30,
     tarifa: 80000,
     modalidad: "EXCLUSIVA",
     tipoPiscina: "PRIVADA",
   });
   assert.equal(validPrivatePool.success, true);
+
+  const publicExclusivePool = createServicioSchema.safeParse({
+    nombre: "Piscina Pública",
+    categoriaId: 2,
+    capacidadMaxima: 30,
+    tarifa: 80000,
+    modalidad: "EXCLUSIVA",
+    tipoPiscina: "PUBLICA",
+  });
+  assert.equal(publicExclusivePool.success, false);
+
+  const publicPool = createServicioSchema.safeParse({
+    nombre: "Piscina Pública",
+    categoriaId: 2,
+    capacidadMaxima: 30,
+    tarifa: 80000,
+    modalidad: "AFORO",
+    tipoPiscina: "PUBLICA",
+  });
+  assert.equal(publicPool.success, true);
 });
 
 test("normalizeServicePayload mapea atributos legados en inglés a modelo canónico", () => {
@@ -143,6 +177,17 @@ test("normalizeServicePayload mapea atributos legados en inglés a modelo canón
 
   const parsed = createServicioSchema.safeParse(normalized);
   assert.equal(parsed.success, true);
+});
+
+test("normalizeServicePayload deriva modalidad desde el tipo de piscina", () => {
+  assert.equal(
+    normalizeServicePayload({ tipoPiscina: "PRIVADA" }).modalidad,
+    "EXCLUSIVA",
+  );
+  assert.equal(
+    normalizeServicePayload({ tipoPiscina: "PUBLICA" }).modalidad,
+    "AFORO",
+  );
 });
 
 test("serviceSchema retrocompatible sigue aceptando llamadas heredadas", () => {
