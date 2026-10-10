@@ -196,7 +196,7 @@ function VerifyPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailParam, code: token }),
       })
-      const payload: unknown = await response.json()
+      const payload: unknown = await response.json().catch(() => null)
       if (!response.ok || !isRecord(payload) || payload.success !== true) {
         throw new Error(getApiErrorMessage(payload, 'No se pudo verificar el código. Inténtalo nuevamente.'))
       }
@@ -224,7 +224,7 @@ function VerifyPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailParam }),
       })
-      const payload: unknown = await response.json()
+      const payload: unknown = await response.json().catch(() => null)
       if (!response.ok || !isVerificationTiming(payload)) {
         throw new Error(getApiErrorMessage(payload, 'No se pudo reenviar el código. Inténtalo nuevamente.'))
       }

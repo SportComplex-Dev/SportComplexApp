@@ -31,8 +31,22 @@ function seedTicket() {
   }
 
   mock._state.usuarios.push(
-    { id: LECTOR, nombre: "Lector" },
-    { id: "usuario-1", nombre: "Cliente" },
+    {
+      id: LECTOR,
+      nombre: "Lector",
+      estado: "ACTIVO",
+      deletedAt: null,
+      rolId: 2,
+      rolNombre: "LECTOR",
+    },
+    {
+      id: "usuario-1",
+      nombre: "Cliente",
+      estado: "ACTIVO",
+      deletedAt: null,
+      rolId: 3,
+      rolNombre: "CLIENTE",
+    },
   );
   mock._state.servicios.push({
     id: 1,
@@ -148,6 +162,21 @@ test("TSK-BE-15: rechaza usuario no autenticado y rol sin permiso antes de acced
     authenticatedAs("cliente-1", "CLIENTE"),
   );
   assert.equal(forbidden.status, 403);
+  assert.equal(mock._state.lecturas.length, 0);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+});
+
+test("TSK-BE-21: empleado inactivo no puede consultar tickets", async () => {
+  seedTicket();
+  mock._state.usuarios.find((user: { id: string }) => user.id === LECTOR)!.estado = "INACTIVO";
+
+  const response = await handleTicketVerification(
+    request(signTicket(CODIGO, SECRET)),
+    context,
+    authenticatedAs(LECTOR, "EMPLEADO_LECTOR"),
+  );
+
+  assert.equal(response.status, 403);
   assert.equal(mock._state.lecturas.length, 0);
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
 });

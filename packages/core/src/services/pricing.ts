@@ -28,3 +28,17 @@ export function formatDate(
   const text = date.toLocaleDateString('es-CO', options);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+export type PaymentMethod = 'card' | 'pse' | 'wompi' | 'on_site';
+
+/**
+ * Calcula el valor total de una reserva.
+ * Si el servicio es una cancha, el cobro es fijo por el espacio completo.
+ * Para los demás servicios, se multiplica por la cantidad de asistentes.
+ */
+export function calculateBookingPrice(item: { category: string; price: number }, attendees: number): number {
+  if (item.category === 'canchas') {
+    return item.price;
+  }
+  return item.price * Math.max(1, attendees);
+}

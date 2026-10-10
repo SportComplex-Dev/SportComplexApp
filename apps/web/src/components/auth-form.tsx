@@ -11,6 +11,7 @@ import { Brand } from '@/components/brand'
 import { TopBar } from '@/components/top-bar'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
+import { useApp } from '@/components/app-provider'
 
 function getSafeNextPath() {
   const path = new URLSearchParams(window.location.search).get('next')
@@ -20,6 +21,7 @@ function getSafeNextPath() {
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const register = mode === 'register'
   const router = useRouter()
+  const { login: syncLogin } = useApp()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -56,12 +58,16 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           return
         }
         role = result.data.user.role
+        if (result.data.user) {
+          syncLogin(result.data.user.email, result.data.user.name)
+        }
       }
       // TODO(register): llamar al endpoint de registro cuando exista (hoy fe-00 solo valida y redirige)
 
       // 3. Redirección: ?next= si es seguro; si no, la pantalla de inicio del rol
       router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.')
     } finally {
