@@ -45,7 +45,7 @@ export const sampleAccounts: Session[] = [
   { name: 'Laura Pérez', email: 'laura@altura.co', role: 'Cliente' },
 ]
 
-export const useStoredSession = () => usePersistentState<Session | null>('altura:session', sampleAccounts[0])
+export const useStoredSession = () => usePersistentState<Session | null>('altura:session', null)
 
 export const defaultSettings = { businessName: 'Altura Club', businessHours: '06:00 a. m. — 10:00 p. m.', bookingsOpen: true }
 export const useSettings = () => usePersistentState('altura:settings', defaultSettings)
