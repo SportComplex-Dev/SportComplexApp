@@ -129,6 +129,7 @@ function mapDbService(s: DbService, categoriesList: CustomCategory[]): CatalogIt
     price: Number(s.tarifa) || 0,
     capacity: s.capacidadMaxima || 1,
     status: s.estado === 'ACTIVO' ? 'Disponible' : 'Mantenimiento',
+    poolType: s.tipoPiscina ? (s.tipoPiscina as 'PUBLICA' | 'PRIVADA') : undefined,
   }
 }
 
@@ -543,7 +544,12 @@ export default function AdminCatalogPage() {
       }
 
       const isPool = categoryObj?.tipo === 'PISCINA' || item.category === 'piscinas'
-      const isShared = item.capacity > 1 || categoryObj?.tipo === 'GIMNASIO' || item.category === 'gimnasio'
+      const poolType = isPool
+        ? (item.poolType ?? (item.capacity > 1 ? 'PUBLICA' : 'PRIVADA'))
+        : null
+      const modalidad = isPool
+        ? (poolType === 'PRIVADA' ? 'EXCLUSIVA' : 'AFORO')
+        : (item.capacity > 1 || categoryObj?.tipo === 'GIMNASIO' || item.category === 'gimnasio' ? 'AFORO' : 'EXCLUSIVA')
 
       if (item.id && !isNaN(Number(item.id))) {
         const numId = Number(item.id)
@@ -555,8 +561,8 @@ export default function AdminCatalogPage() {
             categoriaId,
             capacidadMaxima: item.capacity,
             tarifa: item.price,
-            modalidad: isShared ? 'AFORO' : 'EXCLUSIVA',
-            tipoPiscina: isPool ? (isShared ? 'PUBLICA' : 'PRIVADA') : null,
+            modalidad,
+            tipoPiscina: poolType,
             estado: item.status === 'Disponible' ? 'ACTIVO' : 'INHABILITADO',
           }),
         })
@@ -590,8 +596,8 @@ export default function AdminCatalogPage() {
             categoriaId,
             capacidadMaxima: item.capacity,
             tarifa: item.price,
-            modalidad: isShared ? 'AFORO' : 'EXCLUSIVA',
-            tipoPiscina: isPool ? (isShared ? 'PUBLICA' : 'PRIVADA') : null,
+            modalidad,
+            tipoPiscina: poolType,
             estado: item.status === 'Disponible' ? 'ACTIVO' : 'INHABILITADO',
             franjasHorarias: defaultFranjas,
           }),

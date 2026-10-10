@@ -52,9 +52,9 @@ export default function CustomerBookPage() {
 
   const isPool = selectedService?.category === 'piscinas'
   const isPrivatePool =
-    isPool && (selectedService.poolType === 'PRIVADA' || selectedService.capacity === 1)
+    isPool && (selectedService.poolType ? selectedService.poolType === 'PRIVADA' : selectedService.capacity === 1)
   const maxAttendees = Math.max(1, selectedService?.capacity ?? 1)
-  const effectiveAttendees = isPrivatePool ? 1 : attendees
+  const effectiveAttendees = isPrivatePool ? 1 : Math.min(attendees, maxAttendees)
   const totalPrice = (selectedService?.price ?? 0) * effectiveAttendees
 
   const handleSelectDate = (dateISO: string) => {
@@ -145,6 +145,7 @@ export default function CustomerBookPage() {
                   onClick={() => {
                     setSelectedServiceId(item.id)
                     setSelectedSlot(null)
+                    setAttendees(1)
                   }}
                   className={`p-3.5 rounded-xl border text-left transition-all relative ${
                     isSelected
@@ -289,7 +290,7 @@ export default function CustomerBookPage() {
                       Cantidad de personas / cupos:
                       <select
                         aria-label="Cantidad de personas"
-                        value={attendees}
+                        value={effectiveAttendees}
                         onChange={(e) => setAttendees(Number(e.target.value))}
                         className="py-1 px-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] text-xs font-bold"
                       >
