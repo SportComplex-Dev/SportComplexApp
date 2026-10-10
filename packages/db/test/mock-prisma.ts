@@ -578,6 +578,10 @@ export function createMockPrisma() {
             reservation.id !== where.id
           ) return false;
           if (
+            Array.isArray(where?.id?.in) &&
+            !where.id.in.includes(reservation.id)
+          ) return false;
+          if (
             where?.disponibilidadId !== undefined &&
             typeof where.disponibilidadId !== "object" &&
             reservation.disponibilidadId !== where.disponibilidadId

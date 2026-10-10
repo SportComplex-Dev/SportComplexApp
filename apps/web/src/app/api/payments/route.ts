@@ -51,8 +51,16 @@ export async function POST(request: Request) {
   }
 
   const intent = event.data.object as Stripe.PaymentIntent;
-  const { userId, bookingId, membershipId } = parsePaymentIntentMetadata(intent.metadata);
-  if (!intent.id || !userId || (!bookingId && !membershipId)) {
+  const { userId, bookingId, bookingIds, membershipId } = parsePaymentIntentMetadata(intent.metadata);
+  const effectiveBookingIds =
+    bookingIds && bookingIds.length > 0
+      ? bookingIds
+      : bookingId
+        ? [bookingId]
+        : [];
+  const hasBookings = effectiveBookingIds.length > 0;
+
+  if (!intent.id || !userId || (!hasBookings && !membershipId)) {
     // Evento sin nuestro metadato (otro flujo de Stripe): no es procesable.
     return ok({ received: true, ignored: true, reason: "MISSING_METADATA" });
   }
@@ -64,8 +72,13 @@ export async function POST(request: Request) {
       monto: stripeAmountToMonto(intent.amount ?? 0),
       estado:
         event.type === "payment_intent.succeeded" ? "APROBADO" : "FALLIDO",
-      tipo: bookingId ? "RESERVA" : "MEMBRESIA",
-      reservaId: bookingId,
+      tipo: hasBookings ? "RESERVA" : "MEMBRESIA",
+      ...(hasBookings
+        ? {
+            reservaId: effectiveBookingIds.length === 1 ? effectiveBookingIds[0] : undefined,
+            reservaIds: effectiveBookingIds,
+          }
+        : {}),
       membresiaId: membershipId ? Number(membershipId) : undefined,
     });
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.

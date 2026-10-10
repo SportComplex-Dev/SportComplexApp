@@ -325,6 +325,249 @@ export async function getBookableAvailability(serviceId: number, date: string, n
   });
 }
 
+export interface CartItemInput {
+  serviceId: number;
+  startTime: string;
+  endTime: string;
+  cantidadCupos: number;
+}
+
+export interface CartBookingResult {
+  bookings: Array<{
+    id: string;
+    disponibilidadId: bigint;
+    titularId: string;
+    cantidadCupos: number;
+    canal: string;
+    estado: string;
+    subtotal: Prisma.Decimal;
+    descuentoPct: Prisma.Decimal;
+    total: Prisma.Decimal;
+    expiraEn: Date | null;
+    creadoEn: Date;
+    disponibilidad: {
+      id: bigint;
+      servicioId: number;
+      fecha: Date;
+      franja: {
+        id: number;
+        horaInicio: Date;
+        horaFin: Date;
+      };
+      servicio: {
+        id: number;
+        nombre: string;
+        tarifa: Prisma.Decimal;
+        modalidad: string;
+      };
+    };
+  }>;
+  total: number;
+  expiresAt: Date;
+}
+
+export async function createBookingHoldCart(input: {
+  items: CartItemInput[];
+  userId: string;
+}, now = new Date()): Promise<CartBookingResult> {
+  if (!Array.isArray(input.items) || input.items.length < 2) {
+    throw new BookingError("El carrito debe contener al menos 2 servicios.", "INVALID_CART_SIZE", 400);
+  }
+
+  const validatedItems = input.items.map((item, index) => {
+    if (!Number.isInteger(item.cantidadCupos) || item.cantidadCupos <= 0) {
+      throw new BookingError(
+        `Ítem ${index}: la cantidad de cupos debe ser un entero mayor que cero.`,
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    const startTime = new Date(item.startTime);
+    const endTime = new Date(item.endTime);
+    if (!Number.isFinite(startTime.getTime()) || !Number.isFinite(endTime.getTime())) {
+      throw new BookingError(
+        `Ítem ${index}: las fechas de la franja no son válidas.`,
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    if (startTime.getTime() <= now.getTime()) {
+      throw new BookingError(
+        `Ítem ${index}: la franja solicitada ya comenzó.`,
+        "SLOT_IN_PAST",
+        409,
+      );
+    }
+    if (endTime <= startTime) {
+      throw new BookingError(
+        `Ítem ${index}: la hora de fin debe ser posterior al inicio.`,
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    const date = dateInBogota(startTime);
+    validateBookingDate(date, now);
+    return { ...item, startTime, endTime, date, index };
+  });
+
+  return prisma.$transaction(async (tx) => {
+    const availabilityMap = new Map<string, {
+      availability: {
+        id: bigint;
+        servicioId: number;
+        servicio: { id: number; nombre: string; tarifa: Prisma.Decimal; modalidad: string; estado: string };
+        franja: { id: number; horaInicio: Date; horaFin: Date };
+        cuposTotales: number;
+        cuposOcupados: number;
+        bloqueadaMantenimiento: boolean;
+      };
+      item: typeof validatedItems[0];
+    }>();
+
+    const sortedItems = [...validatedItems].sort((a, b) => {
+      if (a.serviceId !== b.serviceId) return a.serviceId - b.serviceId;
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.startTime.getTime() - b.startTime.getTime();
+    });
+
+    for (const item of sortedItems) {
+      const targetDate = new Date(`${item.date}T00:00:00.000Z`);
+      const candidates = await tx.disponibilidad.findMany({
+        where: {
+          servicioId: item.serviceId,
+          fecha: targetDate,
+        },
+        include: {
+          servicio: true,
+          franja: true,
+        },
+      });
+      const candidate = candidates.find((av) => slotMatchesRequest(av, item.startTime, item.endTime));
+      if (!candidate) {
+        throw new BookingError(
+          `Ítem ${item.index} (servicio ${item.serviceId}): la franja solicitada no existe.`,
+          "SLOT_NOT_FOUND",
+          404,
+        );
+      }
+
+      await lockAvailability(tx, candidate.id);
+      await releaseExpiredHolds(tx, candidate.id, now);
+
+      const availability = await tx.disponibilidad.findUnique({
+        where: { id: candidate.id },
+        include: { servicio: true, franja: true },
+      });
+      if (!availability || availability.servicio.estado !== "ACTIVO") {
+        throw new BookingError(
+          `Ítem ${item.index} (servicio ${item.serviceId}): el servicio no está disponible.`,
+          "SERVICE_UNAVAILABLE",
+          409,
+        );
+      }
+      if (availability.bloqueadaMantenimiento) {
+        throw new BookingError(
+          `Ítem ${item.index} (servicio ${item.serviceId}): la franja está bloqueada por mantenimiento.`,
+          "SLOT_BLOCKED",
+          409,
+        );
+      }
+      if (availability.cuposOcupados + item.cantidadCupos > availability.cuposTotales) {
+        throw new BookingError(
+          `Ítem ${item.index} (servicio ${item.serviceId}): no hay suficientes cupos disponibles.`,
+          "CAPACITY_EXCEEDED",
+          409,
+        );
+      }
+      if (availability.servicio.modalidad === "EXCLUSIVA" && item.cantidadCupos !== 1) {
+        throw new BookingError(
+          `Ítem ${item.index} (servicio ${item.serviceId}): las franjas exclusivas permiten una sola reserva.`,
+          "INVALID_BOOKING_QUANTITY",
+          400,
+        );
+      }
+
+      const key = `${availability.servicioId}-${item.date}-${availability.franja.id}`;
+      if (availabilityMap.has(key)) {
+        throw new BookingError(
+          `Ítem ${item.index}: servicio duplicado en la misma franja dentro del carrito.`,
+          "DUPLICATE_SERVICE_IN_CART",
+          409,
+        );
+      }
+      availabilityMap.set(key, { availability, item });
+    }
+
+    for (const { availability, item } of availabilityMap.values()) {
+      await assertNoTitularOverlap(tx, {
+        titularId: input.userId,
+        servicioId: availability.servicioId,
+        targetDate: new Date(`${item.date}T00:00:00.000Z`),
+        startTime: item.startTime,
+        endTime: item.endTime,
+        now,
+      });
+    }
+
+    for (const { availability, item } of availabilityMap.values()) {
+      const otherItems = [...availabilityMap.values()].filter(
+        (v) => v.item.index !== item.index && v.availability.servicioId === availability.servicioId,
+      );
+      for (const other of otherItems) {
+        const start1 = secondsFromInstant(item.startTime);
+        const end1 = secondsFromInstant(item.endTime);
+        const start2 = secondsFromInstant(other.item.startTime);
+        const end2 = secondsFromInstant(other.item.endTime);
+        if (start1 < end2 && end1 > start2) {
+          throw new BookingError(
+            `Ítem ${item.index} (servicio ${availability.servicioId}): solapamiento con otro servicio del mismo titular en el carrito.`,
+            "TITULAR_RESERVATION_OVERLAP",
+            409,
+          );
+        }
+      }
+    }
+
+    const expiresAt = new Date(now.getTime() + HOLD_TTL_MINUTES * 60_000);
+    const bookings = [];
+    let total = 0;
+
+    for (const { availability, item } of availabilityMap.values()) {
+      await tx.disponibilidad.update({
+        where: { id: availability.id },
+        data: { cuposOcupados: { increment: item.cantidadCupos } },
+      });
+
+      const subtotal = Number(
+        (Number(availability.servicio.tarifa) * item.cantidadCupos).toFixed(2),
+      );
+      total += subtotal;
+
+      const booking = await tx.reserva.create({
+        data: {
+          disponibilidadId: availability.id,
+          titularId: input.userId,
+          cantidadCupos: item.cantidadCupos,
+          canal: "ONLINE",
+          estado: "PENDIENTE_PAGO",
+          subtotal,
+          descuentoPct: 0,
+          total: subtotal,
+          expiraEn: expiresAt,
+        },
+        include: {
+          disponibilidad: {
+            include: { servicio: true, franja: true },
+          },
+        },
+      });
+      bookings.push(booking);
+    }
+
+    return { bookings, total: Number(total.toFixed(2)), expiresAt };
+  });
+}
+
 /**
  * Read-only availability for integrations that must not trigger lazy hold
  * expiration. Expired pending holds are accounted for in the returned capacity

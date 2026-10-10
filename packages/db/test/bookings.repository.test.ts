@@ -8,6 +8,7 @@ const mock = createMockPrisma();
 const {
   BookingError,
   createBookingHold,
+  createBookingHoldCart,
   getBookableAvailability,
   getReadOnlyBookableAvailability,
 } = await import(
@@ -285,6 +286,203 @@ test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja compl
     (error: unknown) =>
       error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
   );
+});
+
+test("SCRUM-163: createBookingHoldCart éxito con 2+ servicios distintos", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(15);
+  const userId = "00000000-0000-4000-8000-00000000cart1";
+
+  const res = await createBookingHoldCart({
+    items: [
+      {
+        serviceId: slot1.serviceId,
+        startTime: slot1.startsAt.toISOString(),
+        endTime: slot1.endsAt.toISOString(),
+        cantidadCupos: 2,
+      },
+      {
+        serviceId: slot2.serviceId,
+        startTime: slot2.startsAt.toISOString(),
+        endTime: slot2.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+    ],
+    userId,
+  });
+
+  assert.equal(res.bookings.length, 2);
+  assert.equal(res.total, 7500); // 2500*2 + 2500*1
+  assert.ok(res.expiresAt instanceof Date);
+
+  // Ambas reservas tienen el mismo TTL
+  assert.equal(res.bookings[0].expiraEn.getTime(), res.expiresAt.getTime());
+  assert.equal(res.bookings[1].expiraEn.getTime(), res.expiresAt.getTime());
+
+  // Cupos ocupados se incrementaron
+  const disp1 = mock._state.disponibilidades.find((d: any) => d.id === slot1.availabilityId);
+  const disp2 = mock._state.disponibilidades.find((d: any) => d.id === slot2.availabilityId);
+  assert.equal(disp1.cuposOcupados, 2);
+  assert.equal(disp2.cuposOcupados, 1);
+});
+
+test("SCRUM-163: fallo atómico en createBookingHoldCart si 1 ítem no tiene cupos → 0 holds creados", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(1);
+  // Llenar slot2
+  await createBookingHold(requestFor(slot2, 1, "00000000-0000-4000-8000-00000000fill"));
+
+  const initialReservasCount = mock._state.reservas.length;
+  const userId = "00000000-0000-4000-8000-00000000cart2";
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 2,
+          },
+          {
+            serviceId: slot2.serviceId,
+            startTime: slot2.startsAt.toISOString(),
+            endTime: slot2.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
+  );
+
+  // Atomicidad: cero holds adicionales y cupos de slot1 intactos (0 ocupados)
+  assert.equal(mock._state.reservas.length, initialReservasCount);
+  const disp1 = mock._state.disponibilidades.find((d: any) => d.id === slot1.availabilityId);
+  assert.equal(disp1.cuposOcupados, 0);
+});
+
+test("SCRUM-163: solapamiento intra-carrito (mismo servicio franjas solapadas) rechaza con TITULAR_RESERVATION_OVERLAP o DUPLICATE_SERVICE_IN_CART", async () => {
+  const slot1 = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000cart3";
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError &&
+      (error.code === "DUPLICATE_SERVICE_IN_CART" || error.code === "TITULAR_RESERVATION_OVERLAP"),
+  );
+});
+
+test("SCRUM-163: solapamiento con reserva existente activa del titular aborta carrito", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(15);
+  const userId = "00000000-0000-4000-8000-00000000cart4";
+
+  // El usuario ya tiene una reserva activa en slot1
+  await createBookingHold(requestFor(slot1, 1, userId));
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+          {
+            serviceId: slot2.serviceId,
+            startTime: slot2.startsAt.toISOString(),
+            endTime: slot2.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "TITULAR_RESERVATION_OVERLAP",
+  );
+
+  // Slot 2 no fue reservado
+  const disp2 = mock._state.disponibilidades.find((d: any) => d.id === slot2.availabilityId);
+  assert.equal(disp2.cuposOcupados, 0);
+});
+
+test("SCRUM-163: concurrencia: dos carritos compitiendo por mismos cupos limitados → uno gana, otro CAPACITY_EXCEEDED", async () => {
+  const slotContended = addAforoSlot(2);
+  const slotOther1 = addAforoSlot(10);
+  const slotOther2 = addAforoSlot(10);
+
+  const userA = "00000000-0000-4000-8000-00000000cartA";
+  const userB = "00000000-0000-4000-8000-00000000cartB";
+
+  const results = await Promise.allSettled([
+    createBookingHoldCart({
+      items: [
+        {
+          serviceId: slotContended.serviceId,
+          startTime: slotContended.startsAt.toISOString(),
+          endTime: slotContended.endsAt.toISOString(),
+          cantidadCupos: 2,
+        },
+        {
+          serviceId: slotOther1.serviceId,
+          startTime: slotOther1.startsAt.toISOString(),
+          endTime: slotOther1.endsAt.toISOString(),
+          cantidadCupos: 1,
+        },
+      ],
+      userId: userA,
+    }),
+    createBookingHoldCart({
+      items: [
+        {
+          serviceId: slotContended.serviceId,
+          startTime: slotContended.startsAt.toISOString(),
+          endTime: slotContended.endsAt.toISOString(),
+          cantidadCupos: 2,
+        },
+        {
+          serviceId: slotOther2.serviceId,
+          startTime: slotOther2.startsAt.toISOString(),
+          endTime: slotOther2.endsAt.toISOString(),
+          cantidadCupos: 1,
+        },
+      ],
+      userId: userB,
+    }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r) => r.status === "rejected");
+
+  assert.equal(fulfilled.length, 1);
+  assert.equal(rejected.length, 1);
+  const dispContended = mock._state.disponibilidades.find(
+    (d: any) => d.id === slotContended.availabilityId,
+  );
+  assert.equal(dispContended.cuposOcupados, 2);
 });
 
 test("TSK-BE-23: read-only availability discounts only expired pending holds", async () => {
