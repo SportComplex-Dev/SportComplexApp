@@ -51,13 +51,19 @@ export function buildPaymentMetadata(opts: {
 
 /**
  * Metadatos leídos del PaymentIntent que llega en el webhook.
- * `userId` es la única obligatoria; `bookingId`/`membershipId` determinan el
+ * `userId` es la única obligatoria; `bookingId`/`bookingIds`/`membershipId` determinan el
  * tipo de pago (RESERVA / MEMBRESIA).
  */
 export function parsePaymentIntentMetadata(metadata: Record<string, string> | undefined | null) {
+  const rawBookingIds = metadata?.bookingIds || metadata?.bookingId || undefined;
+  const bookingIds = rawBookingIds
+    ? rawBookingIds.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
   return {
     userId: metadata?.userId || undefined,
     bookingId: metadata?.bookingId || undefined,
+    bookingIds,
     membershipId: metadata?.membershipId || undefined,
   };
 }
@@ -127,7 +133,7 @@ export function buildCheckoutSessionParams(
   appUrl = defaultAppUrl(),
 ): Stripe.Checkout.SessionCreateParams {
   const now = input.now ?? new Date();
-  const unitAmount = toStripeAmountCents(input.total);
+  toStripeAmountCents(input.total);
   const metadata = buildPaymentMetadata({
     bookingId: input.reservaIds.join(","),
     userId: input.userId,

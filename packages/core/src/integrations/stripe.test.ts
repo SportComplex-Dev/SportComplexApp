@@ -6,6 +6,7 @@ import {
   CHECKOUT_TTL_MINUTES,
   createStripeCheckoutSession,
   extractPaymentIntentId,
+  parsePaymentIntentMetadata,
   toStripeAmountCents,
 } from "./stripe.js";
 
@@ -126,4 +127,30 @@ test("TSK-BE-09: createStripeCheckoutSession envuelve errores del SDK en STRIPE_
       err instanceof Error &&
       (err as { code?: string }).code === "STRIPE_CHECKOUT_FAILED",
   );
+});
+
+test("SCRUM-163: parsePaymentIntentMetadata parsea bookingId CSV o bookingIds a array", () => {
+  // Caso CSV en bookingId
+  const parsed1 = parsePaymentIntentMetadata({
+    bookingId: "r-1,r-2,r-3",
+    userId: "u-1",
+  });
+  assert.equal(parsed1.userId, "u-1");
+  assert.deepEqual(parsed1.bookingIds, ["r-1", "r-2", "r-3"]);
+
+  // Caso bookingIds explícito
+  const parsed2 = parsePaymentIntentMetadata({
+    bookingIds: "r-a,r-b",
+    userId: "u-2",
+  });
+  assert.equal(parsed2.userId, "u-2");
+  assert.deepEqual(parsed2.bookingIds, ["r-a", "r-b"]);
+
+  // Caso individual (1 reserva)
+  const parsed3 = parsePaymentIntentMetadata({
+    bookingId: "r-single",
+    userId: "u-3",
+  });
+  assert.equal(parsed3.bookingId, "r-single");
+  assert.deepEqual(parsed3.bookingIds, ["r-single"]);
 });

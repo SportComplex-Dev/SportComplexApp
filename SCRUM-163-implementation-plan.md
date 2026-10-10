@@ -28,8 +28,8 @@
 | `packages/core/src/integrations/stripe.ts` | **Modificar** `CheckoutSessionInput`: `reservaIds: string[]`, `items: { servicioNombre, cantidadCupos, subtotal }[]`, `total`. **Actualizar** `buildCheckoutSessionParams`: múltiples `line_items`, `metadata: { bookingIds: "id1,id2,...", userId, cashless: "true" }`. **Actualizar** `createStripeCheckoutSession` para nuevo input. | DB cart function | ✅ Completado |
 | `apps/web/src/app/api/bookings/lock-cart/route.ts` | **Nuevo endpoint** `POST /api/bookings/lock-cart`:<br>1. Auth (CLIENTE ACTIVO).<br>2. Validar `cartCheckoutSchema`.<br>3. `createBookingHoldCart` (TX DB).<br>4. `createStripeCheckoutSession` (fuera de TX).<br>5. **Si Stripe falla (error definitivo)**: `compensateFailedCheckout` para **cada** `booking.id` (secuencial, idempotente).<br>6. Return `{ reservas: Booking[], checkout: { sessionId, url, expiresAt } }`. | DB + Stripe | ✅ Completado |
 | `apps/web/src/app/api/bookings/lock/route.ts` | **Actualizar** llamada a `createStripeCheckoutSession` para usar nueva interfaz (`reservaIds[]`, `items[]`). Mantener lógica individual intacta. | Stripe multi-item | ✅ Completado |
-| `packages/db/src/repositories/payments.ts` | **Ampliar** `ProcesarPagoInput`: `reservaIds?: string[]` (opcional, array), mantener `reservaId?: string`. **Modificar** `procesarPagoWebhook`:<br>- Si `reservaIds` presente: upsert `Pago` → confirmar **todas** las reservas en un solo `updateMany` condicional `WHERE id IN (...) AND estado='PENDIENTE_PAGO'`.<br>- Idempotencia: reintentos por `P2002` (único `stripePaymentIntentId`) re-ejecutan TX completa.<br>- Verificar importe esperado vs recibido (suma de `Reserva.total` de las `reservaIds`).<br>- Return: `reservasConfirmadas: string[]`, `reservasEstado: Record<string, string>`. | — | 🔄 Pendiente |
-| `apps/web/src/app/api/payments/route.ts` | **Modificar** webhook: parsear `metadata.bookingIds` (CSV) → `reservaIds[]`. Llamar `procesarPagoWebhook` con `reservaIds`. Mantener fallback a `reservaId` único si no hay CSV (compatibilidad). | Payments repo | 🔄 Pendiente |
+| `packages/db/src/repositories/payments.ts` | **Ampliar** `ProcesarPagoInput`: `reservaIds?: string[]` (opcional, array), mantener `reservaId?: string`. **Modificar** `procesarPagoWebhook`:<br>- Si `reservaIds` presente: upsert `Pago` → confirmar **todas** las reservas en un solo `updateMany` condicional `WHERE id IN (...) AND estado='PENDIENTE_PAGO'`.<br>- Idempotencia: reintentos por `P2002` (único `stripePaymentIntentId`) re-ejecutan TX completa.<br>- Verificar importe esperado vs recibido (suma de `Reserva.total` de las `reservaIds`).<br>- Return: `reservasConfirmadas: string[]`, `reservasEstado: Record<string, string>`. | — | ✅ Completado |
+| `apps/web/src/app/api/payments/route.ts` | **Modificar** webhook: parsear `metadata.bookingIds` (CSV) → `reservaIds[]`. Llamar `procesarPagoWebhook` con `reservaIds`. Mantener fallback a `reservaId` único si no hay CSV (compatibilidad). | Payments repo | ✅ Completado |
 | `packages/db/src/repositories/checkout.ts` | **Revisar** `compensateFailedCheckout`: ya soporta una reserva. Para carrito, se llama en bucle desde endpoint. **No cambios necesarios** si es idempotente por reserva. | — | ✅ Sin cambios |
 
 ---
@@ -126,13 +126,14 @@
 | 3 | `packages/core/src/integrations/stripe.ts` — multi-item session | ✅ Completado |
 | 4 | `apps/web/src/app/api/bookings/lock-cart/route.ts` | ✅ Completado |
 | 4b | `apps/web/src/app/api/bookings/lock/route.ts` — compatibilidad | ✅ Completado |
-| 5 | `packages/db/src/repositories/payments.ts` — `procesarPagoWebhook` multi-reserva | 🔄 Pendiente |
-| 6 | `apps/web/src/app/api/payments/route.ts` — webhook multi-booking | 🔄 Pendiente |
-| 7 | Tests adicionales (ver sección Tests) | 🔄 Pendiente |
+| 5 | `packages/db/src/repositories/payments.ts` — `procesarPagoWebhook` multi-reserva | ✅ Completado |
+| 6 | `apps/web/src/app/api/payments/route.ts` — webhook multi-booking | ✅ Completado |
+| 7 | Tests adicionales (ver sección Tests) | ✅ Completado |
 
-## Próximos Pasos
+## Estado del Plan
 
-1. **Implementar** paso 5: ampliar `procesarPagoWebhook` en `packages/db/src/repositories/payments.ts` para aceptar `reservaIds[]`.
-2. **Implementar** paso 6: actualizar webhook `apps/web/src/app/api/payments/route.ts` para parsear CSV `bookingIds`.
-3. **Ejecutar** tests y typecheck tras cada cambio.
-4. **Validar** criterios de aceptación CA-1 a CA-10.
+Todos los pasos (1 al 7) han sido completados exitosamente.
+- `pnpm test`: 100% pruebas pasando (db, core, validation, web).
+- `pnpm lint`: 100% pasando sin errores ni advertencias.
+- `pnpm build`: compilación de producción exitosa en todos los paquetes y aplicación Next.js.
+- Criterios de aceptación CA-1 a CA-10 verificados.

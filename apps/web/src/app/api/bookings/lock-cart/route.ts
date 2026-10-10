@@ -29,9 +29,34 @@ import { fail, created } from "@/lib/api-response";
  *
  * El endpoint individual POST /api/bookings/lock se mantiene intacto.
  */
-export async function POST(request: Request) {
+function isUncertainStripeError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const anyErr = err as { name?: string; code?: string; message?: string; type?: string };
+  return (
+    anyErr.name === "StripeConnectionError" ||
+    anyErr.type === "StripeConnectionError" ||
+    anyErr.code === "ETIMEDOUT" ||
+    anyErr.code === "ECONNRESET" ||
+    anyErr.code === "ECONNABORTED" ||
+    anyErr.code === "STRIPE_TIMEOUT" ||
+    (typeof anyErr.message === "string" &&
+      (anyErr.message.toLowerCase().includes("timeout") ||
+        anyErr.message.toLowerCase().includes("timed out") ||
+        anyErr.message.toLowerCase().includes("connection")))
+  );
+}
+
+type LockCartSession = {
+  user?: { id?: string | null; role?: string | null; estado?: string | null } | null;
+} | null;
+
+export async function handleLockCart(
+  request: Request,
+  authenticate: () => Promise<LockCartSession> = auth,
+  stripeCheckout: typeof createStripeCheckoutSession = createStripeCheckoutSession,
+) {
   try {
-    const session = await auth();
+    const session = await authenticate();
     if (!session?.user?.id) {
       return fail("UNAUTHORIZED", "Debes iniciar sesión para reservar.", 401);
     }
@@ -60,7 +85,7 @@ export async function POST(request: Request) {
     // Stripe Checkout Session consolidada (fuera de cualquier transacción).
     let checkout;
     try {
-      checkout = await createStripeCheckoutSession({
+      checkout = await stripeCheckout({
         reservaIds: cartResult.bookings.map((b) => b.id),
         userId: session.user.id,
         total: cartResult.total,
@@ -72,7 +97,13 @@ export async function POST(request: Request) {
         })),
       });
     } catch (err) {
-      // Compensación: liberar TODOS los holds del carrito; nunca se crea PAGO.
+      // CA-4: Timeout o error de red incierto: NO compensar; confiar en TTL 30 min + job TSK-BD-08.
+      if (isUncertainStripeError(err)) {
+        console.warn("Stripe timeout o resultado incierto: no se liberan holds, delegando al TTL (CA-4):", err);
+        return fail("CHECKOUT_STRIPE_TIMEOUT", "Tiempo de espera agotado al conectar con Stripe. La reserva se mantiene temporalmente.", 504);
+      }
+
+      // CA-3: Error definitivo (card_declined, config, etc.): liberar TODOS los holds del carrito.
       await Promise.all(
         cartResult.bookings.map((b) =>
           compensateFailedCheckout(b.id).catch((compErr) => {
@@ -102,4 +133,8 @@ export async function POST(request: Request) {
     console.error("Error en POST /api/bookings/lock-cart:", error);
     return fail("SERVER_ERROR", "Error al procesar el bloqueo de checkout del carrito.", 500);
   }
+}
+
+export async function POST(request: Request) {
+  return handleLockCart(request);
 }
