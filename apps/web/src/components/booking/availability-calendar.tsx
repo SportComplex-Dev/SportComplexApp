@@ -47,28 +47,7 @@ export function AvailabilityCalendar({
 }: AvailabilityCalendarProps) {
   const [holidays, setHolidays] = useState<HolidayItem[]>([])
 
-  // 1. Cargar festivos oficiales de Colombia (patrón Cache-Aside vía API /api/holidays)
-  useEffect(() => {
-    let isMounted = true
-    const currentYear = new Date().getFullYear()
-
-    fetch(`/api/holidays?year=${currentYear}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data?.holidays) {
-          setHolidays(data.holidays)
-        }
-      })
-      .catch((err) => {
-        console.warn('Error al cargar festivos, continuando con lista local:', err)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  // 2. Generar días con restricción estricta de ventana de 15 días en America/Bogota (TSK-FE-06 / RN-01)
+  // 1. Generar días con restricción estricta de ventana de 15 días en America/Bogota (TSK-FE-06 / RN-01)
   const calendarDays: BookingCalendarDay[] = useMemo(() => {
     return getBookingCalendarDays(15, 20)
   }, [])
@@ -78,10 +57,67 @@ export function AvailabilityCalendar({
     return day15 ? day15.dateISO : ''
   }, [calendarDays])
 
+  const todayISO = calendarDays[0]?.dateISO ?? ''
+
+  const currentBogotaHour = useMemo(() => {
+    try {
+      const hourStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota',
+        hour: 'numeric',
+        hourCycle: 'h23',
+      }).format(new Date())
+      return parseInt(hourStr, 10)
+    } catch {
+      return new Date().getHours()
+    }
+  }, [])
+
+  // Abarcar los años presentes en la ventana de 15 días (ej. transición diciembre - enero)
+  const yearsToFetch = useMemo(() => {
+    const years = new Set<number>()
+    calendarDays.forEach((d) => {
+      const y = parseInt(d.dateISO.slice(0, 4), 10)
+      if (!isNaN(y)) years.add(y)
+    })
+    if (years.size === 0) years.add(new Date().getFullYear())
+    return Array.from(years)
+  }, [calendarDays])
+
+  // 2. Cargar festivos oficiales de Colombia para los años de la ventana (Cache-Aside vía API /api/holidays)
+  useEffect(() => {
+    let isMounted = true
+
+    Promise.all(
+      yearsToFetch.map((y) =>
+        fetch(`/api/holidays?year=${y}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => (Array.isArray(data?.holidays) ? (data.holidays as HolidayItem[]) : []))
+          .catch(() => [] as HolidayItem[])
+      )
+    )
+      .then((results) => {
+        if (!isMounted) return
+        const map = new Map<string, HolidayItem>()
+        results.flat().forEach((h) => {
+          if (h?.date) map.set(h.date, h)
+        })
+        if (map.size > 0) {
+          setHolidays(Array.from(map.values()))
+        }
+      })
+      .catch((err) => {
+        console.warn('Error al cargar festivos, continuando con lista local:', err)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [yearsToFetch])
+
   // 3. Determinar si el servicio es de piscina y evaluar mantenimiento (TSK-FE-07 / RN-02)
   const isPool = service.category === 'piscinas'
   const isPrivatePool =
-    isPool && (service.poolType === 'PRIVADA' || service.capacity === 1)
+    isPool && (service.poolType ? service.poolType === 'PRIVADA' : service.capacity === 1)
 
   const poolMaintenance: PoolMaintenanceResult = useMemo(() => {
     if (!isPool || !selectedDate) return { blocked: false }
@@ -106,7 +142,10 @@ export function AvailabilityCalendar({
 
       // Si es piscina y hay mantenimiento hoy, todas las franjas están bloqueadas
       const isMaintenanceBlocked = isPool && poolMaintenance.blocked
-      const isAvailable = !isConfigDisabled && !isMaintenanceBlocked
+
+      // RN-11: Si la fecha seleccionada es hoy, las horas que ya transcurrieron o concluyeron quedan deshabilitadas
+      const isPastSlot = selectedDate === todayISO && h <= currentBogotaHour
+      const isAvailable = !isConfigDisabled && !isMaintenanceBlocked && !isPastSlot
 
       let disabledReason: string | undefined
       if (isPool && poolMaintenance.blocked) {
@@ -116,6 +155,8 @@ export function AvailabilityCalendar({
             : 'Mantenimiento rutinario'
       } else if (isConfigDisabled) {
         disabledReason = 'Pausada por administración'
+      } else if (isPastSlot) {
+        disabledReason = 'Horario concluido'
       }
 
       list.push({
@@ -132,7 +173,7 @@ export function AvailabilityCalendar({
     }
 
     return list
-  }, [scheduleConfig, service, isPool, isPrivatePool, poolMaintenance])
+  }, [scheduleConfig, service, isPool, isPrivatePool, poolMaintenance, selectedDate, todayISO, currentBogotaHour])
 
   const selectedDayObj = calendarDays.find((d) => d.dateISO === selectedDate)
 
