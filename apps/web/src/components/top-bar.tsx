@@ -68,13 +68,13 @@ export function TopBar() {
         <div className="flex items-center gap-4">
           <ThemeToggle dark={dark} onToggle={toggleTheme} />
           <span className="topbar-action-divider" aria-hidden="true" />
-          {ready && (session ? (
+          {ready && session ? (
             <UserMenu />
           ) : (
             <Link href="/login" className="action-button nav-access">
               Accede al club <ArrowRight size={15} />
             </Link>
-          ))}
+          )}
           <button
             type="button"
             aria-label={openMenu ? 'Cerrar menú' : 'Abrir menú'}
