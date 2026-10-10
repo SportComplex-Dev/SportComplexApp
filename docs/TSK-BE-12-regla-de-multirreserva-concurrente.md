@@ -54,3 +54,10 @@ Verificación realizada:
 Nota: la prueba de concurrencia de TSK-BE-05 (40 solicitudes sobre aforo 25) ahora usa
 titulares distintos, porque con un único titular la nueva regla limita a una sola reserva
 activa por servicio y la prueba mediría unicidad de titular en lugar de aforo.
+
+## Tarea complementaria: TSK-BE-12b (SCRUM-163)
+
+Para completar el criterio de aceptación de frontend en **TSK-FE-12** (*"dos servicios distintos en la misma franja o diferente franja se pueden seleccionar y pagar juntos"*), se definió **TSK-BE-12b**:
+- **Alcance**: Soporte transaccional en backend para recibir lotes de reservas (`items: Array<BookingRequest>`).
+- **Transacción Atómica**: Bloqueo atómico (*all-or-nothing*) de todas las franjas seleccionadas, validando aforos, mantenimiento y la regla de no-solapamiento (`assertNoTitularOverlap`) entre los ítems y las reservas previas.
+- **Stripe Checkout Consolidado**: Creación de una única sesión de Stripe Checkout con múltiples `line_items` y registro de los identificadores de reserva en los metadatos para confirmación conjunta en el webhook RF-09.

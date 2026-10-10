@@ -184,6 +184,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@node-rs/argon2':
+        specifier: ^2.0.2
+        version: 2.2.1
       '@prisma/client':
         specifier: 7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react@19.0.10)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(typescript@5.7.3))(typescript@5.7.3)

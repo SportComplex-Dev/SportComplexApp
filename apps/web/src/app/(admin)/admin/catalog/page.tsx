@@ -313,24 +313,6 @@ function CatalogForm({
             placeholder="Breve descripción de las características técnicas del espacio"
           />
         </label>
-        {form.category === 'piscinas' && (
-          <label className="demo-field">
-            Modalidad de piscina (TSK-FE-08 / RF-07)
-            <select
-              value={form.poolType ?? 'PUBLICA'}
-              onChange={(e) => {
-                const val = e.target.value as 'PUBLICA' | 'PRIVADA'
-                set('poolType', val)
-                if (val === 'PRIVADA') {
-                  set('capacity', 1)
-                }
-              }}
-            >
-              <option value="PUBLICA">Pública (Aforo masivo compartido)</option>
-              <option value="PRIVADA">Privada (Alquiler exclusivo completo)</option>
-            </select>
-          </label>
-        )}
         <div className="form-row">
           <label className="demo-field">
             Precio base (COP)

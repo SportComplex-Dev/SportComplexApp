@@ -45,9 +45,9 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const result = await res.json()
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'No se pudo crear la cuenta.')
+      const result = await res.json().catch(() => null)
+      if (!res.ok || !result?.success) {
+        setError(result?.error?.message || 'No se pudo conectar con el servidor o la base de datos.')
         return
       }
       router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)

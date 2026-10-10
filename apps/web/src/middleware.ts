@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
 import { createClient } from "@supabase/supabase-js";
-import { prisma } from "@sportcomplex/db";
 import { authConfig } from "@/auth.config";
 import {
   extractSupabaseAccessToken,
@@ -200,27 +199,38 @@ export default withAuth(async (req) => {
     if (!sessionToRefresh.userId) {
       currentSession = null;
     } else {
-      let account;
+      let account: { id: string; estado: string; deletedAt: Date | null; rol: { nombre: string } | null } | null = null;
       try {
-        account = await prisma.usuario.findUnique({
-          where: { id: sessionToRefresh.userId },
-          select: {
-            id: true,
-            estado: true,
-            deletedAt: true,
-            rol: { select: { nombre: true } },
-          },
-        });
-        if (!account && supabasePrincipal?.email) {
-          account = await prisma.usuario.findUnique({
-            where: { correo: supabasePrincipal.email },
-            select: {
-              id: true,
-              estado: true,
-              deletedAt: true,
-              rol: { select: { nombre: true } },
-            },
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
           });
+          const { data: userById } = await supabase
+            .from("usuario")
+            .select("id, estado, deleted_at, rol:rol_id(nombre)")
+            .eq("id", sessionToRefresh.userId)
+            .maybeSingle();
+
+          let row = userById;
+          if (!row && supabasePrincipal?.email) {
+            const { data: userByEmail } = await supabase
+              .from("usuario")
+              .select("id, estado, deleted_at, rol:rol_id(nombre)")
+              .eq("correo", supabasePrincipal.email)
+              .maybeSingle();
+            row = userByEmail;
+          }
+
+          if (row) {
+            account = {
+              id: row.id,
+              estado: row.estado,
+              deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+              rol: Array.isArray(row.rol) ? row.rol[0] : row.rol,
+            };
+          }
         }
       } catch (error: unknown) {
         console.error("Error al validar el estado de la sesión:", error);
