@@ -197,7 +197,7 @@ export default function BookPage() {
               </div>
               <span className="text-xs text-[#728077] dark:text-[#aab8ad]">{visibleServices.length} opciones</span>
             </div>
-            <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Filtrar por categoría">
+            <div className="sticky top-[72px] z-10 -mx-1 mb-3 flex gap-2 overflow-x-auto bg-[#f7f8f5]/95 px-1 py-2 backdrop-blur dark:bg-[#111815]/95" aria-label="Filtrar por categoría">
               <button
                 type="button"
                 aria-pressed={selectedCategory === "todos"}
@@ -219,42 +219,35 @@ export default function BookPage() {
               ))}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {visibleServices.map((service, index) => {
                 const inCart = cart.some((item) => item.serviceId === service.id);
                 const color = ["#eaf2d9", "#e4f1f3", "#faeee1", "#eeeafa"][index % 4];
                 return (
-                  <article key={service.id} className="flex min-h-[168px] flex-col justify-between rounded-2xl border border-[#e5e9e2] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-[#2b3730] dark:bg-[#19231d]">
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-base font-bold text-[#244b37]" style={{ backgroundColor: color }}>
-                            {service.name.slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#63816d] dark:text-[#9eb3a1]">
-                              {categoryBySlug(service.category)?.name ?? "Servicio"}
-                            </p>
-                            <h3 className="mt-0.5 line-clamp-1 text-sm font-bold text-[#18291f] dark:text-[#edf3ee]">{service.name}</h3>
-                          </div>
-                        </div>
-                        {inCart && <Check size={17} className="shrink-0 text-[#446b36] dark:text-[#c9ef75]" />}
-                      </div>
-                      <p className="mt-3 line-clamp-2 min-h-9 text-xs leading-4 text-[#68776d] dark:text-[#aab8ad]">
-                        {service.description}
+                  <article
+                    key={service.id}
+                    title={service.description}
+                    className={`flex items-center gap-3 rounded-xl border bg-white p-2.5 shadow-sm transition hover:shadow-md dark:bg-[#19231d] ${inCart ? "border-[#7ca657]" : "border-[#e5e9e2] dark:border-[#2b3730]"}`}
+                  >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-base font-bold text-[#244b37]" style={{ backgroundColor: color }}>
+                      {service.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[10px] font-bold uppercase tracking-[0.1em] text-[#63816d] dark:text-[#9eb3a1]">
+                        {categoryBySlug(service.category)?.name ?? "Servicio"}
                       </p>
+                      <h3 className="truncate text-sm font-bold text-[#18291f] dark:text-[#edf3ee]">{service.name}</h3>
+                      <span className="text-xs font-bold text-[#183c2e] dark:text-[#dce8dd]">{formatMoney(service.price)}</span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#edf0eb] pt-3 dark:border-[#2b3730]">
-                      <span className="text-sm font-bold text-[#183c2e] dark:text-[#dce8dd]">{formatMoney(service.price)}</span>
-                      <button
-                        type="button"
-                        disabled={!selectedSlot || inCart}
-                        onClick={() => addService(service)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#edf5e2] px-3 py-2 text-xs font-bold text-[#31563a] transition hover:bg-[#e1efce] disabled:cursor-not-allowed disabled:bg-[#f1f3ef] disabled:text-[#9aa49c] dark:bg-[#2b3b2a] dark:text-[#d8efb3] dark:hover:bg-[#354a32] dark:disabled:bg-[#252d27] dark:disabled:text-[#758078]"
-                      >
-                        {inCart ? "Agregado" : <><Plus size={14} /> Agregar</>}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedSlot || inCart}
+                      onClick={() => addService(service)}
+                      aria-label={inCart ? `${service.name} agregado` : `Agregar ${service.name}`}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#edf5e2] px-2.5 py-2 text-xs font-bold text-[#31563a] transition hover:bg-[#e1efce] disabled:cursor-not-allowed disabled:bg-[#f1f3ef] disabled:text-[#9aa49c] dark:bg-[#2b3b2a] dark:text-[#d8efb3] dark:hover:bg-[#354a32] dark:disabled:bg-[#252d27] dark:disabled:text-[#758078]"
+                    >
+                      {inCart ? <Check size={14} /> : <Plus size={14} />}
+                    </button>
                   </article>
                 );
               })}
