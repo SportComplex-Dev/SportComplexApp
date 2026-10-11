@@ -388,6 +388,65 @@ test("TSK-BE-20 API: webhook invoice.payment_failed transiciona a VENCIDA y devu
   assert.equal(m.estado, "VENCIDA");
 });
 
+test("TSK-BE-20 API: webhook invoice.paid da de alta la membresía usando parent.subscription_details.metadata", async () => {
+  const userId = "user-first-sub-parent";
+  mock._state.usuarios.push({ id: userId, correo: "firstsub@test.com" });
+  mock._state.planesMembresia.push({
+    id: 1,
+    nombre: "Plan Semanal",
+    periodicidad: "SEMANAL",
+    precio: 50000,
+    descuentoPct: 30,
+    activo: true,
+  });
+
+  const invoiceEvent = {
+    id: "evt_inv_first_parent_1",
+    object: "event",
+    api_version: "2024-11-20.acacia",
+    created: Math.floor(Date.now() / 1000),
+    type: "invoice.paid",
+    data: {
+      object: {
+        id: "in_first_parent_1",
+        object: "invoice",
+        payment_intent: "pi_first_parent_1",
+        amount_paid: 5000000,
+        currency: "cop",
+        status: "paid",
+        period_end: Math.floor(new Date("2026-10-25T12:00:00Z").getTime() / 1000),
+        parent: {
+          subscription: "sub_from_parent_100",
+          subscription_details: {
+            metadata: {
+              userId,
+              planId: "1",
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const payload = JSON.stringify(invoiceEvent);
+  const signature = signPayload(payload);
+  const res = await postWebhook(payload, signature);
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.membresiaRenovada, true);
+  assert.equal(body.data.estado, "APROBADO");
+
+  // Verifica que se creó la membresía en la BD y quedó en estado VIGENTE
+  const createdMembresia = mock._state.membresias.find(
+    (item: any) => item.usuarioId === userId && item.stripeSubscriptionId === "sub_from_parent_100",
+  );
+  assert.ok(createdMembresia);
+  assert.equal(createdMembresia.estado, "VIGENTE");
+  assert.equal(createdMembresia.planId, 1);
+});
+
 test("TSK-BE-18 API: webhook POS firmado confirma, emite QR y registra vendedor/taquilla", async () => {
   seedReserva({ id: "reserva-pos-webhook", titularId: "cliente-pos", total: 75000 });
   mock._state.disponibilidades.push({

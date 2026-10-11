@@ -438,6 +438,7 @@ export interface ProcesarFacturaInput {
   stripeSubscriptionId?: string | null;
   stripePaymentIntentId?: string | null;
   usuarioId?: string | null;
+  planId?: number | string | null;
   monto: string | number;
   estado: EstadoPagoValor;
   periodEnd?: Date | null;
@@ -489,7 +490,7 @@ export async function procesarFacturaWebhook(
           estado: string;
           proximaRenovacion: Date;
           stripeSubscriptionId?: string | null;
-          plan?: { periodicidad?: string } | null;
+          plan?: { id?: number; periodicidad?: string } | null;
         };
         let membresia: MembresiaResumen | null = null;
         if (input.membresiaId != null) {
@@ -532,6 +533,50 @@ export async function procesarFacturaWebhook(
           );
         }
 
+        // Si es el primer cobro exitoso de una suscripción y aún no existe membresía en la BD, se crea (alta de membresía).
+        let membresiaRecienCreada = false;
+        if (!membresia && input.estado === "APROBADO") {
+          const vigenteExistente = await tx.membresia.findFirst({
+            where: {
+              usuarioId: resolvedUserId,
+              estado: "VIGENTE",
+            },
+            include: { plan: true },
+          });
+
+          if (vigenteExistente) {
+            membresia = vigenteExistente;
+          } else {
+            const planIdNum = input.planId ? Number(input.planId) : null;
+            if (planIdNum && Number.isInteger(planIdNum) && planIdNum > 0) {
+              const plan = await tx.planMembresia.findUnique({
+                where: { id: planIdNum },
+              });
+              if (plan) {
+                const now = new Date();
+                const fechaInicio = now;
+                const proximaRenovacion = input.periodEnd
+                  ? input.periodEnd
+                  : calculateRenewalDate(now, plan.periodicidad as PeriodicidadPlan);
+
+                const nuevaMembresia = await tx.membresia.create({
+                  data: {
+                    usuarioId: resolvedUserId,
+                    planId: plan.id,
+                    estado: "VIGENTE",
+                    fechaInicio,
+                    proximaRenovacion,
+                    stripeSubscriptionId: input.stripeSubscriptionId?.trim() || null,
+                  },
+                  include: { plan: true },
+                });
+                membresia = nuevaMembresia;
+                membresiaRecienCreada = true;
+              }
+            }
+          }
+        }
+
         // 2. Upsert de PAGO
         let pago = await tx.pago.findUnique({
           where: { stripePaymentIntentId: paymentRefId },
@@ -551,12 +596,21 @@ export async function procesarFacturaWebhook(
             },
           });
           pagoCreado = true;
-        } else if (pago.estado !== "APROBADO" && pago.estado !== input.estado) {
-          await tx.pago.update({
-            where: { id: pago.id },
-            data: { estado: input.estado },
-          });
-          pago = { ...pago, estado: input.estado };
+        } else {
+          if (pago.estado !== "APROBADO" && pago.estado !== input.estado) {
+            await tx.pago.update({
+              where: { id: pago.id },
+              data: { estado: input.estado },
+            });
+            pago = { ...pago, estado: input.estado };
+          }
+          if (membresia && !pago.membresiaId) {
+            await tx.pago.update({
+              where: { id: pago.id },
+              data: { membresiaId: membresia.id },
+            });
+            pago = { ...pago, membresiaId: membresia.id };
+          }
         }
 
         // Reenvío idempotente si ya estaba previamente aprobado en la BD
@@ -580,7 +634,9 @@ export async function procesarFacturaWebhook(
 
         // 3. Actualización de membresía según resultado
         if (input.estado === "APROBADO") {
-          if (membresia) {
+          if (membresiaRecienCreada) {
+            membresiaRenovada = true;
+          } else if (membresia) {
             if (input.periodEnd) {
               proximaRenovacion = input.periodEnd;
             } else if (membresia.plan?.periodicidad) {

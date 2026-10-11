@@ -505,16 +505,25 @@ export function parseInvoiceEventData(
     amount_due?: number;
     total?: number;
     period_end?: number;
-    lines?: { data?: Array<{ period?: { end?: number } }> };
+    lines?: { data?: Array<{ period?: { end?: number }; metadata?: Record<string, string> }> };
     metadata?: Record<string, string>;
     subscription_details?: { metadata?: Record<string, string> };
+    parent?: {
+      subscription_details?: { metadata?: Record<string, string> };
+      metadata?: Record<string, string>;
+      subscription?: string | { id: string } | null;
+    };
   };
 
   const invoiceId = inv.id;
   const subscriptionId =
     typeof inv.subscription === "string"
       ? inv.subscription
-      : inv.subscription?.id ?? null;
+      : (inv.subscription as { id?: string } | undefined)?.id ??
+        (typeof inv.parent?.subscription === "string"
+          ? inv.parent.subscription
+          : (inv.parent?.subscription as { id?: string } | undefined)?.id) ??
+        null;
 
   const paymentIntentId =
     typeof inv.payment_intent === "string"
@@ -536,6 +545,9 @@ export function parseInvoiceEventData(
   }
 
   const meta = {
+    ...(inv.lines?.data?.[0]?.metadata ?? {}),
+    ...(inv.parent?.metadata ?? {}),
+    ...(inv.parent?.subscription_details?.metadata ?? {}),
     ...(inv.subscription_details?.metadata ?? {}),
     ...(inv.metadata ?? {}),
   };

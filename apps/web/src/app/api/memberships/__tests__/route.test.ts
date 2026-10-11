@@ -114,3 +114,42 @@ test("POST /api/memberships/subscribe inicia sesión de checkout en Stripe", asy
   assert.ok(body.data.checkout.url);
 });
 
+test("POST /api/memberships/subscribe rechaza con 400 si el plan no tiene stripePriceId configurado", async () => {
+  const userId = "00000000-0000-4000-8000-0000000000sub3";
+  (globalThis as any).__scAuthSession = {
+    user: { id: userId, email: "sub3@test.com" },
+  };
+
+  mock._state.usuarios.push({
+    id: userId,
+    nombre: "Usuario Sin Precio",
+    correo: "sub3@test.com",
+    estado: "ACTIVO",
+    rolId: 4,
+    rolNombre: "Cliente",
+  });
+
+  mock._state.planesMembresia.push({
+    id: 999,
+    nombre: "Plan Sin Stripe",
+    periodicidad: "MENSUAL",
+    precio: 99000,
+    descuentoPct: 30.0,
+    stripePriceId: null,
+    activo: true,
+  });
+
+  const res = await subscribeRoute.POST(
+    new Request("http://localhost:3000/api/memberships/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: 999 }),
+    }),
+  );
+
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "STRIPE_PRICE_NOT_CONFIGURED");
+});
+

@@ -52,7 +52,15 @@ export async function POST(request: Request) {
       return fail("PLAN_NOT_FOUND", "El plan de membresía seleccionado no existe o no está activo.", 404);
     }
 
-    const priceId = plan.stripePriceId || "price_test_fallback";
+    if (!plan.stripePriceId || !plan.stripePriceId.trim()) {
+      return fail(
+        "STRIPE_PRICE_NOT_CONFIGURED",
+        "El plan de membresía seleccionado no tiene un ID de precio de Stripe configurado.",
+        400,
+      );
+    }
+
+    const priceId = plan.stripePriceId.trim();
 
     let checkout;
     try {

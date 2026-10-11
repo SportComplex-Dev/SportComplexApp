@@ -73,6 +73,7 @@ export async function POST(request: Request) {
         stripeSubscriptionId: parsed.subscriptionId,
         stripePaymentIntentId: parsed.paymentIntentId,
         usuarioId: parsed.userId,
+        planId: parsed.planId ? Number(parsed.planId) : undefined,
         monto: stripeAmountToMonto(parsed.amount),
         estado: event.type === "invoice.paid" ? "APROBADO" : "FALLIDO",
         periodEnd: parsed.periodEnd,
