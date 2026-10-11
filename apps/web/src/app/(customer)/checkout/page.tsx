@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -13,6 +13,7 @@ import {
 } from '@sportcomplex/core'
 import { Badge, Input } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
+import { CheckoutTimer } from '@/components/booking/checkout-timer'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
@@ -59,6 +60,35 @@ export default function CheckoutPage() {
 
   // Wompi / Nequi state
   const [nequiPhone, setNequiPhone] = useState('')
+
+  // Timer & Cupo state (TSK-FE-09 / SCRUM-117)
+  const [isExpired, setIsExpired] = useState(false)
+
+  // Sincronizar o inicializar el TTL de 30 minutos (1800 seg) del cupo
+  useEffect(() => {
+    if (!draft) return
+
+    if (!draft.expiresAt) {
+      const expiresAt = Date.now() + 30 * 60 * 1000
+      setDraft({ ...draft, expiresAt })
+    } else if (draft.expiresAt <= Date.now()) {
+      setIsExpired(true)
+    }
+  }, [draft, setDraft])
+
+  const handleExpire = () => {
+    setIsExpired(true)
+    notify('El tiempo de reserva de 30 minutos ha finalizado. El cupo ha sido liberado.', 'error')
+  }
+
+  const handleRetry = () => {
+    setDraft(null)
+    if (item) {
+      router.push(`/services/${item.category}/${item.id}`)
+    } else {
+      router.push('/services')
+    }
+  }
 
   const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
@@ -108,6 +138,11 @@ export default function CheckoutPage() {
   }
 
   const confirmPayment = async () => {
+    if (isExpired) {
+      notify('El tiempo de reserva ha expirado. Por favor selecciona un nuevo turno.', 'error')
+      return
+    }
+
     // Form validation based on method
     if (method === 'card') {
       if (!cardNumber.trim() || cardNumber.replace(/\s/g, '').length < 15) {
@@ -206,6 +241,16 @@ export default function CheckoutPage() {
         <i />
         <span className="progress-step">3&nbsp; Confirmación</span>
       </div>
+
+      {/* Temporizador regresivo visible en todo momento (TSK-FE-09 / SCRUM-117) */}
+      <CheckoutTimer
+        expiresAt={draft.expiresAt}
+        initialSeconds={1800}
+        onExpire={handleExpire}
+        onRetry={handleRetry}
+        isExpired={isExpired}
+        className="mb-8 max-w-[960px] mx-auto"
+      />
 
       <div className="payment-layout">
         <section className="payment-form">
@@ -477,12 +522,16 @@ export default function CheckoutPage() {
           {/* Action button */}
           <ActionButton
             onClick={confirmPayment}
-            disabled={isProcessing}
+            disabled={isProcessing || isExpired}
             className="w-full justify-center text-[14px]"
           >
             {isProcessing ? (
               <>
                 <Loader2 size={17} className="animate-spin" /> Procesando pago...
+              </>
+            ) : isExpired ? (
+              <>
+                Cupo liberado (Tiempo expirado)
               </>
             ) : (
               <>
@@ -528,6 +577,12 @@ export default function CheckoutPage() {
           <div className="order-price">
             <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
             <b>{formatMoney(total)}</b>
+          </div>
+          <div className="order-item py-2 border-b border-[var(--line)] flex items-center justify-between text-[12px]">
+            <span>Estado de cupo</span>
+            <b className={isExpired ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
+              {isExpired ? 'Expirado' : 'Bloqueado (30 min)'}
+            </b>
           </div>
           <div className="order-total">
             <span>Total a pagar</span>

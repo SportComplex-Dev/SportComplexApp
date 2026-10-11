@@ -26,7 +26,7 @@ export const initialBookings: Booking[] = [
 
 export const useBookings = () => usePersistentState<Booking[]>('altura:bookings', initialBookings)
 
-export type Draft = { itemId: string; date: string; time: string; attendees: number }
+export type Draft = { itemId: string; date: string; time: string; attendees: number; expiresAt?: number }
 export const useDraft = () => usePersistentState<Draft | null>('altura:draft', null)
 
 /** Código del último tiquete generado, para mostrar la confirmación. */
