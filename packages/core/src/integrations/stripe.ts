@@ -181,12 +181,16 @@ export function extractPaymentIntentId(
   return null;
 }
 
-/** Superficie mínima del SDK usada por TSK-BE-09 (inyectable en tests). */
+/** Superficie mínima del SDK usada por TSK-BE-09 y TSK-BE-20 (inyectable en tests). */
 export interface StripeCheckoutClient {
   checkout: {
     sessions: {
       create(params: unknown, options?: unknown): Promise<Stripe.Checkout.Session>;
     };
+  };
+  subscriptions?: {
+    create(params: unknown, options?: unknown): Promise<Stripe.Subscription>;
+    retrieve?(id: string, options?: unknown): Promise<Stripe.Subscription>;
   };
 }
 
@@ -243,5 +247,205 @@ export async function createStripeCheckoutSession(
     url: session.url ?? null,
     paymentIntentId: extractPaymentIntentId(session),
     expiresAt,
+  };
+}
+
+export interface CreateSubscriptionInput {
+  customerId: string;
+  priceId: string;
+  userId: string;
+  planId: number | string;
+  membershipId?: number | string;
+  metadata?: Record<string, string>;
+}
+
+export interface StripeSubscriptionResult {
+  subscriptionId: string;
+  status: string;
+  customerId: string;
+  currentPeriodEnd: Date;
+}
+
+/**
+ * TSK-BE-20 (RF-16 / RN-09): Creación directa de suscripciones recurrentes en Stripe.
+ */
+export async function createStripeSubscription(
+  input: CreateSubscriptionInput,
+  deps: { client?: StripeCheckoutClient } = {},
+): Promise<StripeSubscriptionResult> {
+  const client = resolveClient(deps.client);
+  if (!client.subscriptions?.create) {
+    throw stripeError("STRIPE_NOT_SUPPORTED", "Subscriptions API no disponible en este cliente.");
+  }
+
+  const metadata = {
+    userId: input.userId,
+    planId: String(input.planId),
+    ...(input.membershipId ? { membershipId: String(input.membershipId) } : {}),
+    ...(input.metadata ?? {}),
+    cashless: "true",
+  };
+
+  try {
+    const subscription = await client.subscriptions.create({
+      customer: input.customerId,
+      items: [{ price: input.priceId }],
+      metadata,
+    });
+
+    const periodEndSec = (subscription as unknown as { current_period_end?: number }).current_period_end;
+    const currentPeriodEnd = periodEndSec ? new Date(periodEndSec * 1000) : new Date();
+
+    return {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id ?? input.customerId,
+      currentPeriodEnd,
+    };
+  } catch (err) {
+    throw stripeError(
+      "STRIPE_SUBSCRIPTION_FAILED",
+      err instanceof Error ? err.message : String(err),
+      { cause: err },
+    );
+  }
+}
+
+export interface SubscriptionCheckoutSessionInput {
+  userId: string;
+  planId: number | string;
+  priceId: string;
+  customerId?: string;
+  customerEmail?: string;
+  membershipId?: number | string;
+  successUrl?: string;
+  cancelUrl?: string;
+}
+
+export function buildSubscriptionCheckoutSessionParams(
+  input: SubscriptionCheckoutSessionInput,
+  appUrl = defaultAppUrl(),
+): Stripe.Checkout.SessionCreateParams {
+  const metadata = {
+    userId: input.userId,
+    planId: String(input.planId),
+    ...(input.membershipId ? { membershipId: String(input.membershipId) } : {}),
+    cashless: "true",
+  };
+
+  return {
+    mode: "subscription",
+    line_items: [{ price: input.priceId, quantity: 1 }],
+    metadata,
+    subscription_data: { metadata },
+    ...(input.customerId ? { customer: input.customerId } : {}),
+    ...(input.customerEmail && !input.customerId ? { customer_email: input.customerEmail } : {}),
+    success_url:
+      input.successUrl ?? `${appUrl}/portal/membership?session_id={CHECKOUT_SESSION_ID}&success=true`,
+    cancel_url:
+      input.cancelUrl ?? `${appUrl}/portal/membership?cancelled=true`,
+  };
+}
+
+/**
+ * Inicia una sesión de checkout en modo `subscription` para adquirir membresías online.
+ */
+export async function createStripeSubscriptionCheckoutSession(
+  input: SubscriptionCheckoutSessionInput,
+  deps: { client?: StripeCheckoutClient; appUrl?: string } = {},
+): Promise<{ sessionId: string; url: string | null }> {
+  const params = buildSubscriptionCheckoutSessionParams(input, deps.appUrl ?? defaultAppUrl());
+  const client = resolveClient(deps.client);
+
+  try {
+    const session = await client.checkout.sessions.create(params);
+    return {
+      sessionId: session.id,
+      url: session.url ?? null,
+    };
+  } catch (err) {
+    throw stripeError(
+      "STRIPE_SUBSCRIPTION_CHECKOUT_FAILED",
+      err instanceof Error ? err.message : String(err),
+      { cause: err },
+    );
+  }
+}
+
+export interface ParsedInvoiceData {
+  invoiceId: string;
+  subscriptionId: string | null;
+  paymentIntentId: string | null;
+  customerId: string | null;
+  amount: number;
+  periodEnd: Date | null;
+  userId: string | null;
+  planId: string | null;
+  membershipId: string | null;
+}
+
+/**
+ * TSK-BE-20: Parsea eventos invoice.paid e invoice.payment_failed provenientes de Stripe Webhook.
+ */
+export function parseInvoiceEventData(
+  invoice: Record<string, unknown> | Stripe.Invoice,
+): ParsedInvoiceData {
+  const inv = invoice as {
+    id: string;
+    subscription?: string | { id: string } | null;
+    payment_intent?: string | { id: string } | null;
+    customer?: string | { id: string } | null;
+    amount_paid?: number;
+    amount_due?: number;
+    total?: number;
+    period_end?: number;
+    lines?: { data?: Array<{ period?: { end?: number } }> };
+    metadata?: Record<string, string>;
+    subscription_details?: { metadata?: Record<string, string> };
+  };
+
+  const invoiceId = inv.id;
+  const subscriptionId =
+    typeof inv.subscription === "string"
+      ? inv.subscription
+      : inv.subscription?.id ?? null;
+
+  const paymentIntentId =
+    typeof inv.payment_intent === "string"
+      ? inv.payment_intent
+      : inv.payment_intent?.id ?? null;
+
+  const customerId =
+    typeof inv.customer === "string"
+      ? inv.customer
+      : inv.customer?.id ?? null;
+
+  const amount = inv.amount_paid ?? inv.amount_due ?? inv.total ?? 0;
+
+  let periodEnd: Date | null = null;
+  if (inv.lines?.data?.[0]?.period?.end) {
+    periodEnd = new Date(inv.lines.data[0].period.end * 1000);
+  } else if (inv.period_end) {
+    periodEnd = new Date(inv.period_end * 1000);
+  }
+
+  const meta = {
+    ...(inv.subscription_details?.metadata ?? {}),
+    ...(inv.metadata ?? {}),
+  };
+  const userId = meta.userId || meta.user_id || null;
+  const planId = meta.planId || meta.plan_id || null;
+  const membershipId = meta.membershipId || meta.membership_id || null;
+
+  return {
+    invoiceId,
+    subscriptionId,
+    paymentIntentId,
+    customerId,
+    amount,
+    periodEnd,
+    userId,
+    planId,
+    membershipId,
   };
 }

@@ -154,3 +154,94 @@ test("SCRUM-163: parsePaymentIntentMetadata parsea bookingId CSV o bookingIds a 
   assert.equal(parsed3.bookingId, "r-single");
   assert.deepEqual(parsed3.bookingIds, ["r-single"]);
 });
+
+test("TSK-BE-20: buildSubscriptionCheckoutSessionParams genera parámetros con mode: subscription y metadata", async () => {
+  const { buildSubscriptionCheckoutSessionParams } = await import("./stripe.js");
+  const params = buildSubscriptionCheckoutSessionParams(
+    {
+      userId: "u-100",
+      planId: 2,
+      priceId: "price_mensual_123",
+      customerEmail: "user@example.com",
+    },
+    "http://localhost:3000",
+  );
+
+  assert.equal(params.mode, "subscription");
+  assert.deepEqual(params.line_items, [{ price: "price_mensual_123", quantity: 1 }]);
+  assert.equal(params.customer_email, "user@example.com");
+  assert.deepEqual(params.metadata, {
+    userId: "u-100",
+    planId: "2",
+    cashless: "true",
+  });
+});
+
+test("TSK-BE-20: createStripeSubscription llama a client.subscriptions.create y retorna resultado", async () => {
+  const { createStripeSubscription } = await import("./stripe.js");
+  const fake = {
+    checkout: { sessions: { create: async () => ({} as never) } },
+    subscriptions: {
+      async create(params: Record<string, unknown>) {
+        return {
+          id: "sub_test_123",
+          status: "active",
+          customer: params.customer,
+          current_period_end: 1770000000,
+        } as never;
+      },
+    },
+  };
+
+  const result = await createStripeSubscription(
+    {
+      customerId: "cus_abc",
+      priceId: "price_123",
+      userId: "u-sub-1",
+      planId: 1,
+    },
+    { client: fake },
+  );
+
+  assert.equal(result.subscriptionId, "sub_test_123");
+  assert.equal(result.status, "active");
+  assert.equal(result.customerId, "cus_abc");
+  assert.equal(result.currentPeriodEnd.getTime(), 1770000000 * 1000);
+});
+
+test("TSK-BE-20: parseInvoiceEventData extrae datos de invoice.paid e invoice.payment_failed", async () => {
+  const { parseInvoiceEventData } = await import("./stripe.js");
+
+  const rawInvoice = {
+    id: "in_test_invoice_99",
+    subscription: "sub_xyz",
+    payment_intent: "pi_invoice_123",
+    customer: "cus_customer_1",
+    amount_paid: 18000000,
+    lines: {
+      data: [
+        {
+          period: {
+            end: 1775000000,
+          },
+        },
+      ],
+    },
+    metadata: {
+      userId: "u-99",
+      planId: "3",
+      membershipId: "42",
+    },
+  };
+
+  const parsed = parseInvoiceEventData(rawInvoice);
+  assert.equal(parsed.invoiceId, "in_test_invoice_99");
+  assert.equal(parsed.subscriptionId, "sub_xyz");
+  assert.equal(parsed.paymentIntentId, "pi_invoice_123");
+  assert.equal(parsed.customerId, "cus_customer_1");
+  assert.equal(parsed.amount, 18000000);
+  assert.equal(parsed.periodEnd?.getTime(), 1775000000 * 1000);
+  assert.equal(parsed.userId, "u-99");
+  assert.equal(parsed.planId, "3");
+  assert.equal(parsed.membershipId, "42");
+});

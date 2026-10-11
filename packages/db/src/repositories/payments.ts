@@ -1,4 +1,6 @@
 import { prisma } from "../client";
+import { PeriodicidadPlan } from "@prisma/client";
+import { calculateRenewalDate } from "./memberships";
 
 /**
  * TSK-BD-09 — Idempotencia de pagos con Stripe (HU-10 / RF-09).
@@ -381,3 +383,205 @@ export async function procesarPagoWebhook(
   }
   throw ultimoError;
 }
+
+export interface ProcesarFacturaInput {
+  stripeInvoiceId: string;
+  stripeSubscriptionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  usuarioId?: string | null;
+  monto: string | number;
+  estado: EstadoPagoValor;
+  periodEnd?: Date | null;
+  membresiaId?: number | null;
+}
+
+export interface ProcesarFacturaResultado {
+  pagoId: string;
+  pagoCreado: boolean;
+  duplicado: boolean;
+  estado: EstadoPagoValor;
+  membresiaRenovada: boolean;
+  membresiaVencida: boolean;
+  proximaRenovacion: Date | null;
+  membresiaId: number | null;
+  usuarioId: string;
+}
+
+/**
+ * TSK-BE-20 (RF-16 / RN-08, RN-09): Procesa eventos de factura recurrente de Stripe (invoice.paid e invoice.payment_failed).
+ * - invoice.paid: actualiza/mantiene estado VIGENTE y renueva `proxima_renovacion` (beneficios sin interrupción).
+ * - invoice.payment_failed: registra el fallo y transiciona la membresía a VENCIDA.
+ * Idempotente ante reenvíos de Stripe por event ID / invoice ID.
+ */
+export async function procesarFacturaWebhook(
+  input: ProcesarFacturaInput,
+  options: ProcesarPagoOptions = {},
+): Promise<ProcesarFacturaResultado> {
+  if (!input.stripeInvoiceId?.trim()) {
+    throw new PaymentError("Falta stripeInvoiceId.", "VALIDATION_ERROR", 400);
+  }
+  if (!ESTADOS_PAGO.includes(input.estado)) {
+    throw new PaymentError(`Estado de pago inválido: ${input.estado}`, "VALIDATION_ERROR", 400);
+  }
+  const db = options.db ?? prisma;
+  const monto = normalizeMonto(input.monto);
+  const paymentRefId =
+    input.stripePaymentIntentId?.trim() || `inv_${input.stripeInvoiceId.trim()}`;
+
+  const MAX_INTENTOS = 3;
+  let ultimoError: unknown;
+
+  for (let intento = 1; intento <= MAX_INTENTOS; intento += 1) {
+    try {
+      return await db.$transaction(async (tx: DbLike) => {
+        type MembresiaResumen = {
+          id: number;
+          usuarioId: string;
+          estado: string;
+          proximaRenovacion: Date;
+          stripeSubscriptionId?: string | null;
+          plan?: { periodicidad?: string } | null;
+        };
+        let membresia: MembresiaResumen | null = null;
+        if (input.membresiaId != null) {
+          membresia = await tx.membresia.findUnique({
+            where: { id: input.membresiaId },
+            include: { plan: true },
+          });
+        }
+        if (!membresia && input.stripeSubscriptionId?.trim()) {
+          membresia = await tx.membresia.findFirst({
+            where: { stripeSubscriptionId: input.stripeSubscriptionId.trim() },
+            include: { plan: true },
+          });
+        }
+        if (!membresia && input.usuarioId?.trim()) {
+          membresia = await tx.membresia.findFirst({
+            where: {
+              usuarioId: input.usuarioId.trim(),
+              estado: "VIGENTE",
+            },
+            include: { plan: true },
+          });
+          if (!membresia) {
+            membresia = await tx.membresia.findFirst({
+              where: {
+                usuarioId: input.usuarioId.trim(),
+              },
+              orderBy: { id: "desc" },
+              include: { plan: true },
+            });
+          }
+        }
+
+        const resolvedUserId = input.usuarioId?.trim() || membresia?.usuarioId;
+        if (!resolvedUserId) {
+          throw new PaymentError(
+            "No se pudo resolver el usuario asociado a la factura.",
+            "MISSING_USER",
+            400,
+          );
+        }
+
+        // 2. Upsert de PAGO
+        let pago = await tx.pago.findUnique({
+          where: { stripePaymentIntentId: paymentRefId },
+        });
+        const pagoPrevioEstado = pago?.estado;
+        let pagoCreado = false;
+
+        if (!pago) {
+          pago = await tx.pago.create({
+            data: {
+              usuarioId: resolvedUserId,
+              membresiaId: membresia ? membresia.id : null,
+              tipo: "MEMBRESIA",
+              stripePaymentIntentId: paymentRefId,
+              monto,
+              estado: input.estado,
+            },
+          });
+          pagoCreado = true;
+        } else if (pago.estado !== "APROBADO" && pago.estado !== input.estado) {
+          await tx.pago.update({
+            where: { id: pago.id },
+            data: { estado: input.estado },
+          });
+          pago = { ...pago, estado: input.estado };
+        }
+
+        // Reenvío idempotente si ya estaba previamente aprobado en la BD
+        if (pagoPrevioEstado === "APROBADO" && input.estado === "APROBADO") {
+          return {
+            pagoId: pago.id as string,
+            pagoCreado: false,
+            duplicado: true,
+            estado: "APROBADO",
+            membresiaRenovada: false,
+            membresiaVencida: false,
+            proximaRenovacion: membresia?.proximaRenovacion ?? null,
+            membresiaId: membresia?.id ?? null,
+            usuarioId: resolvedUserId,
+          };
+        }
+
+        let membresiaRenovada = false;
+        let membresiaVencida = false;
+        let proximaRenovacion: Date | null = membresia?.proximaRenovacion ?? null;
+
+        // 3. Actualización de membresía según resultado
+        if (input.estado === "APROBADO") {
+          if (membresia) {
+            if (input.periodEnd) {
+              proximaRenovacion = input.periodEnd;
+            } else if (membresia.plan?.periodicidad) {
+              const base = membresia.proximaRenovacion ? new Date(membresia.proximaRenovacion) : new Date();
+              proximaRenovacion = calculateRenewalDate(base, membresia.plan.periodicidad as PeriodicidadPlan);
+            } else {
+              proximaRenovacion = calculateRenewalDate(new Date(), PeriodicidadPlan.MENSUAL);
+            }
+
+            await tx.membresia.update({
+              where: { id: membresia.id },
+              data: {
+                estado: "VIGENTE",
+                proximaRenovacion,
+                ...(input.stripeSubscriptionId && !membresia.stripeSubscriptionId
+                  ? { stripeSubscriptionId: input.stripeSubscriptionId }
+                  : {}),
+              },
+            });
+            membresiaRenovada = true;
+          }
+        } else if (input.estado === "FALLIDO") {
+          if (membresia) {
+            await tx.membresia.update({
+              where: { id: membresia.id },
+              data: {
+                estado: "VENCIDA",
+              },
+            });
+            membresiaVencida = true;
+          }
+        }
+
+        return {
+          pagoId: pago.id as string,
+          pagoCreado,
+          duplicado: !pagoCreado,
+          estado: pago.estado as EstadoPagoValor,
+          membresiaRenovada,
+          membresiaVencida,
+          proximaRenovacion,
+          membresiaId: membresia?.id ?? null,
+          usuarioId: resolvedUserId,
+        };
+      });
+    } catch (err: unknown) {
+      if (!isUniqueViolation(err)) throw err;
+      ultimoError = err;
+    }
+  }
+  throw ultimoError;
+}
+

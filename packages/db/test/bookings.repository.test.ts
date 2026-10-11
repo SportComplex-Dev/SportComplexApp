@@ -591,3 +591,95 @@ test("TSK-BE-23: read-only availability clamps over-discount and reports mainten
   assert.equal(blockedResult[0].cuposOcupados, 3);
   assert.equal(blockedResult[0].cuposDisponibles, 0);
 });
+
+test("TSK-BE-20 / RN-08: createBookingHold aplica el 30% de descuento automático en ONLINE si el titular tiene membresía VIGENTE", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m1";
+  mock._state.membresias.push({
+    id: 101,
+    usuarioId: memberUserId,
+    planId: 2,
+    estado: "VIGENTE",
+  });
+
+  const slot = addAforoSlot(10);
+  const hold = await createBookingHold(requestFor(slot, 2, memberUserId));
+
+  // Tarifa = 2500, 2 cupos => subtotal = 5000
+  assert.equal(Number(hold.subtotal), 5000);
+  assert.equal(Number(hold.descuentoPct), 30);
+  // 5000 - 30% = 3500
+  assert.equal(Number(hold.total), 3500);
+  assert.equal(hold.membresiaId, 101);
+  assert.equal(hold.canal, "ONLINE");
+});
+
+test("TSK-BE-20 / RN-08 (Criterio Clave): createBookingHold aplica el 30% de descuento en canal TAQUILLA", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m2";
+  const vendedorId = "00000000-0000-4000-8000-0000000000v1";
+  mock._state.membresias.push({
+    id: 102,
+    usuarioId: memberUserId,
+    planId: 2,
+    estado: "VIGENTE",
+  });
+
+  const slot = addAforoSlot(10);
+  const hold = await createBookingHold({
+    ...requestFor(slot, 1, memberUserId),
+    canal: "TAQUILLA",
+    vendedorId,
+  });
+
+  // Tarifa = 2500 => subtotal = 2500
+  assert.equal(Number(hold.subtotal), 2500);
+  assert.equal(Number(hold.descuentoPct), 30);
+  // 2500 - 30% = 1750
+  assert.equal(Number(hold.total), 1750);
+  assert.equal(hold.membresiaId, 102);
+  assert.equal(hold.canal, "TAQUILLA");
+  assert.equal(hold.vendedorId, vendedorId);
+  // El descuento nunca supera el monto de la reserva
+  assert.ok(Number(hold.subtotal) - Number(hold.total) <= Number(hold.subtotal));
+});
+
+test("TSK-BE-20 / RN-08: createBookingHoldCart aplica el 30% a cada ítem del carrito para titular con membresía VIGENTE", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m3";
+  mock._state.membresias.push({
+    id: 103,
+    usuarioId: memberUserId,
+    planId: 1,
+    estado: "VIGENTE",
+  });
+
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(10);
+
+  const cart = await createBookingHoldCart({
+    items: [
+      {
+        serviceId: slot1.serviceId,
+        startTime: slot1.startsAt.toISOString(),
+        endTime: slot1.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+      {
+        serviceId: slot2.serviceId,
+        startTime: slot2.startsAt.toISOString(),
+        endTime: slot2.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+    ],
+    userId: memberUserId,
+  });
+
+  assert.equal(cart.bookings.length, 2);
+  assert.equal(Number(cart.bookings[0].descuentoPct), 30);
+  assert.equal(Number(cart.bookings[0].total), 1750);
+  assert.equal(cart.bookings[0].membresiaId, 103);
+  assert.equal(Number(cart.bookings[1].descuentoPct), 30);
+  assert.equal(Number(cart.bookings[1].total), 1750);
+  assert.equal(cart.bookings[1].membresiaId, 103);
+  assert.equal(cart.total, 3500);
+});
+
+

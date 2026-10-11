@@ -31,7 +31,7 @@ import { fail, created } from "@/lib/api-response";
  */
 export async function POST(request: Request) {
   try {
-    const authorization = await authorizeApiRequest(["Cliente"]);
+    const authorization = await authorizeApiRequest(["Cliente", "Empleado_Vendedor", "Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
@@ -45,10 +45,17 @@ export async function POST(request: Request) {
       return fail("VALIDATION_ERROR", "Datos de reserva inválidos.", 400, parsed.error.flatten());
     }
 
-    // TX1 — bloqueo transaccional + RESERVA PENDIENTE_PAGO con TTL 30 min.
+    const isStaff = authorization.actor.role === "Empleado_Vendedor" || authorization.actor.role === "Administrador";
+    const titularId = isStaff ? (parsed.data.titularId ?? authorization.actor.id) : authorization.actor.id;
+    const canal = isStaff ? (parsed.data.canal ?? "TAQUILLA") : "ONLINE";
+    const vendedorId = isStaff ? authorization.actor.id : null;
+
+    // TX1 — bloqueo transaccional + RESERVA PENDIENTE_PAGO con TTL 30 min (con 30% descuento si es socio).
     const hold = await createBookingHold({
       ...parsed.data,
-      userId: authorization.actor.id,
+      userId: titularId,
+      canal,
+      vendedorId,
     });
 
     // Stripe Checkout Session (fuera de cualquier transacción).
@@ -56,14 +63,14 @@ export async function POST(request: Request) {
     try {
       checkout = await createStripeCheckoutSession({
         reservaIds: [hold.id],
-        userId: authorization.actor.id,
+        userId: titularId,
         total: hold.total,
         items: [
           {
             reservaId: hold.id,
             servicioNombre: hold.disponibilidad?.servicio?.nombre ?? "",
             cantidadCupos: hold.cantidadCupos,
-            subtotal: Number(hold.subtotal),
+            subtotal: Number(hold.total),
           },
         ],
       });
