@@ -7,14 +7,14 @@ import { prisma } from "../client";
  * `procesarPagoWebhook` ejecuta dentro de UNA transacción:
  *   1. Upsert del registro `PAGO` por `stripe_payment_intent_id`
  *      (UNIQUE desde TSK-BD-06 → `pago_stripe_payment_intent_id_key`).
- * 2. Confirmación condicional de la `RESERVA`
+ *   2. Confirmación condicional de las `RESERVA(s)`
  *      (`PENDIENTE_PAGO → CONFIRMADA`, solo si el pago es `APROBADO`) y
- *      emisión del `TICKET_QR` (`EMITIDO`) de esa reserva (TSK-BE-10 / RF-09).
- * 3. Cancelación condicional de la `RESERVA` en pago `FALLIDO`
+ *      emisión del `TICKET_QR` (`EMITIDO`) de cada reserva (TSK-BE-10 / RF-09).
+ *   3. Cancelación condicional de las `RESERVA(s)` en pago `FALLIDO`
  *      (`PENDIENTE_PAGO → CANCELADA_PAGO`) con restitución de la franja
  *      (`cupos_ocupados -= cantidad`); el job de TTL (TSK-BD-08) cubre los
  *      checkouts abandonados sin webhook, sin doble liberación.
- * 4. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
+ *   4. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
  *
  * Garantías de idempotencia:
  * - Reenviar el mismo webhook (mismo `payment_intent`) N veces deja SIEMPRE
@@ -30,7 +30,8 @@ import { prisma } from "../client";
  *   (un evento tardío de fallo no pisa un pago ya aprobado).
  *
  * Contrato de metadatos Stripe (ver `buildPaymentMetadata` en core):
- *   metadata.bookingId  → reserva a confirmar (opcional)
+ *   metadata.bookingId  → reserva o lista CSV de reservas a confirmar
+ *   metadata.bookingIds → lista CSV explícita de reservas a confirmar
  *   metadata.userId     → usuario dueño del pago (obligatorio)
  *   metadata.membershipId → membresía a activar (opcional)
  */
@@ -63,8 +64,10 @@ export interface ProcesarPagoInput {
   monto: string | number;
   estado: EstadoPagoValor;
   tipo: TipoPagoValor;
-  /** Si el pago confirma una reserva, su id (`reserva.id`). */
+  /** Si el pago confirma una reserva individual, su id (`reserva.id`). */
   reservaId?: string | undefined;
+  /** Si el pago confirma múltiples reservas (carrito conjunto), sus ids. */
+  reservaIds?: string[] | undefined;
   /** Si el pago activa una membresía, su id (`membresia.id`). */
   membresiaId?: number | undefined;
   /**
@@ -85,12 +88,16 @@ export interface ProcesarPagoResultado {
   reservaConfirmada: boolean;
   /** Estado final de la reserva referenciada (si se pasó `reservaId`). */
   reservaEstado: string | null;
-  /** true solo si ESTA corrida emitió el `TICKET_QR` (pago APROBADO). */
+  /** true solo si ESTA corrida emitió al menos un `TICKET_QR` (pago APROBADO). */
   ticketQrEmitido: boolean;
   /** true solo si ESTA corrida canceló la reserva y liberó la franja (FALLIDO). */
   franjaRestituida: boolean;
   /** true solo si ESTA corrida ejecutó la activación de la membresía. */
   membresiaActivada: boolean;
+  /** Lista de IDs de reservas confirmadas en ESTA corrida. */
+  reservasConfirmadas?: string[];
+  /** Mapa de ID de reserva a su estado final. */
+  reservasEstado?: Record<string, string>;
 }
 
 type DbLike = {
@@ -149,7 +156,31 @@ function validateInput(input: ProcesarPagoInput): void {
   if (!TIPOS_PAGO.includes(input.tipo)) {
     throw new PaymentError(`Tipo de pago inválido: ${input.tipo}`, "VALIDATION_ERROR", 400);
   }
+  if (input.reservaIds !== undefined) {
+    if (!Array.isArray(input.reservaIds)) {
+      throw new PaymentError(
+        "reservaIds debe ser un array de strings.",
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    for (const id of input.reservaIds) {
+      if (!id || typeof id !== "string" || !id.trim()) {
+        throw new PaymentError(
+          "Cada reservaId debe ser un string no vacío.",
+          "VALIDATION_ERROR",
+          400,
+        );
+      }
+    }
+  }
 }
+
+type ReservaResumen = {
+  id: string;
+  estado: string;
+  total?: number | string | { toString(): string } | null;
+};
 
 /**
  * Emite el `TICKET_QR` (estado `EMITIDO`) de una reserva confirmada.
@@ -165,8 +196,6 @@ async function emitirTicketQr(
     await tx.ticketQr.create({
       data: {
         reservaId,
-        // UUIDv4 no predecible generado por `@sportcomplex/core` (`newTicketId`).
-        // Si no se provee, la BD aplica su default `uuid()`.
         ...(codigoUuid ? { codigoUuid } : {}),
         estado: "EMITIDO",
       },
@@ -205,7 +234,40 @@ async function restituirFranja(tx: DbLike, reservaId: string): Promise<boolean> 
 async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
 
+  const rawReservaIds =
+    input.reservaIds && input.reservaIds.length > 0
+      ? input.reservaIds
+      : input.reservaId
+        ? [input.reservaId]
+        : [];
+  const targetReservaIds = Array.from(
+    new Set(rawReservaIds.map((id) => id.trim()).filter(Boolean)),
+  );
+
   return db.$transaction(async (tx: DbLike) => {
+    // Si hay reservas vinculadas, consultar existentes y validar monto esperado si tienen total definido
+    let reservasExistentes: ReservaResumen[] = [];
+    if (targetReservaIds.length > 0) {
+      reservasExistentes = (await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+      })) as ReservaResumen[];
+
+      const reservasConTotal = reservasExistentes.filter((r) => r.total != null);
+      if (reservasConTotal.length > 0) {
+        const sumaEsperada = reservasConTotal.reduce(
+          (acc: number, r) => acc + Number(r.total ?? 0),
+          0,
+        );
+        if (normalizeMonto(sumaEsperada) !== monto) {
+          throw new PaymentError(
+            `El monto recibido (${monto}) no coincide con el total esperado de las reservas (${normalizeMonto(sumaEsperada)}).`,
+            "AMOUNT_MISMATCH",
+            400,
+          );
+        }
+      }
+    }
+
     // 1. Upsert de PAGO por identificador natural (stripe_payment_intent_id).
     let pago = await tx.pago.findUnique({
       where: { stripePaymentIntentId: input.stripePaymentIntentId },
@@ -233,45 +295,72 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       pago = { ...pago, estado: input.estado };
     }
 
-    // 2. Confirmación de reserva — update condicional (corazón de la
+    // 2. Confirmación de reserva(s) — update condicional (corazón de la
     //    idempotencia: solo gana quien encuentra PENDIENTE_PAGO).
     let reservaConfirmada = false;
     let reservaEstado: string | null = null;
     let ticketQrEmitido = false;
     let franjaRestituida = false;
-    if (input.reservaId) {
+    const reservasConfirmadas: string[] = [];
+    const reservasEstado: Record<string, string> = {};
+
+    if (targetReservaIds.length > 0) {
       if (input.estado === "APROBADO") {
-        const upd = await tx.reserva.updateMany({
-          where: { id: input.reservaId, estado: "PENDIENTE_PAGO" },
-          data: { estado: "CONFIRMADA", pagoId: pago.id },
-        });
-        const count = typeof upd?.count === "number" ? upd.count : 0;
-        reservaConfirmada = count === 1;
-        // 2b. Emisión del QR: SOLO la corrida que ganó la confirmación emite el
-        //     boleto, de modo que reenviar el mismo webhook no lo duplica.
-        if (reservaConfirmada) {
-          ticketQrEmitido = await emitirTicketQr(
-            tx,
-            input.reservaId,
-            input.ticketCodigoUuid,
-          );
+        const pendientes = reservasExistentes.filter((r) => r.estado === "PENDIENTE_PAGO");
+        const pendientesIds = pendientes.map((r) => r.id);
+
+        if (pendientesIds.length > 0) {
+          const upd = await tx.reserva.updateMany({
+            where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
+            data: { estado: "CONFIRMADA", pagoId: pago.id },
+          });
+          const count = typeof upd?.count === "number" ? upd.count : 0;
+          if (count > 0) {
+            reservasConfirmadas.push(...pendientesIds);
+            for (const rId of pendientesIds) {
+              const emitido = await emitirTicketQr(
+                tx,
+                rId,
+                pendientesIds.length === 1 ? input.ticketCodigoUuid : undefined,
+              );
+              if (emitido) ticketQrEmitido = true;
+            }
+          }
         }
       } else if (input.estado === "FALLIDO") {
-        // 2c. Pago fallido: cancelar la reserva y restituir la franja. Update
-        //     condicional → idempotente y compatible con el TTL (TSK-BD-08):
-        //     quien gane (webhook o job de expiración) libera los cupos una
-        //     sola vez; el otro ve count === 0.
-        const upd = await tx.reserva.updateMany({
-          where: { id: input.reservaId, estado: "PENDIENTE_PAGO" },
-          data: { estado: "CANCELADA_PAGO" },
-        });
-        const count = typeof upd?.count === "number" ? upd.count : 0;
-        if (count === 1) {
-          franjaRestituida = await restituirFranja(tx, input.reservaId);
+        // 2c. Pago fallido: cancelar reservas y restituir franjas
+        const pendientes = reservasExistentes.filter((r) => r.estado === "PENDIENTE_PAGO");
+        const pendientesIds = pendientes.map((r) => r.id);
+
+        if (pendientesIds.length > 0) {
+          const upd = await tx.reserva.updateMany({
+            where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
+            data: { estado: "CANCELADA_PAGO" },
+          });
+          const count = typeof upd?.count === "number" ? upd.count : 0;
+          if (count > 0) {
+            for (const rId of pendientesIds) {
+              const restituido = await restituirFranja(tx, rId);
+              if (restituido) franjaRestituida = true;
+            }
+          }
         }
       }
-      const fila = await tx.reserva.findUnique({ where: { id: input.reservaId } });
-      reservaEstado = (fila?.estado as string | undefined) ?? null;
+
+      // Consultar estado final de todas las reservas procesadas
+      const reservasActualizadas = await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+      });
+      for (const r of reservasActualizadas) {
+        if (r.id && r.estado) {
+          reservasEstado[r.id] = r.estado;
+        }
+      }
+
+      // Compatibilidad campos singulares
+      const primerId = targetReservaIds[0];
+      reservaEstado = reservasEstado[primerId] ?? null;
+      reservaConfirmada = reservasConfirmadas.length > 0;
     }
 
     // 3. Activación de membresía — condicional e idempotente por el mismo motivo.
@@ -295,6 +384,8 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       ticketQrEmitido,
       franjaRestituida,
       membresiaActivada,
+      reservasConfirmadas,
+      reservasEstado,
     };
   }) as Promise<ProcesarPagoResultado>;
 }

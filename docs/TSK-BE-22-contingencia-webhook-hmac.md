@@ -13,3 +13,10 @@ Después del commit se envía un POST con el servicio, motivo y reservas/usuario
 Configurar `N8N_CONTINGENCY_WEBHOOK_URL` y `N8N_CONTINGENCY_HMAC_SECRET` (mínimo 32 caracteres aleatorios) en el entorno del servidor; no guardar secretos reales en el repositorio. El timeout es 2.5 segundos. Respuesta HTTP no exitosa, configuración incompleta o fallo de red se informa como `webhook.sent = false` y se registra, pero no revierte el bloqueo ni las cancelaciones. `webhookEnviadoEn` se actualiza solo tras una respuesta exitosa de n8n. Si n8n respondió exitosamente pero falla la actualización de `webhookEnviadoEn`, la API registra el error y mantiene la respuesta exitosa de la contingencia con `webhookEnviadoRegistrado = false`; no se reintenta automáticamente el webhook.
 
 No se modificó el esquema ni se creó/aplicó una migración. `pnpm --filter web test` incluye las pruebas del webhook y la ruta de contingencia: autorización (401/403), validación (400), respuesta cuando n8n falla y fallo al registrar el despacho. Las pruebas de DB cubren cancelación/liberación de cupos, prevención de doble inhabilitación y conservación de pagos.
+
+## Tarea complementaria: TSK-BE-22b (SCRUM-162)
+
+Para resolver la limitación de entrega cuando n8n se encuentra temporalmente inactivo o inaccesible (evitando que se pierda la notificación a los clientes afectados), se definió **TSK-BE-22b**:
+- **Alcance**: Cola persistente de salida (*Outbox pattern*) en base de datos basada en los registros de `inhabilitacion_servicio` con `webhook_enviado_en IS NULL` o cola dedicada.
+- **Worker/Job**: Proceso de reintentos periódicos con retroceso exponencial (*exponential backoff*), conservando la firma HMAC `X-SportComplex-Signature` hasta recibir HTTP 2xx de n8n o alcanzar el umbral de *dead-letter* (coordinado con TSK-AU-08 / SCRUM-147).
+

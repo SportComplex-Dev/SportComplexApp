@@ -55,11 +55,17 @@ export async function POST(request: Request) {
     let checkout;
     try {
       checkout = await createStripeCheckoutSession({
-        reservaId: hold.id,
+        reservaIds: [hold.id],
         userId: authorization.actor.id,
         total: hold.total,
-        cantidadCupos: hold.cantidadCupos,
-        servicioNombre: hold.disponibilidad?.servicio?.nombre,
+        items: [
+          {
+            reservaId: hold.id,
+            servicioNombre: hold.disponibilidad?.servicio?.nombre ?? "",
+            cantidadCupos: hold.cantidadCupos,
+            subtotal: Number(hold.subtotal),
+          },
+        ],
       });
     } catch (err) {
       // Compensación: liberar el hold; nunca se crea PAGO.
