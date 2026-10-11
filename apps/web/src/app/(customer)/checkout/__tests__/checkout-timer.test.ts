@@ -69,6 +69,11 @@ test('TSK-FE-09 / HU-09: Bloqueo de acción de pago cuando el tiempo llega a cer
   // Tiempo expirado: acción bloqueada
   assert.equal(isPaymentBlocked(0), true)
   assert.equal(isPaymentBlocked(-1), true)
+
+  // Fail-secure SEC-01: valores no finitos (NaN, Infinity) bloquean el pago
+  assert.equal(isPaymentBlocked(Number.NaN), true)
+  assert.equal(isPaymentBlocked(Infinity), true)
+  assert.equal(isPaymentBlocked(-Infinity), true)
 })
 
 test('TSK-FE-09 / HU-09: Cálculo de barra de progreso proporcional', () => {
@@ -78,4 +83,15 @@ test('TSK-FE-09 / HU-09: Cálculo de barra de progreso proporcional', () => {
   assert.equal(calculateProgressPercentage(0, 1800), 0)
   assert.equal(calculateProgressPercentage(-50, 1800), 0)
   assert.equal(calculateProgressPercentage(2000, 1800), 100)
+
+  // Casos de borde no numéricos o totales inválidos
+  assert.equal(calculateProgressPercentage(Number.NaN, 1800), 0)
+  assert.equal(calculateProgressPercentage(900, 0), 0)
+  assert.equal(calculateProgressPercentage(900, -100), 0)
+  assert.equal(calculateProgressPercentage(900, Number.NaN), 0)
+})
+
+test('TSK-FE-09 / HU-09: Manejo seguro de NaN en formatCountdown y getTimerStatus', () => {
+  assert.equal(formatCountdown(Number.NaN), '00:00')
+  assert.equal(getTimerStatus(Number.NaN), 'expired')
 })

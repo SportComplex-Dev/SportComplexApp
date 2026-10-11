@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { AlertTriangle, Clock, Hourglass, RotateCcw, XCircle } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
 import {
@@ -33,6 +33,11 @@ export function CheckoutTimer({
   isExpired: forcedExpired,
   className = '',
 }: CheckoutTimerProps) {
+  const onExpireRef = useRef(onExpire)
+  useEffect(() => {
+    onExpireRef.current = onExpire
+  }, [onExpire])
+
   // Calculamos los segundos restantes
   const calculateRemaining = (): number => {
     if (forcedExpired) return 0
@@ -56,13 +61,13 @@ export function CheckoutTimer({
         clearInterval(interval)
         if (!hasNotifiedExpire) {
           setHasNotifiedExpire(true)
-          onExpire?.()
+          onExpireRef.current?.()
         }
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [expiresAt, forcedExpired, hasNotifiedExpire, onExpire, initialSeconds])
+  }, [expiresAt, forcedExpired, hasNotifiedExpire, initialSeconds])
 
   const status = getTimerStatus(forcedExpired ? 0 : remaining)
   const isExpired = status === 'expired'
@@ -76,6 +81,15 @@ export function CheckoutTimer({
 
   return (
     <div className={`checkout-timer-card ${className}`}>
+      {/* Región viva discreta para lectores de pantalla solo en hitos críticos (A11Y-01) */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {isExpired
+          ? 'El tiempo de reserva ha expirado. El cupo fue liberado.'
+          : isWarning
+            ? `Atención: Quedan menos de 5 minutos para completar la reserva (${formattedTime})`
+            : ''}
+      </div>
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center gap-3">
           <div
@@ -83,7 +97,7 @@ export function CheckoutTimer({
               isExpired
                 ? 'bg-red-500/10 text-red-500'
                 : isWarning
-                  ? 'bg-amber-500/10 text-amber-500 animate-pulse'
+                  ? 'bg-amber-500/10 text-amber-500 motion-safe:animate-pulse'
                   : 'bg-[var(--surface-soft)] text-[#4b7652] dark:text-[#9ee285]'
             }`}
           >
@@ -92,7 +106,7 @@ export function CheckoutTimer({
             ) : isWarning ? (
               <AlertTriangle size={22} />
             ) : (
-              <Hourglass size={20} className="animate-spin-slow" />
+              <Hourglass size={20} className="motion-safe:animate-spin-slow" />
             )}
           </div>
           <div>
@@ -122,7 +136,8 @@ export function CheckoutTimer({
         <div className="flex items-center gap-3 self-end sm:self-center">
           <div
             role="timer"
-            aria-live="polite"
+            aria-live="off"
+            aria-label={`Tiempo restante: ${formattedTime}`}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-mono font-bold text-[18px] border ${
               isExpired
                 ? 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400'
@@ -131,35 +146,28 @@ export function CheckoutTimer({
                   : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)]'
             }`}
           >
-            <Clock size={16} className={isWarning ? 'animate-bounce' : ''} />
+            <Clock size={16} className={isWarning ? 'motion-safe:animate-bounce' : ''} />
             <span>{formattedTime}</span>
           </div>
-
-          {isExpired && onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--surface-soft)] hover:bg-[var(--line)] text-[var(--ink)] transition-colors cursor-pointer"
-            >
-              <RotateCcw size={13} /> Reintentar
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Barra de progreso de tiempo */}
+      {/* Barra de progreso con aceleración por hardware GPU (PERF-01) */}
       {!isExpired && (
         <div className="w-full bg-[var(--line)] h-1 rounded-b-xl overflow-hidden -mt-1">
           <div
-            className={`h-full transition-all duration-1000 ${
+            className={`h-full w-full origin-left transition-transform duration-1000 ease-linear ${
               isWarning ? 'bg-amber-500' : 'bg-[#557b53] dark:bg-[#8cd766]'
             }`}
-            style={{ width: `${percentRemaining}%` }}
+            style={{
+              transform: `scaleX(${Math.max(0, Math.min(1, percentRemaining / 100))})`,
+              transformOrigin: 'left',
+            }}
           />
         </div>
       )}
 
-      {/* Alerta si el tiempo expiró */}
+      {/* Alerta unificada si el tiempo expiró con acción clara (UI-01) */}
       {isExpired && (
         <div className="mt-3 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-700 dark:text-red-300 flex items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">

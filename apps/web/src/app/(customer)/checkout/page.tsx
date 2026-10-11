@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -76,22 +76,22 @@ export default function CheckoutPage() {
     }
   }, [draft, setDraft])
 
-  const handleExpire = () => {
+  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
+  const category = item ? categoryBySlug(item.category) : undefined
+
+  const handleExpire = useCallback(() => {
     setIsExpired(true)
     notify('El tiempo de reserva de 30 minutos ha finalizado. El cupo ha sido liberado.', 'error')
-  }
+  }, [notify])
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     setDraft(null)
     if (item) {
       router.push(`/services/${item.category}/${item.id}`)
     } else {
       router.push('/services')
     }
-  }
-
-  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
-  const category = item ? categoryBySlug(item.category) : undefined
+  }, [item, router, setDraft])
 
   if (!draft || !item || !category) {
     return (

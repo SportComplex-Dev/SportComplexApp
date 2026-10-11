@@ -9,6 +9,7 @@ export const WARNING_THRESHOLD_SECONDS = 300; // Últimos 5 minutos
  * Formatea segundos en formato MM:SS garantizando padding de 2 dígitos.
  */
 export function formatCountdown(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '00:00';
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const mins = Math.floor(safeSeconds / 60);
   const secs = safeSeconds % 60;
@@ -23,7 +24,7 @@ export function calculateRemainingSeconds(
   nowMs: number = Date.now(),
   defaultSeconds: number = CHECKOUT_TTL_SECONDS
 ): number {
-  if (expiresAt === undefined || expiresAt === null) {
+  if (expiresAt === undefined || expiresAt === null || !Number.isFinite(expiresAt)) {
     return defaultSeconds;
   }
   const diffMs = expiresAt - nowMs;
@@ -36,15 +37,17 @@ export type TimerStatus = 'active' | 'warning' | 'expired';
  * Determina el estado del cupo según los segundos restantes.
  */
 export function getTimerStatus(remainingSeconds: number): TimerStatus {
-  if (remainingSeconds <= 0) return 'expired';
+  if (!Number.isFinite(remainingSeconds) || remainingSeconds <= 0) return 'expired';
   if (remainingSeconds <= WARNING_THRESHOLD_SECONDS) return 'warning';
   return 'active';
 }
 
 /**
  * Verifica si la acción de pago debe ser bloqueada por expiración del cupo.
+ * Falla de forma cerrada (fail-secure): valores no finitos (NaN, Infinity) bloquean el pago.
  */
 export function isPaymentBlocked(remainingSeconds: number): boolean {
+  if (!Number.isFinite(remainingSeconds)) return true;
   return remainingSeconds <= 0;
 }
 
@@ -55,7 +58,7 @@ export function calculateProgressPercentage(
   remainingSeconds: number,
   totalSeconds: number = CHECKOUT_TTL_SECONDS
 ): number {
-  if (totalSeconds <= 0) return 0;
+  if (!Number.isFinite(remainingSeconds) || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return 0;
   const ratio = (remainingSeconds / totalSeconds) * 100;
   return Math.min(100, Math.max(0, ratio));
 }
