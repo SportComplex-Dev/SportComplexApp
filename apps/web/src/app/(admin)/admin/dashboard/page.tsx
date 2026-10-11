@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Building2,
   Calendar,
@@ -17,6 +18,10 @@ import {
 import { formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { useApp } from '@/components/app-provider'
+
+function getBogotaDateString(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d)
+}
 
 export interface AnalyticsSummary {
   totalAttendance: number
@@ -85,16 +90,17 @@ export default function AdminDashboardPage() {
   const [startDate, setStartDate] = useState<string>(() => {
     const d = new Date()
     d.setDate(d.getDate() - 7)
-    return d.toISOString().slice(0, 10)
+    return getBogotaDateString(d)
   })
-  const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [endDate, setEndDate] = useState<string>(() => getBogotaDateString())
 
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const handleRangeChange = (range: 'today' | '7d' | '30d') => {
     setQuickRange(range)
-    const today = new Date().toISOString().slice(0, 10)
+    const today = getBogotaDateString()
     setEndDate(today)
 
     if (range === 'today') {
@@ -102,16 +108,17 @@ export default function AdminDashboardPage() {
     } else if (range === '7d') {
       const d = new Date()
       d.setDate(d.getDate() - 7)
-      setStartDate(d.toISOString().slice(0, 10))
+      setStartDate(getBogotaDateString(d))
     } else if (range === '30d') {
       const d = new Date()
       d.setDate(d.getDate() - 30)
-      setStartDate(d.toISOString().slice(0, 10))
+      setStartDate(getBogotaDateString(d))
     }
   }
 
   const fetchAnalytics = async () => {
     setIsLoading(true)
+    setFetchError(null)
     try {
       const params = new URLSearchParams({
         period,
@@ -121,67 +128,59 @@ export default function AdminDashboardPage() {
       const res = await fetch(`/api/admin/analytics?${params.toString()}`)
       const json = await res.json()
 
-      if (json.success && json.data) {
+      if (res.ok && json.success && json.data) {
         setData(json.data)
       } else {
-        // Mock fallback seguro y rico para desarrollo local
-        setData({
-          summary: {
-            totalAttendance: 142,
-            totalTransactions: 98,
-            totalRevenue: 6850000,
-            uniqueAttendees: 89,
-            totalBookings: 112,
-            totalSpotsSold: 185,
-          },
-          attendance: [
-            { date: '2026-10-04', ticketsUsed: 15, uniqueUsers: 12 },
-            { date: '2026-10-05', ticketsUsed: 22, uniqueUsers: 18 },
-            { date: '2026-10-06', ticketsUsed: 19, uniqueUsers: 15 },
-            { date: '2026-10-07', ticketsUsed: 28, uniqueUsers: 21 },
-            { date: '2026-10-08', ticketsUsed: 24, uniqueUsers: 20 },
-            { date: '2026-10-09', ticketsUsed: 31, uniqueUsers: 25 },
-            { date: '2026-10-10', ticketsUsed: 35, uniqueUsers: 28 },
-          ],
-          revenue: [],
-          periodBreakdown: {
-            period,
-            items: [
-              { periodKey: '2026-10-04', periodLabel: '04 Oct', attendance: 15, transactions: 11, revenue: 780000 },
-              { periodKey: '2026-10-05', periodLabel: '05 Oct', attendance: 22, transactions: 14, revenue: 950000 },
-              { periodKey: '2026-10-06', periodLabel: '06 Oct', attendance: 19, transactions: 12, revenue: 820000 },
-              { periodKey: '2026-10-07', periodLabel: '07 Oct', attendance: 28, transactions: 18, revenue: 1240000 },
-              { periodKey: '2026-10-08', periodLabel: '08 Oct', attendance: 24, transactions: 16, revenue: 1100000 },
-              { periodKey: '2026-10-09', periodLabel: '09 Oct', attendance: 31, transactions: 21, revenue: 1450000 },
-              { periodKey: '2026-10-10', periodLabel: '10 Oct', attendance: 35, transactions: 24, revenue: 1620000 },
-            ],
-          },
-          categoryPerformance: [
-            { categoryId: 1, categoryName: 'Canchas Sintéticas', categoryType: 'CANCHA', totalBookings: 54, totalSpotsSold: 98, totalRevenue: 3450000, revenuePercentage: 50.3 },
-            { categoryId: 2, categoryName: 'Piscinas Olímpicas', categoryType: 'PISCINA', totalBookings: 32, totalSpotsSold: 52, totalRevenue: 1820000, revenuePercentage: 26.6 },
-            { categoryId: 3, categoryName: 'Gimnasio & Crossfit', categoryType: 'GIMNASIO', totalBookings: 20, totalSpotsSold: 28, totalRevenue: 1180000, revenuePercentage: 17.2 },
-            { categoryId: 4, categoryName: 'Zona Húmeda & Sauna', categoryType: 'ZONA_HUMEDA', totalBookings: 6, totalSpotsSold: 7, totalRevenue: 400000, revenuePercentage: 5.9 },
-          ],
-          servicesComparison: [
-            { serviceId: 1, serviceName: 'Fútbol 5 · Cancha Techada', modality: 'EXCLUSIVA', totalSold: 38, totalUsed: 36, totalRevenue: 2850000 },
-            { serviceId: 2, serviceName: 'Piscina · Nado Libre Matutino', modality: 'AFORO', totalSold: 42, totalUsed: 39, totalRevenue: 1260000 },
-            { serviceId: 3, serviceName: 'Tenis de Campo · Cancha 1', modality: 'EXCLUSIVA', totalSold: 16, totalUsed: 15, totalRevenue: 960000 },
-            { serviceId: 4, serviceName: 'Gimnasio · Pase Libre Full Day', modality: 'AFORO', totalSold: 28, totalUsed: 25, totalRevenue: 840000 },
-            { serviceId: 5, serviceName: 'Clase Hidrogimnasia Guiada', modality: 'AFORO', totalSold: 10, totalUsed: 9, totalRevenue: 450000 },
-          ],
-          filters: {
-            startDate,
-            endDate,
-            period,
-            timezone: 'America/Bogota',
-          },
-        })
+        throw new Error(json.error?.message ?? 'No se pudo sincronizar la analítica con el servidor.')
       }
-    } catch {
-      notify('Error al sincronizar analítica con el servidor.', 'error')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al sincronizar analítica con el servidor.'
+      setFetchError(msg)
+      setData(null)
+      notify(msg, 'error')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleExportCsv = () => {
+    if (!data || !data.servicesComparison || data.servicesComparison.length === 0) {
+      notify('No hay datos analíticos disponibles para exportar.', 'error')
+      return
+    }
+
+    const headers = [
+      'Servicio / Escenario',
+      'Modalidad',
+      'Cupos Vendidos',
+      'Cupos Usados (Puerta)',
+      'Tasa Redencion (%)',
+      'Recaudacion Total (COP)',
+    ]
+
+    const rows = data.servicesComparison.map((serv) => {
+      const redemptionRate = serv.totalSold > 0 ? Math.round((serv.totalUsed / serv.totalSold) * 100) : 0
+      return [
+        `"${serv.serviceName.replace(/"/g, '""')}"`,
+        `"${serv.modality}"`,
+        serv.totalSold,
+        serv.totalUsed,
+        redemptionRate,
+        serv.totalRevenue,
+      ].join(',')
+    })
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `informe-operacion-${startDate}-a-${endDate}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    notify('Informe CSV exportado y descargado exitosamente.', 'success')
   }
 
   useEffect(() => {
@@ -306,6 +305,27 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* Error de Conexión / Servidor */}
+      {fetchError && (
+        <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-red-700 dark:text-red-300 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="shrink-0 text-red-600" />
+            <div>
+              <p className="font-bold">Error de sincronización analítica</p>
+              <p className="text-[11px] opacity-90">{fetchError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fetchAnalytics}
+            disabled={isLoading}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* Los 4 Indicadores Clave (KPIs Primarios) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Recaudación Stripe */}
@@ -405,7 +425,7 @@ export default function AdminDashboardPage() {
               </div>
             ) : (
               breakdownItems.map((item, idx) => {
-                const heightPct = Math.max(8, (item.attendance / maxAttendance) * 100)
+                const heightPct = item.attendance === 0 ? 0 : Math.max(4, (item.attendance / maxAttendance) * 100)
                 return (
                   <div
                     key={item.periodKey || idx}
@@ -455,7 +475,7 @@ export default function AdminDashboardPage() {
               </div>
             ) : (
               breakdownItems.map((item, idx) => {
-                const heightPct = Math.max(8, (item.revenue / maxRevenue) * 100)
+                const heightPct = item.revenue === 0 ? 0 : Math.max(4, (item.revenue / maxRevenue) * 100)
                 return (
                   <div
                     key={item.periodKey || idx}
@@ -543,7 +563,7 @@ export default function AdminDashboardPage() {
           </div>
           <button
             type="button"
-            onClick={() => notify('Exportación a CSV generada con éxito.', 'success')}
+            onClick={handleExportCsv}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--line)] text-xs font-semibold hover:bg-[var(--surface-soft)] text-[var(--ink)] transition-colors cursor-pointer"
           >
             <Download size={13} /> Exportar informe

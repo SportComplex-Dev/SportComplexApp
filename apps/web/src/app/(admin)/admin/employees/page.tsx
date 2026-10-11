@@ -57,60 +57,24 @@ export default function AdminEmployeesPage() {
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<Employee | null>(null)
   const [isDeactivating, setIsDeactivating] = useState(false)
 
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
   const fetchEmployees = async () => {
     setIsLoading(true)
+    setFetchError(null)
     try {
       const res = await fetch('/api/admin/employees')
       const json = await res.json()
-      if (json.success && Array.isArray(json.data)) {
+      if (res.ok && json.success && Array.isArray(json.data)) {
         setEmployees(json.data)
       } else {
-        // Carga de respaldo local para entorno estático/demo
-        setEmployees([
-          {
-            id: 'emp-1',
-            nombre: 'Sebastián Mendoza',
-            correo: 'admin@sportcomplex.co',
-            estado: 'ACTIVO',
-            creadoEn: '2026-09-01T08:00:00Z',
-            deletedAt: null,
-            rolId: 1,
-            rol: { id: 1, nombre: 'ADMIN' },
-          },
-          {
-            id: 'emp-2',
-            nombre: 'Andrés Muñoz',
-            correo: 'andres.taquilla@sportcomplex.co',
-            estado: 'ACTIVO',
-            creadoEn: '2026-09-15T09:30:00Z',
-            deletedAt: null,
-            rolId: 2,
-            rol: { id: 2, nombre: 'VENDEDOR' },
-          },
-          {
-            id: 'emp-3',
-            nombre: 'Carolina Gómez',
-            correo: 'carolina.torniquete@sportcomplex.co',
-            estado: 'ACTIVO',
-            creadoEn: '2026-09-20T14:15:00Z',
-            deletedAt: null,
-            rolId: 3,
-            rol: { id: 3, nombre: 'LECTOR' },
-          },
-          {
-            id: 'emp-4',
-            nombre: 'Felipe Restrepo',
-            correo: 'felipe.antiguo@sportcomplex.co',
-            estado: 'INACTIVO',
-            creadoEn: '2026-08-10T10:00:00Z',
-            deletedAt: '2026-09-28T16:45:00Z',
-            rolId: 2,
-            rol: { id: 2, nombre: 'VENDEDOR' },
-          },
-        ])
+        throw new Error(json.error?.message ?? 'No se pudo cargar la lista de empleados.')
       }
-    } catch {
-      notify('No se pudo conectar con el servidor. Mostrando datos locales.', 'error')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al conectar con el servidor.'
+      setFetchError(msg)
+      setEmployees([])
+      notify(msg, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -270,6 +234,27 @@ export default function AdminEmployeesPage() {
           </ActionButton>
         </div>
       </div>
+
+      {/* Error de Conexión / Servidor */}
+      {fetchError && (
+        <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-red-700 dark:text-red-300 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="shrink-0 text-red-600" />
+            <div>
+              <p className="font-bold">Error de sincronización con el servidor</p>
+              <p className="text-[11px] opacity-90">{fetchError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fetchEmployees}
+            disabled={isLoading}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -449,13 +434,19 @@ export default function AdminEmployeesPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         {isActive ? (
-                          <button
-                            type="button"
-                            onClick={() => setDeactivatingEmployee(emp)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-red-600 hover:bg-red-500/10 border border-red-500/20 transition-colors cursor-pointer"
-                          >
-                            <UserX size={13} /> Dar de baja
-                          </button>
+                          emp.rol?.nombre?.toUpperCase().includes('ADMIN') ? (
+                            <span className="text-[11px] font-medium text-[var(--subtle)] italic">
+                              Administrador
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDeactivatingEmployee(emp)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-red-600 hover:bg-red-500/10 border border-red-500/20 transition-colors cursor-pointer"
+                            >
+                              <UserX size={13} /> Dar de baja
+                            </button>
+                          )
                         ) : (
                           <span className="text-[11px] font-medium text-[var(--subtle)] italic">
                             Acceso revocado

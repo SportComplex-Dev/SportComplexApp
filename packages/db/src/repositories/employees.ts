@@ -97,9 +97,10 @@ export async function createEmployee(
   options: { db?: AnyDb } = {},
 ): Promise<EmployeeItem> {
   const db: AnyDb = options.db ?? prisma;
+  const normalizedEmail = data.correo.trim().toLowerCase();
 
   const existing = await db.usuario.findUnique({
-    where: { correo: data.correo },
+    where: { correo: normalizedEmail },
     select: { id: true },
   });
 
@@ -117,45 +118,61 @@ export async function createEmployee(
   if (targetRolNombre === "EMPLEADO_VENDEDOR") targetRolNombre = "VENDEDOR";
   if (targetRolNombre === "EMPLEADO_LECTOR") targetRolNombre = "LECTOR";
 
-  let rol = await db.rol.findFirst({
+  const rol = await db.rol.findFirst({
     where: {
       OR: [
         { nombre: targetRolNombre },
-        { nombre: data.rolNombre },
+        { nombre: data.rolNombre.trim() },
       ],
     },
     select: { id: true, nombre: true },
   });
 
   if (!rol) {
-    // Si no existe, crear o buscar rol por defecto
-    rol = await db.rol.create({
-      data: { nombre: targetRolNombre },
-      select: { id: true, nombre: true },
-    });
+    throw new EmployeeError(
+      `El rol "${data.rolNombre}" no existe en el catálogo del sistema.`,
+      "ROLE_NOT_FOUND",
+      400,
+    );
   }
 
-  const created = await db.usuario.create({
-    data: {
-      nombre: data.nombre.trim(),
-      correo: data.correo.trim().toLowerCase(),
-      rolId: rol.id,
-      passwordHash: data.passwordHash,
-      estado: "ACTIVO",
-    },
-    select: {
-      id: true,
-      nombre: true,
-      correo: true,
-      estado: true,
-      creadoEn: true,
-      deletedAt: true,
-      rolId: true,
-      rol: { select: { id: true, nombre: true } },
-    },
-  });
+  try {
+    const created = await db.usuario.create({
+      data: {
+        nombre: data.nombre.trim(),
+        correo: normalizedEmail,
+        rolId: rol.id,
+        passwordHash: data.passwordHash,
+        estado: "ACTIVO",
+      },
+      select: {
+        id: true,
+        nombre: true,
+        correo: true,
+        estado: true,
+        creadoEn: true,
+        deletedAt: true,
+        rolId: true,
+        rol: { select: { id: true, nombre: true } },
+      },
+    });
 
-  return created as EmployeeItem;
+    return created as EmployeeItem;
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: string }).code === "P2002"
+    ) {
+      throw new EmployeeError(
+        "Ya existe un usuario registrado con este correo electrónico.",
+        "EMAIL_ALREADY_EXISTS",
+        409,
+      );
+    }
+    throw err;
+  }
 }
 
 /**

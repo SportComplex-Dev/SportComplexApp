@@ -908,13 +908,14 @@ export function createMockPrisma() {
           { id: 3, nombre: "LECTOR" },
           { id: 4, nombre: "CLIENTE" },
         ];
-        let found = roles[0];
+        let found: { id: number; nombre: string } | null = null;
         if (where?.nombre) {
-          found = roles.find((r) => r.nombre === where.nombre) ?? { id: 2, nombre: where.nombre };
+          found = roles.find((r) => r.nombre === where.nombre) ?? null;
         } else if (where?.OR) {
           const names = where.OR.map((o: any) => o.nombre);
-          found = roles.find((r) => names.includes(r.nombre)) ?? { id: 2, nombre: names[0] };
+          found = roles.find((r) => names.includes(r.nombre)) ?? null;
         }
+        if (!found) return null;
         if (!select) return found;
         const picked: Record<string, unknown> = {};
         for (const key of Object.keys(select)) {
