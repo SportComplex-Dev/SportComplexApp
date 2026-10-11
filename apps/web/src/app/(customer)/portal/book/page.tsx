@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,12 +21,14 @@ import { Badge } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
 import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
-import { useCatalog } from '@/lib/stores'
+import { useCatalog, useDraft } from '@/lib/stores'
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
 
 export default function CustomerBookPage() {
+  const router = useRouter()
   const { notify } = useApp()
   const [catalog] = useCatalog()
+  const [, setDraft] = useDraft()
 
   // Filtros de categoría y servicio seleccionado
   const [selectedCategory, setSelectedCategory] = useState<string>('todas')
@@ -323,10 +326,17 @@ export default function CustomerBookPage() {
                   disabled={!selectedSlot || !selectedSlot.isAvailable}
                   onClick={() => {
                     if (!selectedSlot) return
+                    setDraft({
+                      itemId: selectedService.id,
+                      date: selectedDate,
+                      time: selectedSlot.time,
+                      attendees: effectiveAttendees,
+                    })
                     notify(
                       `Reserva preparada para ${selectedService.name} el ${selectedDate} a las ${selectedSlot.time}.`,
                       'success'
                     )
+                    router.push('/checkout')
                   }}
                   className="w-full sm:w-auto"
                 >

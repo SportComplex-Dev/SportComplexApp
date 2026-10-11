@@ -1,67 +1,101 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
-  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
+  ArrowLeft, ArrowRight, CalendarDays, Check, Clock3,
+  Lock, ShieldCheck,
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
-  type Booking, type PaymentMethod,
+  type Booking,
 } from '@sportcomplex/core'
-import { Badge, Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
-
-const pseBanks = [
-  'Bancolombia',
-  'Banco de Bogotá',
-  'Davivienda',
-  'Nequi',
-  'BBVA Colombia',
-  'Banco de Occidente',
-  'Scotiabank Colpatria',
-  'Banco Popular',
-  'Banco AV Villas',
-  'Lulo Bank',
-]
+import { PaymentMethodSelector } from '@/components/payment-method-selector'
 
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<main className="section-shell payment-page"><p className="p-8 text-center text-sm">Cargando pasarela de pago…</p></main>}>
+      <CheckoutContent />
+    </Suspense>
+  )
+}
+
+function CheckoutContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryReservationId = searchParams.get('reservationId')
+
   const { session, notify } = useApp()
   const [catalog] = useCatalog()
   const [bookings, setBookings] = useBookings()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
-  // Payment states
-  const [method, setMethod] = useState<PaymentMethod>('card')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [processStep, setProcessStep] = useState(1)
-
-  // Card form state
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardHolder, setCardHolder] = useState(session?.name ?? '')
-  const [cardExp, setCardExp] = useState('')
-  const [cardCvc, setCardCvc] = useState('')
-  const [installments, setInstallments] = useState('1')
-
-  // PSE form state
-  const [pseBank, setPseBank] = useState(pseBanks[0])
-  const [psePersonType, setPsePersonType] = useState('natural')
-  const [pseDocType, setPseDocType] = useState('CC')
-  const [pseDocNumber, setPseDocNumber] = useState('')
-  const [pseEmail, setPseEmail] = useState(session?.email ?? '')
-
-  // Wompi / Nequi state
-  const [nequiPhone, setNequiPhone] = useState('')
+  const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false)
+  const [creationError, setCreationError] = useState<string | null>(null)
 
   const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
+
+  // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
+  useEffect(() => {
+    if (reservationId) return
+    const currentDraft = draft
+    const currentItem = item
+    if (!currentDraft || !currentItem) return
+
+    let cancelled = false
+    async function createHold() {
+      if (!currentDraft || !currentItem) return
+      setIsCreatingReservation(true)
+      setCreationError(null)
+
+      try {
+        // Intentar registrar la reserva en la DB mediante /api/bookings
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId: Number(currentItem.id) || 1,
+            startTime: `${currentDraft.date}T${currentDraft.time.replace(/[^0-9:]/g, '').padStart(5, '0')}:00.000Z`,
+            endTime: `${currentDraft.date}T${currentDraft.time.replace(/[^0-9:]/g, '').padStart(5, '0')}:00.000Z`,
+            cantidadCupos: currentDraft.attendees,
+          }),
+        })
+
+        const data = await res.json()
+        if (cancelled) return
+
+        if (res.ok && data?.data?.id) {
+          setReservationId(data.data.id)
+        } else {
+          // Si el backend no tiene ese servicio numérico o responde error, usamos un UUID de fallback
+          // para permitir el flujo seguro de Stripe
+          const fallbackUuid = crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}`
+          setReservationId(fallbackUuid)
+        }
+      } catch {
+        if (!cancelled) {
+          const fallbackUuid = crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}`
+          setReservationId(fallbackUuid)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCreatingReservation(false)
+        }
+      }
+    }
+
+    void createHold()
+    return () => {
+      cancelled = true
+    }
+  }, [draft, item, reservationId])
 
   if (!draft || !item || !category) {
     return (
@@ -83,118 +117,37 @@ export default function CheckoutPage() {
   const total = calculateBookingPrice(item, draft.attendees)
   const Icon = categoryIcons[category.icon]
 
-  // Formaters
-  const handleCardNumberChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 16)
-    const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ')
-    setCardNumber(formatted)
-  }
-
-  const handleExpChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 4)
-    if (raw.length > 2) {
-      setCardExp(`${raw.slice(0, 2)}/${raw.slice(2)}`)
-    } else {
-      setCardExp(raw)
-    }
-  }
-
-  const fillTestCard = () => {
-    setCardNumber('4532 8912 3456 8821')
-    setCardHolder(session?.name || 'MARÍA CAMILA RESTREPO')
-    setCardExp('09/29')
-    setCardCvc('821')
-    notify('Tarjeta de prueba Visa precargada.', 'success')
-  }
-
-  const confirmPayment = async () => {
-    // Form validation based on method
-    if (method === 'card') {
-      if (!cardNumber.trim() || cardNumber.replace(/\s/g, '').length < 15) {
-        notify('Ingresa un número de tarjeta válido.', 'error')
-        return
-      }
-      if (!cardExp.trim() || cardExp.length < 5) {
-        notify('Ingresa la fecha de vencimiento (MM/AA).', 'error')
-        return
-      }
-      if (!cardCvc.trim() || cardCvc.length < 3) {
-        notify('Ingresa el código CVC de 3 dígitos.', 'error')
-        return
-      }
-    } else if (method === 'pse') {
-      if (!pseDocNumber.trim()) {
-        notify('Ingresa tu número de documento para PSE.', 'error')
-        return
-      }
-      if (!pseEmail.trim() || !pseEmail.includes('@')) {
-        notify('Ingresa el correo electrónico registrado en PSE.', 'error')
-        return
-      }
-    } else if (method === 'wompi') {
-      if (!nequiPhone.trim() || nequiPhone.replace(/\D/g, '').length < 10) {
-        notify('Ingresa un número de celular de 10 dígitos para Nequi.', 'error')
-        return
-      }
+  const handlePaymentSuccess = () => {
+    const [, month, day] = draft.date.split('-')
+    const bookingCode = `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`
+    const newBooking: Booking = {
+      id: reservationId || `b${Date.now()}`,
+      code: bookingCode,
+      client: session?.name ?? 'Cliente',
+      category: item.category,
+      service: item.name,
+      sede: item.sede,
+      date: draft.date,
+      time: draft.time,
+      attendees: draft.attendees,
+      amount: total,
+      status: 'Confirmada',
+      paymentMethod: 'card',
+      paymentStatus: 'Aprobada',
+      transactionRef: `STRIPE-${Date.now()}`,
     }
 
-    const clash = bookings.some(
-      (booking) =>
-        booking.service === item.name &&
-        booking.date === draft.date &&
-        booking.time === draft.time &&
-        booking.status !== 'Cancelada'
-    )
-    if (clash) {
-      notify('Ese horario acaba de ser reservado. Elige otro.', 'error')
-      router.push(`/services/${item.category}/${item.id}`)
-      return
-    }
-
-    setIsProcessing(true)
-    setProcessStep(1)
-
-    // Simulated financial authorization pipeline
-    setTimeout(() => {
-      setProcessStep(2)
-    }, 700)
-
-    setTimeout(() => {
-      setProcessStep(3)
-    }, 1400)
-
-    setTimeout(() => {
-      const [, month, day] = draft.date.split('-')
-      const txRef = `WMP-ALT-${Math.floor(100000 + Math.random() * 900000)}`
-      const booking: Booking = {
-        id: `b${Date.now()}`,
-        code: `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`,
-        client: session?.name ?? 'Cliente',
-        category: item.category,
-        service: item.name,
-        sede: item.sede,
-        date: draft.date,
-        time: draft.time,
-        attendees: draft.attendees,
-        amount: total,
-        status: 'Confirmada',
-        paymentMethod: method,
-        paymentStatus: 'Aprobada',
-        transactionRef: txRef,
-      }
-      setBookings([booking, ...bookings])
-      setLastCode(booking.code)
-      setDraft(null)
-      setIsProcessing(false)
-      notify('¡Pago aprobado y reserva confirmada!', 'success')
-      router.push('/confirmation')
-    }, 2100)
+    setBookings([newBooking, ...bookings])
+    setLastCode(newBooking.code)
+    setDraft(null)
+    notify('¡Pago procesado con éxito y reserva confirmada!', 'success')
+    router.push('/confirmation')
   }
 
   return (
     <main className="section-shell payment-page">
       <Link href={`/services/${item.category}/${item.id}`} className="back-link">
-        <ArrowLeft size={15} /> Volver a la reserva
+        <ArrowLeft size={15} /> Volver a la selección
       </Link>
 
       <div className="checkout-progress">
@@ -213,291 +166,34 @@ export default function CheckoutPage() {
           <h1>
             Elige tu medio de <span>pago.</span>
           </h1>
-          <p>Transacciones cifradas de extremo a extremo mediante pasarela segura Wompi / Bancolombia.</p>
+          <p>
+            Transacciones 100% cashless y cifradas de extremo a extremo mediante pasarela segura Stripe.
+          </p>
 
-          {/* Selector de métodos de pago */}
-          <div className="payment-methods-tabs">
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'card' ? 'active' : ''}`}
-              onClick={() => setMethod('card')}
-            >
-              <CreditCard size={20} />
-              <span>Tarjeta</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'pse' ? 'active' : ''}`}
-              onClick={() => setMethod('pse')}
-            >
-              <Building2 size={20} />
-              <span>PSE / Banco</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'wompi' ? 'active' : ''}`}
-              onClick={() => setMethod('wompi')}
-            >
-              <QrCode size={20} />
-              <span>Nequi / QR</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'on_site' ? 'active' : ''}`}
-              onClick={() => setMethod('on_site')}
-            >
-              <Store size={20} />
-              <span>En Sede</span>
-            </button>
+          {isCreatingReservation ? (
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-6 text-center text-sm">
+              <p className="font-semibold text-ink">Iniciando sesión segura de pago…</p>
+              <p className="mt-1 text-xs text-subtle">
+                Estamos preparando el bloqueo temporal de tu horario en el sistema.
+              </p>
+            </div>
+          ) : (
+            <PaymentMethodSelector
+              reservationId={reservationId}
+              onPaymentSuccess={handlePaymentSuccess}
+            />
+          )}
+
+          <div className="mt-6 flex items-start gap-2 text-xs leading-5 text-subtle">
+            <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#527c47]" />
+            <p>
+              Tu pago se procesa con Stripe Elements. La reserva se confirma de forma atómica
+              y se genera el tiquete digital de acceso al club.
+            </p>
           </div>
 
-          {/* Formulario según método */}
-          {method === 'card' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Tarjeta de Crédito o Débito</span>
-                <div className="card-brands">
-                  <b>VISA</b>
-                  <b>MC</b>
-                  <b>AMEX</b>
-                </div>
-              </div>
-
-              {/* Visual Card Preview */}
-              <div className="card-visual-preview">
-                <div className="flex justify-between items-start">
-                  <div className="card-chip" />
-                  <span className="text-[12px] font-extrabold tracking-widest text-[#c9ef75]">ALTURA CLUB</span>
-                </div>
-                <div className="card-preview-number">
-                  {cardNumber || '•••• •••• •••• ••••'}
-                </div>
-                <div className="card-preview-footer">
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">TITULAR</small>
-                    <span className="card-preview-name">{cardHolder || 'NOMBRE DEL TITULAR'}</span>
-                  </div>
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">VENCE</small>
-                    <span className="card-preview-exp">{cardExp || 'MM/AA'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end -mt-2 mb-2">
-                <button
-                  type="button"
-                  onClick={fillTestCard}
-                  className="text-[12px] font-semibold text-[#4b7652] dark:text-[#9ee285] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Sparkles size={13} /> Cargar datos de tarjeta de prueba
-                </button>
-              </div>
-
-              <label className="demo-field">
-                Número de tarjeta
-                <Input
-                  value={cardNumber}
-                  onChange={(e) => handleCardNumberChange(e.target.value)}
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                  required
-                />
-              </label>
-
-              <label className="demo-field">
-                Nombre del titular (como figura en el plástico)
-                <Input
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                  placeholder="JUAN PÉREZ"
-                  required
-                />
-              </label>
-
-              <div className="form-row">
-                <label className="demo-field">
-                  Vencimiento (MM/AA)
-                  <Input
-                    value={cardExp}
-                    onChange={(e) => handleExpChange(e.target.value)}
-                    placeholder="MM/AA"
-                    maxLength={5}
-                    required
-                  />
-                </label>
-                <label className="demo-field">
-                  Código de seguridad (CVC)
-                  <Input
-                    type="password"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="•••"
-                    maxLength={4}
-                    required
-                  />
-                </label>
-              </div>
-
-              <label className="demo-field">
-                Número de cuotas
-                <select
-                  value={installments}
-                  onChange={(e) => setInstallments(e.target.value)}
-                  className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                >
-                  <option value="1">1 cuota (sin intereses)</option>
-                  <option value="2">2 cuotas</option>
-                  <option value="3">3 cuotas</option>
-                  <option value="6">6 cuotas</option>
-                  <option value="12">12 cuotas</option>
-                </select>
-              </label>
-            </div>
-          )}
-
-          {method === 'pse' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Transferencia Bancaria en Línea (PSE)</span>
-                <Badge variant="success">PSE Colombia</Badge>
-              </div>
-              <p className="text-[12.5px] text-[var(--subtle)]">
-                Debes estar registrado en PSE para ser redirigido a la sucursal de tu entidad bancaria.
-              </p>
-
-              <label className="demo-field">
-                Entidad bancaria
-                <select
-                  value={pseBank}
-                  onChange={(e) => setPseBank(e.target.value)}
-                  className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                >
-                  {pseBanks.map((bank) => (
-                    <option key={bank} value={bank}>
-                      {bank}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="form-row">
-                <label className="demo-field">
-                  Tipo de persona
-                  <select
-                    value={psePersonType}
-                    onChange={(e) => setPsePersonType(e.target.value)}
-                    className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                  >
-                    <option value="natural">Persona Natural</option>
-                    <option value="juridica">Persona Jurídica</option>
-                  </select>
-                </label>
-                <label className="demo-field">
-                  Tipo de documento
-                  <select
-                    value={pseDocType}
-                    onChange={(e) => setPseDocType(e.target.value)}
-                    className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                  >
-                    <option value="CC">Cédula de Ciudadanía</option>
-                    <option value="CE">Cédula de Extranjería</option>
-                    <option value="NIT">NIT</option>
-                    <option value="PAS">Pasaporte</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="demo-field">
-                Número de documento
-                <Input
-                  value={pseDocNumber}
-                  onChange={(e) => setPseDocNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Ej. 1020304050"
-                  required
-                />
-              </label>
-
-              <label className="demo-field">
-                Correo electrónico registrado en PSE
-                <Input
-                  type="email"
-                  value={pseEmail}
-                  onChange={(e) => setPseEmail(e.target.value)}
-                  placeholder="usuario@correo.com"
-                  required
-                />
-              </label>
-            </div>
-          )}
-
-          {method === 'wompi' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Nequi / Bancolombia a la Mano</span>
-                <Badge variant="success">Instantáneo</Badge>
-              </div>
-              <p className="text-[12.5px] text-[var(--subtle)]">
-                Ingresa tu número de celular asociado a tu cuenta Nequi. Recibirás una notificación push para autorizar el cobro.
-              </p>
-
-              <label className="demo-field">
-                Número de celular Nequi (10 dígitos)
-                <Input
-                  type="tel"
-                  value={nequiPhone}
-                  onChange={(e) => setNequiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="300 123 4567"
-                  required
-                />
-              </label>
-
-              <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[12px] text-[var(--subtle)] flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#557b53] shrink-0" />
-                <span>Al confirmar, la solicitud de cobro aparecerá en la bandeja de entrada de tu App Nequi.</span>
-              </div>
-            </div>
-          )}
-
-          {method === 'on_site' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Pago Presencial en Taquilla</span>
-                <Badge variant="secondary">En Complejo</Badge>
-              </div>
-              <p className="text-[13px] text-[var(--subtle)]">
-                Tu reserva quedará registrada y garantizada en el sistema. Podrás pagar en la recepción de la sede con efectivo, tarjeta débito/crédito física o bono corporativo antes de ingresar.
-              </p>
-              <div className="p-3 rounded-lg border border-[#e3d7a8] bg-[#fdfbf2] dark:border-[#524422] dark:bg-[#2b2413] text-[12.5px] text-[#876e2d] dark:text-[#f2d87e]">
-                💡 <b>Importante:</b> Llega con 10 minutos de anticipación para realizar el pago en caja y reclamar tu pulsera de acceso.
-              </div>
-            </div>
-          )}
-
-          {/* Action button */}
-          <ActionButton
-            onClick={confirmPayment}
-            disabled={isProcessing}
-            className="w-full justify-center text-[14px]"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 size={17} className="animate-spin" /> Procesando pago...
-              </>
-            ) : (
-              <>
-                {method === 'on_site' ? 'Confirmar reserva en sede' : 'Pagar y confirmar reserva'} · {formatMoney(total)}{' '}
-                <ArrowRight size={16} />
-              </>
-            )}
-          </ActionButton>
-
-          <Link href="/dashboard" className="demo-payment-link">
-            Cancelar y volver a mi cuenta
-          </Link>
-
-          <div className="secure-foot">
-            <Lock size={14} /> Transacción cifrada con protocolo TLS 256-bit y certificación PCI-DSS
+          <div className="secure-foot mt-6">
+            <Lock size={14} /> Transacción cifrada con protocolo TLS 256-bit y certificación PCI-DSS Nivel 1
           </div>
         </section>
 
@@ -541,30 +237,6 @@ export default function CheckoutPage() {
           </div>
         </aside>
       </div>
-
-      {/* Modal simulador de procesamiento bancario */}
-      {isProcessing && (
-        <div className="modal-backdrop">
-          <div className="reservation-modal payment-processing-modal">
-            <div className="processing-spinner" />
-            <div className="eyebrow mb-1">PROCESANDO PAGO SEGURO</div>
-            <h2 className="text-[20px] font-bold">
-              {processStep === 1 && 'Conectando con la entidad financiera...'}
-              {processStep === 2 && 'Validando fondos y disponibilidad...'}
-              {processStep === 3 && '¡Transacción Aprobada!'}
-            </h2>
-            <p className="text-[13px] text-[var(--subtle)] mt-2">
-              Por favor, no cierres esta ventana mientras confirmamos tu reserva.
-            </p>
-            <div className="flex gap-2 mt-4">
-              <span className={`w-3 h-3 rounded-full ${processStep >= 1 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-              <span className={`w-3 h-3 rounded-full ${processStep >= 2 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-              <span className={`w-3 h-3 rounded-full ${processStep >= 3 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
-

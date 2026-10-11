@@ -14,30 +14,56 @@ export function getPaymentErrorMessage(
   code: PaymentErrorCode | undefined,
   declineCode?: string,
 ): string {
+  // Fondos insuficientes
   if (declineCode === "insufficient_funds") {
     return "Tu tarjeta no tiene fondos suficientes. Prueba con otra tarjeta o consulta con tu banco.";
   }
 
-  if (code === "card_declined" || declineCode) {
-    return "El banco no autorizó el pago. Prueba con otra tarjeta o comunícate con tu banco.";
+  // Tarjeta vencida
+  if (code === "expired_card" || declineCode === "expired_card") {
+    return "La tarjeta está vencida. Revisa la fecha de expiración o intenta con otra tarjeta.";
   }
 
-  if (code === "expired_card") {
-    return "La tarjeta está vencida. Revisa la fecha o intenta con otra tarjeta.";
+  // Código de seguridad CVC erróneo
+  if (code === "incorrect_cvc" || code === "invalid_cvc" || declineCode === "incorrect_cvc") {
+    return "El código de seguridad (CVC) no coincide. Revísalo e inténtalo de nuevo.";
   }
 
-  if (code === "incorrect_cvc" || code === "invalid_cvc") {
-    return "El código de seguridad no coincide. Revísalo e inténtalo de nuevo.";
+  // Número de tarjeta incorrecto
+  if (code === "incorrect_number" || code === "invalid_number") {
+    return "El número de tarjeta no es válido. Verifica los dígitos e inténtalo de nuevo.";
   }
 
+  // Tarjeta perdida o robada / Prevención de fraude
+  if (
+    declineCode === "lost_card" ||
+    declineCode === "stolen_card" ||
+    declineCode === "fraudulent" ||
+    declineCode === "pickup_card"
+  ) {
+    return "La transacción no pudo ser autorizada por seguridad. Por favor contacta a tu banco o usa otro medio de pago.";
+  }
+
+  // No autorizada o rechazo bancario genérico
+  if (
+    code === "card_declined" ||
+    declineCode === "do_not_honor" ||
+    declineCode === "transaction_not_allowed" ||
+    declineCode === "generic_decline" ||
+    declineCode
+  ) {
+    return "El banco no autorizó el pago. Prueba con otra tarjeta o comunícate con tu entidad financiera.";
+  }
+
+  // Error de procesamiento temporal
   if (code === "processing_error") {
     return "No pudimos procesar el pago en este momento. Inténtalo de nuevo en unos minutos.";
   }
 
-  return "No se pudo completar el pago. Revisa los datos o intenta con otra tarjeta.";
+  return "No se pudo completar el pago. Revisa los datos ingresados o intenta con otra tarjeta.";
 }
 
-function PaymentForm() {
+function PaymentForm({ onSuccess }: { onSuccess?: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,6 +92,9 @@ function PaymentForm() {
 
       if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "processing") {
         setPaymentSubmitted(true);
+        if (onSuccess) {
+          onSuccess();
+        }
         return;
       }
 
@@ -124,7 +153,13 @@ function PaymentForm() {
   );
 }
 
-export function StripePaymentForm({ clientSecret }: { clientSecret: string | null }) {
+export function StripePaymentForm({
+  clientSecret,
+  onSuccess,
+}: {
+  clientSecret: string | null;
+  onSuccess?: () => void;
+}) {
   if (!publishableKey || !stripePromise) {
     return (
       <div className="space-y-4">
@@ -171,7 +206,7 @@ export function StripePaymentForm({ clientSecret }: { clientSecret: string | nul
         },
       }}
     >
-      <PaymentForm />
+      <PaymentForm onSuccess={onSuccess} />
     </Elements>
   );
 }

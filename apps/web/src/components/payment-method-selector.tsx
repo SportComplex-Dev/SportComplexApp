@@ -50,7 +50,13 @@ const paymentMethods: {
   { id: "onsite", label: "En sede", Icon: Store },
 ];
 
-export function PaymentMethodSelector({ reservationId }: { reservationId: string | null }) {
+export function PaymentMethodSelector({
+  reservationId,
+  onPaymentSuccess,
+}: {
+  reservationId: string | null;
+  onPaymentSuccess?: () => void;
+}) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntentState | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -182,7 +188,10 @@ export function PaymentMethodSelector({ reservationId }: { reservationId: string
                 reserva aún no está confirmada.
               </p>
             ) : currentIntent?.clientSecret ? (
-              <StripePaymentForm clientSecret={currentIntent.clientSecret} />
+              <StripePaymentForm
+                clientSecret={currentIntent.clientSecret}
+                onSuccess={onPaymentSuccess}
+              />
             ) : (
               <p role="status" className="rounded-xl border border-[#e1e6df] p-4 text-sm">
                 Preparando el pago seguro de tu reserva…

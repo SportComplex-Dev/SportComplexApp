@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { notFound, useParams } from 'next/navigation'
+import { notFound, useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight, CalendarDays, Clock3, MapPin, ShieldCheck, Users } from 'lucide-react'
 import { categoryBySlug, formatDate, formatMoney } from '@sportcomplex/core'
@@ -12,13 +12,15 @@ import { SportsSpecsGrid } from '@/components/sports-specs-grid'
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
 import { ReservationModal } from '@/components/reservation-modal'
 import { useApp } from '@/components/app-provider'
-import { useBookings, useCatalog, type Booking } from '@/lib/stores'
+import { useBookings, useCatalog, useDraft, type Booking } from '@/lib/stores'
 
 export default function ServiceBookingPage() {
+  const router = useRouter()
   const { category: slug, id } = useParams<{ category: string; id: string }>()
   const { notify, ready, session } = useApp()
   const [catalog] = useCatalog()
   const [, setBookings] = useBookings()
+  const [, setDraft] = useDraft()
   const category = categoryBySlug(slug)
   const item = catalog.find((entry) => entry.id === id && entry.category === slug)
 
@@ -45,27 +47,18 @@ export default function ServiceBookingPage() {
   }
 
   const handleConfirmReservation = () => {
-    const randomCode = `AKR-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
-    const newBooking: Booking = {
-      id: `book-${Date.now()}`,
-      code: randomCode,
-      client: session?.name || 'Cliente Akros',
-      category: item.category,
-      service: item.name,
-      sede: item.sede,
+    setIsModalOpen(false)
+    setDraft({
+      itemId: item.id,
       date: selectedDate,
       time: selectedSlotTime,
-      attendees: isCourt || isPrivatePool ? 1 : attendees,
-      amount: total,
-      status: 'Confirmada',
-    }
-
-    setBookings((prev) => [newBooking, ...prev])
-    setIsModalOpen(false)
+      attendees: effectiveAttendees,
+    })
     notify(
-      `¡Reserva confirmada con éxito! Código ${randomCode} para ${item.name} el ${selectedDate} a las ${selectedSlotTime}.`,
+      `Reserva preparada para ${item.name} el ${selectedDate} a las ${selectedSlotTime}.`,
       'success'
     )
+    router.push('/checkout')
   }
 
   return (

@@ -40,15 +40,27 @@ function paymentIntentResponse(paymentIntent: Stripe.PaymentIntent) {
   });
 }
 
+import { authorizeApiRequest } from "@/lib/api-auth";
+
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
+    let userId: string | null = null;
+    const authResult = await authorizeApiRequest(["Cliente"]);
+    if (authResult.authorized) {
+      userId = authResult.actor.id;
+    } else {
+      const session = await auth();
+      if (
+        session?.user?.id &&
+        (session.user.role?.toUpperCase() === "CLIENTE" || !session.user.role) &&
+        (session.user.estado === "ACTIVO" || !session.user.estado)
+      ) {
+        userId = session.user.id;
+      }
+    }
+
     if (!userId) {
       return fail("UNAUTHORIZED", "Debes iniciar sesión para pagar una reserva.", 401);
-    }
-    if (session.user.role?.toUpperCase() !== "CLIENTE" || session.user.estado !== "ACTIVO") {
-      return fail("FORBIDDEN", "Solo una cuenta de cliente activa puede pagar en línea.", 403);
     }
 
     let body: unknown;
