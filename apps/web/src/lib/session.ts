@@ -88,15 +88,67 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
   }
 }
 
+export function extractSupabaseAccessToken(req: NextRequest): string | null {
+  const groups = new Map<string, Array<{ index: number; value: string }>>();
+
+  for (const cookie of req.cookies.getAll()) {
+    const match = cookie.name.match(/^(sb-.+-auth-token)(?:\.(\d+))?$/);
+    if (!match) continue;
+
+    const baseName = match[1];
+    const index = match[2] === undefined ? 0 : Number.parseInt(match[2], 10);
+    const chunks = groups.get(baseName) ?? [];
+    chunks.push({ index, value: cookie.value });
+    groups.set(baseName, chunks);
+  }
+
+  for (const chunks of groups.values()) {
+    try {
+      chunks.sort((a, b) => a.index - b.index);
+      let value = chunks.map((chunk) => chunk.value).join("");
+      if (value.startsWith("base64-")) {
+        const encoded = value.slice("base64-".length).replace(/-/g, "+").replace(/_/g, "/");
+        const binary = atob(encoded.padEnd(encoded.length + ((4 - (encoded.length % 4)) % 4), "="));
+        value = new TextDecoder().decode(
+          Uint8Array.from(binary, (character) => character.charCodeAt(0)),
+        );
+      }
+
+      if (value.startsWith("{") || value.startsWith("[")) {
+        const parsed: unknown = JSON.parse(value);
+        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+          return parsed[0];
+        }
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "access_token" in parsed &&
+          typeof parsed.access_token === "string"
+        ) {
+          return parsed.access_token;
+        }
+        continue;
+      }
+
+      if (value) return value;
+    } catch {
+      // A malformed cookie group must not prevent checking other Supabase sessions.
+    }
+  }
+
+  return null;
+}
+
 /**
- * Extrae la sesión autenticada activa desde la petición HTTP inspeccionando:
+ * Extrae la sesión disponible para compatibilidad local/de desarrollo inspeccionando:
  * 1. Cabecera `Authorization: Bearer <jwt>`
  * 2. Cookie `sc-token` (JWT)
  * 3. Cookies de sesión de Supabase (`sb-*-auth-token`)
  * 4. Cookie `sc-session` (JSON con { role, status, userId, email })
  * 5. Cookie `sc-role` (con soporte para cookie complementaria `sc-status`)
  *
- * Retorna `null` si no hay sesión, si el token expiró o si la cuenta está inactiva (RN-10).
+ * En producción la identidad de Supabase se verifica contra Auth en `middleware.ts`;
+ * decodificar un JWT aquí no verifica su firma.
  */
 export function extractSession(req: NextRequest): SessionUser | null {
   // 1. Cabecera Authorization: Bearer <jwt>
@@ -150,68 +202,28 @@ export function extractSession(req: NextRequest): SessionUser | null {
     }
   }
 
-  // 3. Cookies de Supabase Auth (sb-*-auth-token con soporte para chunks .0, .1...)
-  // Defensa en Profundidad (Zero Trust):
-  // La decodificación perimetral en Edge optimiza el despacho SSG y enrutamiento con cero I/O.
-  // La validación criptográfica de firma (HMAC/RSA) y autorización granular residen en la capa API.
-  const allCookies = req.cookies.getAll();
-  const supabaseGroups = new Map<string, Array<{ index: number; value: string }>>();
+  // 3. Cookies de Supabase. La firma y vigencia se verifican en el middleware con Auth.
+  const supabaseToken = extractSupabaseAccessToken(req);
+  if (supabaseToken) {
+    const payload = decodeJwtPayload(supabaseToken);
+    if (payload) {
+      const rawRole = (payload.role ||
+        (payload.user_metadata as Record<string, unknown> | undefined)?.role ||
+        (payload.app_metadata as Record<string, unknown> | undefined)?.role) as string | undefined;
 
-  for (const cookie of allCookies) {
-    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
-      const match = cookie.name.match(/^(sb-.+-auth-token)(?:\.(\d+))?$/);
-      if (match) {
-        const baseName = match[1];
-        const chunkIndex = match[2] !== undefined ? parseInt(match[2], 10) : 0;
-        if (!supabaseGroups.has(baseName)) {
-          supabaseGroups.set(baseName, []);
-        }
-        supabaseGroups.get(baseName)!.push({ index: chunkIndex, value: cookie.value });
+      const rawStatus = (payload.estado ||
+        (payload.user_metadata as Record<string, unknown> | undefined)?.estado ||
+        payload.status) as string | undefined;
+
+      const role = normalizeRole(rawRole);
+      if (role && isAccountActive(rawStatus)) {
+        return {
+          role,
+          status: rawStatus ?? "ACTIVO",
+          userId: typeof payload.sub === "string" ? payload.sub : undefined,
+          email: typeof payload.email === "string" ? payload.email : undefined,
+        };
       }
-    }
-  }
-
-  for (const [, chunks] of supabaseGroups) {
-    try {
-      chunks.sort((a, b) => a.index - b.index);
-      const combinedValue = chunks.map((c) => c.value).join("");
-
-      let tokenToVerify: string | null = null;
-      if (combinedValue.startsWith("{") || combinedValue.startsWith("[")) {
-        const parsed = JSON.parse(combinedValue);
-        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
-          tokenToVerify = parsed[0];
-        } else if (parsed && typeof parsed.access_token === "string") {
-          tokenToVerify = parsed.access_token;
-        }
-      } else {
-        tokenToVerify = combinedValue;
-      }
-
-      if (tokenToVerify) {
-        const payload = decodeJwtPayload(tokenToVerify);
-        if (payload) {
-          const rawRole = (payload.role ||
-            (payload.user_metadata as Record<string, unknown> | undefined)?.role ||
-            (payload.app_metadata as Record<string, unknown> | undefined)?.role) as string | undefined;
-
-          const rawStatus = (payload.estado ||
-            (payload.user_metadata as Record<string, unknown> | undefined)?.estado ||
-            payload.status) as string | undefined;
-
-          const role = normalizeRole(rawRole);
-          if (role && isAccountActive(rawStatus)) {
-            return {
-              role,
-              status: rawStatus ?? "ACTIVO",
-              userId: typeof payload.sub === "string" ? payload.sub : undefined,
-              email: typeof payload.email === "string" ? payload.email : undefined,
-            };
-          }
-        }
-      }
-    } catch {
-      // Ignorar cookies malformadas y continuar con el siguiente grupo
     }
   }
 

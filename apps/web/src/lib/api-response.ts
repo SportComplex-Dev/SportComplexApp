@@ -2,7 +2,14 @@ export function jsonSafe(data: unknown): unknown {
   if (typeof data === "bigint") return data.toString();
   if (data === null || typeof data !== "object") return data;
   if (data instanceof Date) return data.toISOString();
+  if ("toNumber" in data && typeof (data as { toNumber: () => number }).toNumber === "function") {
+    return (data as { toNumber: () => number }).toNumber();
+  }
+  if ("toFixed" in data && typeof (data as { toFixed: () => string }).toFixed === "function") {
+    return Number(data);
+  }
   if (Array.isArray(data)) return data.map(jsonSafe);
+
   const copy: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
     copy[key] = jsonSafe(value);
@@ -10,8 +17,11 @@ export function jsonSafe(data: unknown): unknown {
   return copy;
 }
 
-export function ok<T>(data: T) {
-  return Response.json({ success: true, data: jsonSafe(data), timestamp: new Date().toISOString() });
+export function ok<T>(data: T, headers?: HeadersInit) {
+  return Response.json(
+    { success: true, data: jsonSafe(data), timestamp: new Date().toISOString() },
+    headers ? { headers } : undefined,
+  );
 }
 
 export function created<T>(data: T) {

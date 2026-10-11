@@ -131,12 +131,32 @@ test("createServicioSchema valida campos obligatorios y reglas de piscina", () =
   const validPrivatePool = createServicioSchema.safeParse({
     nombre: "Piscina Privada VIP",
     categoriaId: 2,
-    capacidadMaxima: 1,
+    capacidadMaxima: 30,
     tarifa: 80000,
     modalidad: "EXCLUSIVA",
     tipoPiscina: "PRIVADA",
   });
   assert.equal(validPrivatePool.success, true);
+
+  const publicExclusivePool = createServicioSchema.safeParse({
+    nombre: "Piscina Pública",
+    categoriaId: 2,
+    capacidadMaxima: 30,
+    tarifa: 80000,
+    modalidad: "EXCLUSIVA",
+    tipoPiscina: "PUBLICA",
+  });
+  assert.equal(publicExclusivePool.success, false);
+
+  const publicPool = createServicioSchema.safeParse({
+    nombre: "Piscina Pública",
+    categoriaId: 2,
+    capacidadMaxima: 30,
+    tarifa: 80000,
+    modalidad: "AFORO",
+    tipoPiscina: "PUBLICA",
+  });
+  assert.equal(publicPool.success, true);
 });
 
 test("normalizeServicePayload mapea atributos legados en inglés a modelo canónico", () => {
@@ -157,6 +177,17 @@ test("normalizeServicePayload mapea atributos legados en inglés a modelo canón
 
   const parsed = createServicioSchema.safeParse(normalized);
   assert.equal(parsed.success, true);
+});
+
+test("normalizeServicePayload deriva modalidad desde el tipo de piscina", () => {
+  assert.equal(
+    normalizeServicePayload({ tipoPiscina: "PRIVADA" }).modalidad,
+    "EXCLUSIVA",
+  );
+  assert.equal(
+    normalizeServicePayload({ tipoPiscina: "PUBLICA" }).modalidad,
+    "AFORO",
+  );
 });
 
 test("serviceSchema retrocompatible sigue aceptando llamadas heredadas", () => {

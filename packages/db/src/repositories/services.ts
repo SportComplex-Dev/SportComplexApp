@@ -66,8 +66,27 @@ export function parseTimeToDate(timeStr: string): Date {
 function getCuposTotales(servicio: {
   modalidad: string;
   capacidadMaxima: number;
+  tipoPiscina?: string | null;
 }): number {
+  if (servicio.tipoPiscina === "PRIVADA") return 1;
+  if (servicio.tipoPiscina === "PUBLICA") return servicio.capacidadMaxima;
   return servicio.modalidad === "EXCLUSIVA" ? 1 : servicio.capacidadMaxima;
+}
+
+function resolvePoolModality(
+  tipoPiscina: TipoPiscina | null | undefined,
+  modalidad: ModalidadServicio,
+): ModalidadServicio {
+  if (!tipoPiscina) return modalidad;
+  const expected = tipoPiscina === "PRIVADA" ? "EXCLUSIVA" : "AFORO";
+  if (modalidad !== expected) {
+    const error = new Error(
+      `Una piscina ${tipoPiscina.toLowerCase()} debe operar bajo modalidad ${expected}.`,
+    );
+    error.name = "ValidationError";
+    throw error;
+  }
+  return expected;
 }
 
 function assertValidCapacity(capacidadMaxima: number): void {
@@ -282,6 +301,7 @@ export async function generateDisponibilidadesForServicio(
 export async function createServicio(data: CreateServicioData) {
   assertValidCapacity(data.capacidadMaxima);
   const trimmedName = data.nombre.trim();
+  const modalidad = resolvePoolModality(data.tipoPiscina, data.modalidad);
 
   return prisma.$transaction(async (tx) => {
     // Validación de unicidad de nombre de instancia por complejo (RF-03, TSK-BE-04)
@@ -318,7 +338,7 @@ export async function createServicio(data: CreateServicioData) {
         categoriaId: data.categoriaId,
         capacidadMaxima: data.capacidadMaxima,
         tarifa: data.tarifa,
-        modalidad: data.modalidad,
+        modalidad,
         tipoPiscina: data.tipoPiscina ?? null,
         estado: data.estado ?? "ACTIVO",
         franjasHorarias:
@@ -431,10 +451,19 @@ export async function updateServicio(id: number, data: UpdateServicioData) {
       }
     }
 
-    const modalidad = data.modalidad ?? current.modalidad;
+    const tipoPiscina = data.tipoPiscina !== undefined ? data.tipoPiscina : current.tipoPiscina;
+    const modalidad = data.modalidad
+      ?? (data.tipoPiscina !== undefined && tipoPiscina
+        ? tipoPiscina === "PRIVADA" ? "EXCLUSIVA" : "AFORO"
+        : current.modalidad);
+    resolvePoolModality(tipoPiscina, modalidad);
     const capacidadMaxima = data.capacidadMaxima ?? current.capacidadMaxima;
-    const cuposTotales = getCuposTotales({ modalidad, capacidadMaxima });
-    if (data.capacidadMaxima !== undefined || data.modalidad !== undefined) {
+    const cuposTotales = getCuposTotales({ modalidad, capacidadMaxima, tipoPiscina });
+    if (
+      data.capacidadMaxima !== undefined ||
+      data.modalidad !== undefined ||
+      data.tipoPiscina !== undefined
+    ) {
       const disponibilidadSobreAforo = await tx.disponibilidad.findFirst({
         where: { servicioId: id, cuposOcupados: { gt: cuposTotales } },
       });
@@ -454,7 +483,9 @@ export async function updateServicio(id: number, data: UpdateServicioData) {
         ...(data.categoriaId ? { categoriaId: data.categoriaId } : {}),
         ...(data.capacidadMaxima !== undefined ? { capacidadMaxima: data.capacidadMaxima } : {}),
         ...(data.tarifa !== undefined ? { tarifa: data.tarifa } : {}),
-        ...(data.modalidad ? { modalidad: data.modalidad } : {}),
+        ...(data.modalidad || (data.tipoPiscina !== undefined && tipoPiscina)
+          ? { modalidad }
+          : {}),
         ...(data.tipoPiscina !== undefined ? { tipoPiscina: data.tipoPiscina } : {}),
         ...(data.estado ? { estado: data.estado } : {}),
       },
@@ -480,7 +511,11 @@ export async function updateServicio(id: number, data: UpdateServicioData) {
         });
         await generateDisponibilidadesForServicio(id, 15, tx);
       }
-    } else if (data.capacidadMaxima !== undefined || data.modalidad !== undefined) {
+    } else if (
+      data.capacidadMaxima !== undefined ||
+      data.modalidad !== undefined ||
+      data.tipoPiscina !== undefined
+    ) {
       await tx.disponibilidad.updateMany({
         where: { servicioId: id },
         data: { cuposTotales },

@@ -276,7 +276,7 @@ Convenciones: **PK** llave primaria · **FK** llave foránea · **UK** única ·
 | subtotal | numeric(12,2) | NN |  |
 | descuento_pct | numeric(5,2) | NN | 0 o 30 |
 | total | numeric(12,2) | NN |  |
-| expira_en | timestamptz |  | Bloqueo TTL de 15 min (solo PENDIENTE_PAGO) |
+| expira_en | timestamptz |  | Bloqueo TTL de 30 min (solo PENDIENTE_PAGO) |
 | creado_en | timestamptz | NN |  |
 
 ### TICKET_QR
@@ -357,7 +357,7 @@ Convenciones: **PK** llave primaria · **FK** llave foránea · **UK** única ·
 | --- | --- |
 | Sin overbooking (RNF-01) | `UNIQUE (servicio_id, franja_id, fecha)` en DISPONIBILIDAD; `CHECK (cupos_ocupados BETWEEN 0 AND cupos_totales)`; `SELECT ... FOR UPDATE` al reservar |
 | Ventana 15 días / no pasado (RN-01, RN-11) | Validación transaccional al crear DISPONIBILIDAD/RESERVA (`fecha BETWEEN hoy AND hoy + 15`, hora `America/Bogota`) |
-| Bloqueo TTL 15 min (RN-04) | `RESERVA.expira_en` + job que pasa `PENDIENTE_PAGO` vencidas a `EXPIRADA` y libera cupos; índice parcial `WHERE estado = 'PENDIENTE_PAGO'` |
+| Bloqueo TTL 30 min (RN-04, revisado en TSK-BE-09) | `RESERVA.expira_en` + job que pasa `PENDIENTE_PAGO` vencidas a `EXPIRADA` y libera cupos; índice parcial `WHERE estado = 'PENDIENTE_PAGO'` |
 | Ticket de uso único (RN-05) | `UNIQUE (reserva_id)`, `UNIQUE (codigo_uuid)`; `UPDATE ... WHERE estado = 'EMITIDO'` |
 | Validación servicio/horario en puerta | TICKET → RESERVA → DISPONIBILIDAD → SERVICIO comparado con `ASIGNACION_PUESTO.servicio_id` y la franja |
 | Borrado lógico (RN-10) | `USUARIO.deleted_at` / `estado = INACTIVO`; sin `DELETE`; FKs `ON DELETE RESTRICT` |

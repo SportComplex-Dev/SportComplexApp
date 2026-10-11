@@ -133,6 +133,41 @@ test("TSK-BE-05: las disponibilidades AFORO respetan la capacidad y los cambios 
   assert.ok(disponibilidades.every((d: any) => d.cuposTotales === 18));
 });
 
+test("TSK-BE-08: crea piscinas con cupos derivados de tipo y modalidad", async () => {
+  const publicPool = await createServicio({
+    nombre: "Piscina pública con aforo 30",
+    categoriaId: 1,
+    capacidadMaxima: 30,
+    tarifa: 100,
+    modalidad: "AFORO",
+    tipoPiscina: "PUBLICA",
+    franjasHorarias: [{ diaSemana: 1, horaInicio: "08:00", horaFin: "09:00" }],
+  });
+  const publicSlots = mock._state.disponibilidades.filter(
+    (availability: any) => availability.servicioId === publicPool.id,
+  );
+  assert.ok(publicSlots.length > 0);
+  assert.ok(publicSlots.every((availability: any) => availability.cuposTotales === 30));
+
+  const privatePool = await createServicio({
+    nombre: "Piscina privada con aforo configurado 30",
+    categoriaId: 1,
+    capacidadMaxima: 30,
+    tarifa: 100,
+    modalidad: "EXCLUSIVA",
+    tipoPiscina: "PRIVADA",
+    franjasHorarias: [{ diaSemana: 1, horaInicio: "08:00", horaFin: "09:00" }],
+  });
+  const privateSlots = mock._state.disponibilidades.filter(
+    (availability: any) => availability.servicioId === privatePool.id,
+  );
+  assert.ok(privateSlots.length > 0);
+  assert.ok(privateSlots.every((availability: any) => availability.cuposTotales === 1));
+
+  await updateServicio(privatePool.id, { tipoPiscina: "PUBLICA" });
+  assert.ok(privateSlots.every((availability: any) => availability.cuposTotales === 30));
+});
+
 test("Criterio Clave: Reservar en Cancha 1 no altera la disponibilidad de Cancha 2", async () => {
   // Localizar disponibilidades de ambas instancias
   const s1 = await getServicioById(1);

@@ -18,14 +18,17 @@ import { prisma } from "../client";
  *  3. Verificar `fecha BETWEEN hoy AND hoy+15` en `America/Bogota`
  *  4. Verificar `cupos_ocupados + cantidad <= cupos_totales`
  *  5. `UPDATE cupos_ocupados += cantidad` condicional (defensa en profundidad)
- *  6. `INSERT reserva` en `PENDIENTE_PAGO` con `expira_en = now + 15 min`
+ *  6. `INSERT reserva` en `PENDIENTE_PAGO` con `expira_en = now + 30 min`
  *
  * Concurrencia: N transacciones sobre la misma fila se serializan por el
  * row-lock; exactamente 1 gana y el resto recibe `SlotNoCapacityError` (HTTP 409).
  */
 
+// TSK-BE-06 — mensaje contractual RN-01 (duplicado de @sportcomplex/core: db no puede importar core).
+const BOOKING_WINDOW_EXCEEDED_MESSAGE = "La reserva excede la ventana máxima permitida de 15 días";
+
 export const BOOKING_WINDOW_DAYS = 15 as const;
-export const CHECKOUT_TTL_MINUTES = 15 as const;
+export const CHECKOUT_TTL_MINUTES = 30 as const;
 export const BOOKING_TIMEZONE = "America/Bogota" as const;
 
 /** Patrón auditado: ningún write sobre disponibilidad puede omitirlo. */
@@ -51,7 +54,7 @@ export class AvailabilityError extends Error {
       code === "SLOT_NOT_FOUND"
         ? 404
         : code === "SLOT_OUT_OF_WINDOW"
-          ? 422
+          ? 400 // TSK-BE-06: petición manipulada debe recibir HTTP 400.
           : code === "INVALID_QUANTITY"
             ? 400
             : 409; // SLOT_BLOCKED, SLOT_NO_CAPACITY -> 409
@@ -131,7 +134,7 @@ function toBigintId(id: bigint | number | string): bigint {
  * Reserva atómica de cupos. Serializa competidores con row-lock.
  *
  * @throws AvailabilityError `SLOT_NOT_FOUND`(404) | `SLOT_BLOCKED`(409)
- * | `SLOT_OUT_OF_WINDOW`(422) | `SLOT_NO_CAPACITY`(409) | `INVALID_QUANTITY`(400)
+ * | `SLOT_OUT_OF_WINDOW`(400) | `SLOT_NO_CAPACITY`(409) | `INVALID_QUANTITY`(400)
  */
 export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): Promise<Reserva> {
   const cantidad = input.cantidadCupos ?? 1;
@@ -164,10 +167,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
     const fechaStr = toFechaString(slot.fecha);
     const { min, max } = getBookingWindow(now);
     if (fechaStr < min || fechaStr > max) {
-      throw new AvailabilityError(
-        "SLOT_OUT_OF_WINDOW",
-        `Fecha ${fechaStr} fuera de ventana [${min}, ${max}] (${BOOKING_TIMEZONE})`,
-      );
+      throw new AvailabilityError("SLOT_OUT_OF_WINDOW", BOOKING_WINDOW_EXCEEDED_MESSAGE);
     }
 
     // 4. Aforo bajo lock.
@@ -189,7 +189,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
       throw new AvailabilityError("SLOT_NO_CAPACITY", "Sin cupo (condición de carrera detectada)");
     }
 
-    // 6. Reserva en PENDIENTE_PAGO con TTL 15 min (RN-04).
+    // 6. Reserva en PENDIENTE_PAGO con TTL 30 min (RN-04: alineado al mínimo de Stripe).
     return tx.reserva.create({
       data: {
         disponibilidadId,
@@ -208,7 +208,7 @@ export async function reserveDisponibilidad(input: ReserveDisponibilidadInput): 
   });
 }
 
-/** Type-guard para mapear a HTTP en la capa API (`err.httpStatus`: 404/409/422). */
+/** Type-guard para mapear a HTTP en la capa API (`err.httpStatus`: 400/404/409). */
 export function isAvailabilityError(err: unknown): err is AvailabilityError {
   return err instanceof AvailabilityError;
 }

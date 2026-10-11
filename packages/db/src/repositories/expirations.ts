@@ -1,7 +1,7 @@
 import { prisma } from "../client";
 
 /**
- * TSK-BD-08 — Job de expiración del TTL de 15 minutos (HU-09 / RF-08 / RN-04).
+ * TSK-BD-08 — Job de expiración del TTL de 30 minutos (HU-09 / RF-08 / RN-04 rev.).
  *
  * Localiza `RESERVA` en `PENDIENTE_PAGO` con `expira_en < NOW()` y las pasa a
  * `EXPIRADA`, liberando los cupos en `DISPONIBILIDAD` (`cupos_ocupados -= cantidad`).

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { getSession, signIn } from 'next-auth/react'
 import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
 import { loginSchema } from '@sportcomplex/validation'
@@ -12,6 +12,7 @@ import { Brand } from '@/components/brand'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
+import { useApp } from '@/components/app-provider'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 
@@ -27,12 +28,13 @@ function getSafeNextPath() {
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login: syncLogin } = useApp()
   const { dark, toggleTheme } = useThemeToggle()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [checkingSession, setCheckingSession] = useState(true)
+  const [checkingSession, setCheckingSession] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -79,7 +81,8 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await signIn('google', { redirectTo: getSafeNextPath() ?? '/' })
+      const destination = getSafeNextPath() ?? '/portal'
+      await signIn('google', { redirectTo: destination, callbackUrl: destination })
     } catch {
       setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
       setLoading(false)
@@ -105,15 +108,18 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const result = await res.json()
+      const result = await res.json().catch(() => null)
 
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'Correo o contraseña incorrectos.')
+      if (!res.ok || !result?.success) {
+        setError(result?.error?.message || 'Correo o contraseña incorrectos.')
         return
       }
 
       // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
       const role: Role = result.data.user.role
+      if (result.data.user) {
+        syncLogin(result.data.user.email, result.data.user.name, result.data.user.role)
+      }
       router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
     } catch (err: unknown) {
@@ -135,11 +141,11 @@ export default function LoginPage() {
               <div className="eyebrow hero-eyebrow">TU ESPACIO, TU MOMENTO</div>
               <h2>El movimiento<br />cambia <span>todo.</span></h2>
               <p>Bienvenido a una comunidad que se mueve contigo.</p>
-              <div className="auth-decoration" aria-hidden="true">
-                <Activity size={152} strokeWidth={0.8} aria-hidden="true" />
-              </div>
             </div>
             <div className="auth-quote">“La mejor inversión es la que haces en ti.”</div>
+          </div>
+          <div className="auth-decoration auth-decoration-circle" aria-hidden="true">
+            <img src="/images/Akros-logo.png" alt="" width="220" height="220" />
           </div>
         </div>
 
@@ -158,7 +164,7 @@ export default function LoginPage() {
               type="button"
               className="google-button"
               onClick={handleGoogleLogin}
-              disabled={loading || checkingSession}
+              disabled={loading}
               aria-busy={loading}
             >
               {loading ? <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : <GoogleMark />}
@@ -169,7 +175,7 @@ export default function LoginPage() {
               <span />o con tu correo<span />
             </div>
 
-            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading || checkingSession}>
+            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading}>
               <label>
                 Correo electrónico
                 <Input
