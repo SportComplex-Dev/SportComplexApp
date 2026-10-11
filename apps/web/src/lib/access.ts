@@ -1,4 +1,10 @@
-import { decideAccess, verifyTicketSignature } from "@sportcomplex/core";
+import {
+  ACCESS_ALREADY_USED_MESSAGE,
+  ACCESS_WINDOW_EXPIRED_MESSAGE,
+  decideAccess,
+  getTicketAccessWindow,
+  verifyTicketSignature,
+} from "@sportcomplex/core";
 import {
   ejecutarLectura,
   getAsignacionVigente,
@@ -6,6 +12,8 @@ import {
   type ModoLecturaValor,
   type ResultadoLecturaValor,
 } from "@sportcomplex/db";
+
+export { getTicketAccessWindow, ACCESS_WINDOW_EXPIRED_MESSAGE };
 
 // TSK-BD-10 — orquestador del escáner (RF-13/RF-14/RF-15 · RN-05).
 // Orden fijo: 1) firma HMAC ANTES de tocar la BD → 2) cargar ticket →
@@ -51,6 +59,8 @@ export interface EscaneoResultado {
   access: "GRANTED" | "DENIED";
   /** Presente solo cuando `access === "DENIED"`. */
   code?: AccessDeniedCode;
+  /** Mensaje explicativo de la denegación (ej. RF-15 "Acceso denegado: Franja horaria vencida"). */
+  message?: string;
   modo: ModoLecturaValor;
   /** Fila persistida en `LECTURA_ACCESO` (siempre exactamente una). */
   resultado: ResultadoLecturaValor;
@@ -82,20 +92,6 @@ function deniedCodeToResultado(code: AccessDeniedCode): ResultadoLecturaValor {
     default:
       return "DENEGADO_USADO"; // ALREADY_USED / INVALID_STATE
   }
-}
-
-/** Ventana [inicio, fin] de la reserva = fecha + franja (patrón de bookings, TZ Bogotá). */
-export function getTicketAccessWindow(disponibilidad: {
-  fecha: Date;
-  franja: { horaInicio: Date; horaFin: Date };
-}): { start: Date; end: Date } {
-  const fecha = disponibilidad.fecha.toISOString().slice(0, 10);
-  const horaInicio = disponibilidad.franja.horaInicio.toISOString().slice(11, 19);
-  const horaFin = disponibilidad.franja.horaFin.toISOString().slice(11, 19);
-  return {
-    start: new Date(`${fecha}T${horaInicio}-05:00`),
-    end: new Date(`${fecha}T${horaFin}-05:00`),
-  };
 }
 
 export async function procesarEscaneo(
@@ -158,10 +154,16 @@ export async function procesarEscaneo(
       ? "DENIED"
       : "GRANTED";
 
+  const message =
+    access === "DENIED"
+      ? (!decision.allowed ? (decision.message ?? ACCESS_ALREADY_USED_MESSAGE) : ACCESS_ALREADY_USED_MESSAGE)
+      : undefined;
+
   return {
     access,
     ...(access === "DENIED" && !decision.allowed ? { code: decision.code } : {}),
     ...(access === "DENIED" && decision.allowed ? { code: "ALREADY_USED" as const } : {}),
+    ...(message ? { message } : {}),
     modo,
     resultado: salida.resultado,
     canjeado: salida.canjeado,
