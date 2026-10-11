@@ -14,3 +14,20 @@ export const accessScanSchema = z.object({
 });
 
 export type AccessScan = z.infer<typeof accessScanSchema>;
+
+// RF-13 (HU-14 / TSK-BE-14) — canje de ticket en modo turno
+export const accessRedeemSchema = z.object({
+  ticketId: z.uuid(), // contenido del QR = ticket_qr.codigo_uuid (UUIDv4)
+  // HMAC-SHA256 sobre el código (QR_HMAC_SECRET): 32 bytes en hex = 64 chars.
+  // Normalizado a minúsculas para coincidir exactamente con el digest de Node crypto
+  signature: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i, "La firma debe ser un HMAC-SHA256 en hexadecimal.")
+    .transform((s) => s.toLowerCase()),
+  // servicio del puesto seleccionado; FK a servicio.id (Int) — obligatorio en modo turno
+  postServiceId: z.coerce.number().int().positive({
+    message: "El postServiceId es obligatorio y debe ser un entero positivo.",
+  }),
+});
+
+export type AccessRedeem = z.infer<typeof accessRedeemSchema>;

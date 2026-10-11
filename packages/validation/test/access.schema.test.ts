@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accessScanSchema } from "../src/access.schema.ts";
+import { accessRedeemSchema, accessScanSchema } from "../src/access.schema.ts";
 
 const UUID = "9f0d6f4e-0000-4000-8000-0000000000ff";
 
@@ -77,5 +77,50 @@ test("TSK-BE-11: la firma debe ser exactamente 64 hex (HMAC-SHA256)", () => {
   if (upper.success) {
     assert.equal(upper.data.signature, "a".repeat(64));
   }
+});
+
+test("TSK-BE-14: accessRedeemSchema valida postServiceId obligatorio positivo y rechaza null o negativo", () => {
+  const okNumber = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: 5,
+  });
+  assert.equal(okNumber.success, true);
+  if (okNumber.success) assert.equal(okNumber.data.postServiceId, 5);
+
+  const okStringNumber = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: "7",
+  });
+  assert.equal(okStringNumber.success, true);
+  if (okStringNumber.success) assert.equal(okStringNumber.data.postServiceId, 7);
+
+  const sinServicio = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: null,
+  });
+  assert.equal(sinServicio.success, false);
+
+  const servicioZero = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: 0,
+  });
+  assert.equal(servicioZero.success, false);
+
+  const servicioNegativo = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: -1,
+  });
+  assert.equal(servicioNegativo.success, false);
+
+  const servicioAusente = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+  });
+  assert.equal(servicioAusente.success, false);
 });
 
