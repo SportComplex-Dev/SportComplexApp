@@ -144,6 +144,40 @@ test("TSK-BE-10: pago FALLIDO cancela la reserva y restituye la franja (idempote
   assert.equal(mock._state.pagos.length, 1);
 });
 
+test("TSK-BE-18: pago POS aprobado confirma y asocia vendedor/canal a la reserva", async () => {
+  const mock = createMockPrisma();
+  seedReserva(mock, { titularId: "cliente-pos", vendedorId: null, canal: "ONLINE" });
+  seedDisponibilidad(mock, { servicioId: 4 });
+
+  const resultado = await procesarPagoWebhook(
+    baseInput({ vendedorId: "vendedor-pos", serviceId: 4 }),
+    { db: mock },
+  );
+
+  assert.equal(resultado.reservaConfirmada, true);
+  assert.equal(mock._state.reservas[0].estado, "CONFIRMADA");
+  assert.equal(mock._state.reservas[0].vendedorId, "vendedor-pos");
+  assert.equal(mock._state.reservas[0].canal, "TAQUILLA");
+  assert.equal(mock._state.tickets.length, 1);
+});
+
+test("TSK-BE-18: rechaza metadata POS con servicio distinto o vendedor ya asignado", async () => {
+  const mock = createMockPrisma();
+  seedReserva(mock, { vendedorId: "vendedor-original" });
+  seedDisponibilidad(mock, { servicioId: 4 });
+
+  await assert.rejects(
+    () => procesarPagoWebhook(baseInput({ vendedorId: "vendedor-pos", serviceId: 5 }), { db: mock }),
+    (error: unknown) => error instanceof PaymentError && error.code === "INVALID_POS_METADATA",
+  );
+  await assert.rejects(
+    () => procesarPagoWebhook(baseInput({ vendedorId: "vendedor-pos", serviceId: 4 }), { db: mock }),
+    (error: unknown) => error instanceof PaymentError && error.code === "INVALID_POS_METADATA",
+  );
+  assert.equal(mock._state.pagos.length, 0);
+  assert.equal(mock._state.reservas[0].estado, "PENDIENTE_PAGO");
+});
+
 test("TSK-BD-09: un evento FALLIDO tardío nunca degrada un pago APROBADO", async () => {
   const mock = createMockPrisma();
   seedReserva(mock);

@@ -10,6 +10,10 @@ const ROUTE_ROLES: ReadonlyArray<{
     roles: ["Administrador", "Empleado_Vendedor"],
   },
   {
+    prefixes: ["/api/payments/intent"],
+    roles: ["Administrador", "Empleado_Vendedor"],
+  },
+  {
     prefixes: ["/scanner", "/api/access", "/api/tickets/verify"],
     roles: ["Administrador", "Empleado_Lector"],
   },
