@@ -197,7 +197,18 @@ export default function PosPage() {
 
       setProcessStep('Autorizando transacción digital en Stripe...')
 
-      let apiResponse: { success?: boolean; booking?: Record<string, unknown>; ticket?: Record<string, unknown> } | null = null
+      interface PosApiResponse {
+        booking?: {
+          id?: string
+          code?: string
+          stripePaymentIntentId?: string
+        }
+        ticket?: {
+          qrPayload?: string
+        }
+      }
+
+      let apiResponse: PosApiResponse | null = null
       try {
         const res = await fetch('/api/pos/checkout', {
           method: 'POST',
@@ -206,7 +217,7 @@ export default function PosPage() {
         })
         if (res.ok) {
           const json = await res.json()
-          if (json.success) apiResponse = json.data
+          if (json.success) apiResponse = json.data as PosApiResponse
         }
       } catch {
         // Fallback local robusto
@@ -233,8 +244,8 @@ export default function PosPage() {
       }
 
       // Generar QR para comprobante
-      const qrData = apiResponse?.ticket?.qrPayload || `SC1:${newBooking.code}:pos_voucher_signature`
-      const qrUrl = await QRCode.toDataURL(qrData, { width: 260, margin: 2 })
+      const qrData: string = apiResponse?.ticket?.qrPayload || `SC1:${newBooking.code}:pos_voucher_signature`
+      const qrUrl: string = await QRCode.toDataURL(qrData, { width: 260, margin: 2 })
       setReceiptQrUrl(qrUrl)
 
       // Guardar en almacén local
