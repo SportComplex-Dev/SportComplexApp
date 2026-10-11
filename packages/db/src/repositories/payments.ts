@@ -67,6 +67,8 @@ export interface ProcesarPagoInput {
   reservaIds?: string[] | undefined;
   membresiaId?: number | undefined;
   ticketCodigoUuid?: string | undefined;
+  vendedorId?: string | undefined;
+  serviceId?: number | undefined;
 }
 
 export interface ProcesarPagoResultado {
@@ -155,11 +157,29 @@ function validateInput(input: ProcesarPagoInput): void {
       }
     }
   }
+  const tieneVendedor = input.vendedorId !== undefined;
+  const tieneServicio = input.serviceId !== undefined;
+  if (tieneVendedor !== tieneServicio) {
+    throw new PaymentError(
+      "La metadata POS requiere vendedor_id y servicio_id juntos.",
+      "INVALID_POS_METADATA",
+      400,
+    );
+  }
+  if (
+    tieneVendedor &&
+    (!input.vendedorId?.trim() || !Number.isSafeInteger(input.serviceId) || (input.serviceId ?? 0) <= 0)
+  ) {
+    throw new PaymentError("La metadata POS no es válida.", "INVALID_POS_METADATA", 400);
+  }
 }
 
 type ReservaResumen = {
   id: string;
   estado: string;
+  canal?: string;
+  vendedorId?: string | null;
+  disponibilidad?: { servicioId: number } | null;
   disponibilidadId?: bigint | number | null;
   cantidadCupos?: number | null;
   total?: number | string | { toString(): string } | null;
@@ -229,7 +249,30 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
     if (targetReservaIds.length > 0) {
       reservasExistentes = (await tx.reserva.findMany({
         where: { id: { in: targetReservaIds } },
+        include: { disponibilidad: { select: { servicioId: true } } },
       })) as ReservaResumen[];
+
+      if (input.vendedorId !== undefined) {
+        if (targetReservaIds.length !== 1) {
+          throw new PaymentError(
+            "Un cobro POS debe corresponder a una sola reserva.",
+            "INVALID_POS_METADATA",
+            400,
+          );
+        }
+        const reservaPos = reservasExistentes[0];
+        if (
+          !reservaPos ||
+          reservaPos.disponibilidad?.servicioId !== input.serviceId ||
+          (reservaPos.vendedorId != null && reservaPos.vendedorId !== input.vendedorId)
+        ) {
+          throw new PaymentError(
+            "La metadata POS no coincide con la reserva.",
+            "INVALID_POS_METADATA",
+            400,
+          );
+        }
+      }
 
       const reservasConTotal = reservasExistentes.filter((r) => r.total != null);
       if (reservasConTotal.length > 0) {
@@ -289,7 +332,13 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
         if (pendientesIds.length > 0) {
           const upd = await tx.reserva.updateMany({
             where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
-            data: { estado: "CONFIRMADA", pagoId: pago.id },
+            data: {
+              estado: "CONFIRMADA",
+              pagoId: pago.id,
+              ...(input.vendedorId
+                ? { vendedorId: input.vendedorId, canal: "TAQUILLA" }
+                : {}),
+            },
           });
           const count = typeof upd?.count === "number" ? upd.count : 0;
           if (count > 0) {

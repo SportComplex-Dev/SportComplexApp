@@ -40,11 +40,15 @@ export function buildPaymentMetadata(opts: {
   bookingId?: string;
   userId: string;
   membershipId?: string;
+  serviceId?: number;
+  vendedorId?: string;
 }) {
   return {
     ...(opts.bookingId ? { bookingId: opts.bookingId } : {}),
     userId: opts.userId,
     ...(opts.membershipId ? { membershipId: opts.membershipId } : {}),
+    ...(opts.serviceId !== undefined ? { servicio_id: String(opts.serviceId) } : {}),
+    ...(opts.vendedorId ? { vendedor_id: opts.vendedorId } : {}),
     cashless: "true",
   };
 }
@@ -65,6 +69,11 @@ export function parsePaymentIntentMetadata(metadata: Record<string, string> | un
     bookingId: metadata?.bookingId || undefined,
     bookingIds,
     membershipId: metadata?.membershipId || undefined,
+    vendedorId: metadata?.vendedor_id || undefined,
+    serviceId:
+      metadata?.servicio_id && /^\d+$/.test(metadata.servicio_id)
+        ? Number(metadata.servicio_id)
+        : undefined,
   };
 }
 
@@ -90,6 +99,103 @@ export function toStripeAmountCents(
     throw new Error("INVALID_CHECKOUT_AMOUNT");
   }
   return cents;
+}
+
+export interface PosPaymentIntentInput {
+  bookingId: string;
+  userId: string;
+  serviceId: number;
+  vendedorId: string;
+  total: number | string | { toString(): string };
+}
+
+export interface StripePaymentIntentClient {
+  paymentIntents: {
+    create(params: unknown, options?: unknown): Promise<Stripe.PaymentIntent>;
+  };
+}
+
+export interface PosPaymentIntentResult {
+  paymentIntentId: string;
+  clientSecret: string;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
+export function buildPosPaymentIntentParams(input: PosPaymentIntentInput) {
+  if (!Number.isSafeInteger(input.serviceId) || input.serviceId <= 0) {
+    throw new Error("INVALID_POS_SERVICE_ID");
+  }
+  if (!input.bookingId.trim() || !input.userId.trim() || !input.vendedorId.trim()) {
+    throw new Error("INVALID_POS_PAYMENT_METADATA");
+  }
+
+  return {
+    amount: toStripeAmountCents(input.total),
+    currency: STRIPE_CURRENCY,
+    payment_method_types: ["card"],
+    metadata: buildPaymentMetadata({
+      bookingId: input.bookingId,
+      userId: input.userId,
+      serviceId: input.serviceId,
+      vendedorId: input.vendedorId,
+    }),
+    description: `Reserva POS ${input.bookingId}`,
+  };
+}
+
+function resolvePaymentIntentClient(explicit?: StripePaymentIntentClient) {
+  if (explicit) return explicit;
+  const secret = process.env.STRIPE_SECRET_KEY;
+  if (!secret) throw new Error("STRIPE_NOT_CONFIGURED");
+  return new Stripe(secret) as unknown as StripePaymentIntentClient;
+}
+
+/** Crea el PaymentIntent de taquilla en el servidor; el cliente solo confirma el clientSecret. */
+export async function createPosPaymentIntent(
+  input: PosPaymentIntentInput,
+  deps: { client?: StripePaymentIntentClient; idempotencyKey?: string } = {},
+): Promise<PosPaymentIntentResult> {
+  const params = buildPosPaymentIntentParams(input);
+  const client = resolvePaymentIntentClient(deps.client);
+
+  let intent: Stripe.PaymentIntent;
+  try {
+    intent = await client.paymentIntents.create(
+      params,
+      deps.idempotencyKey ? { idempotencyKey: deps.idempotencyKey } : undefined,
+    );
+  } catch (err) {
+    throw stripeError(
+      "STRIPE_PAYMENT_INTENT_FAILED",
+      err instanceof Error ? err.message : String(err),
+      { cause: err },
+    );
+  }
+  if (!intent.id || !intent.client_secret) {
+    throw stripeError("STRIPE_PAYMENT_INTENT_INVALID", "Stripe no devolvió un client_secret.");
+  }
+  if (
+    intent.metadata.bookingId !== input.bookingId ||
+    intent.metadata.userId !== input.userId ||
+    intent.metadata.servicio_id !== String(input.serviceId) ||
+    intent.metadata.vendedor_id !== input.vendedorId ||
+    intent.amount !== params.amount
+  ) {
+    throw stripeError(
+      "POS_PAYMENT_INTENT_CONFLICT",
+      "La reserva ya tiene un PaymentIntent asociado a otros datos POS.",
+    );
+  }
+
+  return {
+    paymentIntentId: intent.id,
+    clientSecret: intent.client_secret,
+    amount: intent.amount,
+    currency: intent.currency,
+    status: intent.status,
+  };
 }
 
 export interface CheckoutSessionItem {

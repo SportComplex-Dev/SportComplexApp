@@ -114,7 +114,14 @@ export async function POST(request: Request) {
   }
 
   const intent = event.data.object as Stripe.PaymentIntent;
-  const { userId, bookingId, bookingIds, membershipId } = parsePaymentIntentMetadata(intent.metadata);
+  const {
+    userId,
+    bookingId,
+    bookingIds,
+    membershipId,
+    vendedorId,
+    serviceId,
+  } = parsePaymentIntentMetadata(intent.metadata);
   const effectiveBookingIds =
     bookingIds && bookingIds.length > 0
       ? bookingIds
@@ -126,6 +133,17 @@ export async function POST(request: Request) {
   if (!intent.id || !userId || (!hasBookings && !membershipId)) {
     // Evento sin nuestro metadato (otro flujo de Stripe): no es procesable.
     return ok({ received: true, ignored: true, reason: "MISSING_METADATA" });
+  }
+  const hasPosMetadata = vendedorId !== undefined || serviceId !== undefined;
+  if (
+    hasPosMetadata &&
+    (!vendedorId || serviceId === undefined || effectiveBookingIds.length !== 1)
+  ) {
+    return fail(
+      "INVALID_POS_METADATA",
+      "El cobro POS requiere vendedor, servicio y una única reserva válidos.",
+      400,
+    );
   }
 
   try {
@@ -145,6 +163,7 @@ export async function POST(request: Request) {
       membresiaId: membershipId ? Number(membershipId) : undefined,
       // UUIDv4 no predecible para el TICKET_QR (TSK-BE-11), generado en core.
       ticketCodigoUuid: newTicketId(),
+      ...(hasPosMetadata ? { vendedorId, serviceId } : {}),
     });
     // Observación de @Its-JrDev: solo notificar a n8n si el pago falló Y NO es un reintento duplicado.
     if (resultado.estado === "FALLIDO" && !resultado.duplicado) {
