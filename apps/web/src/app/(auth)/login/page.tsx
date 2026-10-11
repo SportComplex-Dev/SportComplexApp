@@ -81,7 +81,8 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await signIn('google', { redirectTo: getSafeNextPath() ?? '/portal' })
+      const destination = getSafeNextPath() ?? '/portal'
+      await signIn('google', { redirectTo: destination, callbackUrl: destination })
     } catch {
       setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
       setLoading(false)

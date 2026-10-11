@@ -111,7 +111,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
             <button
               type="button"
               className="google-button"
-              onClick={() => signIn('google', { redirectTo: getSafeNextPath() ?? '/portal' })}
+              onClick={() => {
+                const destination = getSafeNextPath() ?? '/portal';
+                void signIn('google', { redirectTo: destination, callbackUrl: destination });
+              }}
             >
               <GoogleMark /> Continuar con Google
             </button>
