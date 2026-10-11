@@ -1,8 +1,6 @@
 // Mock en memoria de PrismaClient para pruebas unitarias de repositorios
 import { randomUUID } from "node:crypto";
 
-import { randomUUID } from "node:crypto";
-
 export interface MockCategoria {
   id: number;
   nombre: string;
