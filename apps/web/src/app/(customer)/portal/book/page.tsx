@@ -155,15 +155,15 @@ export default function BookPage() {
         ? {
             items: cart.map((item) => ({
               serviceId: item.numericServiceId,
-              startTime: `${date}T${item.startTime}:00-05:00`,
-              endTime: `${date}T${item.endTime}:00-05:00`,
+              startTime: new Date(`${date}T${item.startTime}:00-05:00`).toISOString(),
+              endTime: new Date(`${date}T${item.endTime}:00-05:00`).toISOString(),
               cantidadCupos: 1,
             })),
           }
         : {
             serviceId: cart[0].numericServiceId,
-            startTime: `${date}T${cart[0].startTime}:00-05:00`,
-            endTime: `${date}T${cart[0].endTime}:00-05:00`,
+            startTime: new Date(`${date}T${cart[0].startTime}:00-05:00`).toISOString(),
+            endTime: new Date(`${date}T${cart[0].endTime}:00-05:00`).toISOString(),
             cantidadCupos: 1,
           };
 
@@ -183,8 +183,12 @@ export default function BookPage() {
           return;
         }
 
-        const msg = data?.message || data?.error || 'No se pudo iniciar el proceso de pago. Intenta de nuevo.';
-        setCheckoutError(msg);
+        const msg =
+          (typeof data?.error === 'object' && data?.error !== null ? data.error.message : null) ||
+          (typeof data?.error === 'string' ? data.error : null) ||
+          data?.message ||
+          'No se pudo iniciar el proceso de pago. Intenta de nuevo.';
+        setCheckoutError(String(msg));
         return;
       }
 
@@ -216,10 +220,6 @@ export default function BookPage() {
             </p>
           </div>
         </header>
-
-        <div className="mb-5 rounded-xl border border-[#dce9cb] bg-[#f0f7e5] px-4 py-3 text-sm leading-5 text-[#38583a] dark:border-[#3a4c38] dark:bg-[#202d22] dark:text-[#d3e4c5]">
-          <strong>Selección múltiple (HU-12):</strong> Puedes añadir distintos servicios en un mismo bloque horario sin bloquear la selección. Al confirmar, se creará un único proceso de checkout para pagar todo junto.
-        </div>
 
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section aria-label="Selección de servicios" className="min-w-0">
