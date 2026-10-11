@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import {
   BookingError,
   compensateFailedCheckout,
@@ -31,13 +31,8 @@ import { fail, created } from "@/lib/api-response";
  */
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para reservar.", 401);
-    }
-    if (session.user.role?.toUpperCase() !== "CLIENTE" || session.user.estado !== "ACTIVO") {
-      return fail("FORBIDDEN", "Solo una cuenta de cliente activa puede reservar en línea.", 403);
-    }
+    const authorization = await authorizeApiRequest(["Cliente"]);
+    if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
     try {
@@ -53,18 +48,24 @@ export async function POST(request: Request) {
     // TX1 — bloqueo transaccional + RESERVA PENDIENTE_PAGO con TTL 30 min.
     const hold = await createBookingHold({
       ...parsed.data,
-      userId: session.user.id,
+      userId: authorization.actor.id,
     });
 
     // Stripe Checkout Session (fuera de cualquier transacción).
     let checkout;
     try {
       checkout = await createStripeCheckoutSession({
-        reservaId: hold.id,
-        userId: session.user.id,
+        reservaIds: [hold.id],
+        userId: authorization.actor.id,
         total: hold.total,
-        cantidadCupos: hold.cantidadCupos,
-        servicioNombre: hold.disponibilidad?.servicio?.nombre,
+        items: [
+          {
+            reservaId: hold.id,
+            servicioNombre: hold.disponibilidad?.servicio?.nombre ?? "",
+            cantidadCupos: hold.cantidadCupos,
+            subtotal: Number(hold.subtotal),
+          },
+        ],
       });
     } catch (err) {
       // Compensación: liberar el hold; nunca se crea PAGO.

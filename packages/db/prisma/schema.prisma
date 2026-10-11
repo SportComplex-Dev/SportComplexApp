@@ -119,16 +119,17 @@ model Usuario {
   creadoEn     DateTime      @default(now()) @map("creado_en") @db.Timestamptz
 
   // Relaciones
-  rol                  Rol                     @relation(fields: [rolId], references: [id], onDelete: Restrict)
-  tokens               TokenVerificacion[]
-  reservasTitular      Reserva[]               @relation("ReservaTitular")
-  reservasVendedor     Reserva[]               @relation("ReservaVendedor")
-  ticketsUsados        TicketQr[]              @relation("TicketUsadoPor")
-  asignacionesPuesto   AsignacionPuesto[]
-  lecturasAcceso       LecturaAcceso[]
-  membresias           Membresia[]
-  pagos                Pago[]
-  inhabilitaciones     InhabilitacionServicio[]
+  // HU-21.DB: blindaje borrado — Restrict impide DELETE físico con historial; onUpdate Cascade preserva propagación.
+  rol                Rol                      @relation(fields: [rolId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tokens             TokenVerificacion[]
+  reservasTitular    Reserva[]                @relation("ReservaTitular")
+  reservasVendedor   Reserva[]                @relation("ReservaVendedor")
+  ticketsUsados      TicketQr[]               @relation("TicketUsadoPor")
+  asignacionesPuesto AsignacionPuesto[]
+  lecturasAcceso     LecturaAcceso[]
+  membresias         Membresia[]
+  pagos              Pago[]
+  inhabilitaciones   InhabilitacionServicio[]
 
   @@map("usuario")
 }
@@ -142,7 +143,9 @@ model TokenVerificacion {
   expiraEn  DateTime  @map("expira_en") @db.Timestamptz
   usadoEn   DateTime? @map("usado_en") @db.Timestamptz
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // HU-21.DB excepción documentada: token efímero de auth (no historial financiero/auditoría).
+  // Se mantiene onDelete: Cascade para purga de tokens; fuera del alcance de CA-02.
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("token_verificacion")
 }
@@ -169,7 +172,7 @@ model Servicio {
   estado          EstadoServicio    @default(ACTIVO)
 
   // Relaciones
-  categoria          CategoriaServicio        @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  categoria          CategoriaServicio        @relation(fields: [categoriaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   franjasHorarias    FranjaHoraria[]
   disponibilidades   Disponibilidad[]
   asignacionesPuesto AsignacionPuesto[]
@@ -180,13 +183,13 @@ model Servicio {
 
 // 6. FRANJA_HORARIA
 model FranjaHoraria {
-  id          Int      @id @default(autoincrement())
-  servicioId  Int      @map("servicio_id")
-  diaSemana   Int      @map("dia_semana") @db.SmallInt
-  horaInicio  DateTime @map("hora_inicio") @db.Time
-  horaFin     DateTime @map("hora_fin") @db.Time
+  id         Int      @id @default(autoincrement())
+  servicioId Int      @map("servicio_id")
+  diaSemana  Int      @map("dia_semana") @db.SmallInt
+  horaInicio DateTime @map("hora_inicio") @db.Time
+  horaFin    DateTime @map("hora_fin") @db.Time
 
-  servicio         Servicio         @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  servicio         Servicio         @relation(fields: [servicioId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   disponibilidades Disponibilidad[]
 
   @@map("franja_horaria")
@@ -194,16 +197,16 @@ model FranjaHoraria {
 
 // 7. DISPONIBILIDAD
 model Disponibilidad {
-  id                      BigInt   @id @default(autoincrement())
-  servicioId              Int      @map("servicio_id")
-  franjaId                Int      @map("franja_id")
-  fecha                   DateTime @db.Date
-  cuposTotales            Int      @map("cupos_totales")
-  cuposOcupados           Int      @default(0) @map("cupos_ocupados")
+  id                     BigInt   @id @default(autoincrement())
+  servicioId             Int      @map("servicio_id")
+  franjaId               Int      @map("franja_id")
+  fecha                  DateTime @db.Date
+  cuposTotales           Int      @map("cupos_totales")
+  cuposOcupados          Int      @default(0) @map("cupos_ocupados")
   bloqueadaMantenimiento Boolean  @default(false) @map("bloqueada_mantenimiento")
 
-  servicio Servicio      @relation(fields: [servicioId], references: [id], onDelete: Restrict)
-  franja   FranjaHoraria @relation(fields: [franjaId], references: [id], onDelete: Restrict)
+  servicio Servicio      @relation(fields: [servicioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  franja   FranjaHoraria @relation(fields: [franjaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   reservas Reserva[]
 
   @@unique([servicioId, franjaId, fecha])
@@ -231,8 +234,9 @@ model Pago {
   estado                EstadoPago
   creadoEn              DateTime   @default(now()) @map("creado_en") @db.Timestamptz
 
-  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
-  membresia Membresia? @relation(fields: [membresiaId], references: [id], onDelete: SetNull)
+  // HU-21.DB: historial financiero — Restrict bloquea borrado físico de usuarios con pagos.
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  membresia Membresia? @relation(fields: [membresiaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   reservas  Reserva[]
 
   @@map("pago")
@@ -240,29 +244,31 @@ model Pago {
 
 // 10. RESERVA
 model Reserva {
-  id                String        @id @default(uuid()) @db.Uuid
-  disponibilidadId  BigInt        @map("disponibilidad_id")
-  titularId         String        @map("titular_id") @db.Uuid
-  vendedorId        String?       @map("vendedor_id") @db.Uuid
-  pagoId            String?       @map("pago_id") @db.Uuid
-  membresiaId       Int?          @map("membresia_id")
-  inhabilitacionId  Int?          @map("inhabilitacion_id")
-  cantidadCupos     Int           @map("cantidad_cupos")
-  canal             CanalReserva
-  estado            EstadoReserva
-  subtotal          Decimal       @db.Decimal(12, 2)
-  descuentoPct      Decimal       @default(0.00) @map("descuento_pct") @db.Decimal(5, 2)
-  total             Decimal       @db.Decimal(12, 2)
-  expiraEn          DateTime?     @map("expira_en") @db.Timestamptz
-  creadoEn          DateTime      @default(now()) @map("creado_en") @db.Timestamptz
+  id               String        @id @default(uuid()) @db.Uuid
+  disponibilidadId BigInt        @map("disponibilidad_id")
+  titularId        String        @map("titular_id") @db.Uuid
+  vendedorId       String?       @map("vendedor_id") @db.Uuid
+  pagoId           String?       @map("pago_id") @db.Uuid
+  membresiaId      Int?          @map("membresia_id")
+  inhabilitacionId Int?          @map("inhabilitacion_id")
+  cantidadCupos    Int           @map("cantidad_cupos")
+  canal            CanalReserva
+  estado           EstadoReserva
+  subtotal         Decimal       @db.Decimal(12, 2)
+  descuentoPct     Decimal       @default(0.00) @map("descuento_pct") @db.Decimal(5, 2)
+  total            Decimal       @db.Decimal(12, 2)
+  expiraEn         DateTime?     @map("expira_en") @db.Timestamptz
+  creadoEn         DateTime      @default(now()) @map("creado_en") @db.Timestamptz
 
   // Relaciones
-  disponibilidad Disponibilidad          @relation(fields: [disponibilidadId], references: [id], onDelete: Restrict)
-  titular        Usuario                 @relation("ReservaTitular", fields: [titularId], references: [id], onDelete: Restrict)
-  vendedor       Usuario?                @relation("ReservaVendedor", fields: [vendedorId], references: [id], onDelete: Restrict)
-  pago           Pago?                   @relation(fields: [pagoId], references: [id], onDelete: SetNull)
-  membresia      Membresia?              @relation(fields: [membresiaId], references: [id], onDelete: SetNull)
-  inhabilitacion InhabilitacionServicio? @relation(fields: [inhabilitacionId], references: [id], onDelete: SetNull)
+  // HU-21.DB: historial comercial/auditoría — Restrict en titular/vendedor; SetNull solo en
+  // relaciones no-usuario (pago/membresia/inhabilitacion), fuera del alcance de CA-02.
+  disponibilidad Disponibilidad          @relation(fields: [disponibilidadId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  titular        Usuario                 @relation("ReservaTitular", fields: [titularId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vendedor       Usuario?                @relation("ReservaVendedor", fields: [vendedorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  pago           Pago?                   @relation(fields: [pagoId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  membresia      Membresia?              @relation(fields: [membresiaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  inhabilitacion InhabilitacionServicio? @relation(fields: [inhabilitacionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   ticketQr       TicketQr?
 
   @@index([titularId, estado])
@@ -283,8 +289,8 @@ model TicketQr {
   emitidoEn  DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
   usadoEn    DateTime?    @map("usado_en") @db.Timestamptz
 
-  reserva        Reserva         @relation(fields: [reservaId], references: [id], onDelete: Restrict)
-  empleadoLector Usuario?        @relation("TicketUsadoPor", fields: [usadoPor], references: [id], onDelete: Restrict)
+  reserva        Reserva         @relation(fields: [reservaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empleadoLector Usuario?        @relation("TicketUsadoPor", fields: [usadoPor], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lecturasAcceso LecturaAcceso[]
 
   @@map("ticket_qr")
@@ -298,8 +304,8 @@ model AsignacionPuesto {
   inicioTurno DateTime @map("inicio_turno") @db.Timestamptz
   finTurno    DateTime @map("fin_turno") @db.Timestamptz
 
-  empleado       Usuario         @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
-  servicio       Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  empleado       Usuario         @relation(fields: [empleadoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  servicio       Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lecturasAcceso LecturaAcceso[]
 
   @@map("asignacion_puesto")
@@ -315,9 +321,9 @@ model LecturaAcceso {
   resultado    ResultadoLectura
   fechaHora    DateTime         @default(now()) @map("fecha_hora") @db.Timestamptz
 
-  ticket     TicketQr          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
-  empleado   Usuario           @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
-  asignacion AsignacionPuesto? @relation(fields: [asignacionId], references: [id], onDelete: SetNull)
+  ticket     TicketQr          @relation(fields: [ticketId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  empleado   Usuario           @relation(fields: [empleadoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asignacion AsignacionPuesto? @relation(fields: [asignacionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([fechaHora])
   @@map("lectura_acceso")
@@ -355,8 +361,8 @@ model Membresia {
   proximaRenovacion    DateTime        @map("proxima_renovacion") @db.Date
   stripeSubscriptionId String?         @unique @map("stripe_subscription_id") @db.VarChar(100)
 
-  usuario  Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
-  plan     PlanMembresia @relation(fields: [planId], references: [id], onDelete: Restrict)
+  usuario  Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  plan     PlanMembresia @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   pagos    Pago[]
   reservas Reserva[]
 
@@ -373,8 +379,8 @@ model InhabilitacionServicio {
   fechaFin         DateTime? @map("fecha_fin") @db.Timestamptz
   webhookEnviadoEn DateTime? @map("webhook_enviado_en") @db.Timestamptz
 
-  servicio          Servicio  @relation(fields: [servicioId], references: [id], onDelete: Restrict)
-  admin             Usuario   @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  servicio           Servicio  @relation(fields: [servicioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  admin              Usuario   @relation(fields: [adminId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   reservasCanceladas Reserva[]
 
   @@map("inhabilitacion_servicio")

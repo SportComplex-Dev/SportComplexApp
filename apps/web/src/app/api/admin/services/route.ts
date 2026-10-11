@@ -1,4 +1,5 @@
 import { fail, ok, created } from "@/lib/api-response";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import {
   createCategoriaSchema,
   createServicioSchema,
@@ -23,6 +24,9 @@ import type { EstadoServicio } from "@prisma/client";
  */
 export async function GET(request: Request) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const { searchParams } = new URL(request.url);
     const entity = searchParams.get("entity")?.toLowerCase();
     const rawCategoriaId = searchParams.get("categoriaId");
@@ -60,6 +64,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    const authorization = await authorizeApiRequest(["Administrador"]);
+    if (!authorization.authorized) return authorization.response;
+
     const rawBody = await request.json().catch(() => ({}));
     if (typeof rawBody !== "object" || rawBody === null) {
       return fail("INVALID_PAYLOAD", "El cuerpo de la solicitud debe ser un objeto JSON", 400);

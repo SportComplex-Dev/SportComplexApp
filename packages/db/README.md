@@ -26,6 +26,39 @@ Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM*
 
 ---
 
+## 🔁 Idempotencia de pagos (TSK-BD-09)
+
+El repositorio `src/repositories/payments.ts` exporta `procesarPagoWebhook`,
+punto de entrada único del webhook de Stripe (`POST /api/payments`):
+
+- Upsert de `PAGO` por `stripe_payment_intent_id` (UNIQUE desde `TSK-BD-06`);
+  reintenta la transacción ante `P2002` (carreras concurrentes).
+- Confirmación condicional `PENDIENTE_PAGO → CONFIRMADA` y activación
+  idempotente de membresías, todo en la misma transacción.
+- Reenviar el mismo webhook N veces deja **una sola** fila en `pago` y **una
+  sola** reserva `CONFIRMADA`.
+
+Guía completa para backend y frontend: [`docs/TSK-BD-09-idempotencia-pagos-stripe.md`](../../docs/TSK-BD-09-idempotencia-pagos-stripe.md).
+
+---
+
+## 🎫 Canje de ticket y auditoría de accesos (TSK-BD-10)
+
+El repositorio `src/repositories/tickets.ts` exporta `getTicketForScan`,
+`getAsignacionVigente` y `ejecutarLectura`, el único punto de escritura de
+`ticket_qr` + `lectura_acceso` (`POST /api/access`):
+
+- Canje transaccional `EMITIDO → USADO` con `WHERE estado='EMITIDO'` (RN-05:
+  un boleto `USADO` jamás vuelve a `EMITIDO`).
+- Exactamente **1 fila** en `lectura_acceso` por escaneo (concedido, denegado
+  o consulta); el modo CONSULTA audita con `asignacion_id = NULL` y no altera
+  el boleto.
+
+Guía única de ambas tasks (backend, frontend y docketeo Jira):
+[`docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md`](../../docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md).
+
+---
+
 ## 📋 Guía de Uso e Indicaciones para el Equipo (Partners)
 
 ### 1. Variables de Entorno (`.env`)

@@ -2,7 +2,7 @@ import { ok, fail } from '@/lib/api-response'
 import { prisma } from '@sportcomplex/db'
 import { loginSchema } from '@sportcomplex/validation'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'
-import { verifySecret } from '@sportcomplex/core/src/security/token'
+import { verifySecret } from '@sportcomplex/core'
 import { normalizeRole } from '@/lib/session'
 
 const supportedRoles = [
@@ -72,15 +72,31 @@ export async function POST(request: Request) {
       return fail('ACCOUNT_INACTIVE', 'Tu cuenta está inactiva.', 403)
     }
 
-    // 4. Responder con los datos del usuario para autorizar el acceso
-    return ok({
+    // 4. Responder con los datos del usuario y emitir cookies de sesión perimetral
+    const canonicalRole = normalizeRole(user.rol.nombre) ?? 'Cliente'
+    const sessionData = {
+      userId: user.id,
+      email: user.correo,
+      name: user.nombre,
+      role: canonicalRole,
+      status: user.estado,
+    }
+
+    const response = ok({
       user: {
         id: user.id,
         email: user.correo,
         name: user.nombre,
-        role: normalizeRole(user.rol.nombre) ?? 'Cliente',
+        role: canonicalRole,
       },
     })
+
+    // Cookies de sesión para middleware perimetral (session.ts) y cliente
+    response.headers.append('Set-Cookie', `sc-session=${JSON.stringify(sessionData)}; Path=/; SameSite=Lax; Max-Age=86400`)
+    response.headers.append('Set-Cookie', `sc-role=${canonicalRole}; Path=/; SameSite=Lax; Max-Age=86400`)
+    response.headers.append('Set-Cookie', `sc-status=${user.estado}; Path=/; SameSite=Lax; Max-Age=86400`)
+
+    return response
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error en la conexión a la base de datos'
     return fail('INTERNAL_SERVER_ERROR', message, 500)
