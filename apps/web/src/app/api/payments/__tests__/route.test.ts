@@ -288,3 +288,58 @@ test("SCRUM-163 API: webhook multi-booking con monto menor devuelve 400 AMOUNT_M
   assert.equal(body.success, false);
   assert.equal(body.error.code, "AMOUNT_MISMATCH");
 });
+
+test("TSK-BE-18 API: webhook POS firmado confirma, emite QR y registra vendedor/taquilla", async () => {
+  seedReserva({ id: "reserva-pos-webhook", titularId: "cliente-pos", total: 75000 });
+  mock._state.disponibilidades.push({
+    id: 1n,
+    servicioId: 4,
+    franjaId: 1,
+    fecha: new Date(),
+    cuposTotales: 5,
+    cuposOcupados: 1,
+    bloqueadaMantenimiento: false,
+  });
+
+  const payload = buildEventPayload({
+    id: "evt_pos_1",
+    object: {
+      id: "pi_pos_1",
+      metadata: {
+        bookingId: "reserva-pos-webhook",
+        userId: "cliente-pos",
+        servicio_id: "4",
+        vendedor_id: "vendedor-pos",
+        cashless: "true",
+      },
+    },
+  });
+  const response = await postWebhook(payload, signPayload(payload));
+
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.data.reservaConfirmada, true);
+  assert.equal(result.data.ticketQrEmitido, true);
+  const reserva = mock._state.reservas.find((item: any) => item.id === "reserva-pos-webhook");
+  assert.equal(reserva.estado, "CONFIRMADA");
+  assert.equal(reserva.vendedorId, "vendedor-pos");
+  assert.equal(reserva.canal, "TAQUILLA");
+});
+
+test("TSK-BE-18 API: webhook rechaza metadata POS incompleta o de varias reservas", async () => {
+  const payload = buildEventPayload({
+    id: "evt_pos_invalid",
+    object: {
+      id: "pi_pos_invalid",
+      metadata: {
+        bookingId: "reserva-1,reserva-2",
+        userId: "cliente-pos",
+        vendedor_id: "vendedor-pos",
+      },
+    },
+  });
+  const response = await postWebhook(payload, signPayload(payload));
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "INVALID_POS_METADATA");
+});

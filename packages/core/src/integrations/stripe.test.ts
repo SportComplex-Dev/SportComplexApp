@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildCheckoutSessionParams,
+  buildPosPaymentIntentParams,
   checkoutExpiresAt,
   CHECKOUT_TTL_MINUTES,
+  createPosPaymentIntent,
   createStripeCheckoutSession,
   extractPaymentIntentId,
   parsePaymentIntentMetadata,
@@ -153,4 +155,97 @@ test("SCRUM-163: parsePaymentIntentMetadata parsea bookingId CSV o bookingIds a 
   });
   assert.equal(parsed3.bookingId, "r-single");
   assert.deepEqual(parsed3.bookingIds, ["r-single"]);
+});
+
+test("TSK-BE-18: PaymentIntent POS lleva metadata del servicio y vendedor y monto calculado", () => {
+  const params = buildPosPaymentIntentParams({
+    bookingId: "reserva-pos-1",
+    userId: "cliente-1",
+    serviceId: 7,
+    vendedorId: "vendedor-1",
+    total: "75000.00",
+  });
+
+  assert.equal(params.amount, 7_500_000);
+  assert.equal(params.currency, "cop");
+  assert.deepEqual(params.metadata, {
+    bookingId: "reserva-pos-1",
+    userId: "cliente-1",
+    servicio_id: "7",
+    vendedor_id: "vendedor-1",
+    cashless: "true",
+  });
+});
+
+test("TSK-BE-18: crea PaymentIntent con clave de idempotencia y devuelve client_secret", async () => {
+  let idempotencyOptions: unknown;
+  const input = {
+    bookingId: "reserva-pos-2",
+    userId: "cliente-2",
+    serviceId: 3,
+    vendedorId: "vendedor-2",
+    total: 1250,
+  };
+  const expected = buildPosPaymentIntentParams(input);
+  const result = await createPosPaymentIntent(input, {
+    idempotencyKey: "pos-reserva-pos-2",
+    client: {
+      paymentIntents: {
+        async create(_params, options) {
+          idempotencyOptions = options;
+          return {
+            id: "pi_pos_2",
+            client_secret: "pi_pos_2_secret_test",
+            amount: expected.amount,
+            currency: "cop",
+            status: "requires_payment_method",
+            metadata: expected.metadata,
+          } as never;
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(idempotencyOptions, { idempotencyKey: "pos-reserva-pos-2" });
+  assert.equal(result.paymentIntentId, "pi_pos_2");
+  assert.equal(result.clientSecret, "pi_pos_2_secret_test");
+  assert.equal(result.amount, expected.amount);
+});
+
+test("TSK-BE-18: rechaza un intent idempotente reutilizado por otro vendedor", async () => {
+  await assert.rejects(
+    () =>
+      createPosPaymentIntent(
+        {
+          bookingId: "reserva-pos-3",
+          userId: "cliente-3",
+          serviceId: 3,
+          vendedorId: "vendedor-actual",
+          total: 1250,
+        },
+        {
+          client: {
+            paymentIntents: {
+              async create() {
+                return {
+                  id: "pi_pos_3",
+                  client_secret: "pi_pos_3_secret_test",
+                  amount: 125_000,
+                  currency: "cop",
+                  status: "requires_payment_method",
+                  metadata: {
+                    bookingId: "reserva-pos-3",
+                    userId: "cliente-3",
+                    servicio_id: "3",
+                    vendedor_id: "otro-vendedor",
+                    cashless: "true",
+                  },
+                } as never;
+              },
+            },
+          },
+        },
+      ),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "POS_PAYMENT_INTENT_CONFLICT",
+  );
 });

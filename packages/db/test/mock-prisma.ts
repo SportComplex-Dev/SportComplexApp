@@ -1,7 +1,6 @@
 // Mock en memoria de PrismaClient para pruebas unitarias de repositorios
 import { randomUUID } from "node:crypto";
 
-
 export interface MockCategoria {
   id: number;
   nombre: string;
@@ -42,6 +41,7 @@ export interface MockReserva {
   disponibilidadId: bigint;
   estado: string;
   titularId?: string;
+  vendedorId?: string | null;
   cantidadCupos?: number;
   expiraEn?: Date | null;
   inhabilitacionId?: number | null;
@@ -725,6 +725,8 @@ export function createMockPrisma() {
           }
           if (data.estado !== undefined) reservation.estado = data.estado;
           if (data.pagoId !== undefined) reservation.pagoId = data.pagoId;
+          if (data.vendedorId !== undefined) reservation.vendedorId = data.vendedorId;
+          if (data.canal !== undefined) reservation.canal = data.canal;
           if (data.expiraEn !== undefined) reservation.expiraEn = data.expiraEn;
           if (data.inhabilitacionId !== undefined) {
             reservation.inhabilitacionId = data.inhabilitacionId;
