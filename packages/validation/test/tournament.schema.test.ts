@@ -113,5 +113,34 @@ test("tournamentQuerySchema: parsea filtros válidos", () => {
     assert.equal(parsed.data.categoriaId, 2);
     assert.equal(parsed.data.estado, "INSCRIPCIONES_ABIERTAS");
     assert.equal(parsed.data.search, "Pádel");
+    assert.equal(parsed.data.page, 1);
+    assert.equal(parsed.data.limit, 20);
   }
 });
+
+test("tournamentQuerySchema: normaliza soloActivos como string 'false' y 'true'", () => {
+  const queryFalse = tournamentQuerySchema.safeParse({ soloActivos: "false", page: "3", limit: "50" });
+  assert.equal(queryFalse.success, true);
+  if (queryFalse.success) {
+    assert.equal(queryFalse.data.soloActivos, false);
+    assert.equal(queryFalse.data.page, 3);
+    assert.equal(queryFalse.data.limit, 50);
+  }
+
+  const queryTrue = tournamentQuerySchema.safeParse({ soloActivos: "true" });
+  assert.equal(queryTrue.success, true);
+  if (queryTrue.success) {
+    assert.equal(queryTrue.data.soloActivos, true);
+  }
+});
+
+test("tournamentIdParamSchema: valida UUID v4 y rechaza IDs inválidos", async () => {
+  const { tournamentIdParamSchema } = await import("../src/tournament.schema.ts");
+  const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+  assert.equal(tournamentIdParamSchema.safeParse(validUuid).success, true);
+
+  assert.equal(tournamentIdParamSchema.safeParse("abc-123").success, false);
+  assert.equal(tournamentIdParamSchema.safeParse("").success, false);
+  assert.equal(tournamentIdParamSchema.safeParse(null).success, false);
+});
+

@@ -99,10 +99,31 @@ export const updateTournamentSchema = z
   );
 export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>;
 
+export const tournamentIdParamSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "El ID del torneo debe ser un UUID válido.",
+  );
+
 export const tournamentQuerySchema = z.object({
   estado: estadoTorneoSchema.optional(),
   categoriaId: z.coerce.number().int().positive().optional(),
   search: z.string().trim().optional(),
-  soloActivos: z.coerce.boolean().optional(),
+  soloActivos: z
+    .preprocess((val) => {
+      if (typeof val === "string") {
+        const lower = val.trim().toLowerCase();
+        if (lower === "true" || lower === "1") return true;
+        if (lower === "false" || lower === "0") return false;
+      }
+      if (typeof val === "boolean") return val;
+      return val;
+    }, z.boolean())
+    .optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
 });
 export type TournamentQueryInput = z.infer<typeof tournamentQuerySchema>;
+

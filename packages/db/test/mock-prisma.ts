@@ -564,10 +564,10 @@ export function createMockPrisma() {
       async updateMany({ where, data }: any) {
         let count = 0;
         for (const disponibilidad of disponibilidades) {
-          if (disponibilidad.servicioId === where.servicioId) {
-            Object.assign(disponibilidad, data);
-            count++;
-          }
+          if (where.servicioId !== undefined && disponibilidad.servicioId !== where.servicioId) continue;
+          if (where.id?.in !== undefined && !where.id.in.includes(disponibilidad.id)) continue;
+          Object.assign(disponibilidad, data);
+          count++;
         }
         return { count };
       },
@@ -1062,7 +1062,7 @@ export function createMockPrisma() {
         }
         return res;
       },
-      async findMany({ where, include }: any = {}) {
+      async findMany({ where, include, skip, take }: any = {}) {
         let list = [...torneos];
         if (where?.estado) {
           if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
@@ -1074,6 +1074,12 @@ export function createMockPrisma() {
         if (where?.categoriaId) {
           list = list.filter((t) => t.categoriaId === where.categoriaId);
         }
+        if (where?.titulo?.contains) {
+          const s = where.titulo.contains.toLowerCase();
+          list = list.filter((t) => t.titulo.toLowerCase().includes(s));
+        }
+        if (typeof skip === "number") list = list.slice(skip);
+        if (typeof take === "number") list = list.slice(0, take);
         return list.map((item) => {
           const res: any = { ...item };
           if (include?.categoria) {

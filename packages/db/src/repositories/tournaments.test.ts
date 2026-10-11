@@ -343,21 +343,21 @@ test("TSK-BE-25: Motor de bloqueo preventivo y detección de conflictos", async 
     bloqueadaMantenimiento: false,
   });
 
-  // 1. Torneo se crea exitosamente y bloquea la pista 1
+  // 1. Torneo se crea exitosamente y bloquea la pista 1 (horario legal Colombia -05:00)
   const torneo = await crearTorneo(
     {
       adminId: "admin-1",
       categoriaId: 1,
       titulo: "Torneo Masters Pádel",
       nivel: "Primera",
-      fechaInicio: new Date("2026-11-01T10:00:00Z"),
-      fechaFin: new Date("2026-11-01T14:00:00Z"),
+      fechaInicio: new Date("2026-11-01T10:00:00-05:00"),
+      fechaFin: new Date("2026-11-01T14:00:00-05:00"),
       cuposTotales: 8,
       bloqueos: [
         {
           servicioId: 1,
-          horaInicio: new Date("2026-11-01T10:00:00Z"),
-          horaFin: new Date("2026-11-01T14:00:00Z"),
+          horaInicio: new Date("2026-11-01T10:00:00-05:00"),
+          horaFin: new Date("2026-11-01T14:00:00-05:00"),
         },
       ],
     },
@@ -388,14 +388,14 @@ test("TSK-BE-25: Motor de bloqueo preventivo y detección de conflictos", async 
           categoriaId: 1,
           titulo: "Torneo Rechazado Por Conflicto",
           nivel: "Primera",
-          fechaInicio: new Date("2026-11-01T10:00:00Z"),
-          fechaFin: new Date("2026-11-01T14:00:00Z"),
+          fechaInicio: new Date("2026-11-01T10:00:00-05:00"),
+          fechaFin: new Date("2026-11-01T14:00:00-05:00"),
           cuposTotales: 8,
           bloqueos: [
             {
               servicioId: 1,
-              horaInicio: new Date("2026-11-01T10:00:00Z"),
-              horaFin: new Date("2026-11-01T14:00:00Z"),
+              horaInicio: new Date("2026-11-01T10:00:00-05:00"),
+              horaFin: new Date("2026-11-01T14:00:00-05:00"),
             },
           ],
         },

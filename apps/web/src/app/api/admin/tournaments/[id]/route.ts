@@ -1,6 +1,9 @@
 import { fail, ok } from "@/lib/api-response";
 import { authorizeApiRequest } from "@/lib/api-auth";
-import { updateTournamentSchema } from "@sportcomplex/validation";
+import {
+  tournamentIdParamSchema,
+  updateTournamentSchema,
+} from "@sportcomplex/validation";
 import {
   obtenerTorneoPorId,
   actualizarTorneo,
@@ -18,16 +21,17 @@ interface RouteContext {
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
-    if (!id?.trim()) {
-      return fail("INVALID_ID", "El ID del torneo es requerido", 400);
+    const parsedId = tournamentIdParamSchema.safeParse(id);
+    if (!parsedId.success) {
+      return fail("INVALID_ID", "El ID del torneo debe ser un UUID válido.", 400);
     }
 
     try {
-      const torneo = await obtenerTorneoPorId(id);
+      const torneo = await obtenerTorneoPorId(parsedId.data);
       return ok(torneo);
     } catch (err: unknown) {
       if (err instanceof TournamentError) {
@@ -47,12 +51,13 @@ export async function GET(request: Request, context: RouteContext) {
  */
 async function handleUpdate(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
-    if (!id?.trim()) {
-      return fail("INVALID_ID", "El ID del torneo es requerido", 400);
+    const parsedId = tournamentIdParamSchema.safeParse(id);
+    if (!parsedId.success) {
+      return fail("INVALID_ID", "El ID del torneo debe ser un UUID válido.", 400);
     }
 
     const rawBody = await request.json().catch(() => ({}));
@@ -71,7 +76,7 @@ async function handleUpdate(request: Request, context: RouteContext) {
     }
 
     try {
-      const updated = await actualizarTorneo(id, parsed.data);
+      const updated = await actualizarTorneo(parsedId.data, parsed.data);
       return ok(updated);
     } catch (err: unknown) {
       if (err instanceof TournamentError) {
@@ -93,16 +98,17 @@ export { handleUpdate as PUT, handleUpdate as PATCH };
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
-    if (!id?.trim()) {
-      return fail("INVALID_ID", "El ID del torneo es requerido", 400);
+    const parsedId = tournamentIdParamSchema.safeParse(id);
+    if (!parsedId.success) {
+      return fail("INVALID_ID", "El ID del torneo debe ser un UUID válido.", 400);
     }
 
     try {
-      const resultado = await eliminarTorneo(id);
+      const resultado = await eliminarTorneo(parsedId.data);
       return ok(resultado);
     } catch (err: unknown) {
       if (err instanceof TournamentError) {
@@ -115,3 +121,4 @@ export async function DELETE(request: Request, context: RouteContext) {
     return fail("SERVER_ERROR", "Error al cancelar o eliminar el torneo", 500);
   }
 }
+

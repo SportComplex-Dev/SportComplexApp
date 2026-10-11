@@ -16,7 +16,7 @@ import {
  */
 export async function GET(request: Request) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { searchParams } = new URL(request.url);
@@ -25,6 +25,8 @@ export async function GET(request: Request) {
       categoriaId: searchParams.get("categoriaId") || undefined,
       search: searchParams.get("search") || undefined,
       soloActivos: searchParams.get("soloActivos") || undefined,
+      page: searchParams.get("page") || undefined,
+      limit: searchParams.get("limit") || undefined,
     };
 
     const parsed = tournamentQuerySchema.safeParse(queryObj);
@@ -51,7 +53,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const rawBody = await request.json().catch(() => ({}));
