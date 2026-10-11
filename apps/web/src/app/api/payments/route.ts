@@ -88,26 +88,31 @@ export async function POST(request: Request) {
       // UUIDv4 no predecible para el TICKET_QR (TSK-BE-11), generado en core.
       ticketCodigoUuid: newTicketId(),
     });
-    if (resultado.estado === "FALLIDO") {
+    // Observación de @Its-JrDev: solo notificar a n8n si el pago falló Y NO es un reintento duplicado.
+    if (resultado.estado === "FALLIDO" && !resultado.duplicado) {
       // RF-09: alerta de pago fallido. Fire-and-forget: no bloquea la respuesta
       // a Stripe ni revierte la cancelación de la reserva ya aplicada.
       void sendContingencyWebhook({
         evento: "payment_intent.payment_failed",
         paymentIntentId: intent.id,
         usuarioId: userId,
-        reservaId: bookingId ?? null,
+        reservaId: effectiveBookingIds[0] ?? bookingId ?? null,
         membresiaId: membershipId ?? null,
         reservaEstado: resultado.reservaEstado,
         franjaRestituida: resultado.franjaRestituida,
         monto: stripeAmountToMonto(intent.amount ?? 0),
-      }).then((webhook) => {
-        if (!webhook.sent) {
-          console.error(
-            "Alerta de pago fallido no enviada a n8n:",
-            webhook.error,
-          );
-        }
-      });
+      })
+        .then((webhook) => {
+          if (!webhook.sent) {
+            console.error(
+              "Alerta de pago fallido no enviada a n8n:",
+              webhook.error,
+            );
+          }
+        })
+        .catch((err) => {
+          console.error("Error al despachar alerta de pago fallido a n8n:", err);
+        });
     }
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
     return ok({ received: true, ...resultado });

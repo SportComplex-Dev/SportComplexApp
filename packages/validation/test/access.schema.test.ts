@@ -71,10 +71,11 @@ test("TSK-BE-11: la firma debe ser exactamente 64 hex (HMAC-SHA256)", () => {
       .success,
     false,
   );
-  // Mayúsculas válidas.
-  assert.equal(
-    accessScanSchema.safeParse({ ticketId: UUID, signature: "A".repeat(64), postServiceId: null })
-      .success,
-    true,
-  );
+  // Mayúsculas válidas y transformadas a minúsculas (observación de @Its-JrDev).
+  const upper = accessScanSchema.safeParse({ ticketId: UUID, signature: "A".repeat(64), postServiceId: null });
+  assert.equal(upper.success, true);
+  if (upper.success) {
+    assert.equal(upper.data.signature, "a".repeat(64));
+  }
 });
+
