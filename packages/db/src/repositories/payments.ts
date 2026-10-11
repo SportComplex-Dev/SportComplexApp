@@ -58,8 +58,10 @@ export interface ProcesarPagoInput {
   monto: string | number;
   estado: EstadoPagoValor;
   tipo: TipoPagoValor;
-  /** Si el pago confirma una reserva, su id (`reserva.id`). */
+  /** Si el pago confirma una reserva individual, su id (`reserva.id`). */
   reservaId?: string | undefined;
+  /** Si el pago confirma múltiples reservas (carrito), sus ids (`reserva.id`). */
+  reservaIds?: string[] | undefined;
   /** Si el pago activa una membresía, su id (`membresia.id`). */
   membresiaId?: number | undefined;
 }
@@ -77,6 +79,10 @@ export interface ProcesarPagoResultado {
   reservaEstado: string | null;
   /** true solo si ESTA corrida ejecutó la activación de la membresía. */
   membresiaActivada: boolean;
+  /** Lista de IDs de reservas confirmadas en ESTA corrida. */
+  reservasConfirmadas?: string[];
+  /** Estados finales de todas las reservas procesadas (mapeo id → estado). */
+  reservasEstado?: Record<string, string>;
 }
 
 type DbLike = {
@@ -135,13 +141,70 @@ function validateInput(input: ProcesarPagoInput): void {
   if (!TIPOS_PAGO.includes(input.tipo)) {
     throw new PaymentError(`Tipo de pago inválido: ${input.tipo}`, "VALIDATION_ERROR", 400);
   }
+  if (input.reservaIds !== undefined) {
+    if (!Array.isArray(input.reservaIds)) {
+      throw new PaymentError(
+        "reservaIds debe ser un array de strings.",
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    for (const id of input.reservaIds) {
+      if (!id || typeof id !== "string" || !id.trim()) {
+        throw new PaymentError(
+          "Cada reservaId debe ser un string no vacío.",
+          "VALIDATION_ERROR",
+          400,
+        );
+      }
+    }
+  }
 }
+
+type ReservaResumen = {
+  id: string;
+  estado: string;
+  total?: number | string | { toString(): string } | null;
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
 
+  const rawReservaIds =
+    input.reservaIds && input.reservaIds.length > 0
+      ? input.reservaIds
+      : input.reservaId
+        ? [input.reservaId]
+        : [];
+  const targetReservaIds = Array.from(
+    new Set(rawReservaIds.map((id) => id.trim()).filter(Boolean)),
+  );
+
   return db.$transaction(async (tx: DbLike) => {
+    // Si hay reservas vinculadas, consultar existentes y validar monto esperado si tienen total definido
+    let reservasExistentes: ReservaResumen[] = [];
+    if (targetReservaIds.length > 0) {
+      reservasExistentes = (await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+      })) as ReservaResumen[];
+
+      const reservasConTotal = reservasExistentes.filter((r) => r.total != null);
+      if (reservasConTotal.length > 0) {
+        const sumaEsperada = reservasConTotal.reduce(
+          (acc: number, r) => acc + Number(r.total ?? 0),
+          0,
+        );
+        if (normalizeMonto(sumaEsperada) !== monto) {
+          throw new PaymentError(
+            `El monto recibido (${monto}) no coincide con el total esperado de las reservas (${normalizeMonto(sumaEsperada)}).`,
+            "AMOUNT_MISMATCH",
+            400,
+          );
+        }
+      }
+    }
+
     // 1. Upsert de PAGO por identificador natural (stripe_payment_intent_id).
     let pago = await tx.pago.findUnique({
       where: { stripePaymentIntentId: input.stripePaymentIntentId },
@@ -169,21 +232,44 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       pago = { ...pago, estado: input.estado };
     }
 
-    // 2. Confirmación de reserva — update condicional (corazón de la
+    // 2. Confirmación de reserva(s) — update condicional (corazón de la
     //    idempotencia: solo gana quien encuentra PENDIENTE_PAGO).
     let reservaConfirmada = false;
     let reservaEstado: string | null = null;
-    if (input.reservaId) {
+    const reservasConfirmadas: string[] = [];
+    const reservasEstado: Record<string, string> = {};
+
+    if (targetReservaIds.length > 0) {
       if (input.estado === "APROBADO") {
-        const upd = await tx.reserva.updateMany({
-          where: { id: input.reservaId, estado: "PENDIENTE_PAGO" },
-          data: { estado: "CONFIRMADA", pagoId: pago.id },
-        });
-        const count = typeof upd?.count === "number" ? upd.count : 0;
-        reservaConfirmada = count === 1;
+        const pendientes = reservasExistentes.filter((r) => r.estado === "PENDIENTE_PAGO");
+        const pendientesIds = pendientes.map((r) => r.id);
+
+        if (pendientesIds.length > 0) {
+          const upd = await tx.reserva.updateMany({
+            where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
+            data: { estado: "CONFIRMADA", pagoId: pago.id },
+          });
+          const count = typeof upd?.count === "number" ? upd.count : 0;
+          if (count > 0) {
+            reservasConfirmadas.push(...pendientesIds);
+          }
+        }
       }
-      const fila = await tx.reserva.findUnique({ where: { id: input.reservaId } });
-      reservaEstado = (fila?.estado as string | undefined) ?? null;
+
+      // Consultar estado final de todas las reservas procesadas
+      const reservasActualizadas = await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+      });
+      for (const r of reservasActualizadas) {
+        if (r.id && r.estado) {
+          reservasEstado[r.id] = r.estado;
+        }
+      }
+
+      // Compatibilidad campos singulares
+      const primerId = targetReservaIds[0];
+      reservaEstado = reservasEstado[primerId] ?? null;
+      reservaConfirmada = reservasConfirmadas.length > 0;
     }
 
     // 3. Activación de membresía — condicional e idempotente por el mismo motivo.
@@ -205,6 +291,8 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       reservaConfirmada,
       reservaEstado,
       membresiaActivada,
+      reservasConfirmadas,
+      reservasEstado,
     };
   }) as Promise<ProcesarPagoResultado>;
 }

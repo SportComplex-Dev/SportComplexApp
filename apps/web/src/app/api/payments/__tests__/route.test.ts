@@ -20,15 +20,19 @@ const paymentsRoute = await import("../route");
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-function seedReserva() {
-  mock._state.reservas.push({
+function seedReserva(overrides: Record<string, unknown> = {}) {
+  const reserva = {
     id: "reserva-1",
     disponibilidadId: 1n,
     estado: "PENDIENTE_PAGO",
     cantidadCupos: 1,
     expiraEn: new Date(Date.now() + 15 * 60_000),
     pagoId: null,
-  });
+    total: 75000,
+    ...overrides,
+  };
+  mock._state.reservas.push(reserva);
+  return reserva;
 }
 
 function buildEventPayload(
@@ -159,4 +163,83 @@ test("TSK-BD-09 API: 503 si faltan las variables de entorno de Stripe", async ()
   } finally {
     process.env.STRIPE_SECRET_KEY = prevKey;
   }
+});
+
+test("SCRUM-163 API: webhook multi-booking con bookingId CSV confirma todas las reservas en una sola transacción", async () => {
+  seedReserva({ id: "reserva-c1", total: 40000 });
+  seedReserva({ id: "reserva-p1", total: 35000 });
+
+  const payload = buildEventPayload({
+    id: "evt_cart_1",
+    object: {
+      id: "pi_cart_web_1",
+      amount: 7500000,
+      metadata: {
+        bookingId: "reserva-c1,reserva-p1",
+        userId: "user-1",
+        cashless: "true",
+      },
+    },
+  });
+  const res = await postWebhook(payload, signPayload(payload));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.pagoCreado, true);
+  assert.equal(body.data.reservaConfirmada, true);
+  assert.deepEqual(body.data.reservasConfirmadas, ["reserva-c1", "reserva-p1"]);
+
+  const r1 = mock._state.reservas.find((r: any) => r.id === "reserva-c1");
+  const r2 = mock._state.reservas.find((r: any) => r.id === "reserva-p1");
+  assert.equal(r1.estado, "CONFIRMADA");
+  assert.equal(r2.estado, "CONFIRMADA");
+  assert.equal(r1.pagoId, body.data.pagoId);
+  assert.equal(r2.pagoId, body.data.pagoId);
+});
+
+test("SCRUM-163 API: webhook multi-booking con metadata.bookingIds explícito confirma correctamente", async () => {
+  seedReserva({ id: "reserva-c2", total: 50000 });
+  seedReserva({ id: "reserva-p2", total: 25000 });
+
+  const payload = buildEventPayload({
+    id: "evt_cart_2",
+    object: {
+      id: "pi_cart_web_2",
+      amount: 7500000,
+      metadata: {
+        bookingIds: "reserva-c2,reserva-p2",
+        userId: "user-1",
+        cashless: "true",
+      },
+    },
+  });
+  const res = await postWebhook(payload, signPayload(payload));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.pagoCreado, true);
+  assert.deepEqual(body.data.reservasConfirmadas, ["reserva-c2", "reserva-p2"]);
+});
+
+test("SCRUM-163 API: webhook multi-booking con monto menor devuelve 400 AMOUNT_MISMATCH", async () => {
+  seedReserva({ id: "reserva-err-1", total: 40000 });
+  seedReserva({ id: "reserva-err-2", total: 35000 });
+
+  const payload = buildEventPayload({
+    id: "evt_cart_mismatch",
+    object: {
+      id: "pi_cart_web_mismatch",
+      amount: 5000000, // 50000 < 75000
+      metadata: {
+        bookingId: "reserva-err-1,reserva-err-2",
+        userId: "user-1",
+        cashless: "true",
+      },
+    },
+  });
+  const res = await postWebhook(payload, signPayload(payload));
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "AMOUNT_MISMATCH");
 });
