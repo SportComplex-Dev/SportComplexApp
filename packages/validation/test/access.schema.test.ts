@@ -39,6 +39,23 @@ test("TSK-BD-10 fix: postServiceId ya no acepta un UUID (string) — era servici
     postServiceId: "no-numerico",
   });
   assert.equal(basura.success, false);
+
+  assert.equal(
+    accessScanSchema.safeParse({
+      ticketId: UUID,
+      signature: "a".repeat(64),
+      postServiceId: true,
+    }).success,
+    false,
+  );
+  assert.equal(
+    accessScanSchema.safeParse({
+      ticketId: UUID,
+      signature: "a".repeat(64),
+      postServiceId: false,
+    }).success,
+    false,
+  );
 });
 
 test("accessScanSchema rechaza ticketId no-UUID y firma corta", () => {
@@ -117,10 +134,52 @@ test("TSK-BE-14: accessRedeemSchema valida postServiceId obligatorio positivo y 
   });
   assert.equal(servicioNegativo.success, false);
 
+  // Validación estricta contra coerción indeseada de booleanos (true -> 1, false -> 0)
+  const servicioBooleanoTrue = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: true,
+  });
+  assert.equal(servicioBooleanoTrue.success, false);
+
+  const servicioBooleanoFalse = accessRedeemSchema.safeParse({
+    ticketId: UUID,
+    signature: "b".repeat(64),
+    postServiceId: false,
+  });
+  assert.equal(servicioBooleanoFalse.success, false);
+
+  // Decimales y strings inválidos
+  assert.equal(
+    accessRedeemSchema.safeParse({
+      ticketId: UUID,
+      signature: "b".repeat(64),
+      postServiceId: 1.5,
+    }).success,
+    false,
+  );
+  assert.equal(
+    accessRedeemSchema.safeParse({
+      ticketId: UUID,
+      signature: "b".repeat(64),
+      postServiceId: "1.5",
+    }).success,
+    false,
+  );
+  assert.equal(
+    accessRedeemSchema.safeParse({
+      ticketId: UUID,
+      signature: "b".repeat(64),
+      postServiceId: "0",
+    }).success,
+    false,
+  );
+
   const servicioAusente = accessRedeemSchema.safeParse({
     ticketId: UUID,
     signature: "b".repeat(64),
   });
   assert.equal(servicioAusente.success, false);
 });
+
 

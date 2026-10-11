@@ -331,6 +331,22 @@ test("TSK-BE-14: payload sin postServiceId o con null se rechaza con 400 (modo t
   assert.equal(resMissing.status, 400);
   assert.equal(bodyMissing.success, false);
   assert.equal(bodyMissing.error.code, "VALIDATION_ERROR");
+
+  // postServiceId: true no debe ser coercionado a 1 por z.coerce.number()
+  const reqBoolean = createRedeemRequest({
+    ticketId: CODIGO,
+    signature,
+    postServiceId: true,
+  });
+  const resBoolean = await handleAccessRedeem(reqBoolean, {
+    authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"),
+    now: ADENTRO,
+  });
+  const bodyBoolean = await resBoolean.json();
+
+  assert.equal(resBoolean.status, 400);
+  assert.equal(bodyBoolean.success, false);
+  assert.equal(bodyBoolean.error.code, "VALIDATION_ERROR");
 });
 
 test("TSK-BE-14: discrepancia de servicio (SERVICE_MISMATCH) deniega acceso sin consumir el ticket", async () => {

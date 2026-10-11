@@ -10,8 +10,8 @@ Endpoint transaccional de canje de tickets en modo turno (asociado a un puesto/s
 
 - **Idempotencia e irreversibilidad transaccional**: El cambio de estado se realiza con `UPDATE ticket_qr SET estado='USADO', usadoPor=:empleadoId, usadoEn=:now WHERE id=:id AND estado='EMITIDO'`. Solo una transacción gana; el boleto transmutado nunca regresa a `EMITIDO` (RN-05).
 - **Segundo escaneo denegado**: Si se reenvía el mismo código o se escanea de nuevo, `decideAccess` detecta el estado `USADO` y deniega con `code = "ALREADY_USED"` y `resultado = "DENEGADO_USADO"`, conservando inalterados la marca temporal y el empleado del canje original, registrando exactamente una nueva fila en `LECTURA_ACCESO`.
-- **Auditoría estricta**: Cada intento genera exactamente una fila en `LECTURA_ACCESO` con `modo = TURNO` y el resultado correspondiente (`CONCEDIDO`, `DENEGADO_SERVICIO`, `DENEGADO_HORARIO`, `DENEGADO_USADO`).
-- **Validación criptográfica previa**: Si la firma HMAC no coincide con `QR_HMAC_SECRET` o el UUID fue alterado, se rechaza inmediatamente con `400 INVALID_SIGNATURE` sin realizar consultas ni escrituras en la base de datos.
+- **Auditoría estricta y asignación best-effort**: Cada intento genera exactamente una fila en `LECTURA_ACCESO` con `modo = TURNO` y el resultado correspondiente (`CONCEDIDO`, `DENEGADO_SERVICIO`, `DENEGADO_HORARIO`, `DENEGADO_USADO`). Si el empleado lector tiene un turno vigente registrado en `asignacion_puesto` para ese servicio, se vincula `asignacion_id`; si no cuenta con asignación registrada en base de datos, el canje procede normalmente y se audita con `asignacion_id = null` (comportamiento best-effort para no bloquear el acceso de clientes legítimos).
+- **Validación criptográfica previa y tipado estricto**: Si la firma HMAC no coincide con `QR_HMAC_SECRET` o el UUID fue alterado, se rechaza inmediatamente con `400 INVALID_SIGNATURE` sin realizar consultas ni escrituras en la base de datos. Asimismo, `postServiceId` exige enteros positivos estrictos y rechaza valores booleanos (`true`/`false`), decimales o nulos.
 
 ## Autorización y Perímetro
 
@@ -129,7 +129,7 @@ Content-Type: application/json
 
 ### Respuestas de Error
 
-- `400 VALIDATION_ERROR`: `postServiceId` nulo, no numérico o faltante; `ticketId` no es UUID; firma no es 64 hex.
+- `400 VALIDATION_ERROR`: `postServiceId` nulo, booleano, no numérico, decimal o faltante; `ticketId` no es UUID; firma no es 64 hex.
 - `400 INVALID_SIGNATURE`: Firma HMAC incorrecta o QR manipulado (0 consultas a BD).
 - `401 UNAUTHORIZED`: Petición sin sesión válida.
 - `403 FORBIDDEN`: Rol sin permisos de lector o cuenta inactiva.
@@ -139,7 +139,7 @@ Content-Type: application/json
 ## Pruebas Automatizadas
 
 - `packages/validation/test/access.schema.test.ts`:
-  - Valida `accessRedeemSchema` obligando `postServiceId` como entero positivo y rechazando `null`, valores negativos y 0.
+  - Valida `accessRedeemSchema` obligando `postServiceId` como entero positivo y rechazando booleanos (`true`/`false`), `null`, valores negativos, 0 y decimales.
 - `apps/web/src/app/api/access/redeem/__tests__/route.test.ts`:
   - Canje exitoso en modo TURNO transmuta `EMITIDO` → `USADO`, audita `CONCEDIDO` y devuelve datos del boleto.
   - Segundo escaneo deniega con `ALREADY_USED` y no altera timestamp ni empleado original del boleto.
