@@ -5185,6 +5185,10 @@ button { cursor: pointer; }
    Impresión de Comprobante / Voucher PDF (RF-12 & RNF-05)
    ========================================================================== */
 @media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
   body * {
     visibility: hidden;
   }
@@ -5196,11 +5200,14 @@ button { cursor: pointer; }
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
+    width: 58mm !important;
+    max-width: 58mm !important;
+    margin: 0 auto;
+    padding: 3mm 2mm;
     background: #fff !important;
     color: #000 !important;
+    font-family: 'Courier New', Courier, monospace, monospace;
+    box-sizing: border-box;
   }
   .no-print {
     display: none !important;

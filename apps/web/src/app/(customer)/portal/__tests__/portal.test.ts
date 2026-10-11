@@ -232,3 +232,25 @@ test("TSK-FE-13 Componentes: Formateo de horario de franja y fechas", () => {
   const formateada = formatDate(fechaStr);
   assert.ok(formateada.length > 5, "Debe producir una fecha legible en español");
 });
+
+test("TSK-FE-11: Billetera digital - Generación de imagen PNG descargable para pase transferible (RF-10)", async () => {
+  const ticketCode = "SC1:882233aa-bb44-cc55-dd66-ee7788990011:sig123456";
+  const highResQr = await generarQRDataUrl(ticketCode, 600);
+
+  assert.ok(highResQr.startsWith("data:image/png;base64,"), "Debe generar formato PNG descargable en alta resolución");
+  const base64Content = highResQr.replace(/^data:image\/png;base64,/, "");
+  const binaryBuf = Buffer.from(base64Content, "base64");
+  assert.ok(binaryBuf.length > 1000, "El PNG descargable de 600px debe poseer densidad adecuada para lectura óptica");
+});
+
+test("TSK-FE-19: Comprobante PDF en formato compacto 58mm con desglose fiscal (RF-17 / RNF-05)", () => {
+  const montoTotal = 75000;
+  const desglose = calcularDesgloseComprobante(montoTotal);
+
+  assert.ok(desglose.subtotal > 0, "El subtotal debe ser positivo");
+  assert.ok(desglose.iva > 0, "El IVA debe ser positivo");
+  assert.equal(desglose.subtotal + desglose.iva, montoTotal, "La suma debe ser exactamente el monto total");
+  assert.ok(desglose.subtotalFormateado.length > 0, "El subtotal debe estar formateado en COP");
+  assert.ok(desglose.totalFormateado.length > 0, "El total debe estar formateado en COP");
+});
+

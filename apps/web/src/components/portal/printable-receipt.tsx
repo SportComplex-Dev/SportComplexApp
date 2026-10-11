@@ -40,69 +40,56 @@ export function PrintableReceipt({ ticket, qrDataUrl: initialQrUrl }: PrintableR
   const { subtotalFormateado, ivaFormateado, totalFormateado } = calcularDesgloseComprobante(ticket.amount)
 
   return (
-    <div className="printable-receipt">
-      <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '16px', marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 4px 0' }}>AKROS SPORTCOMPLEX</h2>
-        <p style={{ margin: 0, fontSize: '13px' }}>Complejo Deportivo y Wellness Cashless</p>
-        <p style={{ margin: 0, fontSize: '12px', color: '#555' }}>NIT: 901.458.789-2 · Medellín, Colombia</p>
-        <p style={{ margin: '6px 0 0', fontSize: '14px', fontWeight: 'bold' }}>COMPROBANTE DE RESERVA Y PASE DIGITAL</p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px', fontSize: '13px' }}>
-        <div>
-          <p style={{ margin: '4px 0' }}><strong>Código de Pase:</strong> {ticket.code}</p>
-          <p style={{ margin: '4px 0' }}><strong>Titular:</strong> {ticket.client}</p>
-          <p style={{ margin: '4px 0' }}><strong>Servicio:</strong> {ticket.service}</p>
-          <p style={{ margin: '4px 0' }}><strong>Sede:</strong> Sede {ticket.sede} · Medellín</p>
-        </div>
-        <div>
-          <p style={{ margin: '4px 0' }}><strong>Fecha del Servicio:</strong> {formatDate(ticket.date)}</p>
-          <p style={{ margin: '4px 0' }}><strong>Horario:</strong> {ticket.time}</p>
-          <p style={{ margin: '4px 0' }}><strong>Capacidad / Cupos:</strong> {ticket.attendees} {ticket.attendees === 1 ? 'persona' : 'personas'}</p>
-          <p style={{ margin: '4px 0' }}><strong>Estado:</strong> {ticket.status.toUpperCase()}</p>
+    <div className="printable-receipt font-mono text-[11px] leading-tight text-black bg-white max-w-[58mm] mx-auto p-2">
+      <div className="text-center border-b border-black pb-2 mb-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider m-0">AKROS SPORTCOMPLEX</h2>
+        <p className="text-[9px] m-0">Complejo Deportivo & Wellness Cashless</p>
+        <p className="text-[9px] m-0 text-gray-700">NIT: 901.458.789-2 · Medellín</p>
+        <div className="text-[10px] font-bold mt-1.5 pt-1 border-t border-dashed border-black">
+          COMPROBANTE 58mm · PASE DIGITAL
         </div>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '13px' }}>
-        <thead>
-          <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
-            <th style={{ padding: '8px 4px' }}>Descripción</th>
-            <th style={{ padding: '8px 4px', textAlign: 'right' }}>Total (COP)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ padding: '8px 4px' }}>Reserva deportiva: {ticket.service}</td>
-            <td style={{ padding: '8px 4px', textAlign: 'right' }}>{subtotalFormateado}</td>
-          </tr>
-          <tr>
-            <td style={{ padding: '8px 4px' }}>IVA (19%)</td>
-            <td style={{ padding: '8px 4px', textAlign: 'right' }}>{ivaFormateado}</td>
-          </tr>
-          <tr style={{ borderTop: '2px solid #000', fontWeight: 'bold', fontSize: '15px' }}>
-            <td style={{ padding: '10px 4px' }}>TOTAL PAGADO</td>
-            <td style={{ padding: '10px 4px', textAlign: 'right' }}>{totalFormateado} COP</td>
-          </tr>
-        </tbody>
-      </table>
+      <div className="space-y-1 mb-2 border-b border-dashed border-black pb-2 text-[10px]">
+        <div><span className="font-bold">BOLETO:</span> {ticket.code}</div>
+        <div><span className="font-bold">TITULAR:</span> {ticket.client}</div>
+        <div><span className="font-bold">SERVICIO:</span> {ticket.service}</div>
+        <div><span className="font-bold">FECHA:</span> {formatDate(ticket.date)}</div>
+        <div><span className="font-bold">HORARIO:</span> {ticket.time}</div>
+        <div><span className="font-bold">SEDE:</span> Sede {ticket.sede}</div>
+        <div><span className="font-bold">CUPOS:</span> {ticket.attendees} {ticket.attendees === 1 ? 'persona' : 'personas'}</div>
+        <div><span className="font-bold">ESTADO:</span> {ticket.status.toUpperCase()}</div>
+      </div>
 
-      {/* Código QR impreso para validación en torniquetes ópticos (RN-14) */}
-      <div style={{ textAlign: 'center', marginTop: '24px', padding: '12px 0' }}>
-        <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0 0 10px 0' }}>
-          PRESENTA ESTE CÓDIGO EN EL TORNIQUETE O LECTOR ÓPTICO
-        </p>
+      <div className="mb-2 border-b border-black pb-2 text-[10px]">
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>{subtotalFormateado}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>IVA (19%):</span>
+          <span>{ivaFormateado}</span>
+        </div>
+        <div className="flex justify-between font-bold text-[11px] pt-1 mt-1 border-t border-dotted border-black">
+          <span>TOTAL:</span>
+          <span>{totalFormateado} COP</span>
+        </div>
+      </div>
+
+      {/* Código QR impreso para torniquete óptico (RF-10 / RN-14 / RNF-05) */}
+      <div className="text-center my-2">
         {generatedQr && (
-          <div style={{ margin: '0 auto', display: 'inline-block', padding: '8px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff' }}>
+          <div className="inline-block p-1 bg-white border border-black mx-auto">
             <img
               src={generatedQr}
               alt={`QR Acceso ${ticket.code}`}
-              style={{ width: '160px', height: '160px', display: 'block' }}
+              className="w-32 h-32 mx-auto block object-contain"
             />
           </div>
         )}
-        <p style={{ fontSize: '11px', color: '#666', margin: '8px 0 4px' }}>Código UUID: {ticket.code}</p>
-        <p style={{ fontSize: '10px', color: '#888', marginTop: '12px' }}>
-          * Cancelaciones y reprogramaciones gratuitas hasta 4 horas antes del horario de reserva. Pase transferible (RF-10 / RF-12).
+        <p className="text-[9px] font-bold mt-1.5 mb-0.5">VALIDACIÓN ÓPTICA EN TORNIQUETE</p>
+        <p className="text-[8px] text-gray-600 m-0 leading-normal">
+          Pase digital transferible sin biometría (RF-10 / RF-12). Válido para ingreso por torniquete de sede.
         </p>
       </div>
     </div>

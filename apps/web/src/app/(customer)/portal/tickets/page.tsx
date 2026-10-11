@@ -99,6 +99,18 @@ export default function TicketsPage() {
     }, 200)
   }, [])
 
+  const handleDownloadQr = useCallback(async (ticket: Booking) => {
+    try {
+      const url = await generarQRDataUrl(ticket.code, 600)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ticket-${ticket.code}.png`
+      link.click()
+    } catch {
+      // Fallback
+    }
+  }, [])
+
   return (
     <>
       <main className="section-shell app-page no-print">
@@ -210,11 +222,19 @@ export default function TicketsPage() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => handleDownloadQr(booking)}
+                            className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
+                            title="Descargar imagen QR transferible (PNG)"
+                          >
+                            <Download size={14} /> Descargar QR
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handlePrintTicket(booking)}
                             className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-                            title="Descargar comprobante en PDF"
+                            title="Descargar comprobante en PDF (formato 58mm)"
                           >
-                            <Download size={14} /> PDF
+                            <Printer size={14} /> PDF 58mm
                           </button>
                           <Link
                             href="/confirmation"
@@ -232,7 +252,7 @@ export default function TicketsPage() {
                             onClick={() => handlePrintTicket(booking)}
                             className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
                           >
-                            <Printer size={14} /> Recibo
+                            <Printer size={14} /> Recibo 58mm
                           </button>
                           <Link href="/services" className="calendar-shortcut text-xs py-2 px-3">
                             Reservar de nuevo <ArrowRight size={13} />
@@ -289,16 +309,23 @@ export default function TicketsPage() {
 
             <div className="qr-turnstile-hint">
               <ShieldCheck size={16} className="text-[var(--brand-accent)] shrink-0" />
-              <span>Pase transferible sin biometría. Acerca la pantalla al lector óptico del torniquete.</span>
+              <span>Pase transferible sin biometría (RF-10 / RF-12). Acerca la pantalla o la imagen al lector óptico.</span>
             </div>
 
-            <div className="qr-modal-actions">
+            <div className="qr-modal-actions flex-wrap gap-2">
               <button
                 type="button"
                 className="action-button text-xs py-2 px-4 gap-2"
+                onClick={() => handleDownloadQr(selectedTicket)}
+              >
+                <Download size={15} /> Descargar Imagen QR (PNG)
+              </button>
+              <button
+                type="button"
+                className="calendar-shortcut text-xs py-2 px-4 gap-2"
                 onClick={() => handlePrintTicket(selectedTicket)}
               >
-                <Printer size={15} /> Imprimir / PDF
+                <Printer size={15} /> Imprimir / PDF (58mm)
               </button>
               <button
                 type="button"
