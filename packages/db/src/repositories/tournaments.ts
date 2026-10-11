@@ -26,8 +26,8 @@ export class TournamentError extends Error {
 
 export interface BloqueoCanchaInput {
   servicioId: number;
-  horaInicio: Date;
-  horaFin: Date;
+  horaInicio: Date | string;
+  horaFin: Date | string;
 }
 
 export interface CrearTorneoInput {
@@ -36,10 +36,24 @@ export interface CrearTorneoInput {
   titulo: string;
   descripcion?: string | null;
   nivel: string;
-  fechaInicio: Date;
-  fechaFin: Date;
+  fechaInicio: Date | string;
+  fechaFin: Date | string;
   cuposTotales: number;
   precioInscripcion?: number | string;
+  estado?: EstadoTorneoValor;
+  bloqueos?: BloqueoCanchaInput[];
+}
+
+export interface ActualizarTorneoInput {
+  titulo?: string;
+  descripcion?: string | null;
+  categoriaId?: number;
+  nivel?: string;
+  fechaInicio?: Date | string;
+  fechaFin?: Date | string;
+  cuposTotales?: number;
+  precioInscripcion?: number | string;
+  estado?: EstadoTorneoValor;
   bloqueos?: BloqueoCanchaInput[];
 }
 
@@ -47,6 +61,7 @@ export interface ListarTorneosFiltros {
   estado?: EstadoTorneoValor;
   categoriaId?: number;
   soloActivos?: boolean;
+  search?: string;
 }
 
 export interface InscribirUsuarioInput {
@@ -68,7 +83,169 @@ function normalizePrecio(val: number | string | undefined): number {
 }
 
 /**
- * Crea un torneo y registra sus bloqueos de pistas asociados.
+ * Verifica si hay reservas activas (CONFIRMADA o PENDIENTE_PAGO vigente)
+ * en el servicio y rango horario especificado.
+ */
+export async function verificarConflictoReservas(
+  servicioId: number,
+  horaInicio: Date,
+  horaFin: Date,
+  options: TournamentDbOptions = {},
+): Promise<boolean> {
+  const db = options.db ?? prisma;
+  const now = new Date();
+
+  const targetDateStr = new Date(horaInicio).toISOString().slice(0, 10);
+  const targetDate = new Date(`${targetDateStr}T00:00:00.000Z`);
+
+  const disponibilidades = await db.disponibilidad.findMany({
+    where: {
+      servicioId,
+      fecha: targetDate,
+    },
+    include: {
+      franja: true,
+      reservas: {
+        where: {
+          estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
+        },
+        select: { id: true, estado: true, expiraEn: true },
+      },
+    },
+  });
+
+  const startSec =
+    new Date(horaInicio).getUTCHours() * 3600 +
+    new Date(horaInicio).getUTCMinutes() * 60;
+  const endSec =
+    new Date(horaFin).getUTCHours() * 3600 +
+    new Date(horaFin).getUTCMinutes() * 60;
+
+  for (const disp of disponibilidades) {
+    if (!disp.franja) continue;
+    const fStart =
+      new Date(disp.franja.horaInicio).getUTCHours() * 3600 +
+      new Date(disp.franja.horaInicio).getUTCMinutes() * 60;
+    const fEnd =
+      new Date(disp.franja.horaFin).getUTCHours() * 3600 +
+      new Date(disp.franja.horaFin).getUTCMinutes() * 60;
+
+    // Verificar si se solapan en franja horaria
+    const solapa = fStart < endSec && fEnd > startSec;
+    if (solapa && Array.isArray(disp.reservas)) {
+      const activas = disp.reservas.filter((r: any) => {
+        if (r.estado === "CONFIRMADA") return true;
+        if (r.estado === "PENDIENTE_PAGO" && r.expiraEn && new Date(r.expiraEn) > now) {
+          return true;
+        }
+        return false;
+      });
+      if (activas.length > 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Bloquea franjas en Disponibilidad para un conjunto de bloqueos.
+ */
+export async function aplicarBloqueosDisponibilidad(
+  bloqueos: BloqueoCanchaInput[],
+  options: TournamentDbOptions = {},
+): Promise<void> {
+  const db = options.db ?? prisma;
+
+  for (const b of bloqueos) {
+    const targetDateStr = new Date(b.horaInicio).toISOString().slice(0, 10);
+    const targetDate = new Date(`${targetDateStr}T00:00:00.000Z`);
+    const startSec =
+      new Date(b.horaInicio).getUTCHours() * 3600 +
+      new Date(b.horaInicio).getUTCMinutes() * 60;
+    const endSec =
+      new Date(b.horaFin).getUTCHours() * 3600 +
+      new Date(b.horaFin).getUTCMinutes() * 60;
+
+    const disponibilidades = await db.disponibilidad.findMany({
+      where: {
+        servicioId: b.servicioId,
+        fecha: targetDate,
+      },
+      include: { franja: true },
+    });
+
+    for (const disp of disponibilidades) {
+      if (!disp.franja) continue;
+      const fStart =
+        new Date(disp.franja.horaInicio).getUTCHours() * 3600 +
+        new Date(disp.franja.horaInicio).getUTCMinutes() * 60;
+      const fEnd =
+        new Date(disp.franja.horaFin).getUTCHours() * 3600 +
+        new Date(disp.franja.horaFin).getUTCMinutes() * 60;
+
+      if (fStart < endSec && fEnd > startSec) {
+        await db.disponibilidad.update({
+          where: { id: disp.id },
+          data: { bloqueadaMantenimiento: true },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Libera las franjas bloqueadas en Disponibilidad para un torneo cancelado o eliminado.
+ */
+export async function liberarBloqueosTorneo(
+  torneoId: string,
+  options: TournamentDbOptions = {},
+): Promise<void> {
+  const db = options.db ?? prisma;
+  const bloqueos = await db.torneoBloqueo.findMany({
+    where: { torneoId },
+  });
+
+  for (const b of bloqueos) {
+    const targetDateStr = new Date(b.horaInicio).toISOString().slice(0, 10);
+    const targetDate = new Date(`${targetDateStr}T00:00:00.000Z`);
+    const startSec =
+      new Date(b.horaInicio).getUTCHours() * 3600 +
+      new Date(b.horaInicio).getUTCMinutes() * 60;
+    const endSec =
+      new Date(b.horaFin).getUTCHours() * 3600 +
+      new Date(b.horaFin).getUTCMinutes() * 60;
+
+    const disponibilidades = await db.disponibilidad.findMany({
+      where: {
+        servicioId: b.servicioId,
+        fecha: targetDate,
+      },
+      include: { franja: true },
+    });
+
+    for (const disp of disponibilidades) {
+      if (!disp.franja) continue;
+      const fStart =
+        new Date(disp.franja.horaInicio).getUTCHours() * 3600 +
+        new Date(disp.franja.horaInicio).getUTCMinutes() * 60;
+      const fEnd =
+        new Date(disp.franja.horaFin).getUTCHours() * 3600 +
+        new Date(disp.franja.horaFin).getUTCMinutes() * 60;
+
+      if (fStart < endSec && fEnd > startSec) {
+        await db.disponibilidad.update({
+          where: { id: disp.id },
+          data: { bloqueadaMantenimiento: false },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Crea un torneo y registra sus bloqueos de pistas asociados validando disponibilidad.
  */
 export async function crearTorneo(
   input: CrearTorneoInput,
@@ -86,9 +263,28 @@ export async function crearTorneo(
     throw new TournamentError("La fecha de finalización debe ser posterior a la de inicio.", "VALIDATION_ERROR", 400);
   }
 
+  // Validar solapamiento preventivo con reservas existentes
+  if (input.bloqueos && input.bloqueos.length > 0) {
+    for (const b of input.bloqueos) {
+      const hayConflicto = await verificarConflictoReservas(
+        b.servicioId,
+        new Date(b.horaInicio),
+        new Date(b.horaFin),
+        options,
+      );
+      if (hayConflicto) {
+        throw new TournamentError(
+          `La pista ${b.servicioId} ya cuenta con reservas confirmadas o en proceso en el horario solicitado.`,
+          "COURT_SLOT_CONFLICT",
+          409,
+        );
+      }
+    }
+  }
+
   const precio = normalizePrecio(input.precioInscripcion);
 
-  return db.torneo.create({
+  const torneo = await db.torneo.create({
     data: {
       adminId: input.adminId,
       categoriaId: input.categoriaId,
@@ -100,7 +296,7 @@ export async function crearTorneo(
       cuposTotales: input.cuposTotales,
       cuposOcupados: 0,
       precioInscripcion: precio,
-      estado: "BORRADOR",
+      estado: input.estado ?? "BORRADOR",
       ...(input.bloqueos && input.bloqueos.length > 0
         ? {
             bloqueos: {
@@ -118,6 +314,13 @@ export async function crearTorneo(
       bloqueos: { include: { servicio: true } },
     },
   });
+
+  // Aplicar bloqueo en disponibilidad de franjas
+  if (input.bloqueos && input.bloqueos.length > 0) {
+    await aplicarBloqueosDisponibilidad(input.bloqueos, options);
+  }
+
+  return torneo;
 }
 
 /**
@@ -138,6 +341,10 @@ export async function listarTorneos(
 
   if (filtros.categoriaId) {
     where.categoriaId = filtros.categoriaId;
+  }
+
+  if (filtros.search) {
+    where.titulo = { contains: filtros.search, mode: "insensitive" };
   }
 
   return db.torneo.findMany({
@@ -191,10 +398,176 @@ export async function actualizarEstadoTorneo(
     throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
   }
 
+  if (nuevoEstado === "CANCELADO") {
+    await liberarBloqueosTorneo(id, options);
+  }
+
   return db.torneo.update({
     where: { id },
     data: { estado: nuevoEstado },
+    include: {
+      categoria: true,
+      bloqueos: { include: { servicio: true } },
+    },
   });
+}
+
+/**
+ * Actualiza los campos de un torneo y actualiza sus bloqueos de pista.
+ */
+export async function actualizarTorneo(
+  id: string,
+  input: ActualizarTorneoInput,
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  const torneo = await db.torneo.findUnique({
+    where: { id },
+    include: { bloqueos: true },
+  });
+  if (!torneo) {
+    throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
+  }
+
+  const updateData: any = {};
+  if (input.titulo !== undefined) {
+    if (!input.titulo.trim()) {
+      throw new TournamentError("El título del torneo no puede estar vacío.", "VALIDATION_ERROR", 400);
+    }
+    updateData.titulo = input.titulo.trim();
+  }
+  if (input.descripcion !== undefined) {
+    updateData.descripcion = input.descripcion?.trim() ?? null;
+  }
+  if (input.categoriaId !== undefined) {
+    updateData.categoriaId = input.categoriaId;
+  }
+  if (input.nivel !== undefined) {
+    updateData.nivel = input.nivel.trim();
+  }
+  if (input.fechaInicio !== undefined) {
+    updateData.fechaInicio = new Date(input.fechaInicio);
+  }
+  if (input.fechaFin !== undefined) {
+    updateData.fechaFin = new Date(input.fechaFin);
+  }
+
+  const fIni = updateData.fechaInicio ?? torneo.fechaInicio;
+  const fFin = updateData.fechaFin ?? torneo.fechaFin;
+  if (new Date(fFin) <= new Date(fIni)) {
+    throw new TournamentError("La fecha de finalización debe ser posterior a la de inicio.", "VALIDATION_ERROR", 400);
+  }
+
+  if (input.cuposTotales !== undefined) {
+    if (input.cuposTotales <= 0 || input.cuposTotales < (torneo.cuposOcupados ?? 0)) {
+      throw new TournamentError(
+        "Los cupos totales no pueden ser menores a los cupos ya ocupados.",
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    updateData.cuposTotales = input.cuposTotales;
+  }
+  if (input.precioInscripcion !== undefined) {
+    updateData.precioInscripcion = normalizePrecio(input.precioInscripcion);
+  }
+  if (input.estado !== undefined) {
+    updateData.estado = input.estado;
+    if (input.estado === "CANCELADO") {
+      await liberarBloqueosTorneo(id, options);
+    }
+  }
+
+  if (input.bloqueos !== undefined) {
+    for (const b of input.bloqueos) {
+      const hayConflicto = await verificarConflictoReservas(
+        b.servicioId,
+        new Date(b.horaInicio),
+        new Date(b.horaFin),
+        options,
+      );
+      if (hayConflicto) {
+        throw new TournamentError(
+          `La pista ${b.servicioId} ya cuenta con reservas confirmadas o en proceso en el horario solicitado.`,
+          "COURT_SLOT_CONFLICT",
+          409,
+        );
+      }
+    }
+
+    // Liberar bloqueos previos
+    await liberarBloqueosTorneo(id, options);
+    if (db.torneoBloqueo?.deleteMany) {
+      await db.torneoBloqueo.deleteMany({ where: { torneoId: id } });
+    }
+
+    // Registrar nuevos bloqueos
+    if (input.bloqueos.length > 0 && db.torneoBloqueo?.createMany) {
+      await db.torneoBloqueo.createMany({
+        data: input.bloqueos.map((b) => ({
+          torneoId: id,
+          servicioId: b.servicioId,
+          horaInicio: new Date(b.horaInicio),
+          horaFin: new Date(b.horaFin),
+        })),
+      });
+      await aplicarBloqueosDisponibilidad(input.bloqueos, options);
+    }
+  }
+
+  return db.torneo.update({
+    where: { id },
+    data: updateData,
+    include: {
+      categoria: true,
+      bloqueos: { include: { servicio: true } },
+    },
+  });
+}
+
+/**
+ * Elimina o cancela un torneo de forma controlada:
+ * - Si tiene inscripciones registradas o no está en BORRADOR, lo cancela y libera bloqueos.
+ * - Si está en BORRADOR sin inscripciones, lo elimina físicamente y libera bloqueos.
+ */
+export async function eliminarTorneo(
+  id: string,
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  const torneo = await db.torneo.findUnique({
+    where: { id },
+    include: {
+      bloqueos: true,
+      inscripciones: true,
+    },
+  });
+
+  if (!torneo) {
+    throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
+  }
+
+  await liberarBloqueosTorneo(id, options);
+
+  const tieneInscripciones =
+    Array.isArray(torneo.inscripciones) && torneo.inscripciones.length > 0;
+
+  if (tieneInscripciones || torneo.estado !== "BORRADOR") {
+    return db.torneo.update({
+      where: { id },
+      data: { estado: "CANCELADO" },
+      include: {
+        categoria: true,
+        bloqueos: { include: { servicio: true } },
+      },
+    });
+  }
+
+  if (db.torneoBloqueo?.deleteMany) {
+    await db.torneoBloqueo.deleteMany({ where: { torneoId: id } });
+  }
+
+  return db.torneo.delete({ where: { id } });
 }
 
 /**

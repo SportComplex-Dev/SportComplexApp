@@ -6,3 +6,4 @@ export * from "./automation.schema";
 export * from "./contingency.schema";
 export * from "./analytics.schema";
 export * from "./bot.schema";
+export * from "./tournament.schema";

@@ -484,15 +484,20 @@ export function createMockPrisma() {
                   if (reservation.disponibilidadId !== d.id) return false;
                   if (
                     relationWhere?.estado !== undefined &&
+                    typeof relationWhere.estado === "string" &&
                     reservation.estado !== relationWhere.estado
+                  ) return false;
+                  if (
+                    relationWhere?.estado !== undefined &&
+                    Array.isArray(relationWhere.estado?.in) &&
+                    !relationWhere.estado.in.includes(reservation.estado)
                   ) return false;
                   const expiresAt = relationWhere?.expiraEn?.lte;
                   if (expiresAt && (!reservation.expiraEn || reservation.expiraEn > expiresAt)) {
                     return false;
                   }
                   return true;
-                })
-                .map(({ cantidadCupos }) => ({ cantidadCupos }));
+                });
             }
             return result;
           });
@@ -509,6 +514,9 @@ export function createMockPrisma() {
       async update({ where, data }: any) {
         const disp = disponibilidades.find((d) => d.id === where.id);
         if (!disp) throw new Error("Not found");
+        if (data.bloqueadaMantenimiento !== undefined) {
+          disp.bloqueadaMantenimiento = data.bloqueadaMantenimiento;
+        }
         if (data.cuposOcupados?.increment !== undefined) {
           disp.cuposOcupados += data.cuposOcupados.increment;
         }
@@ -1087,9 +1095,17 @@ export function createMockPrisma() {
           return res;
         });
       },
-      async update({ where, data }: any) {
+      async update({ where, data, include }: any) {
         const item = torneos.find((t) => t.id === where.id);
         if (!item) throw new Error("Torneo no encontrado");
+        if (data.titulo !== undefined) item.titulo = data.titulo;
+        if (data.descripcion !== undefined) item.descripcion = data.descripcion;
+        if (data.categoriaId !== undefined) item.categoriaId = data.categoriaId;
+        if (data.nivel !== undefined) item.nivel = data.nivel;
+        if (data.fechaInicio !== undefined) item.fechaInicio = new Date(data.fechaInicio);
+        if (data.fechaFin !== undefined) item.fechaFin = new Date(data.fechaFin);
+        if (data.cuposTotales !== undefined) item.cuposTotales = data.cuposTotales;
+        if (data.precioInscripcion !== undefined) item.precioInscripcion = data.precioInscripcion;
         if (data.estado !== undefined) item.estado = data.estado;
         if (data.cuposOcupados?.increment !== undefined) {
           item.cuposOcupados = (item.cuposOcupados ?? 0) + data.cuposOcupados.increment;
@@ -1097,7 +1113,25 @@ export function createMockPrisma() {
           item.cuposOcupados = data.cuposOcupados;
         }
         item.actualizadoEn = new Date();
-        return { ...item };
+        const res: any = { ...item };
+        if (include?.categoria) {
+          res.categoria = categorias.find((c) => c.id === item.categoriaId) ?? null;
+        }
+        if (include?.bloqueos) {
+          res.bloqueos = bloqueosTorneo
+            .filter((b) => b.torneoId === item.id)
+            .map((b) => ({
+              ...b,
+              servicio: servicios.find((s) => s.id === b.servicioId) ?? null,
+            }));
+        }
+        return res;
+      },
+      async delete({ where }: any) {
+        const idx = torneos.findIndex((t) => t.id === where.id);
+        if (idx === -1) throw new Error("Torneo no encontrado");
+        const [deleted] = torneos.splice(idx, 1);
+        return deleted;
       },
     },
     torneoBloqueo: {
@@ -1107,6 +1141,41 @@ export function createMockPrisma() {
           if (where?.servicioId && b.servicioId !== where.servicioId) return false;
           return true;
         });
+      },
+      async create({ data }: any) {
+        const item = {
+          id: bloqueosTorneo.length + 1,
+          torneoId: data.torneoId,
+          servicioId: data.servicioId,
+          horaInicio: new Date(data.horaInicio),
+          horaFin: new Date(data.horaFin),
+        };
+        bloqueosTorneo.push(item);
+        return item;
+      },
+      async createMany({ data }: any) {
+        const items = Array.isArray(data) ? data : [data];
+        for (const d of items) {
+          bloqueosTorneo.push({
+            id: bloqueosTorneo.length + 1,
+            torneoId: d.torneoId,
+            servicioId: d.servicioId,
+            horaInicio: new Date(d.horaInicio),
+            horaFin: new Date(d.horaFin),
+          });
+        }
+        return { count: items.length };
+      },
+      async deleteMany({ where }: any = {}) {
+        let removed = 0;
+        for (let i = bloqueosTorneo.length - 1; i >= 0; i--) {
+          const b = bloqueosTorneo[i];
+          if (!where?.torneoId || b.torneoId === where.torneoId) {
+            bloqueosTorneo.splice(i, 1);
+            removed++;
+          }
+        }
+        return { count: removed };
       },
     },
     inscripcionTorneo: {
