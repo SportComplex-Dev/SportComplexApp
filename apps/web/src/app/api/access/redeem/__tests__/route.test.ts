@@ -396,12 +396,102 @@ test("TSK-BE-14: fuera de la franja horaria deniega acceso con WINDOW_EXPIRED (D
   assert.equal(body.success, true);
   assert.equal(body.data.access, "DENIED");
   assert.equal(body.data.code, "WINDOW_EXPIRED");
+  assert.equal(body.data.message, "Acceso denegado: Franja horaria vencida");
   assert.equal(body.data.resultado, "DENEGADO_HORARIO");
   assert.equal(body.data.canjeado, false);
 
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
   assert.equal(mock._state.lecturas.length, 1);
   assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_HORARIO");
+});
+
+test("TSK-BE-17 CRITERIO CLAVE: tiquete 10:00–11:00 con hora actual 10:15 se valida; a las 11:01 se deniega con 'Acceso denegado: Franja horaria vencida'", async () => {
+  seed();
+  const signature = signTicket(CODIGO, SECRET);
+
+  // 1. A las 10:15 (Bogotá) = 15:15Z: el boleto 10:00–11:00 se valida y canjea con éxito
+  const at1015 = new Date("2026-10-10T15:15:00.000Z");
+  const req1015 = createRedeemRequest({
+    ticketId: CODIGO,
+    signature,
+    postServiceId: 1,
+  });
+  const res1015 = await handleAccessRedeem(req1015, {
+    authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"),
+    now: at1015,
+  });
+  const body1015 = await res1015.json();
+
+  assert.equal(res1015.status, 200);
+  assert.equal(body1015.success, true);
+  assert.equal(body1015.data.access, "GRANTED");
+  assert.equal(body1015.data.resultado, "CONCEDIDO");
+  assert.equal(body1015.data.canjeado, true);
+  assert.equal(mock._state.tickets[0].estado, "USADO");
+
+  // 2. A las 11:01 (Bogotá) = 16:01Z: sobre un ticket emitido se deniega con "Acceso denegado: Franja horaria vencida"
+  seed(); // re-sembrar estado limpio con ticket en EMITIDO
+  const at1101 = new Date("2026-10-10T16:01:00.000Z");
+  const req1101 = createRedeemRequest({
+    ticketId: CODIGO,
+    signature,
+    postServiceId: 1,
+  });
+  const res1101 = await handleAccessRedeem(req1101, {
+    authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"),
+    now: at1101,
+  });
+  const body1101 = await res1101.json();
+
+  assert.equal(res1101.status, 200);
+  assert.equal(body1101.success, true);
+  assert.equal(body1101.data.access, "DENIED");
+  assert.equal(body1101.data.code, "WINDOW_EXPIRED");
+  assert.equal(body1101.data.message, "Acceso denegado: Franja horaria vencida");
+  assert.equal(body1101.data.resultado, "DENEGADO_HORARIO");
+  assert.equal(body1101.data.canjeado, false);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.lecturas.length, 1);
+  assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_HORARIO");
+});
+
+test("TSK-BE-17: límites exactos de franja [10:00:00, 11:00:00] (Bogotá) se validan y 09:59:59 se deniega", async () => {
+  seed();
+  const signature = signTicket(CODIGO, SECRET);
+
+  // Antes de las 10:00 (09:59:59 Bogotá = 14:59:59Z) -> DENEGADO_HORARIO
+  const at0959 = new Date("2026-10-10T14:59:59.000Z");
+  const resEarly = await handleAccessRedeem(
+    createRedeemRequest({ ticketId: CODIGO, signature, postServiceId: 1 }),
+    { authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"), now: at0959 },
+  );
+  const bodyEarly = await resEarly.json();
+  assert.equal(bodyEarly.data.access, "DENIED");
+  assert.equal(bodyEarly.data.code, "WINDOW_EXPIRED");
+  assert.equal(bodyEarly.data.message, "Acceso denegado: Franja horaria vencida");
+  assert.equal(bodyEarly.data.resultado, "DENEGADO_HORARIO");
+
+  // En punto 10:00:00 (15:00:00Z) -> GRANTED (límite inferior inclusivo)
+  seed();
+  const at1000 = new Date("2026-10-10T15:00:00.000Z");
+  const resStart = await handleAccessRedeem(
+    createRedeemRequest({ ticketId: CODIGO, signature, postServiceId: 1 }),
+    { authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"), now: at1000 },
+  );
+  const bodyStart = await resStart.json();
+  assert.equal(bodyStart.data.access, "GRANTED");
+  assert.equal(bodyStart.data.canjeado, true);
+
+  // En punto 11:00:00 (16:00:00Z) -> GRANTED (límite superior inclusivo)
+  seed();
+  const at1100 = new Date("2026-10-10T16:00:00.000Z");
+  const resEnd = await handleAccessRedeem(
+    createRedeemRequest({ ticketId: CODIGO, signature, postServiceId: 1 }),
+    { authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"), now: at1100 },
+  );
+  const bodyEnd = await resEnd.json();
+  assert.equal(bodyEnd.data.access, "GRANTED");
+  assert.equal(bodyEnd.data.canjeado, true);
 });
 
 test("TSK-BE-14: rol Cliente o petición no autenticada se rechaza antes de procesar", async () => {
