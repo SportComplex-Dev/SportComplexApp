@@ -1,7 +1,16 @@
 import { prisma } from "../client";
 import type { EstadoUsuario } from "@prisma/client";
 
-const EMPLOYEE_ROLES = new Set([
+export const ALL_EMPLOYEE_ROLES = [
+  "ADMIN",
+  "ADMINISTRADOR",
+  "VENDEDOR",
+  "EMPLEADO_VENDEDOR",
+  "LECTOR",
+  "EMPLEADO_LECTOR",
+] as const;
+
+const DEACTIVATABLE_ROLES = new Set([
   "VENDEDOR",
   "EMPLEADO_VENDEDOR",
   "LECTOR",
@@ -26,51 +35,144 @@ export interface EmployeeDeactivationResult {
   role: string;
 }
 
-interface EmployeeDatabase {
-  usuario: {
-    findUnique(args: {
-      where: { id: string };
-      select: {
-        id: true;
-        estado: true;
-        deletedAt: true;
-        rolId: true;
-        rol: { select: { nombre: true } };
-      };
-    }): Promise<{
-      id: string;
-      estado: EstadoUsuario;
-      deletedAt: Date | null;
-      rolId: number;
-      rol: { nombre: string } | null;
-    } | null>;
-    updateMany(args: {
-      where: {
-        id: string;
-        rolId: number;
-        estado: EstadoUsuario;
-        deletedAt: Date | null;
-      };
-      data: { estado: "INACTIVO"; deletedAt: Date };
-    }): Promise<{ count: number }>;
+export interface EmployeeItem {
+  id: string;
+  nombre: string;
+  correo: string;
+  estado: EstadoUsuario;
+  creadoEn: Date;
+  deletedAt: Date | null;
+  rolId: number;
+  rol: {
+    id: number;
+    nombre: string;
   };
 }
 
+export interface CreateEmployeeInputData {
+  nombre: string;
+  correo: string;
+  rolNombre: string;
+  passwordHash: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyDb = any;
+
 /**
- * Baja lógica de un empleado: conserva el usuario y sus relaciones históricas.
+ * Consulta y lista todos los empleados del sistema (ADMIN, VENDEDOR, LECTOR).
+ * Nunca expone password_hash (seguridad RF-18 / RNF-02).
+ */
+export async function listEmployees(
+  options: { db?: AnyDb } = {},
+): Promise<EmployeeItem[]> {
+  const db: AnyDb = options.db ?? prisma;
+  const users = await db.usuario.findMany({
+    where: {
+      rol: {
+        nombre: { in: [...ALL_EMPLOYEE_ROLES] },
+      },
+    },
+    select: {
+      id: true,
+      nombre: true,
+      correo: true,
+      estado: true,
+      creadoEn: true,
+      deletedAt: true,
+      rolId: true,
+      rol: { select: { id: true, nombre: true } },
+    },
+    orderBy: { creadoEn: "desc" },
+  });
+
+  return users as EmployeeItem[];
+}
+
+/**
+ * Registra un nuevo empleado con rol especificado.
+ */
+export async function createEmployee(
+  data: CreateEmployeeInputData,
+  options: { db?: AnyDb } = {},
+): Promise<EmployeeItem> {
+  const db: AnyDb = options.db ?? prisma;
+
+  const existing = await db.usuario.findUnique({
+    where: { correo: data.correo },
+    select: { id: true },
+  });
+
+  if (existing) {
+    throw new EmployeeError(
+      "Ya existe un usuario registrado con este correo electrónico.",
+      "EMAIL_ALREADY_EXISTS",
+      409,
+    );
+  }
+
+  // Normalizar nombre de rol si viene como alias
+  let targetRolNombre = data.rolNombre.trim().toUpperCase();
+  if (targetRolNombre === "ADMINISTRADOR") targetRolNombre = "ADMIN";
+  if (targetRolNombre === "EMPLEADO_VENDEDOR") targetRolNombre = "VENDEDOR";
+  if (targetRolNombre === "EMPLEADO_LECTOR") targetRolNombre = "LECTOR";
+
+  let rol = await db.rol.findFirst({
+    where: {
+      OR: [
+        { nombre: targetRolNombre },
+        { nombre: data.rolNombre },
+      ],
+    },
+    select: { id: true, nombre: true },
+  });
+
+  if (!rol) {
+    // Si no existe, crear o buscar rol por defecto
+    rol = await db.rol.create({
+      data: { nombre: targetRolNombre },
+      select: { id: true, nombre: true },
+    });
+  }
+
+  const created = await db.usuario.create({
+    data: {
+      nombre: data.nombre.trim(),
+      correo: data.correo.trim().toLowerCase(),
+      rolId: rol.id,
+      passwordHash: data.passwordHash,
+      estado: "ACTIVO",
+    },
+    select: {
+      id: true,
+      nombre: true,
+      correo: true,
+      estado: true,
+      creadoEn: true,
+      deletedAt: true,
+      rolId: true,
+      rol: { select: { id: true, nombre: true } },
+    },
+  });
+
+  return created as EmployeeItem;
+}
+
+/**
+ * Baja lógica de un empleado (RN-10): conserva el usuario y sus relaciones históricas.
  */
 export async function deactivateEmployee(
   employeeId: string,
   options: {
-    db?: EmployeeDatabase;
+    db?: AnyDb;
     now?: Date;
   } = {},
 ): Promise<EmployeeDeactivationResult> {
-  if (!employeeId.trim()) {
+  if (!employeeId || !employeeId.trim()) {
     throw new EmployeeError("Falta el ID del empleado.", "INVALID_ID", 400);
   }
 
-  const db: EmployeeDatabase = options.db ?? prisma;
+  const db: AnyDb = options.db ?? prisma;
   const employee = await db.usuario.findUnique({
     where: { id: employeeId },
     select: {
@@ -85,7 +187,7 @@ export async function deactivateEmployee(
     ? employee.rol.nombre.trim().toUpperCase()
     : "";
 
-  if (!employee || !EMPLOYEE_ROLES.has(role)) {
+  if (!employee || (!DEACTIVATABLE_ROLES.has(role) && !role.includes("VENDEDOR") && !role.includes("LECTOR"))) {
     throw new EmployeeError("Empleado no encontrado.", "EMPLOYEE_NOT_FOUND", 404);
   }
 

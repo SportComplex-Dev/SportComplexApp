@@ -76,6 +76,8 @@ export interface MockUsuario {
   deletedAt?: Date | null;
   rolId?: number;
   rolNombre?: string;
+  creadoEn?: Date;
+  passwordHash?: string;
 }
 
 export interface MockTicketQr {
@@ -812,6 +814,32 @@ export function createMockPrisma() {
       },
     },
     usuario: {
+      async findMany({ where, select, orderBy }: any = {}) {
+        let list = [...usuarios];
+        if (where?.rol?.nombre?.in) {
+          const allowedRoles = where.rol.nombre.in;
+          list = list.filter((u) => allowedRoles.includes(u.rolNombre));
+        }
+        if (where?.estado) {
+          list = list.filter((u) => u.estado === where.estado);
+        }
+        if (orderBy?.creadoEn === "desc") {
+          list.sort((a, b) => ((b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0)));
+        }
+        if (!select) return list;
+        return list.map((u) => {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(select)) {
+            if (!select[key]) continue;
+            if (key === "rol") {
+              picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? "VENDEDOR" };
+            } else {
+              picked[key] = (u as any)[key];
+            }
+          }
+          return picked;
+        });
+      },
       async findUnique({ where, select }: any) {
         const usuario = where.id !== undefined
           ? usuarios.find((u) => u.id === where.id)
@@ -825,9 +853,33 @@ export function createMockPrisma() {
         for (const key of Object.keys(select)) {
           if (!select[key]) continue;
           if (key === "rol") {
-            picked.rol = { nombre: usuario.rolNombre };
+            picked.rol = { id: usuario.rolId ?? 1, nombre: usuario.rolNombre };
           } else {
             picked[key] = (usuario as any)[key];
+          }
+        }
+        return picked;
+      },
+      async create({ data, select }: any) {
+        const newU: MockUsuario = {
+          id: data.id ?? `00000000-0000-4000-8000-${String(usuarios.length + 100).padStart(12, "0")}`,
+          nombre: data.nombre,
+          correo: data.correo,
+          estado: data.estado ?? "ACTIVO",
+          deletedAt: null,
+          rolId: data.rolId,
+          rolNombre: data.rolNombre ?? "VENDEDOR",
+          creadoEn: new Date(),
+        };
+        usuarios.push(newU);
+        if (!select) return newU;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (!select[key]) continue;
+          if (key === "rol") {
+            picked.rol = { id: newU.rolId ?? 1, nombre: newU.rolNombre ?? "VENDEDOR" };
+          } else {
+            picked[key] = (newU as any)[key];
           }
         }
         return picked;
@@ -846,6 +898,38 @@ export function createMockPrisma() {
           count++;
         }
         return { count };
+      },
+    },
+    rol: {
+      async findFirst({ where, select }: any) {
+        const roles = [
+          { id: 1, nombre: "ADMIN" },
+          { id: 2, nombre: "VENDEDOR" },
+          { id: 3, nombre: "LECTOR" },
+          { id: 4, nombre: "CLIENTE" },
+        ];
+        let found = roles[0];
+        if (where?.nombre) {
+          found = roles.find((r) => r.nombre === where.nombre) ?? { id: 2, nombre: where.nombre };
+        } else if (where?.OR) {
+          const names = where.OR.map((o: any) => o.nombre);
+          found = roles.find((r) => names.includes(r.nombre)) ?? { id: 2, nombre: names[0] };
+        }
+        if (!select) return found;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (found as any)[key];
+        }
+        return picked;
+      },
+      async create({ data, select }: any) {
+        const created = { id: 5, nombre: data.nombre };
+        if (!select) return created;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (created as any)[key];
+        }
+        return picked;
       },
     },
     ticketQr: {
