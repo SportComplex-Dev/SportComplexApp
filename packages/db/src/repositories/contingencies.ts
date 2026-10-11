@@ -145,3 +145,62 @@ export async function markContingencyWebhookSent(id: number, sentAt = new Date()
     data: { webhookEnviadoEn: sentAt },
   });
 }
+
+export async function getContingencyPreview(serviceId: number) {
+  const service = await prisma.servicio.findUnique({
+    where: { id: serviceId },
+    select: { id: true, nombre: true, estado: true },
+  });
+
+  if (!service) {
+    throw new ContingencyError("Servicio no encontrado.", "NOT_FOUND", 404);
+  }
+
+  const availability = await prisma.disponibilidad.findMany({
+    where: { servicioId: serviceId },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  const availabilityIds = availability.map(({ id }) => id);
+
+  const activeReservations = availabilityIds.length
+    ? await prisma.reserva.findMany({
+        where: {
+          disponibilidadId: { in: availabilityIds },
+          estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
+        },
+        include: {
+          titular: { select: { id: true, nombre: true, correo: true } },
+          disponibilidad: {
+            include: { franja: true },
+          },
+        },
+        orderBy: [{ creadoEn: "asc" }, { id: "asc" }],
+      })
+    : [];
+
+  const previewReservations = activeReservations.map((reservation) => ({
+    reservaId: reservation.id,
+    usuarioId: reservation.titular.id,
+    nombre: reservation.titular.nombre,
+    correo: reservation.titular.correo,
+    fecha: reservation.disponibilidad.fecha,
+    horaInicio: reservation.disponibilidad.franja.horaInicio,
+    horaFin: reservation.disponibilidad.franja.horaFin,
+    cantidadCupos: reservation.cantidadCupos,
+    estado: reservation.estado,
+  }));
+
+  const totalCupos = previewReservations.reduce((acc, r) => acc + r.cantidadCupos, 0);
+
+  // Clientes únicos afectados
+  const uniqueUsers = new Set(previewReservations.map((r) => r.usuarioId));
+
+  return {
+    servicio: { id: service.id, nombre: service.nombre, estado: service.estado },
+    totalReservas: previewReservations.length,
+    totalCupos,
+    totalClientesAfectados: uniqueUsers.size,
+    reservasAfectadas: previewReservations,
+  };
+}
