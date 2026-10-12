@@ -27,6 +27,21 @@ export type EstadoServicioInput = z.infer<typeof estadoServicioSchema>;
 
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
+function timeToSeconds(time: string): number {
+  const [hours, minutes, seconds = "0"] = time.split(":");
+  return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+}
+
+function piscinaModalidadIsConsistent(data: {
+  tipoPiscina?: TipoPiscinaInput | null;
+  modalidad?: ModalidadServicioInput;
+}): boolean {
+  if (!data.tipoPiscina || !data.modalidad) return true;
+  return data.tipoPiscina === "PRIVADA"
+    ? data.modalidad === "EXCLUSIVA"
+    : data.modalidad === "AFORO";
+}
+
 export const franjaHorariaSchema = z
   .object({
     diaSemana: z.coerce
@@ -39,8 +54,7 @@ export const franjaHorariaSchema = z
   })
   .refine(
     (data) => {
-      // Validar que horaFin sea estrictamente posterior a horaInicio
-      return data.horaFin > data.horaInicio;
+      return timeToSeconds(data.horaFin) > timeToSeconds(data.horaInicio);
     },
     {
       message: "horaFin debe ser posterior a horaInicio",
@@ -102,15 +116,9 @@ export const createServicioSchema = z
     franjasHorarias: z.array(franjaHorariaSchema).optional().default([]),
   })
   .refine(
-    (data) => {
-      // Si la modalidad es AFORO y es piscina privada, no es consistente
-      if (data.tipoPiscina === "PRIVADA" && data.modalidad === "AFORO") {
-        return false;
-      }
-      return true;
-    },
+    piscinaModalidadIsConsistent,
     {
-      message: "Una piscina privada debe operar bajo modalidad EXCLUSIVA",
+      message: "Piscinas PRIVADAS requieren modalidad EXCLUSIVA y PUBLICAS requieren AFORO",
       path: ["modalidad"],
     },
   );
@@ -144,14 +152,9 @@ export const updateServicioSchema = z
     franjasHorarias: z.array(franjaHorariaSchema).optional(),
   })
   .refine(
-    (data) => {
-      if (data.tipoPiscina === "PRIVADA" && data.modalidad === "AFORO") {
-        return false;
-      }
-      return true;
-    },
+    piscinaModalidadIsConsistent,
     {
-      message: "Una piscina privada debe operar bajo modalidad EXCLUSIVA",
+      message: "Piscinas PRIVADAS requieren modalidad EXCLUSIVA y PUBLICAS requieren AFORO",
       path: ["modalidad"],
     },
   );
@@ -194,7 +197,13 @@ export function normalizeServicePayload(raw: Record<string, unknown>): Record<st
     categoriaId: raw.categoriaId ?? raw.categoryId,
     capacidadMaxima: raw.capacidadMaxima ?? raw.capacity,
     tarifa: raw.tarifa ?? raw.price ?? raw.tariff ?? 0,
-    modalidad: modalidadNormalized ?? modalidadRaw,
+    modalidad:
+      modalidadNormalized ??
+      (tipoPiscinaNormalized === "PRIVADA"
+        ? "EXCLUSIVA"
+        : tipoPiscinaNormalized === "PUBLICA"
+          ? "AFORO"
+          : modalidadRaw),
     tipoPiscina: tipoPiscinaNormalized,
     estado: raw.estado ?? raw.status ?? "ACTIVO",
     franjasHorarias: raw.franjasHorarias ?? raw.schedule ?? raw.schedules ?? [],

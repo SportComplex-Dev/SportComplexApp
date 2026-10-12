@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, ShieldAlert, WifiOff } from "lucide-react";
+import { CheckCircle2, ShieldAlert, WifiOff } from "lucide-react";
 
 import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
 import { ScannerHeader } from "@/components/scanner/scanner-header";
@@ -10,11 +10,13 @@ import { ShiftSelector } from "@/components/scanner/shift-selector";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
 import {
   type ScannerFlowState,
+  type ScannedTicket,
   type ShiftOption,
-  type TicketValidationResponse,
+  type RedeemTicketResponse,
   scannerService,
 } from "@/components/scanner/scanner.service";
 import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
+import { useApp } from "@/components/app-provider";
 
 export default function ScannerPage() {
   const [flowState, setFlowState] = useState<ScannerFlowState>("idle");
@@ -26,13 +28,14 @@ export default function ScannerPage() {
   const [activeShift, setActiveShift] = useState<ShiftOption | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [ticket, setTicket] = useState<TicketValidationResponse | null>(null);
+  const [ticket, setTicket] = useState<ScannedTicket | null>(null);
   const [modalMessage, setModalMessage] = useState("Se debe validar el QR para confirmar acceso.");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
 
   const { playSuccess, playError } = useAudioFeedback(audioEnabled);
+  const { session } = useApp();
 
   useEffect(() => {
     let isCurrent = true;
@@ -43,7 +46,7 @@ export default function ScannerPage() {
       })
       .catch((error: unknown) => {
         if (isCurrent) {
-          setShiftLoadError(error instanceof Error ? error.message : "No se pudieron cargar los puestos de turno.");
+          setShiftLoadError(error instanceof Error ? error.message : "No se pudieron cargar los servicios de acceso.");
         }
       })
       .finally(() => {
@@ -70,7 +73,7 @@ export default function ScannerPage() {
   }, []);
 
   const handleOpenCamera = useCallback(() => {
-    if (!activeShift) {
+    if (!activeShift || !Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0) {
       return;
     }
 
@@ -108,79 +111,63 @@ export default function ScannerPage() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isModalOpen) {
-        setIsModalOpen(false);
-      }
+      if (event.key === "Escape" && isModalOpen) setIsModalOpen(false);
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeShift, isModalOpen]);
 
-  const handleScan = useCallback(
-    async (rawQr: string) => {
-      if (!activeShift) {
-        return;
-      }
+  const handleScan = useCallback((rawQr: string) => {
+    if (!activeShift || !Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0) return;
 
-      setFlowState("validating-ticket");
-      setModalMessage("Validando QR del ticket y comprobando coincidencia de turno...");
-      setIsModalOpen(true);
-
-      try {
-        const result = await scannerService.validateTicket(rawQr, activeShift);
-        if (result.isValid && !result.ticketId) {
-          setTicket(null);
-          setStateAndMessage("ticket-invalid", "La respuesta de validación no incluye el identificador requerido para el canje.");
-          if (audioEnabled) playError();
-          return;
-        }
-
-        if (!result.isValid) {
-          const nextState = result.status === "WRONG_COURT" ? "access-denied" : "ticket-invalid";
-          setStateAndMessage(nextState, result.message);
-          setTicket(null);
-          if (audioEnabled) playError();
-          return;
-        }
-
-        setTicket(result);
-        setStateAndMessage("ticket-valid", result.message);
-        if (audioEnabled) {
-          playSuccess();
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error
-          ? `No se pudo validar el ticket: ${error.message}`
-          : "No se pudo validar el ticket por un error de conexión.";
-        setTicket(null);
-        setStateAndMessage("ticket-invalid", message);
-        if (audioEnabled) playError();
-      }
-    },
-    [activeShift, audioEnabled, playError, playSuccess, setStateAndMessage],
-  );
-
-  const handleRedeem = useCallback(async () => {
-    if (!ticket?.isValid || !ticket.ticketId || !activeShift) {
+    setIsModalOpen(true);
+    const parsed = scannerService.parseTicket(rawQr);
+    if (!parsed) {
+      setTicket(null);
+      setStateAndMessage("ticket-invalid", "El QR no contiene un ticket firmado válido (SC1, UUID y firma HMAC).");
+      if (audioEnabled) playError();
       return;
     }
+
+    setTicket(parsed);
+    setStateAndMessage("ticket-valid", "Confirma el canje para validar el acceso con el servidor.");
+  }, [activeShift, audioEnabled, playError, setStateAndMessage]);
+
+  const handleRedeem = useCallback(async () => {
+    if (
+      !ticket ||
+      !activeShift ||
+      !Number.isInteger(activeShift.postServiceId) ||
+      activeShift.postServiceId <= 0
+    ) return;
 
     setFlowState("redeeming");
     setIsRedeeming(true);
     setModalMessage("Registrando acceso y confirmando el paso del cliente...");
 
     try {
-      const result = await scannerService.redeemTicket(ticket.ticketId, activeShift);
-      if (!result.success) {
-        setStateAndMessage("redeem-error", result.message);
+      const result: RedeemTicketResponse = await scannerService.redeemTicket(
+        ticket,
+        activeShift.postServiceId,
+      );
+      setTicket({ ...ticket, result });
+      if (result.access === "DENIED") {
+        const message = result.code === "ALREADY_USED"
+          ? "Boleto ya utilizado anteriormente."
+          : result.code === "SERVICE_MISMATCH"
+            ? result.message ?? "El ticket pertenece a otro escenario deportivo."
+            : result.code === "WINDOW_EXPIRED"
+              ? result.message ?? "Franja horaria vencida o no disponible."
+              : result.message ?? "El acceso fue denegado.";
+        setStateAndMessage("access-denied", message);
         if (audioEnabled) {
           playError();
         }
         return;
       }
 
-      setStateAndMessage("access-granted", result.message);
+      setStateAndMessage("access-granted", result.message ?? "Acceso concedido y canje registrado.");
       if (audioEnabled) {
         playSuccess();
       }
@@ -213,7 +200,12 @@ export default function ScannerPage() {
     setModalMessage("Escaneando siguiente QR...");
   }, []);
 
-  const canStartCamera = Boolean(activeShift) && (flowState === "starting-camera" || flowState === "scanning" || flowState === "validating-ticket");
+  const canStartCamera = Boolean(
+    activeShift &&
+    Number.isInteger(activeShift.postServiceId) &&
+    activeShift.postServiceId > 0 &&
+    (flowState === "starting-camera" || flowState === "scanning"),
+  );
 
   return (
     <main data-scanner-theme={theme} className="min-h-screen bg-brand-dark text-brand-text">
@@ -258,6 +250,7 @@ export default function ScannerPage() {
                 <button
                   type="button"
                   onClick={handleOpenCamera}
+                  disabled={!Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0}
                   className="rounded-full bg-brand-accent px-4 py-2 text-xs font-bold text-brand-on-accent transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
                 >
                   {flowState === "scanning" ? "Cámara activa" : "Iniciar cámara"}
@@ -294,12 +287,8 @@ export default function ScannerPage() {
 
                 <div className="space-y-3 text-sm text-brand-muted">
                   <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
-                    <span>Horario</span>
-                    <span className="font-semibold text-brand-text">{activeShift.startTime} - {activeShift.endTime}</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
-                    <span>Instalación</span>
-                    <span className="font-semibold text-brand-text">{activeShift.venueName}</span>
+                    <span>ID del puesto/servicio</span>
+                    <span className="font-semibold text-brand-text">{activeShift.postServiceId}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
                     <span>Validación</span>
@@ -314,17 +303,10 @@ export default function ScannerPage() {
                   </div>
                   <p className="mt-2 text-sm text-brand-text">
                     {flowState === "scanning"
-                      ? "Apunte al código del ticket para validar el acceso del cliente."
-                      : "Confirme el turno y active la cámara para iniciar lectura."}
+                      ? "Apunte al QR firmado del ticket para confirmar el canje."
+                      : "Seleccione un puesto/servicio válido para habilitar la lectura."}
                   </p>
                 </div>
-
-                {flowState === "validating-ticket" ? (
-                  <div className="mt-5 flex items-center gap-2 rounded-2xl border border-brand-border bg-brand-control px-3 py-3 text-sm text-brand-text">
-                    <Loader2 className="h-4 w-4 animate-spin text-brand-accent" />
-                    Validando reserva y comprobando coincidencia con el puesto activo...
-                  </div>
-                ) : null}
               </motion.aside>
             </div>
           </div>
@@ -336,6 +318,7 @@ export default function ScannerPage() {
         state={flowState}
         ticket={ticket}
         message={modalMessage}
+        employeeName={session?.name ?? ""}
         isRedeeming={isRedeeming}
         onClose={() => setIsModalOpen(false)}
         onRedeem={handleRedeem}

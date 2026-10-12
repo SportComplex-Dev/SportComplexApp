@@ -13,8 +13,10 @@
     "db:seed": "prisma db seed",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "db:expire": "tsx src/jobs/expire.ts",
+    "smoke:be09": "tsx scripts/smoke-be09.mts",
     "lint": "eslint .",
-    "test": "tsx --test test/**/*.test.ts",
     "clean": "rm -rf dist"
   },
   "prisma": {

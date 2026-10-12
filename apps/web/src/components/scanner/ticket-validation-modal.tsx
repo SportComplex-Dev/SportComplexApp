@@ -4,24 +4,68 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, X } from "lucide-react";
 import { useEffect } from "react";
 
-import type { ScannerFlowState, TicketValidationResponse } from "@/components/scanner/scanner.service";
+import type {
+  RedeemTicketResponse,
+  ScannerFlowState,
+  ScannedTicket,
+} from "@/components/scanner/scanner.service";
 
 type TicketValidationModalProps = {
   isOpen: boolean;
   state: ScannerFlowState;
-  ticket: TicketValidationResponse | null;
+  ticket: ScannedTicket | null;
   message: string;
+  employeeName: string;
   isRedeeming: boolean;
   onClose: () => void;
   onRedeem: () => void;
   onScanNext: () => void;
 };
 
+function TicketDetails({ ticket }: { ticket: NonNullable<RedeemTicketResponse["ticket"]> }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Reserva</p>
+        <p className="mt-2 break-all font-medium text-brand-text">{ticket.reservaId}</p>
+      </div>
+      <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Servicio reservado</p>
+        <p className="mt-2 font-medium text-brand-text">{ticket.servicioNombre}</p>
+      </div>
+      <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Fecha y horario</p>
+        <p className="mt-2 font-medium text-brand-text">
+          {ticket.fecha} · {ticket.horaInicio.slice(0, 5)}–{ticket.horaFin.slice(0, 5)}
+        </p>
+      </div>
+      <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Estado del boleto</p>
+        <p className="mt-2 font-medium text-brand-text">{ticket.estado}</p>
+      </div>
+    </div>
+  );
+}
+
+function denialLabel(code: RedeemTicketResponse["code"]): string | null {
+  switch (code) {
+    case "ALREADY_USED":
+      return "ALREADY_USED · Boleto ya utilizado anteriormente";
+    case "SERVICE_MISMATCH":
+      return "SERVICE_MISMATCH · El ticket pertenece a otro escenario deportivo";
+    case "WINDOW_EXPIRED":
+      return "WINDOW_EXPIRED · Franja horaria vencida o no disponible";
+    default:
+      return code ?? null;
+  }
+}
+
 export function TicketValidationModal({
   isOpen,
   state,
   ticket,
   message,
+  employeeName,
   isRedeeming,
   onClose,
   onRedeem,
@@ -38,9 +82,12 @@ export function TicketValidationModal({
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [isOpen, onClose]);
 
+  const result = ticket?.result;
   const isGranted = state === "access-granted";
-  const isValidating = state === "validating-ticket";
-  const isValidTicket = state === "ticket-valid" || isGranted;
+  const isDenied = state === "access-denied";
+  const isPending = state === "redeeming";
+  const denial = denialLabel(result?.code);
+  const detailTicket = result?.ticket;
 
   return (
     <AnimatePresence>
@@ -66,19 +113,26 @@ export function TicketValidationModal({
                 <div
                   className={[
                     "flex h-10 w-10 items-center justify-center rounded-2xl",
-                    isValidTicket ? "bg-brand-emerald text-brand-accent" : "bg-brand-danger-bg text-brand-danger-text",
+                    isGranted
+                      ? "bg-brand-emerald text-brand-accent"
+                      : "bg-brand-danger-bg text-brand-danger-text",
                   ].join(" ")}
                 >
-                  {isValidTicket ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                  {isGranted ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-muted">Validación</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-muted">Canje de ticket</p>
                   <h3 id="ticket-dialog-title" className="text-xl font-bold text-brand-text">
-                    {isGranted ? "Acceso concedido" : isValidTicket ? "Acceso válido" : "Acceso denegado"}
+                    {isGranted
+                      ? "Acceso Concedido"
+                      : isDenied
+                        ? "Acceso denegado"
+                        : state === "ticket-valid"
+                          ? "QR listo para canje"
+                          : "No se pudo validar el QR"}
                   </h3>
                 </div>
               </div>
-
               <button
                 type="button"
                 aria-label="Cerrar diálogo"
@@ -89,102 +143,98 @@ export function TicketValidationModal({
               </button>
             </div>
 
-            {isValidating ? (
+            {isPending ? (
               <div role="status" className="flex items-center gap-3 rounded-2xl border border-brand-border bg-brand-control p-5 text-sm text-brand-text">
                 <Loader2 className="h-5 w-5 animate-spin text-brand-accent" />
                 {message}
               </div>
-            ) : isValidTicket && ticket ? (
+            ) : isGranted ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-brand-accent/30 bg-brand-emerald p-4">
+                <motion.div
+                  initial={{ scale: 0.96, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="rounded-2xl border border-brand-accent/30 bg-brand-emerald p-4"
+                >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-accent">
-                      {isGranted ? "Canje registrado" : "Ticket validado"}
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-accent">Canje registrado</p>
                     <span className="rounded-full border border-brand-accent/30 bg-brand-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-accent">
-                      {isGranted ? "Concedido" : "Válido"}
+                      Concedido
                     </span>
                   </div>
-                  <p className="mt-2 text-lg font-semibold text-brand-text">{ticket.userName ?? "Titular del ticket"}</p>
-                </div>
+                  <p className="mt-2 text-lg font-semibold text-brand-text">
+                    {detailTicket?.titularNombre ?? "Titular del ticket"}
+                  </p>
+                </motion.div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Código del ticket</p>
-                    <p className="mt-2 break-all font-medium text-brand-text">{ticket.ticketId}</p>
-                  </div>
-                  <div className="rounded-2xl border border-brand-border bg-brand-control p-3">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-brand-muted">Cancha/Instalación</p>
-                    <p className="mt-2 font-medium text-brand-text">{ticket.targetCourtName ?? "Puesto activo"}</p>
-                  </div>
+                {detailTicket ? <TicketDetails ticket={detailTicket} /> : null}
+                <div className="rounded-2xl border border-brand-border bg-brand-control p-3 text-sm text-brand-text">
+                  <p><span className="text-brand-muted">Empleado lector:</span> {employeeName || "Sesión autorizada"}</p>
+                  <p className="mt-1 break-all"><span className="text-brand-muted">Ticket:</span> {ticket?.ticketId}</p>
                 </div>
-
-                <p role="status" className="rounded-2xl border border-brand-border bg-brand-control px-4 py-3 text-sm text-brand-muted">
+                <p role="status" className="rounded-2xl border border-brand-accent/30 bg-brand-accent/10 px-4 py-3 text-sm text-brand-text">
                   {message}
                 </p>
-
-                <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-                  {isGranted ? (
-                    <button
-                      type="button"
-                      onClick={onScanNext}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-accent px-4 py-3 text-sm font-bold text-brand-on-accent transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Escanear siguiente
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={onRedeem}
-                      disabled={isRedeeming}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-accent px-4 py-3 text-sm font-bold text-brand-on-accent transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                    >
-                      {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      {isRedeeming ? "Dando acceso..." : "Dar Acceso"}
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-full border border-brand-border bg-brand-control px-4 py-3 text-sm font-semibold text-brand-text transition hover:border-brand-accent hover:text-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                  >
-                    Cerrar
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={onScanNext}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-accent px-4 py-3 text-sm font-bold text-brand-on-accent transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Escanear siguiente
+                </button>
               </div>
-            ) : (
+            ) : isDenied ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-4 text-brand-danger-text">
+                <div role="alert" className="rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-4 text-brand-danger-text">
                   <div className="flex items-center gap-2 text-base font-semibold">
                     <ShieldAlert className="h-5 w-5" />
-                    {state === "access-denied"
-                      ? "ACCESO DENEGADO"
-                      : state === "redeem-error"
-                        ? "Canje no confirmado"
-                        : "Código no válido"}
+                    {denial ?? "ACCESO DENEGADO"}
                   </div>
                   <p className="mt-2 text-sm">{message}</p>
                 </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={onScanNext}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-danger-solid px-4 py-3 text-sm font-bold text-brand-on-danger transition hover:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-danger-solid"
-                  >
-                    <ShieldAlert className="h-4 w-4" />
-                    Escanear siguiente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-full border border-brand-border bg-brand-control px-4 py-3 text-sm font-semibold text-brand-text transition hover:border-brand-accent hover:text-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                  >
-                    Cerrar
-                  </button>
+                {detailTicket ? <TicketDetails ticket={detailTicket} /> : null}
+                <button
+                  type="button"
+                  onClick={onScanNext}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-danger-solid px-4 py-3 text-sm font-bold text-brand-on-danger transition hover:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-danger-solid"
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                  Escanear siguiente
+                </button>
+              </div>
+            ) : state === "ticket-valid" && ticket ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-brand-accent/30 bg-brand-emerald p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-accent">Firma QR válida</p>
+                  <p className="mt-2 break-all text-sm font-medium text-brand-text">{ticket.ticketId}</p>
+                  <p className="mt-2 text-sm text-brand-muted">{message}</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={onRedeem}
+                  disabled={isRedeeming}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-accent px-4 py-3 text-sm font-bold text-brand-on-accent transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+                >
+                  {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Dar Acceso
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div role="alert" className="rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-4 text-brand-danger-text">
+                  <div className="flex items-center gap-2 text-base font-semibold">
+                    <ShieldAlert className="h-5 w-5" />
+                    {state === "redeem-error" ? "Canje no confirmado" : "Código no válido"}
+                  </div>
+                  <p className="mt-2 text-sm">{message}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onScanNext}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-danger-solid px-4 py-3 text-sm font-bold text-brand-on-danger transition hover:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-danger-solid"
+                >
+                  Escanear siguiente
+                </button>
               </div>
             )}
           </motion.div>

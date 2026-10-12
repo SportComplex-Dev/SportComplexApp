@@ -1,10 +1,10 @@
+import { parseTicketQrPayload } from "@sportcomplex/core";
+
 export type ScannerFlowState =
   | "idle"
   | "configuring-shift"
   | "starting-camera"
   | "scanning"
-  | "ticket-detected"
-  | "validating-ticket"
   | "ticket-valid"
   | "ticket-invalid"
   | "access-granted"
@@ -13,240 +13,167 @@ export type ScannerFlowState =
   | "redeem-error"
   | "camera-error";
 
-export interface ShiftContext {
-  empleadoId: string;
-  venueId: string;
-  courtId: string;
+export interface ShiftOption {
+  id: string;
+  postServiceId: number;
+  label: string;
+  courtName: string;
 }
 
-export interface TicketValidationPayload {
-  qrCode: string;
-  courtId: string;
-}
-
-export interface TicketValidationResponse {
-  isValid: boolean;
-  ticketId?: string;
-  userName?: string;
-  targetCourtName?: string;
-  status: "VALID" | "WRONG_COURT" | "EXPIRED" | "ALREADY_USED" | "INVALID";
-  message: string;
-}
-
-export interface RedeemTicketPayload {
+export interface ScannedTicket {
   ticketId: string;
-  empleadoId: string;
-  courtId: string;
-  venueId: string;
-  scannedAt: string;
+  signature: string;
+  result?: RedeemTicketResponse;
 }
 
 export interface RedeemTicketResponse {
-  success: boolean;
-  redeemedAt: string;
-  message: string;
+  access: "GRANTED" | "DENIED";
+  code?: "ALREADY_USED" | "SERVICE_MISMATCH" | "WINDOW_EXPIRED" | "INVALID_STATE";
+  message?: string;
+  ticket?: {
+    id: string;
+    reservaId: string;
+    estado: "EMITIDO" | "USADO";
+    servicioId: number;
+    servicioNombre: string;
+    fecha: string;
+    horaInicio: string;
+    horaFin: string;
+    titularId: string;
+    titularNombre: string;
+  };
 }
 
-export interface ShiftOption extends ShiftContext {
-  id: string;
-  label: string;
-  venueName: string;
-  courtName: string;
-  startTime: string;
-  endTime: string;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-export interface ScannerServiceAdapter {
-  getShiftOptions(): Promise<ShiftOption[]>;
-  validateTicket(payload: TicketValidationPayload): Promise<TicketValidationResponse>;
-  redeemTicket(payload: RedeemTicketPayload): Promise<RedeemTicketResponse>;
+function isRedeemCode(value: unknown): value is NonNullable<RedeemTicketResponse["code"]> {
+  return value === "ALREADY_USED" ||
+    value === "SERVICE_MISMATCH" ||
+    value === "WINDOW_EXPIRED" ||
+    value === "INVALID_STATE";
 }
 
-const mockShiftOptions: ShiftOption[] = [
-  {
-    id: "shift-court-01",
-    label: "Puesto 01",
-    empleadoId: "emp-lector-01",
-    venueId: "venue-akros",
-    venueName: "AKROS Club",
-    courtId: "court-sf-1",
-    courtName: "Cancha 1 — Fútbol 5",
-    startTime: "09:00",
-    endTime: "12:00",
-  },
-  {
-    id: "shift-court-02",
-    label: "Puesto 02",
-    empleadoId: "emp-lector-02",
-    venueId: "venue-akros",
-    venueName: "AKROS Club",
-    courtId: "court-sf-2",
-    courtName: "Cancha 2 — Fútbol 5",
-    startTime: "12:00",
-    endTime: "15:00",
-  },
-  {
-    id: "shift-court-03",
-    label: "Puesto 03",
-    empleadoId: "emp-lector-03",
-    venueId: "venue-akros",
-    venueName: "AKROS Club",
-    courtId: "court-tennis-1",
-    courtName: "Cancha 3 — Tenis",
-    startTime: "15:00",
-    endTime: "18:00",
-  },
-];
-
-interface MockTicket extends Pick<TicketValidationResponse, "ticketId" | "userName" | "targetCourtName" | "status"> {
-  courtId: string;
+function isRedeemTicket(value: unknown): value is NonNullable<RedeemTicketResponse["ticket"]> {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.reservaId === "string" &&
+    (value.estado === "EMITIDO" || value.estado === "USADO") &&
+    typeof value.servicioId === "number" &&
+    typeof value.servicioNombre === "string" &&
+    typeof value.fecha === "string" &&
+    typeof value.horaInicio === "string" &&
+    typeof value.horaFin === "string" &&
+    typeof value.titularId === "string" &&
+    typeof value.titularNombre === "string"
+  );
 }
 
-const mockTickets: Record<string, MockTicket> = {
-  "AKR-1001": {
-    ticketId: "AKR-1001",
-    userName: "Mateo López",
-    targetCourtName: "Cancha 1 — Fútbol 5",
-    courtId: "court-sf-1",
-    status: "VALID",
-  },
-  "AKR-1002": {
-    ticketId: "AKR-1002",
-    userName: "Paula García",
-    targetCourtName: "Cancha 2 — Fútbol 5",
-    courtId: "court-sf-2",
-    status: "VALID",
-  },
-  "AKR-1003": {
-    ticketId: "AKR-1003",
-    userName: "Nicolás Rojas",
-    targetCourtName: "Cancha 1 — Fútbol 5",
-    courtId: "court-sf-1",
-    status: "EXPIRED",
-  },
-  "AKR-1004": {
-    ticketId: "AKR-1004",
-    userName: "Sofía Ortega",
-    targetCourtName: "Cancha 3 — Tenis",
-    courtId: "court-tennis-1",
-    status: "ALREADY_USED",
-  },
-};
-
-function extractTicketId(qrCode: string): string | null {
-  const trimmed = qrCode.trim();
-  if (!trimmed) return null;
-
-  if (/^AKR-[A-Z0-9-]+$/i.test(trimmed)) {
-    return trimmed.toUpperCase();
-  }
-
+async function readJson(response: Response): Promise<unknown> {
   try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (typeof parsed === "object" && parsed !== null && "ticketId" in parsed && typeof parsed.ticketId === "string") {
-      return parsed.ticketId.toUpperCase();
-    }
-    if (typeof parsed === "object" && parsed !== null && "code" in parsed && typeof parsed.code === "string") {
-      return parsed.code.toUpperCase();
-    }
+    return await response.json();
   } catch {
-    // A non-JSON QR value may still contain a ticket URL.
+    throw new Error("El servidor devolvió una respuesta inválida.");
   }
-
-  const urlMatch = trimmed.match(/(?:ticketId|code|ticket)=([A-Z0-9-]+)/i);
-  return urlMatch?.[1]?.toUpperCase() ?? null;
 }
 
-const mockScannerAdapter: ScannerServiceAdapter = {
-  async getShiftOptions() {
-    return mockShiftOptions;
-  },
-
-  async validateTicket({ qrCode, courtId }) {
-    const ticketId = extractTicketId(qrCode);
-    if (!ticketId) {
-      return {
-        isValid: false,
-        status: "INVALID",
-        message: "El QR no contiene un código de reserva o ticket válido.",
-      };
-    }
-
-    const ticket = mockTickets[ticketId];
-    if (!ticket) {
-      return {
-        isValid: false,
-        ticketId,
-        status: "INVALID",
-        message: `No existe un ticket activo asociado al código ${ticketId}.`,
-      };
-    }
-
-    if (ticket.status === "EXPIRED") {
-      return {
-        ticketId: ticket.ticketId,
-        userName: ticket.userName,
-        targetCourtName: ticket.targetCourtName,
-        isValid: false,
-        status: "EXPIRED",
-        message: `El ticket ${ticketId} ya expiró y no puede usarse en este turno.`,
-      };
-    }
-
-    if (ticket.status === "ALREADY_USED") {
-      return {
-        ticketId: ticket.ticketId,
-        userName: ticket.userName,
-        targetCourtName: ticket.targetCourtName,
-        isValid: false,
-        status: "ALREADY_USED",
-        message: `El ticket ${ticketId} ya fue consumido anteriormente.`,
-      };
-    }
-
-    if (ticket.courtId !== courtId) {
-      return {
-        ticketId: ticket.ticketId,
-        userName: ticket.userName,
-        targetCourtName: ticket.targetCourtName,
-        isValid: false,
-        status: "WRONG_COURT",
-        message: `El ticket pertenece a ${ticket.targetCourtName}; el puesto activo corresponde a otra cancha.`,
-      };
-    }
-
-    return {
-      ticketId: ticket.ticketId,
-      userName: ticket.userName,
-      targetCourtName: ticket.targetCourtName,
-      isValid: true,
-      status: "VALID",
-      message: `Ticket ${ticketId} validado correctamente.`,
-    };
-  },
-
-  async redeemTicket({ ticketId }) {
-    return {
-      success: true,
-      redeemedAt: new Date().toISOString(),
-      message: `Acceso concedido para el ticket ${ticketId}.`,
-    };
-  },
-};
-
-// Swap this adapter for the TSK-BE-14 HTTP adapter once its routes are available.
-const scannerAdapter: ScannerServiceAdapter = mockScannerAdapter;
+function getApiError(payload: unknown): { code: string; message: string } | null {
+  if (
+    isRecord(payload) &&
+    payload.success === false &&
+    isRecord(payload.error) &&
+    typeof payload.error.code === "string" &&
+    typeof payload.error.message === "string"
+  ) {
+    return { code: payload.error.code, message: payload.error.message };
+  }
+  return null;
+}
 
 export const scannerService = {
-  getShiftOptions: () => scannerAdapter.getShiftOptions(),
-  validateTicket: (qrCode: string, shift: ShiftContext) =>
-    scannerAdapter.validateTicket({ qrCode, courtId: shift.courtId }),
-  redeemTicket: (ticketId: string, shift: ShiftContext) =>
-    scannerAdapter.redeemTicket({
-      ticketId,
-      empleadoId: shift.empleadoId,
-      courtId: shift.courtId,
-      venueId: shift.venueId,
-      scannedAt: new Date().toISOString(),
-    }),
+  parseTicket(qrCode: string) {
+    return parseTicketQrPayload(qrCode);
+  },
+
+  async getShiftOptions(): Promise<ShiftOption[]> {
+    const response = await fetch("/api/access/services", { cache: "no-store" });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      const error = getApiError(payload);
+      throw new Error(error?.message ?? "No se pudieron cargar los servicios de acceso.");
+    }
+    if (!isRecord(payload) || payload.success !== true || !Array.isArray(payload.data)) {
+      throw new Error("La respuesta de servicios de acceso tiene un formato inválido.");
+    }
+
+    return payload.data.map((service: unknown) => {
+      if (
+        !isRecord(service) ||
+        typeof service.id !== "number" ||
+        !Number.isInteger(service.id) ||
+        service.id <= 0 ||
+        typeof service.nombre !== "string" ||
+        service.nombre.trim().length === 0
+      ) {
+        throw new Error("El servidor devolvió un servicio de acceso inválido.");
+      }
+      return {
+        id: String(service.id),
+        postServiceId: service.id,
+        label: `Puesto ${service.id}`,
+        courtName: service.nombre,
+      };
+    });
+  },
+
+  async redeemTicket(
+    ticket: Pick<ScannedTicket, "ticketId" | "signature">,
+    postServiceId: number,
+  ): Promise<RedeemTicketResponse> {
+    if (!Number.isInteger(postServiceId) || postServiceId <= 0) {
+      throw new Error("Selecciona un puesto/servicio válido antes de canjear el ticket.");
+    }
+
+    const response = await fetch("/api/access/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ticketId: ticket.ticketId,
+        signature: ticket.signature,
+        postServiceId,
+      }),
+    });
+    const payload = await readJson(response);
+    const apiError = getApiError(payload);
+
+    if (apiError?.code === "SERVICE_MISMATCH") {
+      return { access: "DENIED", code: "SERVICE_MISMATCH", message: apiError.message };
+    }
+    if (!response.ok) {
+      throw new Error(apiError?.message ?? "No se pudo procesar el canje.");
+    }
+    if (!isRecord(payload) || payload.success !== true || !isRecord(payload.data)) {
+      throw new Error("La respuesta de canje tiene un formato inválido.");
+    }
+
+    const data = payload.data;
+    if (data.access !== "GRANTED" && data.access !== "DENIED") {
+      throw new Error("La respuesta de canje no contiene un resultado de acceso válido.");
+    }
+    if (data.code !== undefined && !isRedeemCode(data.code)) {
+      throw new Error("La respuesta de canje contiene un código de denegación desconocido.");
+    }
+    if (data.ticket !== undefined && !isRedeemTicket(data.ticket)) {
+      throw new Error("La respuesta de canje contiene los datos de ticket en un formato inválido.");
+    }
+
+    return {
+      access: data.access,
+      ...(isRedeemCode(data.code) ? { code: data.code } : {}),
+      ...(typeof data.message === "string" ? { message: data.message } : {}),
+      ...(isRedeemTicket(data.ticket) ? { ticket: data.ticket } : {}),
+    };
+  },
 };

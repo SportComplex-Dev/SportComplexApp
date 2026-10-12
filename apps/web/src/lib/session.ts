@@ -44,11 +44,40 @@ export function normalizeRole(roleStr?: string | null): CanonicalRole | null {
 }
 
 /**
+ * Normaliza el rol embebido que devuelve PostgREST/Supabase REST en la relación
+ * `usuario → rol`. Esa relación es many-to-one y PostgREST la entrega como **objeto**
+ * (`{ nombre }`), pero ciertas versiones/consultas la devuelven como **array**
+ * (`[{ nombre }]`). Asumir siempre array fue la causa raíz del bug "se queda en /login".
+ */
+export type EmbeddedRole =
+  | { nombre?: string | null }
+  | Array<{ nombre?: string | null }>
+  | null
+  | undefined;
+
+export function normalizeEmbeddedRole(rol: EmbeddedRole): { nombre: string } | null {
+  const row = Array.isArray(rol) ? rol[0] : rol;
+  return row && typeof row.nombre === "string" ? { nombre: row.nombre } : null;
+}
+
+/**
+ * Escapa un valor literal para usarlo como patrón `ilike`/`like` en PostgREST.
+ * Sin esto, `%`, `_` y `\` del correo actuarían como comodines (p. ej.
+ * `ana_lopez@x` casaría con `anaXlopez@x`). PostgREST lo traslada a un LIKE
+ * de Postgres, donde `\` es el escape por defecto.
+ */
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
  * Comprueba si el estado de la cuenta permite el acceso perimetral.
  * RN-10: Cuentas inactivas o con borrado lógico tienen credenciales revocadas de inmediato.
  */
 export function isAccountActive(statusStr?: string | null): boolean {
-  if (!statusStr) return true; // Si no se declara estado explícito (modo dev / cookie simple), se asume activo
+  // Fail-closed: sin estado explícito no se asume activo (RN-10). El middleware
+  // re-verifica el estado real contra la tabla `usuario` en rutas protegidas.
+  if (!statusStr || !statusStr.trim()) return false;
   const s = statusStr.trim().toUpperCase();
   if (s === "INACTIVO" || s === "TEMP_INACTIVO" || s === "TEMPORALMENTE_INACTIVO" || s === "INACTIVE") {
     return false;
@@ -89,16 +118,174 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
 }
 
 /**
- * Extrae la sesión autenticada activa desde la petición HTTP inspeccionando:
+ * Token de sesión firmado (sc-token) para cuentas sin identidad Supabase.
+ * Formato: `<base64url(payload)>.<base64url(HMAC-SHA256(payload, AUTH_SECRET))>`.
+ * Tiene un único segmento de firma (a diferencia de un JWT de 3 partes), por lo que
+ * `decodeJwtPayload` no lo confunde con tokens de Auth.js/Supabase.
+ */
+export interface ScSessionClaims {
+  sub: string;
+  email?: string;
+  role: CanonicalRole;
+  status: string;
+  exp: number;
+}
+
+const SESSION_TOKEN_TTL_SECONDS = 60 * 60 * 24;
+
+function base64UrlEncode(value: string): string {
+  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  return atob(padded);
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  const binary = base64UrlDecode(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function bytesToBase64Url(bytes: ArrayBuffer | Uint8Array): string {
+  const uint8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let binary = "";
+  for (const byte of uint8) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function importHmacKey(secret: string, keyUsage: "sign" | "verify"): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    [keyUsage],
+  );
+}
+
+export async function signScSessionToken(claims: Omit<ScSessionClaims, "exp">): Promise<string | null> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return null;
+
+  const payload: ScSessionClaims = {
+    ...claims,
+    exp: Math.floor(Date.now() / 1000) + SESSION_TOKEN_TTL_SECONDS,
+  };
+  const encoded = base64UrlEncode(JSON.stringify(payload));
+  const key = await importHmacKey(secret, "sign");
+  const signature = bytesToBase64Url(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encoded)));
+  return `${encoded}.${signature}`;
+}
+
+export async function verifyScSessionToken(token: string): Promise<ScSessionClaims | null> {
+  try {
+    const secret = process.env.AUTH_SECRET;
+    if (!secret) return null;
+
+    const dotIndex = token.lastIndexOf(".");
+    if (dotIndex <= 0) return null;
+
+    const encoded = token.slice(0, dotIndex);
+    const signature = token.slice(dotIndex + 1);
+    // HMAC-SHA256 → 32 bytes → 43 caracteres base64url sin padding. Se valida
+    // antes de decodificar para que un token malformado no dispare atob().
+    if (!encoded || signature.length !== 43 || !/^[A-Za-z0-9_-]+$/.test(signature)) {
+      return null;
+    }
+
+    const key = await importHmacKey(secret, "verify");
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(signature),
+      new TextEncoder().encode(encoded),
+    );
+    if (!valid) return null;
+
+    const payload = JSON.parse(base64UrlDecode(encoded)) as ScSessionClaims;
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    if (typeof payload.sub !== "string" || typeof payload.role !== "string") {
+      return null;
+    }
+    return payload;
+  } catch {
+    // Un `sc-token` corrupto (base64 inválido, JSON roto, etc.) nunca debe tumbar el middleware.
+    return null;
+  }
+}
+
+export function extractSupabaseAccessToken(req: NextRequest): string | null {
+  const groups = new Map<string, Array<{ index: number; value: string }>>();
+
+  for (const cookie of req.cookies.getAll()) {
+    const match = cookie.name.match(/^(sb-.+-auth-token)(?:\.(\d+))?$/);
+    if (!match) continue;
+
+    const baseName = match[1];
+    const index = match[2] === undefined ? 0 : Number.parseInt(match[2], 10);
+    const chunks = groups.get(baseName) ?? [];
+    chunks.push({ index, value: cookie.value });
+    groups.set(baseName, chunks);
+  }
+
+  for (const chunks of groups.values()) {
+    try {
+      chunks.sort((a, b) => a.index - b.index);
+      let value = chunks.map((chunk) => chunk.value).join("");
+      if (value.startsWith("base64-")) {
+        const encoded = value.slice("base64-".length).replace(/-/g, "+").replace(/_/g, "/");
+        const binary = atob(encoded.padEnd(encoded.length + ((4 - (encoded.length % 4)) % 4), "="));
+        value = new TextDecoder().decode(
+          Uint8Array.from(binary, (character) => character.charCodeAt(0)),
+        );
+      }
+
+      if (value.startsWith("{") || value.startsWith("[")) {
+        const parsed: unknown = JSON.parse(value);
+        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+          return parsed[0];
+        }
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "access_token" in parsed &&
+          typeof parsed.access_token === "string"
+        ) {
+          return parsed.access_token;
+        }
+        continue;
+      }
+
+      if (value) return value;
+    } catch {
+      // A malformed cookie group must not prevent checking other Supabase sessions.
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extrae la sesión disponible para compatibilidad local/de desarrollo inspeccionando:
  * 1. Cabecera `Authorization: Bearer <jwt>`
  * 2. Cookie `sc-token` (JWT)
  * 3. Cookies de sesión de Supabase (`sb-*-auth-token`)
  * 4. Cookie `sc-session` (JSON con { role, status, userId, email })
  * 5. Cookie `sc-role` (con soporte para cookie complementaria `sc-status`)
  *
- * Retorna `null` si no hay sesión, si el token expiró o si la cuenta está inactiva (RN-10).
+ * En producción la identidad de Supabase se verifica contra Auth en `middleware.ts`;
+ * el `sc-token` propio se valida por firma HMAC con AUTH_SECRET. `sc-session` y
+ * `sc-role` solo se aceptan en desarrollo.
  */
-export function extractSession(req: NextRequest): SessionUser | null {
+export async function extractSession(req: NextRequest): Promise<SessionUser | null> {
   // 1. Cabecera Authorization: Bearer <jwt>
   const authHeader = req.headers.get("authorization");
   if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
@@ -125,10 +312,27 @@ export function extractSession(req: NextRequest): SessionUser | null {
     }
   }
 
-  // 2. Cookie sc-token (JWT)
+  // 2. Cookie sc-token (token firmado con AUTH_SECRET)
   const tokenCookie = req.cookies.get("sc-token")?.value;
   if (tokenCookie) {
-    const payload = decodeJwtPayload(tokenCookie);
+    const claims = await verifyScSessionToken(tokenCookie);
+    if (claims) {
+      const role = normalizeRole(claims.role);
+      if (role && isAccountActive(claims.status)) {
+        return {
+          role,
+          status: claims.status ?? "ACTIVO",
+          userId: claims.sub,
+          email: claims.email,
+        };
+      }
+    }
+  }
+
+  // 3. Cookies de Supabase. La firma y vigencia se verifican en el middleware con Auth.
+  const supabaseToken = extractSupabaseAccessToken(req);
+  if (supabaseToken) {
+    const payload = decodeJwtPayload(supabaseToken);
     if (payload) {
       const rawRole = (payload.role ||
         (payload.user_metadata as Record<string, unknown> | undefined)?.role ||
@@ -147,71 +351,6 @@ export function extractSession(req: NextRequest): SessionUser | null {
           email: typeof payload.email === "string" ? payload.email : undefined,
         };
       }
-    }
-  }
-
-  // 3. Cookies de Supabase Auth (sb-*-auth-token con soporte para chunks .0, .1...)
-  // Defensa en Profundidad (Zero Trust):
-  // La decodificación perimetral en Edge optimiza el despacho SSG y enrutamiento con cero I/O.
-  // La validación criptográfica de firma (HMAC/RSA) y autorización granular residen en la capa API.
-  const allCookies = req.cookies.getAll();
-  const supabaseGroups = new Map<string, Array<{ index: number; value: string }>>();
-
-  for (const cookie of allCookies) {
-    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
-      const match = cookie.name.match(/^(sb-.+-auth-token)(?:\.(\d+))?$/);
-      if (match) {
-        const baseName = match[1];
-        const chunkIndex = match[2] !== undefined ? parseInt(match[2], 10) : 0;
-        if (!supabaseGroups.has(baseName)) {
-          supabaseGroups.set(baseName, []);
-        }
-        supabaseGroups.get(baseName)!.push({ index: chunkIndex, value: cookie.value });
-      }
-    }
-  }
-
-  for (const [, chunks] of supabaseGroups) {
-    try {
-      chunks.sort((a, b) => a.index - b.index);
-      const combinedValue = chunks.map((c) => c.value).join("");
-
-      let tokenToVerify: string | null = null;
-      if (combinedValue.startsWith("{") || combinedValue.startsWith("[")) {
-        const parsed = JSON.parse(combinedValue);
-        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
-          tokenToVerify = parsed[0];
-        } else if (parsed && typeof parsed.access_token === "string") {
-          tokenToVerify = parsed.access_token;
-        }
-      } else {
-        tokenToVerify = combinedValue;
-      }
-
-      if (tokenToVerify) {
-        const payload = decodeJwtPayload(tokenToVerify);
-        if (payload) {
-          const rawRole = (payload.role ||
-            (payload.user_metadata as Record<string, unknown> | undefined)?.role ||
-            (payload.app_metadata as Record<string, unknown> | undefined)?.role) as string | undefined;
-
-          const rawStatus = (payload.estado ||
-            (payload.user_metadata as Record<string, unknown> | undefined)?.estado ||
-            payload.status) as string | undefined;
-
-          const role = normalizeRole(rawRole);
-          if (role && isAccountActive(rawStatus)) {
-            return {
-              role,
-              status: rawStatus ?? "ACTIVO",
-              userId: typeof payload.sub === "string" ? payload.sub : undefined,
-              email: typeof payload.email === "string" ? payload.email : undefined,
-            };
-          }
-        }
-      }
-    } catch {
-      // Ignorar cookies malformadas y continuar con el siguiente grupo
     }
   }
 
