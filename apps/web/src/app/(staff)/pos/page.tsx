@@ -219,6 +219,17 @@ export default function PosPage() {
         try {
           const stripe = await loadStripe(stripePublishableKey)
           if (stripe) {
+            // ARCH-REG-02: 'pm_card_visa' is a Stripe TEST-mode-only synthetic
+            // payment method. With live keys (pk_live_) physical card capture
+            // requires Stripe Terminal / Elements, so refuse the mock charge
+            // and keep the reservation pending for the Checkout contingency link.
+            const isStripeTestMode = stripePublishableKey.startsWith('pk_test_')
+            if (!isStripeTestMode) {
+              throw new Error(
+                'Modo producción: el cobro presencial con tarjeta física requiere Stripe Terminal. ' +
+                'La reserva quedó pendiente; complete el cobro con el enlace de Stripe Checkout.',
+              )
+            }
             const confirmResult = await stripe.confirmCardPayment(clientSecret, {
               payment_method: 'pm_card_visa',
             })

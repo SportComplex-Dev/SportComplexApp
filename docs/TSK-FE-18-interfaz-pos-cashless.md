@@ -74,3 +74,11 @@ Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en sm
   - Datos de titular y vendedor responsable.
   - Desglose contable: Tarifa base, descuento socio (30%), IVA (19%) y total pagado.
   - Código QR de torniquete óptico firmado con secreto HMAC del servidor (`QR_HMAC_SECRET`).
+
+---
+
+## 5. Limitación Operativa del Datáfono Virtual (ARCH-REG-02)
+
+- El cobro presencial en `pos/page.tsx` confirma el `PaymentIntent` con el método sintético `pm_card_visa`, válido **únicamente con claves de prueba de Stripe (`pk_test_...`)**.
+- Con claves de producción (`pk_live_...`) la aplicación **rechaza el cargo mock** y mantiene la reserva en `PENDIENTE_PAGO`; el operador debe completar el cobro mediante el enlace de Stripe Checkout de contingencia.
+- La captura de tarjetas físicas reales en producción requiere integrar Stripe Terminal SDK o Stripe Elements (fuera del alcance de TSK-FE-18).

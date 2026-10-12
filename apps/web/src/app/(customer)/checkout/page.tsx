@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
-  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
+  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Store,
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
