@@ -389,8 +389,12 @@ export async function getServicios(options?: ServiceFilterOptions) {
   });
 }
 
-export async function getServicioById(id: number) {
-  return prisma.servicio.findUnique({
+export async function getServicioById(
+  id: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any = prisma,
+) {
+  return db.servicio.findUnique({
     where: { id },
     include: {
       categoria: true,

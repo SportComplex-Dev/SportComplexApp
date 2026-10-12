@@ -349,10 +349,12 @@ test("TSK-BE-14: payload sin postServiceId o con null se rechaza con 400 (modo t
   assert.equal(bodyBoolean.error.code, "VALIDATION_ERROR");
 });
 
-test("TSK-BE-14: discrepancia de servicio (SERVICE_MISMATCH) deniega acceso sin consumir el ticket", async () => {
+test("TSK-BE-16: discrepancia de servicio responde 403 con detalle sin consumir el ticket", async () => {
   seed();
+  mock._state.servicios[0].nombre = "Piscina";
+  mock._state.servicios[1].nombre = "Canchas";
   const signature = signTicket(CODIGO, SECRET);
-  // Boleto es para Cancha 1 (id: 1), pero el empleado pasa postServiceId: 2 (Piscina)
+  // Boleto de Piscina escaneado en el puesto de Canchas.
   const req = createRedeemRequest({
     ticketId: CODIGO,
     signature,
@@ -365,12 +367,13 @@ test("TSK-BE-14: discrepancia de servicio (SERVICE_MISMATCH) deniega acceso sin 
   });
   const body = await res.json();
 
-  assert.equal(res.status, 200);
-  assert.equal(body.success, true);
-  assert.equal(body.data.access, "DENIED");
-  assert.equal(body.data.code, "SERVICE_MISMATCH");
-  assert.equal(body.data.resultado, "DENEGADO_SERVICIO");
-  assert.equal(body.data.canjeado, false);
+  assert.equal(res.status, 403);
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "SERVICE_MISMATCH");
+  assert.equal(
+    body.error.message,
+    "Acceso denegado: El tiquete pertenece a Piscina y se encuentra en Canchas",
+  );
 
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
   assert.equal(mock._state.lecturas.length, 1);

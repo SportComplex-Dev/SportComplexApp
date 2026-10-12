@@ -64,6 +64,13 @@ export async function handleAccessRedeem(
       qrSecret,
       now: opts.now,
     });
+    if (resultado.code === "SERVICE_MISMATCH") {
+      return fail(
+        resultado.code,
+        resultado.message ?? "Acceso denegado por discrepancia de servicio.",
+        403,
+      );
+    }
     return ok(resultado);
   } catch (error: unknown) {
     if (error instanceof AccessError || error instanceof TicketError) {

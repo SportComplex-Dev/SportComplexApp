@@ -8,6 +8,7 @@ import {
 import {
   ejecutarLectura,
   getAsignacionVigente,
+  getServicioById,
   getTicketForScan,
   type ModoLecturaValor,
   type ResultadoLecturaValor,
@@ -107,13 +108,27 @@ export async function procesarEscaneo(
   const db = options.db;
   const ticket = await getTicketForScan(input.ticketId, db);
 
+  const ticketServiceId = ticket.reserva.disponibilidad.servicio.id;
+  const ticketServiceName = ticket.reserva.disponibilidad.servicio.nombre;
+  const serviceMismatch =
+    input.postServiceId !== null && input.postServiceId !== ticketServiceId;
+  const stationService = input.postServiceId !== null && serviceMismatch
+    ? await getServicioById(input.postServiceId, db)
+    : null;
+  if (serviceMismatch && !stationService) {
+    throw new AccessError("El servicio del puesto no existe.", "SERVICE_NOT_FOUND", 404);
+  }
+  const serviceMismatchMessage = stationService
+    ? `Acceso denegado: El tiquete pertenece a ${ticketServiceName} y se encuentra en ${stationService.nombre}`
+    : undefined;
+
   const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
   const decision = decideAccess({
     now,
     start,
     end,
     ticketStatus: ticket.estado,
-    ticketServiceId: String(ticket.reserva.disponibilidad.servicio.id),
+    ticketServiceId: String(ticketServiceId),
     postServiceId: input.postServiceId === null ? null : String(input.postServiceId),
   });
 
@@ -156,7 +171,9 @@ export async function procesarEscaneo(
 
   const message =
     access === "DENIED"
-      ? (!decision.allowed ? (decision.message ?? ACCESS_ALREADY_USED_MESSAGE) : ACCESS_ALREADY_USED_MESSAGE)
+      ? !decision.allowed && decision.code === "SERVICE_MISMATCH"
+        ? serviceMismatchMessage ?? decision.message ?? ACCESS_ALREADY_USED_MESSAGE
+        : (!decision.allowed ? (decision.message ?? ACCESS_ALREADY_USED_MESSAGE) : ACCESS_ALREADY_USED_MESSAGE)
       : undefined;
 
   return {

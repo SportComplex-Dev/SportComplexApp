@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const SECRET = "test-qr-secret";
+process.env.QR_HMAC_SECRET = SECRET;
 
 const { createMockPrisma } = await import(
   "../../../../../../../packages/db/test/mock-prisma"
@@ -12,6 +13,7 @@ const mock = createMockPrisma();
 
 // Importar el orquestador DESPUÉS de inyectar el mock de Prisma.
 const { procesarEscaneo, AccessError } = await import("../../../../lib/access");
+const { handleAccess } = await import("../route");
 const { TicketError } = await import("@sportcomplex/db");
 const { signTicket } = await import("@sportcomplex/core");
 
@@ -36,8 +38,22 @@ function seed({ asignacion = true } = {}) {
     mock._state[key].length = 0;
   }
   mock._state.usuarios.push(
-    { id: EMPLEADO, nombre: "Lectora X" },
-    { id: "user-1", nombre: "Cliente Uno" },
+    {
+      id: EMPLEADO,
+      nombre: "Lectora X",
+      estado: "ACTIVO",
+      deletedAt: null,
+      rolId: 2,
+      rolNombre: "EMPLEADO_LECTOR",
+    },
+    {
+      id: "user-1",
+      nombre: "Cliente Uno",
+      estado: "ACTIVO",
+      deletedAt: null,
+      rolId: 3,
+      rolNombre: "CLIENTE",
+    },
   );
   mock._state.servicios.push({
     id: 1,
@@ -47,6 +63,16 @@ function seed({ asignacion = true } = {}) {
     tarifa: 75000,
     modalidad: "EXCLUSIVA",
     tipoPiscina: null,
+    estado: "ACTIVO",
+  });
+  mock._state.servicios.push({
+    id: 2,
+    categoriaId: 1,
+    nombre: "Piscina",
+    capacidadMaxima: 30,
+    tarifa: 25000,
+    modalidad: "AFORO",
+    tipoPiscina: "PUBLICA",
     estado: "ACTIVO",
   });
   mock._state.franjas.push({
@@ -177,15 +203,77 @@ test("TSK-BD-10 API (CRITERIO): segundo escaneo del mismo QR → DENIED ALREADY_
 
 test("TSK-BD-10 API: servicio del puesto ≠ servicio de la reserva → DENIED SERVICE_MISMATCH sin consumir", async () => {
   seed();
-  const res = await scan(999);
+  const res = await scan(2);
 
   assert.equal(res.access, "DENIED");
   assert.equal(res.code, "SERVICE_MISMATCH");
+  assert.equal(
+    res.message,
+    "Acceso denegado: El tiquete pertenece a Cancha 1 y se encuentra en Piscina",
+  );
   assert.equal(res.modo, "TURNO");
   assert.equal(res.resultado, "DENEGADO_SERVICIO");
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
   assert.equal(mock._state.lecturas.length, 1);
   assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_SERVICIO");
+});
+
+test("TSK-BE-16: la ruta de escaneo devuelve 403 con servicios identificados y audita sin alterar el tiquete", async () => {
+  seed();
+  mock._state.servicios[0].nombre = "Piscina";
+  mock._state.servicios[1].nombre = "Canchas";
+  const request = new Request("http://localhost:3000/api/access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ticketId: CODIGO,
+      signature: signTicket(CODIGO, SECRET),
+      postServiceId: 2,
+    }),
+  });
+
+  const response = await handleAccess(request, async () => ({
+    user: { id: EMPLEADO, role: "EMPLEADO_LECTOR" },
+  }));
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "SERVICE_MISMATCH");
+  assert.equal(
+    body.error.message,
+    "Acceso denegado: El tiquete pertenece a Piscina y se encuentra en Canchas",
+  );
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.tickets[0].usadoPor, null);
+  assert.equal(mock._state.tickets[0].usadoEn, null);
+  assert.equal(mock._state.lecturas.length, 1);
+  assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_SERVICIO");
+});
+
+test("TSK-BE-16: un identificador de puesto inexistente devuelve HTTP 404 sin auditar ni alterar el tiquete", async () => {
+  seed();
+  const request = new Request("http://localhost:3000/api/access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ticketId: CODIGO,
+      signature: signTicket(CODIGO, SECRET),
+      postServiceId: 999,
+    }),
+  });
+  const response = await handleAccess(request, async () => ({
+    user: { id: EMPLEADO },
+  }));
+  const body = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "SERVICE_NOT_FOUND");
+  assert.equal(mock._state.lecturas.length, 0);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.tickets[0].usadoPor, null);
+  assert.equal(mock._state.tickets[0].usadoEn, null);
 });
 
 test("TSK-BD-10 API: fuera de la franja → DENIED WINDOW_EXPIRED (DENEGADO_HORARIO) y auditoría", async () => {
