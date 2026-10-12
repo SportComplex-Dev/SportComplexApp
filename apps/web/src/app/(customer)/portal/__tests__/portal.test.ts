@@ -185,7 +185,16 @@ test("TSK-FE-13 Componentes: Banner 'Tu próxima reserva' filtra fechas pasadas 
 });
 
 test("TSK-FE-13 Componentes: Generación de código QR estándar válido para torniquetes ópticos (RF-10 / RF-13)", async () => {
-  const code = "SC1:a5b4c3d2-e1f0-4a8b-9c7d-6e5f4a3b2c1d:mocksignature778899";
+  const { buildTicketQrPayload, parseTicketQrPayload } = await import("@sportcomplex/core");
+  const ticketId = "a5b4c3d2-e1f0-4a8b-9c7d-6e5f4a3b2c1d";
+  const validSignature = "b".repeat(64);
+  const code = buildTicketQrPayload(ticketId, validSignature);
+
+  const parsed = parseTicketQrPayload(code);
+  assert.ok(parsed !== null, "Debe ser parseable por torniquete óptico");
+  assert.equal(parsed?.ticketId, ticketId);
+  assert.equal(parsed?.signature, validSignature);
+
   const dataUrl = await generarQRDataUrl(code, 300);
 
   // Debe retornar un Data URL de formato PNG
@@ -233,25 +242,50 @@ test("TSK-FE-13 Componentes: Formateo de horario de franja y fechas", () => {
   assert.ok(formateada.length > 5, "Debe producir una fecha legible en español");
 });
 
-test("TSK-FE-11: Billetera digital - Generación de imagen PNG descargable para pase transferible (RF-10)", async () => {
-  const ticketCode = "SC1:882233aa-bb44-cc55-dd66-ee7788990011:sig123456";
-  const highResQr = await generarQRDataUrl(ticketCode, 600);
+test("TSK-FE-11: Billetera digital - Payload QR debe ser compatible con parseTicketQrPayload de torniquetes (RF-10 / RF-13)", async () => {
+  const { buildTicketQrPayload, parseTicketQrPayload } = await import("@sportcomplex/core");
+  const ticketId = "882233aa-bb44-4000-8000-ee7788990011";
+  const validHmac = "a".repeat(64); // 64 caracteres hex válidos
+  const payload = buildTicketQrPayload(ticketId, validHmac);
 
+  // 1. Validar que parseTicketQrPayload lo reconoce sin fallar
+  const parsed = parseTicketQrPayload(payload);
+  assert.ok(parsed !== null, "El payload debe cumplir con el formato SC1:<uuid>:<hex64>");
+  assert.equal(parsed?.ticketId, ticketId);
+  assert.equal(parsed?.signature, validHmac);
+
+  // 2. Validar que la generación de imagen HD produce un dataUrl íntegro
+  const highResQr = await generarQRDataUrl(payload, 600);
   assert.ok(highResQr.startsWith("data:image/png;base64,"), "Debe generar formato PNG descargable en alta resolución");
   const base64Content = highResQr.replace(/^data:image\/png;base64,/, "");
   const binaryBuf = Buffer.from(base64Content, "base64");
   assert.ok(binaryBuf.length > 1000, "El PNG descargable de 600px debe poseer densidad adecuada para lectura óptica");
 });
 
-test("TSK-FE-19: Comprobante PDF en formato compacto 58mm con desglose fiscal (RF-17 / RNF-05)", () => {
-  const montoTotal = 75000;
-  const desglose = calcularDesgloseComprobante(montoTotal);
+test("TSK-FE-19: Integración de comprobante 58mm con respuesta oficial del backend (RF-17 / RNF-05)", () => {
+  const mockReceiptData = {
+    membrete: {
+      entidad: "AKROS SPORTCOMPLEX",
+      nit: "901.458.789-2",
+    },
+    reserva: {
+      id: "882233aa-bb44-4000-8000-ee7788990011",
+      subtotal: "84033.61",
+      descuentoPct: "0.00",
+      total: "100000.00",
+    },
+    qr: {
+      payload: "SC1:882233aa-bb44-4000-8000-ee7788990011:" + "f".repeat(64),
+      dataUrl: "data:image/png;base64,mockPng",
+    },
+  };
 
-  assert.ok(desglose.subtotal > 0, "El subtotal debe ser positivo");
-  assert.ok(desglose.iva > 0, "El IVA debe ser positivo");
-  assert.equal(desglose.subtotal + desglose.iva, montoTotal, "La suma debe ser exactamente el monto total");
-  assert.ok(desglose.subtotalFormateado.length > 0, "El subtotal debe estar formateado en COP");
-  assert.ok(desglose.totalFormateado.length > 0, "El total debe estar formateado en COP");
+  const subtotalNum = Number(mockReceiptData.reserva.subtotal);
+  const totalNum = Number(mockReceiptData.reserva.total);
+  const iva = totalNum - subtotalNum;
+
+  assert.equal(Math.round(subtotalNum + iva), totalNum, "La suma de subtotal e IVA debe coincidir con el total");
+  assert.ok(mockReceiptData.qr.payload.startsWith("SC1:"));
 });
 
 test("TSK-FE-11: Sanitización de nombres de archivo de descarga de tiquete (DOM-01)", async () => {

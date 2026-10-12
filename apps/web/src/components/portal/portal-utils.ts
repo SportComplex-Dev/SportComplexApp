@@ -122,6 +122,7 @@ export interface ReceiptApiResponse {
     id: string
     subtotal: string
     total: string
+    descuentoPct?: string
   }
   servicio?: {
     nombre: string
@@ -218,7 +219,9 @@ export async function fetchCustomerBookingHistory(
           status: statusMap[item.estado] ?? 'Confirmada',
           paymentMethod: item.pago?.metodo ?? 'card',
           transactionRef: item.pago?.referenciaExterna ?? undefined,
-          qrPayload: item.ticketQr?.codigoUuid ? `SC1:${item.ticketQr.codigoUuid}:verified_ticket_sig` : undefined,
+          // No inventar una firma inválida que rompa parseTicketQrPayload;
+          // al no haber firma HMAC en el historial, se deja undefined para consultar el recibo oficial
+          qrPayload: undefined,
         })
       })
     }

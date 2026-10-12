@@ -90,6 +90,25 @@ export default function TicketsPage() {
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
+  const handleOpenQrModal = useCallback(async (ticket: Booking) => {
+    setSelectedTicket(ticket)
+    if (!ticket.qrPayload && ticket.id) {
+      try {
+        const receipt = await fetchReceiptData(ticket.id)
+        const qr = receipt?.qr
+        if (qr?.payload) {
+          setSelectedTicket((prev) =>
+            prev && prev.id === ticket.id
+              ? { ...prev, qrPayload: qr.payload, qrDataUrl: qr.dataUrl }
+              : prev
+          )
+        }
+      } catch {
+        // Fallback manteniendo ticket
+      }
+    }
+  }, [])
+
   const handlePrintTicket = useCallback(async (ticket: Booking) => {
     try {
       setIsPrinting(true)
@@ -111,7 +130,10 @@ export default function TicketsPage() {
 
       document.body.classList.add('printing-thermal-receipt')
 
-      const handleAfterPrint = () => {
+      let cleanedUp = false
+      const cleanupPrintStyles = () => {
+        if (cleanedUp) return
+        cleanedUp = true
         document.body.classList.remove('printing-thermal-receipt')
         document.getElementById('thermal-print-page-style')?.remove()
         setPrintingTicket(null)
@@ -120,15 +142,26 @@ export default function TicketsPage() {
         setIsPrinting(false)
         window.removeEventListener('afterprint', handleAfterPrint)
       }
+
+      const handleAfterPrint = () => {
+        cleanupPrintStyles()
+      }
       window.addEventListener('afterprint', handleAfterPrint)
 
-      setTimeout(() => {
-        window.print()
-      }, 300)
+      // Doble ciclo para renderizado seguro en DOM y rescate si no emite afterprint (NEW-01 & RACE-01)
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          window.print()
+          setTimeout(cleanupPrintStyles, 2500)
+        }, 300)
+      })
     } catch (err) {
       console.error('Error al preparar impresión:', err)
       document.body.classList.remove('printing-thermal-receipt')
       document.getElementById('thermal-print-page-style')?.remove()
+      setPrintingTicket(null)
+      setPrintingQrUrl(null)
+      setPrintingReceipt(null)
       setIsPrinting(false)
       notify('Error al preparar el comprobante para impresión.', 'error')
     }
@@ -271,7 +304,7 @@ export default function TicketsPage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => setSelectedTicket(booking)}
+                            onClick={() => handleOpenQrModal(booking)}
                             className="action-button text-xs py-2 px-3.5 gap-2"
                           >
                             <QrCode size={15} /> Ver QR de Acceso
@@ -354,7 +387,10 @@ export default function TicketsPage() {
               Sede {selectedTicket.sede} · {formatDate(selectedTicket.date)}, {selectedTicket.time}
             </p>
 
-            <QRGraphicHD code={selectedTicket.qrPayload || selectedTicket.code} />
+            <QRGraphicHD
+              code={selectedTicket.qrPayload || selectedTicket.code}
+              dataUrl={selectedTicket.qrDataUrl}
+            />
 
             <div className="mt-2 mb-3">
               <b className="text-lg font-mono tracking-widest block text-[var(--ink)]">

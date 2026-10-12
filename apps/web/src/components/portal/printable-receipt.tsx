@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatDate, type Booking } from '@sportcomplex/core'
+import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 import { calcularDesgloseComprobante, generarQRDataUrl, type ReceiptApiResponse } from './portal-utils'
 
 interface PrintableReceiptProps {
@@ -54,6 +54,19 @@ export function PrintableReceipt({
 
   const { subtotalFormateado, ivaFormateado, totalFormateado } = calcularDesgloseComprobante(ticket.amount)
 
+  // Priorizar cifras oficiales devueltas por TSK-BE-19 (ARC-01)
+  const hasServerFiscal = Boolean(receiptData?.reserva?.subtotal && receiptData?.reserva?.total)
+  const serverSubtotal = hasServerFiscal ? Number(receiptData!.reserva!.subtotal) : null
+  const serverTotal = hasServerFiscal ? Number(receiptData!.reserva!.total) : null
+  const serverIva = (serverSubtotal !== null && serverTotal !== null)
+    ? Math.max(0, Math.round(serverTotal - serverSubtotal))
+    : null
+  const descuentoPct = receiptData?.reserva?.descuentoPct ? Number(receiptData.reserva.descuentoPct) : 0
+
+  const subtotalText = serverSubtotal !== null ? formatMoney(Math.round(serverSubtotal)) : subtotalFormateado
+  const ivaText = serverIva !== null ? formatMoney(serverIva) : ivaFormateado
+  const totalText = serverTotal !== null ? `${formatMoney(Math.round(serverTotal))} COP` : `${totalFormateado} COP`
+
   return (
     <div className="printable-receipt font-mono text-[11px] leading-tight text-black bg-white max-w-[58mm] mx-auto p-2">
       <div className="text-center border-b border-black pb-2 mb-2">
@@ -79,15 +92,21 @@ export function PrintableReceipt({
       <div className="mb-2 border-b border-black pb-2 text-[10px] text-black">
         <div className="flex justify-between">
           <span>Subtotal:</span>
-          <span>{subtotalFormateado}</span>
+          <span>{subtotalText}</span>
         </div>
+        {descuentoPct > 0 && (
+          <div className="flex justify-between">
+            <span>Descuento ({descuentoPct}%):</span>
+            <span>Aplicado</span>
+          </div>
+        )}
         <div className="flex justify-between">
-          <span>IVA (19%):</span>
-          <span>{ivaFormateado}</span>
+          <span>IVA{hasServerFiscal ? '' : ' (19%)'}:</span>
+          <span>{ivaText}</span>
         </div>
         <div className="flex justify-between font-bold text-[11px] pt-1 mt-1 border-t border-dotted border-black">
           <span>TOTAL:</span>
-          <span>{totalFormateado} COP</span>
+          <span>{totalText}</span>
         </div>
       </div>
 
