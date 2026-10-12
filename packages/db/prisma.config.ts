@@ -1,11 +1,14 @@
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { defineConfig } from '@prisma/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../../apps/web/.env') });
-dotenv.config();
+try {
+  process.loadEnvFile(path.resolve(__dirname, '../../apps/web/.env'));
+} catch {}
+try {
+  process.loadEnvFile();
+} catch {}
 
 export default defineConfig({ 
   datasource: { 

@@ -12,3 +12,5 @@ export * from "./repositories/contingencies";
 export * from "./repositories/analytics";
 export * from "./repositories/receipts";
 export * from "./repositories/employees";
+export * from "./repositories/tournaments";
+export * from "./repositories/memberships";

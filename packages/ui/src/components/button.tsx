@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../lib/utils";
 
 export type ButtonVariant = "default" | "brand" | "accent" | "outline" | "secondary" | "ghost" | "destructive" | "link";
@@ -26,6 +26,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  children?: ReactNode;
 }
 
 export function Button({ variant = "default", size = "default", className, ...rest }: ButtonProps) {

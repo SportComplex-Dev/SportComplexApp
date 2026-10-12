@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
-import { createClient } from "@supabase/supabase-js";
-import { prisma } from "@sportcomplex/db";
+import { createSupabaseRestClient } from "@/lib/supabase/admin";
 import { authConfig } from "@/auth.config";
 import {
   extractSupabaseAccessToken,
   extractSession,
+  escapeIlikePattern,
   isAccountActive,
+  normalizeEmbeddedRole,
   normalizeRole,
   ROLE_HOME,
   type SessionUser,
@@ -28,13 +29,7 @@ async function verifySupabasePrincipal(req: NextRequest): Promise<SupabasePrinci
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!accessToken || !supabaseUrl || !supabaseAnonKey) return null;
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: false,
-    },
-  });
+  const supabase = createSupabaseRestClient(supabaseAnonKey);
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error) {
     if (error.status === 400 || error.status === 401 || error.status === 403) {
@@ -69,6 +64,8 @@ async function verifySupabasePrincipal(req: NextRequest): Promise<SupabasePrinci
  */
 
 const { auth: withAuth } = NextAuth(authConfig);
+// Aviso único por proceso cuando la lectura de `usuario` cae a la anon key (ver abajo).
+let warnedAnonAccountLookup = false;
 const protectedRoutePrefixes = [
   "/admin",
   "/pos",
@@ -76,6 +73,7 @@ const protectedRoutePrefixes = [
   "/portal",
   "/api/admin",
   "/api/pos",
+  "/api/payments/intent",
   "/api/access",
   "/api/tickets/verify",
   "/api/pdf/receipt",
@@ -189,7 +187,7 @@ export default withAuth(async (req) => {
           userId: "dev-override",
           email: "admin@sportcomplex.co",
         }
-      : (isDev ? extractSession(req) : null));
+      : (await extractSession(req)));
   let currentSession = session;
   if (
     needsFreshAccount &&
@@ -200,59 +198,84 @@ export default withAuth(async (req) => {
     if (!sessionToRefresh.userId) {
       currentSession = null;
     } else {
-      let account;
+      let account: { id: string; estado: string; deletedAt: Date | null; rol: { nombre: string } | null } | null = null;
       try {
-        account = await prisma.usuario.findUnique({
-          where: { id: sessionToRefresh.userId },
-          select: {
-            id: true,
-            estado: true,
-            deletedAt: true,
-            rol: { select: { nombre: true } },
-          },
-        });
-        if (!account && supabasePrincipal?.email) {
-          account = await prisma.usuario.findUnique({
-            where: { correo: supabasePrincipal.email },
-            select: {
-              id: true,
-              estado: true,
-              deletedAt: true,
-              rol: { select: { nombre: true } },
-            },
-          });
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const usingServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
+        if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
+          if (!usingServiceRole && !warnedAnonAccountLookup) {
+            warnedAnonAccountLookup = true;
+            console.warn(
+              "middleware: sin SUPABASE_SERVICE_ROLE_KEY, la lectura de `usuario` usa la anon key " +
+                "y queda sujeta a RLS (puede ocultar filas y tratar sesiones válidas como anónimas).",
+            );
+          }
+          const supabase = createSupabaseRestClient(supabaseKey);
+          const { data: userById } = await supabase
+            .from("usuario")
+            .select("id, estado, deleted_at, rol:rol_id(nombre)")
+            .eq("id", sessionToRefresh.userId)
+            .maybeSingle();
+
+          let row = userById;
+          if (!row && supabasePrincipal?.email) {
+            const { data: userByEmail } = await supabase
+              .from("usuario")
+              .select("id, estado, deleted_at, rol:rol_id(nombre)")
+              .ilike("correo", escapeIlikePattern(supabasePrincipal.email))
+              .maybeSingle();
+            row = userByEmail;
+          }
+
+          if (row) {
+            account = {
+              id: row.id,
+              estado: row.estado,
+              deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+              rol: normalizeEmbeddedRole(row.rol),
+            };
+          }
         }
       } catch (error: unknown) {
         console.error("Error al validar el estado de la sesión:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "AUTHORIZATION_UNAVAILABLE",
-              message: "No se pudo verificar el estado de la cuenta.",
+        if (!authUser) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "AUTHORIZATION_UNAVAILABLE",
+                message: "No se pudo verificar el estado de la cuenta.",
+              },
+              timestamp: new Date().toISOString(),
             },
-            timestamp: new Date().toISOString(),
-          },
-          { status: 503 },
-        );
+            { status: 503 },
+          );
+        }
       }
 
-      const currentRole = normalizeRole(account?.rol?.nombre);
       const isAuthenticationLanding =
         pathname === "/" || pathname === "/login" || pathname === "/register";
-      if (
-        !account ||
-        (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
-        !currentRole
-      ) {
+
+      if (account) {
+        const currentRole = normalizeRole(account.rol?.nombre);
+        if (
+          (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
+          !currentRole
+        ) {
+          currentSession = null;
+        } else {
+          currentSession = {
+            ...sessionToRefresh,
+            role: currentRole,
+            status: account.deletedAt ? "INACTIVO" : account.estado,
+            userId: account.id,
+          };
+        }
+      } else if (!authUser) {
+        // Solo descartar sesión si no proviene de un token NextAuth firmado
         currentSession = null;
-      } else {
-        currentSession = {
-          ...sessionToRefresh,
-          role: currentRole,
-          status: account.deletedAt ? "INACTIVO" : account.estado,
-          userId: account.id,
-        };
       }
     }
   }

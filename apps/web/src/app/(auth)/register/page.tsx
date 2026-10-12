@@ -10,6 +10,7 @@ import { Brand } from '@/components/brand'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
+import { signIn } from 'next-auth/react'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -20,6 +21,17 @@ export default function RegisterPage() {
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const handleGoogleLogin = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      await signIn('google', { redirectTo: '/portal' })
+    } catch {
+      setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -45,9 +57,9 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const result = await res.json()
-      if (!res.ok || !result.success) {
-        setError(result.error?.message || 'No se pudo crear la cuenta.')
+      const result = await res.json().catch(() => null)
+      if (!res.ok || !result?.success) {
+        setError(result?.error?.message || 'No se pudo conectar con el servidor o la base de datos.')
         return
       }
       router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
@@ -89,8 +101,15 @@ export default function RegisterPage() {
             <h1>Crea tu cuenta.</h1>
             <p className="auth-subtitle">Un paso más cerca de tu próxima aventura.</p>
 
-            <button type="button" className="google-button" disabled title="Próximamente">
-              <GoogleMark /> Continuar con Google
+            <button
+              type="button"
+              className="google-button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              aria-busy={loading}
+            >
+              {loading ? <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : <GoogleMark />}
+              {loading ? 'Conectando con Google…' : 'Continuar con Google'}
             </button>
 
             <div className="auth-divider">
