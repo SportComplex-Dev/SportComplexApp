@@ -144,3 +144,28 @@ test("tournamentIdParamSchema: valida UUID v4 y rechaza IDs inválidos", async (
   assert.equal(tournamentIdParamSchema.safeParse(null).success, false);
 });
 
+test("createTournamentSchema: rechaza bloqueos fuera del intervalo del torneo (VAL-01)", () => {
+  const input = {
+    titulo: "Torneo Fuera de Rango",
+    categoriaId: 1,
+    nivel: "INTERMEDIO",
+    fechaInicio: "2026-11-01T08:00:00Z",
+    fechaFin: "2026-11-02T18:00:00Z",
+    cuposTotales: 8,
+    bloqueos: [
+      {
+        servicioId: 1,
+        horaInicio: "2026-11-05T08:00:00Z",
+        horaFin: "2026-11-05T12:00:00Z",
+      },
+    ],
+  };
+
+  const parsed = createTournamentSchema.safeParse(input);
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    const errorPaths = parsed.error.issues.map((i) => i.path.join("."));
+    assert.ok(errorPaths.includes("bloqueos"));
+  }
+});
+

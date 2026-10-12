@@ -9,6 +9,7 @@ import {
   actualizarEstadoTorneo,
   actualizarTorneo,
   eliminarTorneo,
+  liberarBloqueosTorneo,
   inscribirUsuarioTorneo,
   obtenerInscripcionPorTicket,
   canjearTicketTorneo,
@@ -198,6 +199,12 @@ test("TSK-BD-12: listarTorneos y actualizarEstadoTorneo", async () => {
 
   const listaAbiertos = await listarTorneos({ estado: "INSCRIPCIONES_ABIERTAS" }, { db: mock });
   assert.equal(listaAbiertos.length, 1);
+
+  // ARC-04: Transición inválida (INSCRIPCIONES_ABIERTAS -> BORRADOR) debe ser rechazada
+  await assert.rejects(
+    () => actualizarEstadoTorneo(torneo.id, "BORRADOR", { db: mock }),
+    (err: any) => err instanceof TournamentError && err.code === "INVALID_STATE_TRANSITION",
+  );
 });
 
 test("TSK-BD-12: inscribirUsuarioTorneo valida estado, cupos y previene duplicados", async () => {
@@ -367,9 +374,26 @@ test("TSK-BE-25: Motor de bloqueo preventivo y detección de conflictos", async 
   const disp = mock._state.disponibilidades.find((d: any) => d.id === 101n);
   assert.equal(disp.bloqueadaMantenimiento, true, "La franja debió quedar bloqueada por el torneo");
 
-  // 2. Al cancelar el torneo, la pista debe liberarse
+  // 2. Al cancelar el torneo, la pista debe liberarse si no hay inhabilitación
   await actualizarEstadoTorneo(torneo.id, "CANCELADO", { db: mock });
   assert.equal(disp.bloqueadaMantenimiento, false, "La franja debió liberarse tras cancelar el torneo");
+
+  // 2b. ARC-03: Si la pista tiene una inhabilitación activa, liberar bloqueos no reactiva la franja
+  mock._state.inhabilitaciones.push({
+    id: 1,
+    servicioId: 1,
+    adminId: "admin-1",
+    motivo: "Filtración de agua",
+    fechaInicio: new Date("2026-11-01T00:00:00.000Z"),
+    fechaFin: new Date("2026-11-02T00:00:00.000Z"),
+  });
+  disp.bloqueadaMantenimiento = true;
+  await liberarBloqueosTorneo(torneo.id, { db: mock });
+  assert.equal(
+    disp.bloqueadaMantenimiento,
+    true,
+    "La franja debe permanecer bloqueada si hay una inhabilitación activa (ARC-03)",
+  );
 
   // 3. Si hay una reserva confirmada activa en ese horario, se rechaza la creación del torneo
   mock._state.reservas.push({

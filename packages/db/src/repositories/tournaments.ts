@@ -208,6 +208,51 @@ export async function aplicarBloqueosDisponibilidad(
       }
     }
 
+    // ARC-02: Si la fecha está fuera de la ventana de 15 días o aún no tiene filas de disponibilidad generadas,
+    // aprovisionar las franjas horarias correspondientes con bloqueadaMantenimiento: true
+    if (disponibilidades.length === 0 && db.servicio?.findUnique) {
+      const servicio = await db.servicio.findUnique({
+        where: { id: b.servicioId },
+        include: { franjasHorarias: true },
+      });
+
+      if (servicio && Array.isArray(servicio.franjasHorarias) && servicio.franjasHorarias.length > 0) {
+        // diaSemana ISO: 1 (Lunes) a 7 (Domingo)
+        const diaSemana = targetDate.getUTCDay() === 0 ? 7 : targetDate.getUTCDay();
+        const franjasDelDia = servicio.franjasHorarias.filter(
+          (f: { diaSemana: number }) => f.diaSemana === diaSemana,
+        );
+        const cuposTotales = servicio.modalidad === "EXCLUSIVA" ? 1 : servicio.capacidadMaxima;
+
+        for (const franja of franjasDelDia) {
+          const fStart = secondsFromDbTime(new Date(franja.horaInicio));
+          const fEnd = secondsFromDbTime(new Date(franja.horaFin));
+          const solapa = fStart < endSec && fEnd > startSec;
+
+          if (db.disponibilidad.upsert) {
+            await db.disponibilidad.upsert({
+              where: {
+                servicioId_franjaId_fecha: {
+                  servicioId: servicio.id,
+                  franjaId: franja.id,
+                  fecha: targetDate,
+                },
+              },
+              update: solapa ? { bloqueadaMantenimiento: true } : {},
+              create: {
+                servicioId: servicio.id,
+                franjaId: franja.id,
+                fecha: targetDate,
+                cuposTotales,
+                cuposOcupados: 0,
+                bloqueadaMantenimiento: solapa,
+              },
+            });
+          }
+        }
+      }
+    }
+
     if (matchingIds.length > 0) {
       if (db.disponibilidad.updateMany) {
         await db.disponibilidad.updateMany({
@@ -264,17 +309,30 @@ export async function liberarBloqueosTorneo(
     }
 
     if (matchingIds.length > 0) {
-      if (db.disponibilidad.updateMany) {
-        await db.disponibilidad.updateMany({
-          where: { id: { in: matchingIds } },
-          data: { bloqueadaMantenimiento: false },
-        });
-      } else {
-        for (const id of matchingIds) {
-          await db.disponibilidad.update({
-            where: { id },
+      // ARC-03: No reactivar franjas si el servicio posee una inhabilitación activa en la fecha
+      const tieneInhabilitacion = db.inhabilitacionServicio?.findFirst
+        ? await db.inhabilitacionServicio.findFirst({
+            where: {
+              servicioId: b.servicioId,
+              fechaInicio: { lte: targetDate },
+              fechaFin: { gte: targetDate },
+            },
+          })
+        : null;
+
+      if (!tieneInhabilitacion) {
+        if (db.disponibilidad.updateMany) {
+          await db.disponibilidad.updateMany({
+            where: { id: { in: matchingIds } },
             data: { bloqueadaMantenimiento: false },
           });
+        } else {
+          for (const id of matchingIds) {
+            await db.disponibilidad.update({
+              where: { id },
+              data: { bloqueadaMantenimiento: false },
+            });
+          }
         }
       }
     }
@@ -436,7 +494,36 @@ export async function obtenerTorneoPorId(
 }
 
 /**
- * Actualiza el estado de un torneo.
+ * Matriz de transiciones de estado legales para un torneo (ARC-04).
+ */
+export const TRANSICIONES_ESTADO_TORNEO: Record<EstadoTorneoValor, readonly EstadoTorneoValor[]> = {
+  BORRADOR: ["INSCRIPCIONES_ABIERTAS", "CANCELADO"],
+  INSCRIPCIONES_ABIERTAS: ["EN_CURSO", "CANCELADO"],
+  EN_CURSO: ["FINALIZADO", "CANCELADO"],
+  FINALIZADO: [],
+  CANCELADO: [],
+};
+
+/**
+ * Valida si la transición de estado es válida según el ciclo de vida del torneo (ARC-04).
+ */
+export function validarTransicionEstadoTorneo(
+  estadoActual: EstadoTorneoValor,
+  nuevoEstado: EstadoTorneoValor,
+): void {
+  if (estadoActual === nuevoEstado) return;
+  const permitidos = TRANSICIONES_ESTADO_TORNEO[estadoActual] ?? [];
+  if (!permitidos.includes(nuevoEstado)) {
+    throw new TournamentError(
+      `No se permite la transición de estado de ${estadoActual} a ${nuevoEstado}.`,
+      "INVALID_STATE_TRANSITION",
+      400,
+    );
+  }
+}
+
+/**
+ * Actualiza el estado de un torneo de forma transaccional (ARC-01b) y validando FSM (ARC-04).
  */
 export async function actualizarEstadoTorneo(
   id: string,
@@ -444,23 +531,30 @@ export async function actualizarEstadoTorneo(
   options: TournamentDbOptions = {},
 ) {
   const db = options.db ?? prisma;
-  const torneo = await db.torneo.findUnique({ where: { id } });
-  if (!torneo) {
-    throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
-  }
 
-  if (nuevoEstado === "CANCELADO") {
-    await liberarBloqueosTorneo(id, options);
-  }
+  const runOperation = async (tx: any) => {
+    const torneo = await tx.torneo.findUnique({ where: { id } });
+    if (!torneo) {
+      throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
+    }
 
-  return db.torneo.update({
-    where: { id },
-    data: { estado: nuevoEstado },
-    include: {
-      categoria: true,
-      bloqueos: { include: { servicio: true } },
-    },
-  });
+    validarTransicionEstadoTorneo(torneo.estado as EstadoTorneoValor, nuevoEstado);
+
+    if (nuevoEstado === "CANCELADO") {
+      await liberarBloqueosTorneo(id, { db: tx });
+    }
+
+    return tx.torneo.update({
+      where: { id },
+      data: { estado: nuevoEstado },
+      include: {
+        categoria: true,
+        bloqueos: { include: { servicio: true } },
+      },
+    });
+  };
+
+  return db.$transaction ? db.$transaction(runOperation) : runOperation(db);
 }
 
 /**
@@ -525,6 +619,7 @@ export async function actualizarTorneo(
       updateData.precioInscripcion = normalizePrecio(input.precioInscripcion);
     }
     if (input.estado !== undefined) {
+      validarTransicionEstadoTorneo(torneo.estado as EstadoTorneoValor, input.estado);
       updateData.estado = input.estado;
       if (input.estado === "CANCELADO") {
         await liberarBloqueosTorneo(id, { db: tx });

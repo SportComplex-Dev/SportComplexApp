@@ -1175,6 +1175,19 @@ export function createMockPrisma() {
       },
     },
     inhabilitacionServicio: {
+      async findFirst({ where }: any = {}) {
+        return (
+          inhabilitaciones.find((item: any) => {
+            if (where?.servicioId !== undefined && item.servicioId !== where.servicioId) return false;
+            if (where?.fechaInicio?.lte !== undefined && new Date(item.fechaInicio) > new Date(where.fechaInicio.lte)) return false;
+            if (where?.fechaFin?.gte !== undefined) {
+              if (!item.fechaFin) return true;
+              if (new Date(item.fechaFin) < new Date(where.fechaFin.gte)) return false;
+            }
+            return true;
+          }) ?? null
+        );
+      },
       async create({ data }: any) {
         const entry = { id: inhabilitaciones.length + 1, ...data };
         inhabilitaciones.push(entry);
@@ -1190,7 +1203,7 @@ export function createMockPrisma() {
     torneo: {
       async create({ data, include }: any) {
         const item: any = {
-          id: data.id ?? `torneo-${torneos.length + 1}`,
+          id: data.id ?? randomUUID(),
           adminId: data.adminId,
           categoriaId: data.categoriaId,
           titulo: data.titulo,
