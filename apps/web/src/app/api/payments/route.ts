@@ -1,23 +1,27 @@
 import Stripe from "stripe";
-import { PaymentError, procesarPagoWebhook } from "@sportcomplex/db";
+import { PaymentError, procesarPagoWebhook, procesarFacturaWebhook } from "@sportcomplex/db";
 import {
   newTicketId,
   parsePaymentIntentMetadata,
+  parseInvoiceEventData,
   stripeAmountToMonto,
 } from "@sportcomplex/core";
 import { ok, fail } from "@/lib/api-response";
 import { sendContingencyWebhook } from "@/lib/contingency-webhook";
+import { clearPendingSubscriptionCheckout } from "@/app/api/memberships/subscribe/route";
 
-// RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09).
+// RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09 / TSK-BE-20).
 // Endpoint a registrar en el dashboard de Stripe:
 //   POST https://<dominio>/api/payments
 // Stripe reenvía el mismo evento ante timeouts/errores; la idempotencia es
-// total: verificar firma → procesarPagoWebhook (UNIQUE stripe_payment_intent_id
-// + updates condicionales) → siempre 200 si el evento fue procesado o ignorado.
+// total: verificar firma → procesarPagoWebhook / procesarFacturaWebhook
+// → siempre 200 si el evento fue procesado o ignorado.
 
 const EVENTOS_PROCESABLES = new Set([
   "payment_intent.succeeded",
   "payment_intent.payment_failed",
+  "invoice.paid",
+  "invoice.payment_failed",
 ]);
 
 export async function POST(request: Request) {
@@ -55,8 +59,75 @@ export async function POST(request: Request) {
     return ok({ received: true, ignored: true, reason: "EVENT_TYPE_NOT_HANDLED" });
   }
 
+  // TSK-BE-20: Manejo de suscripciones recurrentes y renovación proxima_renovacion
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const parsed = parseInvoiceEventData(invoice);
+
+    if (!parsed.invoiceId) {
+      return ok({ received: true, ignored: true, reason: "MISSING_INVOICE_ID" });
+    }
+
+    try {
+      const resultado = await procesarFacturaWebhook({
+        stripeInvoiceId: parsed.invoiceId,
+        stripeSubscriptionId: parsed.subscriptionId,
+        stripePaymentIntentId: parsed.paymentIntentId,
+        usuarioId: parsed.userId,
+        planId: parsed.planId ? Number(parsed.planId) : undefined,
+        monto: stripeAmountToMonto(parsed.amount),
+        estado: event.type === "invoice.paid" ? "APROBADO" : "FALLIDO",
+        periodEnd: parsed.periodEnd,
+        membresiaId: parsed.membershipId ? Number(parsed.membershipId) : undefined,
+      });
+
+      if (resultado.estado === "FALLIDO" && !resultado.duplicado) {
+        void sendContingencyWebhook({
+          evento: "invoice.payment_failed",
+          paymentIntentId: parsed.paymentIntentId ?? parsed.invoiceId,
+          usuarioId: resultado.usuarioId ?? parsed.userId ?? "unknown",
+          reservaId: null,
+          membresiaId: resultado.membresiaId ? String(resultado.membresiaId) : null,
+          reservaEstado: null,
+          franjaRestituida: false,
+          monto: stripeAmountToMonto(parsed.amount),
+        })
+          .then((webhook) => {
+            if (!webhook.sent) {
+              console.error(
+                "Alerta de fallo de cobro de suscripción no enviada a n8n:",
+                webhook.error,
+              );
+            }
+          })
+          .catch((err) => {
+            console.error("Error al despachar alerta de suscripción fallida a n8n:", err);
+          });
+      }
+
+      if (resultado.usuarioId && resultado.estado === "APROBADO") {
+        clearPendingSubscriptionCheckout(resultado.usuarioId);
+      }
+
+      return ok({ received: true, ...resultado });
+    } catch (error: unknown) {
+      if (error instanceof PaymentError) {
+        return fail(error.code, error.message, error.status);
+      }
+      console.error("Error en POST /api/payments (factura Stripe):", error);
+      return fail("SERVER_ERROR", "Error al procesar la factura de Stripe.", 500);
+    }
+  }
+
   const intent = event.data.object as Stripe.PaymentIntent;
-  const { userId, bookingId, bookingIds, membershipId } = parsePaymentIntentMetadata(intent.metadata);
+  const {
+    userId,
+    bookingId,
+    bookingIds,
+    membershipId,
+    vendedorId,
+    serviceId,
+  } = parsePaymentIntentMetadata(intent.metadata);
   const effectiveBookingIds =
     bookingIds && bookingIds.length > 0
       ? bookingIds
@@ -68,6 +139,17 @@ export async function POST(request: Request) {
   if (!intent.id || !userId || (!hasBookings && !membershipId)) {
     // Evento sin nuestro metadato (otro flujo de Stripe): no es procesable.
     return ok({ received: true, ignored: true, reason: "MISSING_METADATA" });
+  }
+  const hasPosMetadata = vendedorId !== undefined || serviceId !== undefined;
+  if (
+    hasPosMetadata &&
+    (!vendedorId || serviceId === undefined || effectiveBookingIds.length !== 1)
+  ) {
+    return fail(
+      "INVALID_POS_METADATA",
+      "El cobro POS requiere vendedor, servicio y una única reserva válidos.",
+      400,
+    );
   }
 
   try {
@@ -87,6 +169,7 @@ export async function POST(request: Request) {
       membresiaId: membershipId ? Number(membershipId) : undefined,
       // UUIDv4 no predecible para el TICKET_QR (TSK-BE-11), generado en core.
       ticketCodigoUuid: newTicketId(),
+      ...(hasPosMetadata ? { vendedorId, serviceId } : {}),
     });
     // Observación de @Its-JrDev: solo notificar a n8n si el pago falló Y NO es un reintento duplicado.
     if (resultado.estado === "FALLIDO" && !resultado.duplicado) {

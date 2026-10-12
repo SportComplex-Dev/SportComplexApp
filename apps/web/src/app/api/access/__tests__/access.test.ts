@@ -201,6 +201,7 @@ test("TSK-BD-10 API: fuera de la franja → DENIED WINDOW_EXPIRED (DENEGADO_HORA
 
   assert.equal(res.access, "DENIED");
   assert.equal(res.code, "WINDOW_EXPIRED");
+  assert.equal(res.message, "Acceso denegado: Franja horaria vencida");
   assert.equal(res.resultado, "DENEGADO_HORARIO");
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
   assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_HORARIO");

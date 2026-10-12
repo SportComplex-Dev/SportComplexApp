@@ -93,7 +93,7 @@ export async function handleLockCart(
           reservaId: b.id,
           servicioNombre: b.disponibilidad.servicio.nombre,
           cantidadCupos: b.cantidadCupos,
-          subtotal: Number(b.subtotal),
+          subtotal: Number(b.total),
         })),
       });
     } catch (err) {
