@@ -113,6 +113,7 @@ fallan con `amount_too_small` al crear la sesión.
 | Payload inválido | 400 | `VALIDATION_ERROR` |
 | Franja inexistente | 404 | `SLOT_NOT_FOUND` |
 | Franja en el pasado / bloqueada por mantenimiento / sin cupo / servicio inactivo | 409 | `SLOT_IN_PAST` / `SLOT_BLOCKED` / `CAPACITY_EXCEEDED` / `SERVICE_UNAVAILABLE` |
+| Solapamiento del mismo titular en la misma instancia de servicio (TSK-BE-12) | 409 | `TITULAR_RESERVATION_OVERLAP` |
 | Fecha fuera de la ventana de 15 días | 400 | `OUTSIDE_BOOKING_WINDOW` |
 | `STRIPE_SECRET_KEY` ausente | 503 | `STRIPE_NOT_CONFIGURED` |
 | Fallo creando la sesión de Stripe (hold compensado) | 502 | `CHECKOUT_STRIPE_FAILED` |

@@ -1,12 +1,10 @@
-import { auth } from "@/auth";
 import {
   BookingError,
   getBookingHistory,
-  prisma,
   type BookingHistoryState,
 } from "@sportcomplex/db";
 import { fail, ok } from "@/lib/api-response";
-import { normalizeRole } from "@/lib/session";
+import { authorizeApiRequest } from "@/lib/api-auth";
 
 const historyStates = new Set<BookingHistoryState>([
   "CONFIRMADA",
@@ -16,31 +14,8 @@ const historyStates = new Set<BookingHistoryState>([
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión.", 401);
-    }
-
-    const account = await prisma.usuario.findUnique({
-      where: { id: session.user.id },
-      select: {
-        estado: true,
-        deletedAt: true,
-        rol: { select: { nombre: true } },
-      },
-    });
-    if (
-      !account ||
-      account.deletedAt ||
-      account.estado !== "ACTIVO" ||
-      normalizeRole(account.rol.nombre) !== "Cliente"
-    ) {
-      return fail(
-        "FORBIDDEN",
-        "Solo una cuenta de cliente activa puede consultar su historial.",
-        403,
-      );
-    }
+    const authorization = await authorizeApiRequest(["Cliente"]);
+    if (!authorization.authorized) return authorization.response;
 
     const { searchParams } = new URL(request.url);
     const estado = searchParams.get("status");
@@ -60,7 +35,7 @@ export async function GET(request: Request) {
 
     return ok(
       await getBookingHistory({
-        userId: session.user.id,
+        userId: authorization.actor.id,
         estado: estado as BookingHistoryState,
         cursor: searchParams.get("cursor") ?? undefined,
         limit,

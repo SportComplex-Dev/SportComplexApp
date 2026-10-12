@@ -52,11 +52,12 @@ export interface TicketParaEscaneo {
   usadoEn: Date | null;
   reserva: {
     id: string;
+    estado: string;
     titularId: string;
     titular: { id: string; nombre: string };
     disponibilidad: {
       fecha: Date;
-      servicio: { id: number; nombre: string };
+      servicio: { id: number; nombre: string; estado: string };
       franja: { horaInicio: Date; horaFin: Date };
     };
   };

@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
 import { created, fail, ok } from "@/lib/api-response";
@@ -26,13 +26,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para reservar.", 401);
-    }
-    if (session.user.role?.toUpperCase() !== "CLIENTE" || session.user.estado !== "ACTIVO") {
-      return fail("FORBIDDEN", "Solo una cuenta de cliente activa puede reservar en línea.", 403);
-    }
+    const authorization = await authorizeApiRequest(["Cliente", "Empleado_Vendedor", "Administrador"]);
+    if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
     try {
@@ -45,9 +40,16 @@ export async function POST(request: Request) {
       return fail("VALIDATION_ERROR", "Datos de reserva inválidos.", 400, parsed.error.flatten());
     }
 
+    const isStaff = authorization.actor.role === "Empleado_Vendedor" || authorization.actor.role === "Administrador";
+    const titularId = isStaff ? (parsed.data.titularId ?? authorization.actor.id) : authorization.actor.id;
+    const canal = isStaff ? (parsed.data.canal ?? "TAQUILLA") : "ONLINE";
+    const vendedorId = isStaff ? authorization.actor.id : null;
+
     const reservation = await createBookingHold({
       ...parsed.data,
-      userId: session.user.id,
+      userId: titularId,
+      canal,
+      vendedorId,
     });
     return created(reservation);
   } catch (error: unknown) {

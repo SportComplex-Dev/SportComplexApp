@@ -1,28 +1,39 @@
-import { auth } from "@/auth";
+import { authorizeApiRequest } from "@/lib/api-auth";
 import { AccessError, procesarEscaneo } from "@/lib/access";
+import { accessResultResponse } from "@/lib/access-response";
 import { accessScanSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
-import { fail, ok } from "@/lib/api-response";
+import { fail } from "@/lib/api-response";
 
 // RF-13 / RF-14 / RF-15 — canje de ticket + auditoría (TSK-BD-10).
 // Firma HMAC → decideAccess → transacción única (UPDATE WHERE estado='EMITIDO'
 // + INSERT en LECTURA_ACCESO). Siempre escribe 1 fila de auditoría por lectura;
-// un boleto USADO nunca vuelve a EMITIDO (RN-05).
-export async function POST(request: Request) {
+type SessionLike = { user?: { id?: string | null; role?: string | null } | null } | null;
+export type AccessAuthenticate = () => Promise<SessionLike>;
+
+export interface AccessOptions {
+  authenticate?: AccessAuthenticate;
+  now?: Date;
+}
+
+export async function handleAccess(
+  request: Request,
+  options: AccessOptions | AccessAuthenticate = {},
+) {
   const qrSecret = process.env.QR_HMAC_SECRET;
   if (!qrSecret) {
     return fail("QR_NOT_CONFIGURED", "Falta QR_HMAC_SECRET.", 503);
   }
 
+  const opts: AccessOptions =
+    typeof options === "function" ? { authenticate: options } : options;
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para escanear.", 401);
-    }
-    const role = session.user.role?.toUpperCase();
-    if (role !== "ADMINISTRADOR" && role !== "EMPLEADO_LECTOR") {
-      return fail("FORBIDDEN", "Solo un lector de accesos puede escanear tickets.", 403);
-    }
+    const authorization = await authorizeApiRequest(
+      ["Administrador", "Empleado_Lector"],
+      opts.authenticate ? { authenticate: opts.authenticate } : {},
+    );
+    if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
     try {
@@ -36,10 +47,11 @@ export async function POST(request: Request) {
     }
 
     const resultado = await procesarEscaneo(parsed.data, {
-      empleadoId: session.user.id,
+      empleadoId: authorization.actor.id,
       qrSecret,
+      now: opts.now,
     });
-    return ok(resultado);
+    return accessResultResponse(resultado);
   } catch (error: unknown) {
     if (error instanceof AccessError || error instanceof TicketError) {
       return fail(error.code, error.message, error.status);
@@ -48,3 +60,8 @@ export async function POST(request: Request) {
     return fail("SERVER_ERROR", "Error al procesar el escaneo.", 500);
   }
 }
+
+export async function POST(request: Request) {
+  return handleAccess(request);
+}
+
