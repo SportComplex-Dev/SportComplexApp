@@ -241,6 +241,21 @@ test("TSK-BE-19: sin QR_HMAC_SECRET se rechaza antes de leer la base de datos", 
   );
 });
 
+test("TSK-BE-11: sin generador inyectado, el QR se rasteriza en memoria con `qrcode`", async () => {
+  seed();
+  // `generarQrDataUrl: undefined` fuerza el generador real (`qrcode`, import
+  // diferido). Verificamos que produce un PNG data-URL y que rasteriza el
+  // MISMO payload firmado (nada inventado por el cliente).
+  const data = await comprobante({ generarQrDataUrl: undefined });
+
+  assert.equal(data.qr?.dataUrl.startsWith("data:image/png;base64,"), true);
+  assert.equal(data.qr!.dataUrl.length > 100, true);
+
+  const separado = parseTicketQrPayload(data.qr!.payload);
+  assert.equal(separado?.ticketId, CODIGO_QR);
+  assert.equal(verifyTicketSignature(separado!.ticketId, separado!.signature, QR_SECRET), true);
+});
+
 test("TSK-BE-19: la validación de entrada exige reservaId UUID y destinatario válido", () => {
   assert.deepEqual(validarSolicitudComprobante({ reservaId: RESERVA_ID, destinatario: "POS" }), {
     reservaId: RESERVA_ID,

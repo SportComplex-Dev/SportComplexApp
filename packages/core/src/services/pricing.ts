@@ -4,7 +4,49 @@ import { MEMBERSHIP_DISCOUNT_RATE } from "../domain/index";
 export function applyMembershipDiscount(amountCents: number, hasActiveMembership: boolean): number {
   if (!Number.isInteger(amountCents) || amountCents < 0) throw new Error("INVALID_AMOUNT");
   if (!hasActiveMembership) return amountCents;
-  return Math.round(amountCents * (1 - MEMBERSHIP_DISCOUNT_RATE));
+  // Criterio: el descuento nunca supera el monto de la reserva
+  const discount = Math.min(Math.round(amountCents * MEMBERSHIP_DISCOUNT_RATE), amountCents);
+  return Math.max(0, amountCents - discount);
+}
+
+export interface PricingDiscountResult {
+  subtotal: number;
+  discountPct: number;
+  discountAmount: number;
+  total: number;
+}
+
+/**
+ * Aplica el descuento del 30% antes de generar el cobro si la membresía está VIGENTE.
+ * Válido tanto para portal online como taquilla física (RF-16 / RN-08).
+ * Garantía: el descuento nunca supera el monto de la reserva.
+ */
+export function calculatePricingWithDiscount(
+  subtotal: number,
+  hasActiveMembership: boolean,
+): PricingDiscountResult {
+  if (!Number.isFinite(subtotal) || subtotal < 0) {
+    throw new Error("INVALID_AMOUNT");
+  }
+  const cleanSubtotal = Number(subtotal.toFixed(2));
+  if (!hasActiveMembership) {
+    return {
+      subtotal: cleanSubtotal,
+      discountPct: 0,
+      discountAmount: 0,
+      total: cleanSubtotal,
+    };
+  }
+  // RN-08: 30% automático. El descuento nunca supera el monto de la reserva.
+  const rawDiscount = Number((cleanSubtotal * MEMBERSHIP_DISCOUNT_RATE).toFixed(2));
+  const discountAmount = Math.min(rawDiscount, cleanSubtotal);
+  const total = Number(Math.max(0, cleanSubtotal - discountAmount).toFixed(2));
+  return {
+    subtotal: cleanSubtotal,
+    discountPct: 30.0,
+    discountAmount,
+    total,
+  };
 }
 
 export function formatMoney(amount: number): string {

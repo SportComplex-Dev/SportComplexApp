@@ -75,6 +75,7 @@ const protectedRoutePrefixes = [
   "/portal",
   "/api/admin",
   "/api/pos",
+  "/api/payments/intent",
   "/api/access",
   "/api/tickets/verify",
   "/api/pdf/receipt",
@@ -203,7 +204,8 @@ export default withAuth(async (req) => {
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (supabaseUrl && supabaseKey) {
+        const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
+        if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
           const supabase = createClient(supabaseUrl, supabaseKey, {
             auth: { autoRefreshToken: false, persistSession: false },
           });
@@ -234,35 +236,42 @@ export default withAuth(async (req) => {
         }
       } catch (error: unknown) {
         console.error("Error al validar el estado de la sesión:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "AUTHORIZATION_UNAVAILABLE",
-              message: "No se pudo verificar el estado de la cuenta.",
+        if (!authUser) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "AUTHORIZATION_UNAVAILABLE",
+                message: "No se pudo verificar el estado de la cuenta.",
+              },
+              timestamp: new Date().toISOString(),
             },
-            timestamp: new Date().toISOString(),
-          },
-          { status: 503 },
-        );
+            { status: 503 },
+          );
+        }
       }
 
-      const currentRole = normalizeRole(account?.rol?.nombre);
       const isAuthenticationLanding =
         pathname === "/" || pathname === "/login" || pathname === "/register";
-      if (
-        !account ||
-        (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
-        !currentRole
-      ) {
+
+      if (account) {
+        const currentRole = normalizeRole(account.rol?.nombre);
+        if (
+          (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
+          !currentRole
+        ) {
+          currentSession = null;
+        } else {
+          currentSession = {
+            ...sessionToRefresh,
+            role: currentRole,
+            status: account.deletedAt ? "INACTIVO" : account.estado,
+            userId: account.id,
+          };
+        }
+      } else if (!authUser) {
+        // Solo descartar sesión si no proviene de un token NextAuth firmado
         currentSession = null;
-      } else {
-        currentSession = {
-          ...sessionToRefresh,
-          role: currentRole,
-          status: account.deletedAt ? "INACTIVO" : account.estado,
-          userId: account.id,
-        };
       }
     }
   }
