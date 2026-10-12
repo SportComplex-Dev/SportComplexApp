@@ -7,20 +7,27 @@ import {
 import {
   toDatetimeLocal,
   parseDatetimeLocalToUtcIso,
+  mapTournamentApiError,
 } from '@/components/admin/tournaments/tournament-form-modal'
+import {
+  calculateTournamentKPIs,
+  type TorneoAdminItem,
+} from '@/app/(admin)/admin/tournaments/page'
 import { createTournamentSchema } from '@sportcomplex/validation'
 
 // TSK-FE-25 (SCRUM-168): Suite de pruebas unitarias robusta para Panel de Torneos Admin
 
-test('TSK-FE-25: Configuración semántica y visual de estados de torneo (FSM & Badges)', () => {
+test('TSK-FE-25: Configuración semántica y visual de estados de torneo (FSM & Badges con A11Y-02)', () => {
   assert.equal(tournamentConfig.BORRADOR.label, 'Borrador')
   assert.equal(tournamentConfig.INSCRIPCIONES_ABIERTAS.label, 'Inscripciones Abiertas')
   assert.equal(tournamentConfig.EN_CURSO.label, 'En Curso')
   assert.equal(tournamentConfig.FINALIZADO.label, 'Finalizado')
   assert.equal(tournamentConfig.CANCELADO.label, 'Cancelado')
 
-  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /bg-emerald/)
-  assert.match(tournamentConfig.EN_CURSO.dot, /bg-blue/)
+  // A11Y-02: Verificar soporte de motion-safe y motion-reduce
+  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /motion-safe:animate-pulse/)
+  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /motion-reduce:animate-none/)
+  assert.match(tournamentConfig.EN_CURSO.dot, /motion-safe:animate-pulse/)
   assert.match(tournamentConfig.CANCELADO.dot, /bg-rose/)
 
   assert.equal(inscripcionConfig.CONFIRMADA.label, 'Confirmada')
@@ -122,15 +129,68 @@ test('TSK-FE-25 / VAL-01: Rechazo estricto con fieldErrors para datos inválidos
   assert.equal(resultBloqueo.success, false)
 })
 
-test('TSK-FE-25: Manejo y detección del código 409 COURT_SLOT_CONFLICT', () => {
-  const errorResponse = {
-    success: false,
-    error: {
-      code: 'COURT_SLOT_CONFLICT',
-      message: 'La pista seleccionada presenta conflicto con una reserva previa en el horario especificado.',
-    },
-  }
+test('TSK-FE-25 / TEST-01: Mapeo funcional de códigos de error de la API con mapTournamentApiError (no tautológico)', () => {
+  // Evaluación directa de la función pura exportada por tournament-form-modal
+  const conflictMsg = mapTournamentApiError('COURT_SLOT_CONFLICT')
+  assert.match(conflictMsg, /Conflicto de disponibilidad/)
+  assert.match(conflictMsg, /reservas activas/)
 
-  assert.equal(errorResponse.error.code, 'COURT_SLOT_CONFLICT')
-  assert.match(errorResponse.error.message, /conflicto con una reserva previa/)
+  const registeredMsg = mapTournamentApiError('ALREADY_REGISTERED')
+  assert.match(registeredMsg, /Ya te encuentras formalmente inscrito/)
+
+  const customFallbackMsg = mapTournamentApiError('OTHER_CODE', 'Error específico del servidor')
+  assert.equal(customFallbackMsg, 'Error específico del servidor')
+
+  const defaultMsg = mapTournamentApiError(undefined)
+  assert.equal(defaultMsg, 'Error al guardar el torneo en el servidor.')
+})
+
+test('TSK-FE-25 / SCAL-01: Cálculo agregado y reactivo de KPIs con calculateTournamentKPIs', () => {
+  const sampleTournaments: TorneoAdminItem[] = [
+    {
+      id: 'torneo-1',
+      titulo: 'Torneo Pádel Oro',
+      descripcion: null,
+      categoriaId: 1,
+      nivel: 'Segunda',
+      fechaInicio: '2026-11-01T08:00:00Z',
+      fechaFin: '2026-11-02T18:00:00Z',
+      cuposTotales: 16,
+      cuposOcupados: 12,
+      precioInscripcion: 50000,
+      estado: 'INSCRIPCIONES_ABIERTAS',
+    },
+    {
+      id: 'torneo-2',
+      titulo: 'Copa Tenis Interclubes',
+      descripcion: null,
+      categoriaId: 2,
+      nivel: 'Primera',
+      fechaInicio: '2026-11-05T08:00:00Z',
+      fechaFin: '2026-11-06T18:00:00Z',
+      cuposTotales: 32,
+      cuposOcupados: 20,
+      precioInscripcion: 80000,
+      estado: 'EN_CURSO',
+    },
+    {
+      id: 'torneo-3',
+      titulo: 'Torneo Squash Borrador',
+      descripcion: null,
+      categoriaId: 3,
+      nivel: 'Tercera',
+      fechaInicio: '2026-11-10T08:00:00Z',
+      fechaFin: '2026-11-11T18:00:00Z',
+      cuposTotales: 8,
+      cuposOcupados: 0,
+      precioInscripcion: 0,
+      estado: 'BORRADOR',
+    },
+  ]
+
+  const kpis = calculateTournamentKPIs(sampleTournaments)
+  assert.equal(kpis.total, 3)
+  assert.equal(kpis.abiertas, 1)
+  assert.equal(kpis.enCurso, 1)
+  assert.equal(kpis.inscripciones, 32)
 })

@@ -105,6 +105,19 @@ export function parseDatetimeLocalToUtcIso(datetimeStr: string): string {
   return new Date(isoWithBogotaOffset).toISOString()
 }
 
+/**
+ * Mapea códigos de error conocidos de la API de torneos a mensajes legibles por el usuario (TEST-01).
+ */
+export function mapTournamentApiError(code?: string, defaultMsg?: string): string {
+  if (code === 'COURT_SLOT_CONFLICT') {
+    return 'Conflicto de disponibilidad: Una de las pistas seleccionadas ya tiene reservas activas en ese horario.'
+  }
+  if (code === 'ALREADY_REGISTERED') {
+    return 'Ya te encuentras formalmente inscrito en este torneo deportivo.'
+  }
+  return defaultMsg || 'Error al guardar el torneo en el servidor.'
+}
+
 export function TournamentFormModal({
   isOpen,
   onClose,
@@ -274,15 +287,7 @@ export function TournamentFormModal({
         if (json.details?.fieldErrors) {
           setFieldErrors(json.details.fieldErrors)
         }
-        if (json.error?.code === 'COURT_SLOT_CONFLICT') {
-          setErrorMsg(
-            'Conflicto de disponibilidad: Una de las pistas seleccionadas ya tiene reservas activas en ese horario.'
-          )
-        } else {
-          setErrorMsg(
-            json.error?.message || 'Error al guardar el torneo en el servidor.'
-          )
-        }
+        setErrorMsg(mapTournamentApiError(json.error?.code, json.error?.message))
         setLoading(false)
         return
       }

@@ -48,6 +48,17 @@ export interface TorneoAdminItem {
   _count?: { inscripciones: number }
 }
 
+export function calculateTournamentKPIs(tournamentsList: TorneoAdminItem[]) {
+  const total = tournamentsList.length
+  const abiertas = tournamentsList.filter((t) => t.estado === 'INSCRIPCIONES_ABIERTAS').length
+  const enCurso = tournamentsList.filter((t) => t.estado === 'EN_CURSO').length
+  const inscripciones = tournamentsList.reduce(
+    (acc, t) => acc + (t.cuposOcupados ?? t._count?.inscripciones ?? 0),
+    0
+  )
+  return { total, abiertas, enCurso, inscripciones }
+}
+
 const PAGE_SIZE = 10
 
 export default function AdminTournamentsPage() {
@@ -122,6 +133,7 @@ export default function AdminTournamentsPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
+      params.append('limit', '100') // SCAL-01-REG: Cargar hasta 100 torneos para paginar en UI y calcular KPIs
       if (selectedStatus !== 'todos') {
         params.append('estado', selectedStatus)
       }
@@ -164,13 +176,12 @@ export default function AdminTournamentsPage() {
   }, [loadTournaments])
 
   // Métricas de cabecera (KPIs globales)
-  const totalTorneos = tournaments.length
-  const torneosAbiertos = tournaments.filter((t) => t.estado === 'INSCRIPCIONES_ABIERTAS').length
-  const torneosEnCurso = tournaments.filter((t) => t.estado === 'EN_CURSO').length
-  const totalInscripciones = tournaments.reduce(
-    (acc, t) => acc + (t.cuposOcupados ?? t._count?.inscripciones ?? 0),
-    0
-  )
+  const {
+    total: totalTorneos,
+    abiertas: torneosAbiertos,
+    enCurso: torneosEnCurso,
+    inscripciones: totalInscripciones,
+  } = calculateTournamentKPIs(tournaments)
 
   // SCAL-01: Paginación reactiva
   const totalPages = Math.max(1, Math.ceil(tournaments.length / PAGE_SIZE))
