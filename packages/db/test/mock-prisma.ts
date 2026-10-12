@@ -1190,7 +1190,7 @@ export function createMockPrisma() {
     torneo: {
       async create({ data, include }: any) {
         const item: any = {
-          id: data.id ?? `torneo-${torneos.length + 1}`,
+          id: data.id ?? randomUUID(),
           adminId: data.adminId,
           categoriaId: data.categoriaId,
           titulo: data.titulo,
