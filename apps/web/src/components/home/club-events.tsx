@@ -6,6 +6,7 @@ import {
   TournamentRegistrationModal,
   type TournamentRegisterTarget,
 } from './tournament-registration-modal'
+import { useApp } from '@/components/app-provider'
 
 interface ClubEventView {
   id: string
@@ -98,6 +99,7 @@ function getCategoryTone(categoryName: string = ''): 'lime' | 'blue' | 'orange' 
 }
 
 export function ClubEvents() {
+  const { notify } = useApp()
   const [events, setEvents] = useState<ClubEventView[]>(STATIC_EVENTS)
   const [selectedTournament, setSelectedTournament] = useState<TournamentRegisterTarget | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -168,25 +170,12 @@ export function ClubEvents() {
   }, [])
 
   const handleOpenRegister = (eventItem: ClubEventView) => {
-    if (eventItem.rawTournament) {
+    if (eventItem.rawTournament && eventItem.isDynamic) {
       setSelectedTournament(eventItem.rawTournament)
+      setIsModalOpen(true)
     } else {
-      // Mock para eventos estáticos si aún no hay backend poblado
-      setSelectedTournament({
-        id: eventItem.id,
-        titulo: eventItem.title,
-        descripcion: eventItem.description,
-        nivel: eventItem.level,
-        categoria: { id: 1, nombre: eventItem.category },
-        fechaInicio: new Date().toISOString(),
-        fechaFin: new Date(Date.now() + 86400000).toISOString(),
-        cuposTotales: eventItem.totalSpots,
-        cuposDisponibles: eventItem.spotsLeft,
-        cuposOcupados: eventItem.totalSpots - eventItem.spotsLeft,
-        precioInscripcion: 0,
-      })
+      notify('Este evento o clínica deportiva se gestiona directamente en la recepción del club.', 'info')
     }
-    setIsModalOpen(true)
   }
 
   const handleRegistrationSuccess = (tournamentId: string) => {
@@ -256,13 +245,22 @@ export function ClubEvents() {
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
                     <CheckCircle2 size={13} /> Inscrito
                   </span>
-                ) : (
+                ) : event.isDynamic ? (
                   <button
                     type="button"
                     onClick={() => handleOpenRegister(event)}
                     className="event-register-btn cursor-pointer inline-flex items-center gap-1.5"
                   >
                     Inscribirme <ArrowRight size={14} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRegister(event)}
+                    className="event-register-btn cursor-pointer inline-flex items-center gap-1.5 opacity-90"
+                    title="Taller especial gestionado directamente en sede"
+                  >
+                    Consultar en Sede <ArrowRight size={14} />
                   </button>
                 )}
               </div>

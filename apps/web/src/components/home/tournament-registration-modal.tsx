@@ -8,9 +8,11 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
-  Ticket,
   Lock,
   Loader2,
+  Ticket,
+  Clock,
+  CircleDollarSign,
 } from 'lucide-react'
 import { Modal } from '@/components/modal'
 import { ActionButton } from '@/components/action-button'
@@ -22,11 +24,11 @@ export interface TournamentRegisterTarget {
   titulo: string
   descripcion?: string | null
   nivel: string
-  categoria?: { id: number; nombre: string }
+  categoria?: { id?: number; nombre: string }
   fechaInicio: string
   fechaFin: string
   cuposTotales: number
-  cuposDisponibles: number
+  cuposDisponibles?: number
   cuposOcupados: number
   precioInscripcion: number | string
   yaInscrito?: boolean
@@ -37,6 +39,14 @@ interface TournamentRegistrationModalProps {
   onClose: () => void
   tournament: TournamentRegisterTarget | null
   onRegistrationSuccess?: (tournamentId: string) => void
+}
+
+export interface IssuedTournamentTicket {
+  id?: string
+  codigo?: string
+  codigoUuid?: string
+  firma?: string
+  qrPayload?: string
 }
 
 export function TournamentRegistrationModal({
@@ -51,7 +61,8 @@ export function TournamentRegistrationModal({
   const [nombrePareja, setNombrePareja] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successTicket, setSuccessTicket] = useState<{ id: string; codigo: string } | null>(null)
+  const [successTicket, setSuccessTicket] = useState<IssuedTournamentTicket | null>(null)
+  const [pendingPayment, setPendingPayment] = useState(false)
 
   if (!isOpen || !tournament) return null
 
@@ -65,6 +76,7 @@ export function TournamentRegistrationModal({
     setNombrePareja('')
     setErrorMessage(null)
     setSuccessTicket(null)
+    setPendingPayment(false)
     onClose()
   }
 
@@ -105,10 +117,20 @@ export function TournamentRegistrationModal({
         return
       }
 
-      notify('¡Inscripción confirmada con éxito!', 'success')
-
-      if (json.data?.ticket) {
-        setSuccessTicket(json.data.ticket)
+      // BUS-01: Si el torneo tiene costo o quedó PENDIENTE_PAGO, notificar pago pendiente sin simular confirmación
+      if (json.data?.estado === 'PENDIENTE_PAGO' || (!esGratuito && !json.data?.ticket)) {
+        setPendingPayment(true)
+        notify('Inscripción registrada. Recuerda completar el pago para confirmar tu cupo y obtener tu QR.', 'info')
+      } else {
+        notify('¡Inscripción confirmada con éxito!', 'success')
+        // INT-01: Mapear contrato de ticket { codigoUuid, firma, qrPayload }
+        if (json.data?.ticket) {
+          const t = json.data.ticket
+          setSuccessTicket({
+            ...t,
+            codigo: t.codigo ?? t.codigoUuid ?? t.id ?? 'TICKET-OK',
+          })
+        }
       }
 
       if (onRegistrationSuccess) {
@@ -126,7 +148,7 @@ export function TournamentRegistrationModal({
     <Modal
       onClose={handleClose}
       title="Inscripción a Torneo Deportivo"
-      maxWidth="max-w-lg"
+      maxWidth="540px"
     >
       <div className="space-y-5 pt-1">
         {/* Banner de Información del Torneo */}
@@ -140,30 +162,33 @@ export function TournamentRegistrationModal({
                 {tournament.titulo}
               </h3>
             </div>
-            <div className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-              {esGratuito ? 'Gratuito' : `$${precio.toLocaleString('es-CO')} COP`}
+            <div className="text-right">
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {esGratuito ? 'Gratuito' : `$${precio.toLocaleString('es-CO')} COP`}
+              </span>
+              <span className="block text-[11px] text-slate-400">
+                {esGratuito ? 'Entrada Libre' : 'Pago por pareja'}
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
               <Calendar size={13} className="text-emerald-500" />
               <span>
                 {new Date(tournament.fechaInicio).toLocaleDateString('es-CO', {
                   day: 'numeric',
                   month: 'short',
-                })}{' '}
-                -{' '}
-                {new Date(tournament.fechaFin).toLocaleDateString('es-CO', {
-                  day: 'numeric',
-                  month: 'short',
                   year: 'numeric',
+                  timeZone: 'America/Bogota',
                 })}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Users size={13} className="text-blue-500" />
-              <span>{cuposRestantes} cupos disponibles</span>
+            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+              <Users size={13} className="text-emerald-500" />
+              <span>
+                {cuposRestantes} cupos libres de {tournament.cuposTotales}
+              </span>
             </div>
           </div>
 
@@ -172,8 +197,33 @@ export function TournamentRegistrationModal({
           </div>
         </div>
 
-        {/* Estado si ya fue exitosa la inscripción */}
-        {successTicket ? (
+        {/* BUS-01: Estado de inscripción con pago pendiente */}
+        {pendingPayment ? (
+          <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3">
+            <Clock size={36} className="mx-auto text-amber-600 dark:text-amber-400" />
+            <h4 className="text-base font-bold text-amber-800 dark:text-amber-200">
+              ¡Inscripción registrada - Pago pendiente!
+            </h4>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Tu pre-reserva fue registrada. Para activar tu cupo oficial y generar tu entrada digital con código QR firmado, debes abonar <b>${precio.toLocaleString('es-CO')} COP</b> en la recepción de la sede o desde tu portal.
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
+              <ActionButton
+                onClick={() => {
+                  handleClose()
+                  router.push('/portal/tickets')
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Ticket size={14} /> Ir a mis Inscripciones
+              </ActionButton>
+              <ActionButton secondary onClick={handleClose} className="w-full sm:w-auto">
+                Cerrar
+              </ActionButton>
+            </div>
+          </div>
+        ) : successTicket ? (
+          /* INT-01: Estado si ya fue exitosa la inscripción gratuita o confirmada con ticket */
           <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-3">
             <CheckCircle2 size={36} className="mx-auto text-emerald-600 dark:text-emerald-400" />
             <h4 className="text-base font-bold text-emerald-800 dark:text-emerald-200">
@@ -182,7 +232,7 @@ export function TournamentRegistrationModal({
             <p className="text-xs text-emerald-700 dark:text-emerald-300">
               Se ha emitido tu entrada de acceso digital con código seguro:{' '}
               <code className="font-mono font-bold bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-emerald-500/30">
-                {successTicket.codigo}
+                {successTicket.codigo || successTicket.codigoUuid}
               </code>
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
@@ -223,7 +273,11 @@ export function TournamentRegistrationModal({
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
             {errorMessage && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs"
+              >
                 <AlertCircle size={15} />
                 <span>{errorMessage}</span>
               </div>
@@ -249,11 +303,15 @@ export function TournamentRegistrationModal({
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <label
+                    htmlFor="pareja-nombre"
+                    className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between"
+                  >
                     <span>Nombre de Pareja o Compañero (Opcional)</span>
                     <span className="text-[11px] text-slate-400">Dobles / Parejas</span>
                   </label>
                   <Input
+                    id="pareja-nombre"
                     type="text"
                     value={nombrePareja}
                     onChange={(e) => setNombrePareja(e.target.value)}
@@ -264,6 +322,15 @@ export function TournamentRegistrationModal({
                     Si el torneo se juega en modalidad por equipos o dobles, tu compañero quedará formalmente registrado con este pase.
                   </p>
                 </div>
+
+                {!esGratuito && (
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                    <CircleDollarSign size={16} className="text-amber-500 shrink-0" />
+                    <span>
+                      Al confirmar, tu inscripción quedará en estado <b>Pendiente de Pago</b>. Podrás cancelar en recepción del complejo para emitir tu QR de acceso.
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <ActionButton secondary onClick={handleClose} disabled={submitting}>

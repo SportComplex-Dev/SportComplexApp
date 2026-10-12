@@ -45,7 +45,9 @@ interface UserTournamentItem {
     id: string
     estado: string
     nombrePareja?: string | null
-    ticket?: { id: string; codigo: string }
+    ticketCodigoUuid?: string | null
+    ticketQrPayload?: string | null
+    ticket?: { id?: string; codigo?: string; codigoUuid?: string; qrPayload?: string }
   }
 }
 
@@ -72,30 +74,19 @@ export default function TicketsPage() {
         // Fallback a almacenamiento local
       })
 
-    // Cargar torneos en los que el usuario se ha inscrito
+    // PERF-01: Cargar torneos en los que el usuario se ha inscrito directamente sin cascada N+1
     fetch('/api/tournaments')
       .then((res) => res.json())
-      .then(async (json) => {
+      .then((json) => {
         if (!isMounted || !json.success || !Array.isArray(json.data)) return
         const registered = json.data.filter((t: { yaInscrito?: boolean }) => t.yaInscrito)
-        if (registered.length === 0) return
-
-        const detailed = await Promise.all(
-          registered.map(async (t: { id: string }) => {
-            try {
-              const r = await fetch(`/api/tournaments/${t.id}`)
-              const j = await r.json()
-              return j.success && j.data ? j.data : t
-            } catch {
-              return t
-            }
-          })
-        )
         if (isMounted) {
-          setUserTournaments(detailed)
+          setUserTournaments(registered)
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Error cargando torneos del usuario:', err)
+      })
 
     return () => {
       isMounted = false
@@ -218,7 +209,8 @@ export default function TicketsPage() {
                   const ins = tournament.miInscripcion
                   const estadoIns = ins?.estado ?? 'CONFIRMADA'
                   const isConfirmed = estadoIns === 'CONFIRMADA'
-                  const ticketCode = ins?.ticket?.codigo || `TRN-${tournament.id.slice(0, 8)}`
+                  // INT-01: Usar identificador real del ticket firmado ticketCodigoUuid
+                  const ticketCode = ins?.ticketCodigoUuid || ins?.ticket?.codigo || ins?.ticket?.codigoUuid || (isConfirmed ? `TRN-${tournament.id.slice(0, 8)}` : 'PENDIENTE')
                   const precioNum = Number(tournament.precioInscripcion ?? 0)
 
                   const handleOpenTournamentQR = () => {
@@ -300,22 +292,33 @@ export default function TicketsPage() {
                         </span>
                       </div>
 
+                      {/* BUS-01: Condicionar QR de acceso y PDF estrictamente a inscripciones confirmadas */}
                       <div className="portal-ticket-actions">
-                        <button
-                          type="button"
-                          onClick={handleOpenTournamentQR}
-                          className="action-button text-xs py-2 px-3.5 gap-2"
-                        >
-                          <QrCode size={15} /> Ver QR de Acceso
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handlePrintTournamentTicket}
-                          className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-                          title="Descargar comprobante en PDF"
-                        >
-                          <Download size={14} /> PDF
-                        </button>
+                        {isConfirmed ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleOpenTournamentQR}
+                              className="action-button text-xs py-2 px-3.5 gap-2"
+                            >
+                              <QrCode size={15} /> Ver QR de Acceso
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handlePrintTournamentTicket}
+                              className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
+                              title="Descargar comprobante en PDF"
+                            >
+                              <Download size={14} /> PDF
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-amber-700 dark:text-amber-300 font-medium px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                              Pago pendiente en taquilla
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

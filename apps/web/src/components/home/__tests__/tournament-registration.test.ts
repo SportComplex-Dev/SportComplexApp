@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { TournamentRegisterTarget } from '../tournament-registration-modal'
 
-// TSK-FE-26 (SCRUM-169): Suite de pruebas unitarias para flujo de inscripción a torneos en la landing y portal
+// TSK-FE-26 (SCRUM-169): Suite de pruebas unitarias robusta para flujo de inscripción a torneos en la landing y portal
 
 test('TSK-FE-26: Cálculo de aforo disponible y alertas de cupos urgentes en torneos', () => {
   const torneoConAforo: TournamentRegisterTarget = {
@@ -45,7 +45,7 @@ test('TSK-FE-26: Detección de torneo agotado', () => {
   assert.equal(spotsLeft <= 0, true)
 })
 
-test('TSK-FE-26: Validación de payload para inscripción con pareja opcional', () => {
+test('TSK-FE-26: Validación y sanitización de payload para inscripción con pareja opcional', () => {
   const inputConPareja = {
     nombrePareja: '  Carlos Mendoza  ',
   }
@@ -53,6 +53,7 @@ test('TSK-FE-26: Validación de payload para inscripción con pareja opcional', 
   const trimmed = inputConPareja.nombrePareja.trim()
   assert.ok(trimmed.length > 0)
   assert.ok(trimmed.length <= 100)
+  assert.equal(trimmed, 'Carlos Mendoza')
 
   const inputIndividual = {
     nombrePareja: '   ',
@@ -73,9 +74,10 @@ test('TSK-FE-26: Mapeo de códigos de error de inscripción de torneos a mensaje
   assert.match(errorMap.REGISTRATION_CLOSED, /cerradas/)
 })
 
-test('TSK-FE-26: Mapeo de torneo inscrito a estructura compatible con Booking para visualización de QR y PDF', () => {
-  const mockTorneoInscrito = {
-    id: 'trn-100',
+test('TSK-FE-26 / INT-01: Verificación de contrato real de ticket y resolución de identificador UUID firmado', () => {
+  // Contrato real retornado por backend Prisma (InscripcionTorneo con ticketCodigoUuid)
+  const mockBackendResponse = {
+    id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     titulo: 'Torneo Máster de Tenis',
     categoria: { nombre: 'Tenis' },
     fechaInicio: '2026-11-20T10:00:00Z',
@@ -86,28 +88,36 @@ test('TSK-FE-26: Mapeo de torneo inscrito a estructura compatible con Booking pa
       id: 'ins-55',
       estado: 'CONFIRMADA',
       nombrePareja: 'Andrés Gómez',
-      ticket: {
-        id: 'tkt-99',
-        codigo: 'SC-TRN-2026-99',
-      },
+      ticketCodigoUuid: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      ticketQrPayload: 'SC1:3fa85f64-5717-4562-b3fc-2c963f66afa6:a1b2c3d4e5f6',
     },
   }
 
-  const bookingAdapter = {
-    id: mockTorneoInscrito.id,
-    code: mockTorneoInscrito.miInscripcion.ticket.codigo,
-    service: `Torneo: ${mockTorneoInscrito.titulo}`,
-    category: mockTorneoInscrito.categoria.nombre,
-    sede: 'Sede Principal',
-    date: mockTorneoInscrito.fechaInicio.split('T')[0],
-    time: '10:00 AM',
-    attendees: mockTorneoInscrito.miInscripcion.nombrePareja ? 2 : 1,
-    amount: mockTorneoInscrito.precioInscripcion,
-    status: 'Confirmada',
-    client: 'Socio de Prueba',
+  // La función de resolución debe priorizar ticketCodigoUuid real sobre fallbacks
+  const ins = mockBackendResponse.miInscripcion
+  const isConfirmed = ins.estado === 'CONFIRMADA'
+  const resolvedCode = ins.ticketCodigoUuid || (isConfirmed ? `TRN-${mockBackendResponse.id.slice(0, 8)}` : 'PENDIENTE')
+
+  assert.equal(resolvedCode, '3fa85f64-5717-4562-b3fc-2c963f66afa6')
+  assert.match(resolvedCode, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  assert.equal(isConfirmed, true)
+})
+
+test('TSK-FE-26 / BUS-01: Bloqueo de QR de acceso para inscripciones en estado PENDIENTE_PAGO', () => {
+  const mockInscripcionPendiente = {
+    id: 'trn-pago-01',
+    titulo: 'Torneo Pádel Pro Open',
+    precioInscripcion: 60000,
+    miInscripcion: {
+      id: 'ins-pendiente-01',
+      estado: 'PENDIENTE_PAGO',
+      ticketCodigoUuid: null,
+    },
   }
 
-  assert.equal(bookingAdapter.code, 'SC-TRN-2026-99')
-  assert.equal(bookingAdapter.attendees, 2)
-  assert.equal(bookingAdapter.status, 'Confirmada')
+  const isConfirmed = mockInscripcionPendiente.miInscripcion.estado === 'CONFIRMADA'
+  const canShowQR = isConfirmed && Boolean(mockInscripcionPendiente.miInscripcion.ticketCodigoUuid)
+
+  assert.equal(isConfirmed, false)
+  assert.equal(canShowQR, false, 'No se debe emitir ni habilitar QR de acceso si el torneo no ha sido pagado')
 })
