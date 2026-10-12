@@ -61,6 +61,16 @@ export function normalizeEmbeddedRole(rol: EmbeddedRole): { nombre: string } | n
 }
 
 /**
+ * Escapa un valor literal para usarlo como patrón `ilike`/`like` en PostgREST.
+ * Sin esto, `%`, `_` y `\` del correo actuarían como comodines (p. ej.
+ * `ana_lopez@x` casaría con `anaXlopez@x`). PostgREST lo traslada a un LIKE
+ * de Postgres, donde `\` es el escape por defecto.
+ */
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
  * Comprueba si el estado de la cuenta permite el acceso perimetral.
  * RN-10: Cuentas inactivas o con borrado lógico tienen credenciales revocadas de inmediato.
  */

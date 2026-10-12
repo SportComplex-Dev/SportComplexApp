@@ -5,6 +5,7 @@ import { authConfig } from "@/auth.config";
 import {
   extractSupabaseAccessToken,
   extractSession,
+  escapeIlikePattern,
   isAccountActive,
   normalizeEmbeddedRole,
   normalizeRole,
@@ -63,6 +64,8 @@ async function verifySupabasePrincipal(req: NextRequest): Promise<SupabasePrinci
  */
 
 const { auth: withAuth } = NextAuth(authConfig);
+// Aviso único por proceso cuando la lectura de `usuario` cae a la anon key (ver abajo).
+let warnedAnonAccountLookup = false;
 const protectedRoutePrefixes = [
   "/admin",
   "/pos",
@@ -197,9 +200,17 @@ export default withAuth(async (req) => {
       let account: { id: string; estado: string; deletedAt: Date | null; rol: { nombre: string } | null } | null = null;
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const usingServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
         if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
+          if (!usingServiceRole && !warnedAnonAccountLookup) {
+            warnedAnonAccountLookup = true;
+            console.warn(
+              "middleware: sin SUPABASE_SERVICE_ROLE_KEY, la lectura de `usuario` usa la anon key " +
+                "y queda sujeta a RLS (puede ocultar filas y tratar sesiones válidas como anónimas).",
+            );
+          }
           const supabase = createSupabaseRestClient(supabaseKey);
           const { data: userById } = await supabase
             .from("usuario")
@@ -212,7 +223,7 @@ export default withAuth(async (req) => {
             const { data: userByEmail } = await supabase
               .from("usuario")
               .select("id, estado, deleted_at, rol:rol_id(nombre)")
-              .ilike("correo", supabasePrincipal.email)
+              .ilike("correo", escapeIlikePattern(supabasePrincipal.email))
               .maybeSingle();
             row = userByEmail;
           }

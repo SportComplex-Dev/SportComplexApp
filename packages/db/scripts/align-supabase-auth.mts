@@ -9,7 +9,8 @@
  * Uso:
  *   tsx scripts/align-supabase-auth.mts                       # dry-run (solo lectura)
  *   tsx scripts/align-supabase-auth.mts --execute             # crea las identidades pendientes
- *   tsx scripts/align-supabase-auth.mts --reset               # rota la contraseña de identidades existentes
+ *   tsx scripts/align-supabase-auth.mts --reset --only=a@x.com # rota la contraseña de identidades existentes (dirigido)
+ *   tsx scripts/align-supabase-auth.mts --reset --yes         # rota TODAS las existentes (requiere confirmación explícita)
  *   tsx scripts/align-supabase-auth.mts --only=a@x.com,b@x.com
  *
  * Variables:
@@ -17,15 +18,17 @@
  *   SUPABASE_SERVICE_ROLE_KEY                   clave service role (Admin API)
  *   DIRECT_URL | DATABASE_URL                   conexión Postgres (Prisma)
  *
- * Contraseñas: se generan por usuario de forma secuencial `SportComplex{n}!` (no se
- * reutiliza una sola contraseña para todas) y se escriben en
- * `.auth-passwords.local.txt` (gitignored). Nunca se versionan.
+ * Contraseñas: aleatorias por usuario (CSPRNG, 20 caracteres) y se escriben en
+ * `.auth-passwords.local.txt` (gitignored, modo 0600) SOLO para las cuentas
+ * creadas/rotadas en esta ejecución. Nunca se versionan ni se imprimen.
  */
 import { writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../src/index.ts";
 
 const EXECUTE = process.argv.includes("--execute");
 const RESET = process.argv.includes("--reset");
+const CONFIRMED = process.argv.includes("--yes");
 
 const onlyArg = process.argv.find((arg) => arg.startsWith("--only="));
 const onlyFilter = onlyArg
@@ -52,9 +55,15 @@ const adminHeaders = {
   "Content-Type": "application/json",
 };
 
-/** Contraseña determinista por posición del usuario en la lista ordenada. */
-function passwordFor(index: number): string {
-  return `SportComplex${index + 1}!`;
+/** Contraseña aleatoria por usuario (CSPRNG). Alfabeto sin caracteres ambiguos. */
+const PASSWORD_ALPHABET =
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*";
+
+function randomPassword(length = 20): string {
+  const bytes = randomBytes(length);
+  let out = "";
+  for (const byte of bytes) out += PASSWORD_ALPHABET[byte % PASSWORD_ALPHABET.length];
+  return out;
 }
 
 async function listAuthUsers(): Promise<Map<string, string>> {
@@ -111,12 +120,6 @@ const seleccion = candidatos.filter(
 const pendientes = seleccion.filter((u) => !authUsers.has(u.correo.toLowerCase()));
 const existentes = seleccion.filter((u) => authUsers.has(u.correo.toLowerCase()));
 
-// Credenciales por usuario: índice estable sobre la lista completa ordenada.
-const credenciales = new Map<string, string>();
-candidatos.forEach((u, i) => {
-  credenciales.set(u.correo.toLowerCase(), passwordFor(i));
-});
-
 const porRol = pendientes.reduce<Record<string, number>>((acc, u) => {
   const k = u.rol?.nombre ?? "SIN_ROL";
   acc[k] = (acc[k] ?? 0) + 1;
@@ -133,16 +136,32 @@ if (!EXECUTE && !RESET) {
   process.exit(0);
 }
 
+// --reset sin --only ni --yes sería una rotación masiva accidental: exigir alcance.
+if (RESET && !onlyFilter && !CONFIRMED) {
+  console.error(
+    "[reset] Operación destructiva: rota contraseñas de cuentas existentes. " +
+      "Acota con --only=a@x.com,b@x.com o confirma con --yes.",
+  );
+  await prisma.$disconnect();
+  process.exit(1);
+}
+
 let creadas = 0;
 let rotadas = 0;
 let fallidas = 0;
 
+// Solo se persisten en el archivo las credenciales aplicadas en ESTA ejecución
+// (las existentes no tocadas conservan su contraseña anterior).
+const aplicadas = new Map<string, { pass: string; rol: string }>();
+
 if (EXECUTE) {
   for (const u of pendientes) {
-    const pass = credenciales.get(u.correo.toLowerCase())!;
+    const pass = randomPassword();
     const result = await createAuthUser(u.correo.toLowerCase(), pass);
-    if (result.ok) creadas += 1;
-    else {
+    if (result.ok) {
+      creadas += 1;
+      aplicadas.set(u.correo.toLowerCase(), { pass, rol: u.rol?.nombre ?? "SIN_ROL" });
+    } else {
       fallidas += 1;
       console.error(`FALLÓ ${u.correo}: ${result.detail}`);
     }
@@ -152,20 +171,27 @@ if (EXECUTE) {
 if (RESET) {
   for (const u of existentes) {
     const id = authUsers.get(u.correo.toLowerCase())!;
-    const pass = credenciales.get(u.correo.toLowerCase())!;
+    const pass = randomPassword();
     const result = await resetAuthPassword(id, pass);
-    if (result.ok) rotadas += 1;
-    else {
+    if (result.ok) {
+      rotadas += 1;
+      aplicadas.set(u.correo.toLowerCase(), { pass, rol: u.rol?.nombre ?? "SIN_ROL" });
+    } else {
       fallidas += 1;
       console.error(`FALLÓ reset ${u.correo}: ${result.detail}`);
     }
   }
 }
 
-const lineas = seleccion.map((u) => `${u.correo.toLowerCase()}\t${credenciales.get(u.correo.toLowerCase())!}\t${u.rol?.nombre ?? "SIN_ROL"}`);
-writeFileSync(new URL(".auth-passwords.local.txt", import.meta.url), `${lineas.join("\n")}\n`, "utf8");
+if (aplicadas.size > 0) {
+  const destino = new URL(".auth-passwords.local.txt", import.meta.url);
+  const lineas = [...aplicadas.entries()].map(([correo, { pass, rol }]) => `${correo}\t${pass}\t${rol}`);
+  writeFileSync(destino, `${lineas.join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
+  console.log("Credenciales aplicadas escritas en packages/db/scripts/.auth-passwords.local.txt (gitignored, 0600).");
+} else {
+  console.log("Sin credenciales nuevas: no se escribió el archivo de contraseñas.");
+}
 
 console.log(`\n[${EXECUTE ? "execute" : ""}${EXECUTE && RESET ? "+" : ""}${RESET ? "reset" : ""}] Creadas: ${creadas} | Rotadas: ${rotadas} | Fallidas: ${fallidas}`);
-console.log("Credenciales escritas en packages/db/scripts/.auth-passwords.local.txt (gitignored).");
 
 await prisma.$disconnect();

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import {
   extractSupabaseAccessToken,
+  escapeIlikePattern,
   normalizeRole,
   normalizeEmbeddedRole,
   isAccountActive,
@@ -70,6 +71,13 @@ test("isAccountActive es fail-closed ante estado ausente/vacío (RN-10)", () => 
   assert.equal(isAccountActive(null), false);
   assert.equal(isAccountActive(""), false);
   assert.equal(isAccountActive("   "), false);
+});
+
+test("escapeIlikePattern neutraliza %, _ y \\ para coincidencia literal", () => {
+  assert.equal(escapeIlikePattern("ana_lopez@x.com"), "ana\\_lopez@x.com");
+  assert.equal(escapeIlikePattern("100%@x.com"), "100\\%@x.com");
+  assert.equal(escapeIlikePattern("a\\b@x.com"), "a\\\\b@x.com");
+  assert.equal(escapeIlikePattern("normal@x.com"), "normal@x.com");
 });
 
 // Bloqueante de code review: un sc-token malformado NO debe lanzar (tumbaba el middleware con 500).

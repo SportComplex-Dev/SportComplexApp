@@ -31,7 +31,7 @@
 | `apps/web/src/lib/auth/__tests__/auth-gate.test.ts` | Tests de los guards (estados, borrado lógico, roles). |
 | `apps/web/src/lib/supabase/admin.ts` | Cliente admin (service role) con `findSupabaseUserByEmail` y `createSupabaseAuthUser` para la migración/alta de identidades. |
 | `apps/web/src/app/api/auth/logout/route.ts` | Endpoint de cierre de sesión (limpia sesión Supabase y cookies propias). |
-| `packages/db/scripts/align-supabase-auth.mts` | Script de migración **idempotente** de cuentas con `password_hash` hacia Supabase Auth. Dry-run por defecto; `--execute` (crea identidades con contraseña secuencial por usuario `SportComplex{n}!`), `--reset` (rota la contraseña de identidades ya existentes) y filtro `--only=email1,email2`. Las credenciales se escriben en `.auth-passwords.local.txt` (gitignored). |
+| `packages/db/scripts/align-supabase-auth.mts` | Script de migración **idempotente** de cuentas con `password_hash` hacia Supabase Auth. Dry-run por defecto; `--execute` (crea identidades con contraseña aleatoria por usuario), `--reset` (rota contraseñas; exige `--only=` o `--yes`) y filtro `--only=email1,email2`. Solo las credenciales aplicadas se escriben en `.auth-passwords.local.txt` (gitignored, 0600). |
 | `packages/db/scripts/supabase-auth-audit.sql` | Consulta de auditoría de `password_hash` (por estado y tipo de hash). |
 | `packages/db/scripts/usuario-align.sql` | Utilidad SQL de alineación de usuarios. |
 | `docs/PLAN-AUTH-BACKEND.md` | Plan de trabajo del backend de autenticación. |
@@ -118,9 +118,10 @@
 
 ## 7. Usuarios de prueba
 
-> Las contraseñas **no se versionan**. Se generan por usuario de forma secuencial
-> (`SportComplex1!`, `SportComplex2!`, …) durante la migración y se guardan en
-> `packages/db/scripts/.auth-passwords.local.txt` (gitignored). Cámbialas antes de
+> Las contraseñas **no se versionan**. Son aleatorias por usuario (CSPRNG),
+> generadas durante la migración y guardadas en
+> `packages/db/scripts/.auth-passwords.local.txt` (gitignored, modo 0600) solo
+> para las cuentas creadas/rotadas en cada ejecución. Cámbialas antes de
 > cualquier entorno real.
 
 ### 7.1 Cuentas a las que se (re)asignó contraseña

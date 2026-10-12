@@ -66,8 +66,8 @@ export async function createSupabaseAuthUser(input: {
 }
 
 /**
- * GET de la Admin API vía REST (el cliente tipado no expone el filtro `filter`
- * en listUsers para algunos paginados). Solo se usa con service_role en servidor.
+ * GET de la Admin API vía REST (paginado con `page`/`per_page`; se recorre hasta
+ * agotar resultados con salida temprana). Solo se usa con service_role en servidor.
  */
 async function adminJsonGet(
   path: string,
