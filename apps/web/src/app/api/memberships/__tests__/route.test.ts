@@ -153,3 +153,80 @@ test("POST /api/memberships/subscribe rechaza con 400 si el plan no tiene stripe
   assert.equal(body.error.code, "STRIPE_PRICE_NOT_CONFIGURED");
 });
 
+test("POST /api/memberships/subscribe es idempotente y reutiliza la sesión pendiente para el mismo plan", async () => {
+  const userId = "00000000-0000-4000-8000-0000000000sub4";
+  (globalThis as any).__scAuthSession = {
+    user: { id: userId, email: "sub4@test.com" },
+  };
+
+  mock._state.usuarios.push({
+    id: userId,
+    nombre: "Usuario Idempotente",
+    correo: "sub4@test.com",
+    estado: "ACTIVO",
+    rolId: 4,
+    rolNombre: "Cliente",
+  });
+
+  let stripeCalls = 0;
+  (globalThis as any).__scStripeClient = {
+    checkout: {
+      sessions: {
+        create: async () => {
+          stripeCalls++;
+          return {
+            id: "cs_test_sub_idem_4",
+            url: "https://checkout.stripe.com/pay/cs_test_sub_idem_4",
+          };
+        },
+      },
+    },
+  };
+
+  // Primera llamada: crea la sesión
+  const res1 = await subscribeRoute.POST(
+    new Request("http://localhost:3000/api/memberships/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: 1 }),
+    }),
+  );
+  assert.equal(res1.status, 201);
+  const body1 = await res1.json();
+  assert.equal(body1.data.checkout.sessionId, "cs_test_sub_idem_4");
+  assert.equal(stripeCalls, 1);
+
+  // Segunda llamada (mismo plan): devuelve la sesión existente sin llamar a Stripe de nuevo
+  const res2 = await subscribeRoute.POST(
+    new Request("http://localhost:3000/api/memberships/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: 1 }),
+    }),
+  );
+  assert.equal(res2.status, 201);
+  const body2 = await res2.json();
+  assert.equal(body2.data.checkout.sessionId, "cs_test_sub_idem_4");
+  assert.equal(stripeCalls, 1, "No debe invocar a Stripe una segunda vez para el mismo plan pendiente");
+});
+
+test("POST /api/memberships/subscribe rechaza con 409 si el usuario ya tiene un checkout pendiente para otro plan", async () => {
+  const userId = "00000000-0000-4000-8000-0000000000sub4";
+  (globalThis as any).__scAuthSession = {
+    user: { id: userId, email: "sub4@test.com" },
+  };
+
+  // El usuario ya tiene una sesión abierta para el plan 1, intenta solicitar el plan 2
+  const res = await subscribeRoute.POST(
+    new Request("http://localhost:3000/api/memberships/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: 2 }),
+    }),
+  );
+
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error.code, "PENDING_SUBSCRIPTION_CHECKOUT");
+});
+

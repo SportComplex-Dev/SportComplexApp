@@ -265,10 +265,56 @@ test("TSK-BE-20: buildSubscriptionCheckoutSessionParams genera parámetros con m
   assert.equal(params.mode, "subscription");
   assert.deepEqual(params.line_items, [{ price: "price_mensual_123", quantity: 1 }]);
   assert.equal(params.customer_email, "user@example.com");
+  assert.ok(params.expires_at);
   assert.deepEqual(params.metadata, {
     userId: "u-100",
     planId: "2",
     cashless: "true",
+  });
+});
+
+test("TSK-BE-20: createStripeSubscriptionCheckoutSession envía clave de idempotencia a Stripe", async () => {
+  const { createStripeSubscriptionCheckoutSession } = await import("./stripe.js");
+  let capturedOptions: unknown;
+  const fake = {
+    checkout: {
+      sessions: {
+        async create(_params: unknown, options?: unknown) {
+          capturedOptions = options;
+          return { id: "cs_sub_idempotent", url: "https://stripe.com/cs_1" } as never;
+        },
+      },
+    },
+  };
+
+  const res = await createStripeSubscriptionCheckoutSession(
+    {
+      userId: "u-user-idem",
+      planId: 3,
+      priceId: "price_anual_999",
+    },
+    { client: fake },
+  );
+
+  assert.equal(res.sessionId, "cs_sub_idempotent");
+  assert.deepEqual(capturedOptions, {
+    idempotencyKey: "sub_checkout_u-user-idem_3",
+  });
+  assert.ok(res.expiresAt instanceof Date);
+
+  // Con idempotencyKey personalizada
+  await createStripeSubscriptionCheckoutSession(
+    {
+      userId: "u-user-idem",
+      planId: 3,
+      priceId: "price_anual_999",
+      idempotencyKey: "custom-idempotency-token-123",
+    },
+    { client: fake },
+  );
+
+  assert.deepEqual(capturedOptions, {
+    idempotencyKey: "custom-idempotency-token-123",
   });
 });
 

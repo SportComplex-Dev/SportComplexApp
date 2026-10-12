@@ -426,6 +426,8 @@ export interface SubscriptionCheckoutSessionInput {
   membershipId?: number | string;
   successUrl?: string;
   cancelUrl?: string;
+  idempotencyKey?: string;
+  now?: Date;
 }
 
 export function buildSubscriptionCheckoutSessionParams(
@@ -439,11 +441,14 @@ export function buildSubscriptionCheckoutSessionParams(
     cashless: "true",
   };
 
+  const now = input.now ?? new Date();
+
   return {
     mode: "subscription",
     line_items: [{ price: input.priceId, quantity: 1 }],
     metadata,
     subscription_data: { metadata },
+    expires_at: stripeSessionExpiresAtSec(now),
     ...(input.customerId ? { customer: input.customerId } : {}),
     ...(input.customerEmail && !input.customerId ? { customer_email: input.customerEmail } : {}),
     success_url:
@@ -459,15 +464,24 @@ export function buildSubscriptionCheckoutSessionParams(
 export async function createStripeSubscriptionCheckoutSession(
   input: SubscriptionCheckoutSessionInput,
   deps: { client?: StripeCheckoutClient; appUrl?: string } = {},
-): Promise<{ sessionId: string; url: string | null }> {
+): Promise<{ sessionId: string; url: string | null; expiresAt: Date }> {
+  const now = input.now ?? new Date();
+  const expiresAt = new Date(stripeSessionExpiresAtSec(now) * 1000);
   const params = buildSubscriptionCheckoutSessionParams(input, deps.appUrl ?? defaultAppUrl());
   const client = resolveClient(deps.client);
 
+  const idempotencyKey =
+    input.idempotencyKey?.trim() ||
+    `sub_checkout_${input.userId}_${input.planId}`;
+
   try {
-    const session = await client.checkout.sessions.create(params);
+    const session = await client.checkout.sessions.create(params, {
+      idempotencyKey,
+    });
     return {
       sessionId: session.id,
       url: session.url ?? null,
+      expiresAt,
     };
   } catch (err) {
     throw stripeError(

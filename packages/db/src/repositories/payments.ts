@@ -546,6 +546,15 @@ export async function procesarFacturaWebhook(
 
           if (vigenteExistente) {
             membresia = vigenteExistente;
+            if (
+              vigenteExistente.stripeSubscriptionId &&
+              input.stripeSubscriptionId &&
+              vigenteExistente.stripeSubscriptionId !== input.stripeSubscriptionId
+            ) {
+              console.warn(
+                `[ALERTA MEMBRESIA] Detectada suscripción concurrente en Stripe para usuario ${resolvedUserId}. Activa previa: ${vigenteExistente.stripeSubscriptionId}, Entrante adicional: ${input.stripeSubscriptionId}`,
+              );
+            }
           } else {
             const planIdNum = input.planId ? Number(input.planId) : null;
             if (planIdNum && Number.isInteger(planIdNum) && planIdNum > 0) {
