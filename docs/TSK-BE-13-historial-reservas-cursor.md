@@ -13,4 +13,4 @@
 
 Las páginas usan keyset pagination descendente por `(creadoEn, id)`, con `id` como desempate. El cursor codifica esos valores; no se usa offset. Las inserciones posteriores quedan antes del cursor y no desplazan los elementos de páginas ya recorridas.
 
-No se modificó el esquema ni se creó/aplicó una migración. Las pruebas verifican conjuntos disjuntos por estado, aislamiento por titular y estabilidad al insertar una reserva nueva.
+El modelo `Reserva` declara el índice compuesto `@@index([titularId, estado, creadoEn, id])`, que acompaña el keyset: el prefijo de igualdad `(titularId, estado)` más el orden descendente `(creadoEn, id)` sin necesidad de un sort adicional. Se aplica con la migración `20261011130000_reserva_history_keyset_index` (reemplaza al índice previo `[titularId, estado]`). Las pruebas verifican conjuntos disjuntos por estado, aislamiento por titular y estabilidad al insertar una reserva nueva.

@@ -6,6 +6,17 @@ export const bookingRequestSchema = z.object({
   startTime: z.iso.datetime(),
   endTime: z.iso.datetime(),
   cantidadCupos: z.coerce.number().int().positive().default(1),
+  titularId: z.string().uuid().optional(),
+  canal: z.enum(["ONLINE", "TAQUILLA"]).optional(),
+});
+
+export const cartCheckoutSchema = z.object({
+  items: z.array(z.object({
+    serviceId: z.coerce.number().int().positive(),
+    startTime: z.iso.datetime(),
+    endTime: z.iso.datetime(),
+    cantidadCupos: z.coerce.number().int().positive().default(1),
+  })).min(2),
 });
 
 export const availabilityQuerySchema = z.object({
@@ -14,4 +25,5 @@ export const availabilityQuerySchema = z.object({
 });
 
 export type BookingRequest = z.infer<typeof bookingRequestSchema>;
+export type CartCheckoutRequest = z.infer<typeof cartCheckoutSchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
