@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
-  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
+  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store, Zap,
 } from 'lucide-react'
 import {
-  calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
+  calculateBookingPrice, calculatePricingWithDiscount, categoryBySlug, formatDate, formatMoney,
   type Booking, type PaymentMethod,
 } from '@sportcomplex/core'
 import { Badge, Input } from '@sportcomplex/ui'
@@ -37,6 +37,28 @@ export default function CheckoutPage() {
   const [bookings, setBookings] = useBookings()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
+
+  // Estado de membresía vigente del cliente (RF-16 / RN-08)
+  const [hasActiveMembership, setHasActiveMembership] = useState(false)
+  const [membershipPlanName, setMembershipPlanName] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    fetch('/api/memberships')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data?.success && data?.data?.membresiaActiva?.estado === 'VIGENTE') {
+          setHasActiveMembership(true)
+          setMembershipPlanName(data.data.membresiaActiva.plan?.nombre || 'Membresía Activa')
+        }
+      })
+      .catch(() => {
+        // Fallback sin membresía
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [session])
 
   // Payment states
   const [method, setMethod] = useState<PaymentMethod>('card')
@@ -80,7 +102,9 @@ export default function CheckoutPage() {
   }
 
   const isCourt = item.category === 'canchas'
-  const total = calculateBookingPrice(item, draft.attendees)
+  const subtotalBase = calculateBookingPrice(item, draft.attendees)
+  const pricing = calculatePricingWithDiscount(subtotalBase, hasActiveMembership)
+  const total = pricing.total
   const Icon = categoryIcons[category.icon]
 
   // Formaters
@@ -526,9 +550,19 @@ export default function CheckoutPage() {
             </span>
           </div>
           <div className="order-price">
-            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
-            <b>{formatMoney(total)}</b>
+            <span>{isCourt ? 'Tarifa regular' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
+            <b className={hasActiveMembership ? 'line-through opacity-70' : ''}>{formatMoney(subtotalBase)}</b>
           </div>
+
+          {hasActiveMembership && (
+            <div className="flex items-center justify-between text-xs text-[#557b53] dark:text-[#c9ef75] font-semibold bg-[#c9ef75]/10 p-2 rounded-lg my-1">
+              <span className="flex items-center gap-1">
+                <Zap size={13} /> Descuento Socio VIGENTE (30%):
+              </span>
+              <span>- {formatMoney(pricing.discountAmount)}</span>
+            </div>
+          )}
+
           <div className="order-total">
             <span>Total a pagar</span>
             <b>
