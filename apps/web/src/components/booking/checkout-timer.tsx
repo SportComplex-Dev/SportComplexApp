@@ -45,7 +45,7 @@ export function CheckoutTimer({
   }
 
   const [remaining, setRemaining] = useState<number>(calculateRemaining)
-  const [hasNotifiedExpire, setHasNotifiedExpire] = useState(false)
+  const hasNotifiedExpireRef = useRef(false)
 
   useEffect(() => {
     if (forcedExpired) {
@@ -59,15 +59,15 @@ export function CheckoutTimer({
 
       if (nextRemaining <= 0) {
         clearInterval(interval)
-        if (!hasNotifiedExpire) {
-          setHasNotifiedExpire(true)
+        if (!hasNotifiedExpireRef.current) {
+          hasNotifiedExpireRef.current = true
           onExpireRef.current?.()
         }
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [expiresAt, forcedExpired, hasNotifiedExpire, initialSeconds])
+  }, [expiresAt, forcedExpired, initialSeconds])
 
   const status = getTimerStatus(forcedExpired ? 0 : remaining)
   const isExpired = status === 'expired'
@@ -81,12 +81,12 @@ export function CheckoutTimer({
 
   return (
     <div className={`checkout-timer-card ${className}`}>
-      {/* Región viva discreta para lectores de pantalla solo en hitos críticos (A11Y-01) */}
+      {/* Región viva discreta para lectores de pantalla solo en hitos críticos (A11Y-01 / REG-01) */}
       <div className="sr-only" role="status" aria-live="polite">
         {isExpired
           ? 'El tiempo de reserva ha expirado. El cupo fue liberado.'
           : isWarning
-            ? `Atención: Quedan menos de 5 minutos para completar la reserva (${formattedTime})`
+            ? 'Atención: Quedan menos de 5 minutos para completar la reserva.'
             : ''}
       </div>
 

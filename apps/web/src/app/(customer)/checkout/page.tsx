@@ -14,6 +14,10 @@ import {
 import { Badge, Input } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
 import { CheckoutTimer } from '@/components/booking/checkout-timer'
+import {
+  isPaymentBlocked,
+  calculateRemainingSeconds,
+} from '@/components/booking/checkout-timer-utils'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
@@ -137,8 +141,11 @@ export default function CheckoutPage() {
     notify('Tarjeta de prueba Visa precargada.', 'success')
   }
 
+  const remainingSeconds = calculateRemainingSeconds(draft?.expiresAt, Date.now())
+  const paymentBlocked = isExpired || isPaymentBlocked(remainingSeconds)
+
   const confirmPayment = async () => {
-    if (isExpired) {
+    if (paymentBlocked) {
       notify('El tiempo de reserva ha expirado. Por favor selecciona un nuevo turno.', 'error')
       return
     }
@@ -522,14 +529,14 @@ export default function CheckoutPage() {
           {/* Action button */}
           <ActionButton
             onClick={confirmPayment}
-            disabled={isProcessing || isExpired}
+            disabled={isProcessing || paymentBlocked}
             className="w-full justify-center text-[14px]"
           >
             {isProcessing ? (
               <>
                 <Loader2 size={17} className="animate-spin" /> Procesando pago...
               </>
-            ) : isExpired ? (
+            ) : paymentBlocked ? (
               <>
                 Cupo liberado (Tiempo expirado)
               </>

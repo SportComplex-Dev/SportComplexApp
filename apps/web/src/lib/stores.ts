@@ -26,7 +26,19 @@ export const initialBookings: Booking[] = [
 
 export const useBookings = () => usePersistentState<Booking[]>('altura:bookings', initialBookings)
 
-export type Draft = { itemId: string; date: string; time: string; attendees: number; expiresAt?: number }
+/**
+ * Información del borrador de reserva en progreso.
+ */
+export type Draft = {
+  itemId: string
+  date: string
+  time: string
+  attendees: number
+  /**
+   * Epoch timestamp en milisegundos (`Date.now()`) indicando el momento exacto en que expira la retención del cupo (TSK-FE-09).
+   */
+  expiresAt?: number
+}
 export const useDraft = () => usePersistentState<Draft | null>('altura:draft', null)
 
 /** Código del último tiquete generado, para mostrar la confirmación. */
