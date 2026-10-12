@@ -12,6 +12,7 @@ import { Brand } from '@/components/brand'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
+import { useApp } from '@/components/app-provider'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 
@@ -27,12 +28,13 @@ function getSafeNextPath() {
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login: syncLogin } = useApp()
   const { dark, toggleTheme } = useThemeToggle()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [checkingSession, setCheckingSession] = useState(true)
+  const [checkingSession, setCheckingSession] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -79,7 +81,8 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await signIn('google', { redirectTo: getSafeNextPath() ?? '/' })
+      const destination = getSafeNextPath() ?? '/portal'
+      await signIn('google', { redirectTo: destination, callbackUrl: destination })
     } catch {
       setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
       setLoading(false)
@@ -104,15 +107,17 @@ export default function LoginPage() {
         ...parsed.data,
         redirect: false,
       })
-
       if (!result?.ok || result.error) {
         setError('Correo o contraseña incorrectos, o cuenta inactiva.')
         return
       }
 
-      // 3. Leer el rol desde la sesión ya emitida por Auth.js.
+      // 3. Leer la sesión emitida por Auth.js y sincronizar estado
       const session = await getSession()
       const role = getUserRole(session?.user?.role)
+      if (session?.user?.email) {
+        syncLogin(session.user.email, session.user.name || undefined, role)
+      }
       router.push(getSafeNextPath() ?? roleHome[role])
       router.refresh()
     } catch (err: unknown) {
@@ -157,7 +162,7 @@ export default function LoginPage() {
               type="button"
               className="google-button"
               onClick={handleGoogleLogin}
-              disabled={loading || checkingSession}
+              disabled={loading}
               aria-busy={loading}
             >
               {loading ? <Loader2 size={16} aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : <GoogleMark />}
@@ -168,7 +173,7 @@ export default function LoginPage() {
               <span />o con tu correo<span />
             </div>
 
-            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading || checkingSession}>
+            <form className="auth-fields" onSubmit={handleSubmit} noValidate aria-busy={loading}>
               <label>
                 Correo electrónico
                 <Input

@@ -1,4 +1,6 @@
 import { prisma } from "../client";
+import { PeriodicidadPlan } from "@prisma/client";
+import { calculateRenewalDate } from "./memberships";
 
 /**
  * TSK-BD-09 — Idempotencia de pagos con Stripe (HU-10 / RF-09).
@@ -7,9 +9,14 @@ import { prisma } from "../client";
  * `procesarPagoWebhook` ejecuta dentro de UNA transacción:
  *   1. Upsert del registro `PAGO` por `stripe_payment_intent_id`
  *      (UNIQUE desde TSK-BD-06 → `pago_stripe_payment_intent_id_key`).
- *   2. Confirmación condicional de la `RESERVA`
- *      (`PENDIENTE_PAGO → CONFIRMADA`, solo si el pago es `APROBADO`).
- *   3. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
+ *   2. Confirmación condicional de las `RESERVA(s)`
+ *      (`PENDIENTE_PAGO → CONFIRMADA`, solo si el pago es `APROBADO`) y
+ *      emisión del `TICKET_QR` (`EMITIDO`) de cada reserva (TSK-BE-10 / RF-09).
+ *   3. Cancelación condicional de las `RESERVA(s)` en pago `FALLIDO`
+ *      (`PENDIENTE_PAGO → CANCELADA_PAGO`) con restitución de la franja
+ *      (`cupos_ocupados -= cantidad`); el job de TTL (TSK-BD-08) cubre los
+ *      checkouts abandonados sin webhook, sin doble liberación.
+ *   4. Activación condicional de la `MEMBRESIA` (`→ VIGENTE`, solo `APROBADO`).
  *
  * Garantías de idempotencia:
  * - Reenviar el mismo webhook (mismo `payment_intent`) N veces deja SIEMPRE
@@ -25,7 +32,8 @@ import { prisma } from "../client";
  *   (un evento tardío de fallo no pisa un pago ya aprobado).
  *
  * Contrato de metadatos Stripe (ver `buildPaymentMetadata` en core):
- *   metadata.bookingId  → reserva a confirmar (opcional)
+ *   metadata.bookingId  → reserva o lista CSV de reservas a confirmar
+ *   metadata.bookingIds → lista CSV explícita de reservas a confirmar
  *   metadata.userId     → usuario dueño del pago (obligatorio)
  *   metadata.membershipId → membresía a activar (opcional)
  */
@@ -50,33 +58,31 @@ export class PaymentError extends Error {
 }
 
 export interface ProcesarPagoInput {
-  /** `PaymentIntent.id` de Stripe (`pi_...`). Identificador natural único. */
   stripePaymentIntentId: string;
-  /** Usuario responsable del pago (FK `pago.usuario_id`, NOT NULL). */
   usuarioId: string;
-  /** Monto con 2 decimales (ej. `"75000.00"`). Numérico >= 0. */
   monto: string | number;
   estado: EstadoPagoValor;
   tipo: TipoPagoValor;
-  /** Si el pago confirma una reserva, su id (`reserva.id`). */
   reservaId?: string | undefined;
-  /** Si el pago activa una membresía, su id (`membresia.id`). */
+  reservaIds?: string[] | undefined;
   membresiaId?: number | undefined;
+  ticketCodigoUuid?: string | undefined;
+  vendedorId?: string | undefined;
+  serviceId?: number | undefined;
 }
 
 export interface ProcesarPagoResultado {
   pagoId: string;
-  /** true solo si ESTA corrida insertó la fila de `pago`. */
   pagoCreado: boolean;
-  /** true si la fila de `pago` ya existía (reintento de webhook). */
   duplicado: boolean;
   estado: EstadoPagoValor;
-  /** true solo si ESTA corrida ejecutó `PENDIENTE_PAGO → CONFIRMADA`. */
   reservaConfirmada: boolean;
-  /** Estado final de la reserva referenciada (si se pasó `reservaId`). */
   reservaEstado: string | null;
-  /** true solo si ESTA corrida ejecutó la activación de la membresía. */
+  ticketQrEmitido: boolean;
+  franjaRestituida: boolean;
   membresiaActivada: boolean;
+  reservasConfirmadas?: string[];
+  reservasEstado?: Record<string, string>;
 }
 
 type DbLike = {
@@ -87,7 +93,6 @@ type DbLike = {
 };
 
 export interface ProcesarPagoOptions {
-  /** Cliente inyectable para tests. Por defecto el `prisma` global. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db?: any;
 }
@@ -95,7 +100,6 @@ export interface ProcesarPagoOptions {
 function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = (err as { code?: unknown }).code;
-  // P2002 = Prisma unique constraint violation; 23505 = Postgres unique_violation.
   return code === "P2002" || code === "23505";
 }
 
@@ -135,14 +139,158 @@ function validateInput(input: ProcesarPagoInput): void {
   if (!TIPOS_PAGO.includes(input.tipo)) {
     throw new PaymentError(`Tipo de pago inválido: ${input.tipo}`, "VALIDATION_ERROR", 400);
   }
+  if (input.reservaIds !== undefined) {
+    if (!Array.isArray(input.reservaIds)) {
+      throw new PaymentError(
+        "reservaIds debe ser un array de strings.",
+        "VALIDATION_ERROR",
+        400,
+      );
+    }
+    for (const id of input.reservaIds) {
+      if (!id || typeof id !== "string" || !id.trim()) {
+        throw new PaymentError(
+          "Cada reservaId debe ser un string no vacío.",
+          "VALIDATION_ERROR",
+          400,
+        );
+      }
+    }
+  }
+  const tieneVendedor = input.vendedorId !== undefined;
+  const tieneServicio = input.serviceId !== undefined;
+  if (tieneVendedor !== tieneServicio) {
+    throw new PaymentError(
+      "La metadata POS requiere vendedor_id y servicio_id juntos.",
+      "INVALID_POS_METADATA",
+      400,
+    );
+  }
+  if (
+    tieneVendedor &&
+    (!input.vendedorId?.trim() || !Number.isSafeInteger(input.serviceId) || (input.serviceId ?? 0) <= 0)
+  ) {
+    throw new PaymentError("La metadata POS no es válida.", "INVALID_POS_METADATA", 400);
+  }
+}
+
+type ReservaResumen = {
+  id: string;
+  estado: string;
+  canal?: string;
+  vendedorId?: string | null;
+  disponibilidad?: { servicioId: number } | null;
+  disponibilidadId?: bigint | number | null;
+  cantidadCupos?: number | null;
+  total?: number | string | { toString(): string } | null;
+};
+
+/**
+ * Emite el `TICKET_QR` (estado `EMITIDO`) sin abortar transacciones de Postgres.
+ * Se verifica previamente con findUnique para no provocar abortos de bloque transaccional.
+ */
+async function emitirTicketQr(
+  tx: DbLike,
+  reservaId: string,
+  codigoUuid?: string,
+): Promise<boolean> {
+  const existente = await tx.ticketQr.findUnique({ where: { reservaId } });
+  if (existente) return false;
+
+  await tx.ticketQr.create({
+    data: {
+      reservaId,
+      ...(codigoUuid ? { codigoUuid } : {}),
+      estado: "EMITIDO",
+    },
+  });
+  return true;
+}
+
+/**
+ * Restituye la franja de una reserva cancelada reutilizando los datos en memoria.
+ */
+async function restituirFranja(
+  tx: DbLike,
+  reserva: ReservaResumen,
+): Promise<boolean> {
+  const disponibilidadId = reserva.disponibilidadId;
+  const cantidad = reserva.cantidadCupos as number | undefined;
+  if (disponibilidadId == null || !cantidad) return false;
+
+  const disp = await tx.disponibilidad.findUnique({ where: { id: disponibilidadId } });
+  const actual = (disp?.cuposOcupados as number | undefined) ?? 0;
+  const liberar = Math.min(actual, cantidad);
+  if (liberar <= 0) return false;
+
+  await tx.disponibilidad.update({
+    where: { id: disponibilidadId },
+    data: { cuposOcupados: { decrement: liberar } },
+  });
+  return true;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
 
+  const rawReservaIds =
+    input.reservaIds && input.reservaIds.length > 0
+      ? input.reservaIds
+      : input.reservaId
+        ? [input.reservaId]
+        : [];
+  const targetReservaIds = Array.from(
+    new Set(rawReservaIds.map((id) => id.trim()).filter(Boolean)),
+  );
+
   return db.$transaction(async (tx: DbLike) => {
-    // 1. Upsert de PAGO por identificador natural (stripe_payment_intent_id).
+    let reservasExistentes: ReservaResumen[] = [];
+    if (targetReservaIds.length > 0) {
+      reservasExistentes = (await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+        include: { disponibilidad: { select: { servicioId: true } } },
+      })) as ReservaResumen[];
+
+      if (input.vendedorId !== undefined) {
+        if (targetReservaIds.length !== 1) {
+          throw new PaymentError(
+            "Un cobro POS debe corresponder a una sola reserva.",
+            "INVALID_POS_METADATA",
+            400,
+          );
+        }
+        const reservaPos = reservasExistentes[0];
+        if (
+          !reservaPos ||
+          reservaPos.disponibilidad?.servicioId !== input.serviceId ||
+          (reservaPos.vendedorId != null && reservaPos.vendedorId !== input.vendedorId)
+        ) {
+          throw new PaymentError(
+            "La metadata POS no coincide con la reserva.",
+            "INVALID_POS_METADATA",
+            400,
+          );
+        }
+      }
+
+      const reservasConTotal = reservasExistentes.filter((r) => r.total != null);
+      if (reservasConTotal.length > 0) {
+        const sumaEsperada = reservasConTotal.reduce(
+          (acc: number, r) => acc + Number(r.total ?? 0),
+          0,
+        );
+        if (normalizeMonto(sumaEsperada) !== monto) {
+          throw new PaymentError(
+            `El monto recibido (${monto}) no coincide con el total esperado de las reservas (${normalizeMonto(sumaEsperada)}).`,
+            "AMOUNT_MISMATCH",
+            400,
+          );
+        }
+      }
+    }
+
+    // 1. Upsert de PAGO
     let pago = await tx.pago.findUnique({
       where: { stripePaymentIntentId: input.stripePaymentIntentId },
     });
@@ -161,7 +309,6 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       });
       pagoCreado = true;
     } else if (pago.estado !== "APROBADO" && pago.estado !== input.estado) {
-      // Solo avanza de estado; jamás degrada un APROBADO.
       await tx.pago.update({
         where: { id: pago.id },
         data: { estado: input.estado },
@@ -169,24 +316,77 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       pago = { ...pago, estado: input.estado };
     }
 
-    // 2. Confirmación de reserva — update condicional (corazón de la
-    //    idempotencia: solo gana quien encuentra PENDIENTE_PAGO).
+    // 2. Procesamiento de reservas
     let reservaConfirmada = false;
     let reservaEstado: string | null = null;
-    if (input.reservaId) {
+    let ticketQrEmitido = false;
+    let franjaRestituida = false;
+    const reservasConfirmadas: string[] = [];
+    const reservasEstado: Record<string, string> = {};
+
+    if (targetReservaIds.length > 0) {
       if (input.estado === "APROBADO") {
-        const upd = await tx.reserva.updateMany({
-          where: { id: input.reservaId, estado: "PENDIENTE_PAGO" },
-          data: { estado: "CONFIRMADA", pagoId: pago.id },
-        });
-        const count = typeof upd?.count === "number" ? upd.count : 0;
-        reservaConfirmada = count === 1;
+        const pendientes = reservasExistentes.filter((r) => r.estado === "PENDIENTE_PAGO");
+        const pendientesIds = pendientes.map((r) => r.id);
+
+        if (pendientesIds.length > 0) {
+          const upd = await tx.reserva.updateMany({
+            where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
+            data: {
+              estado: "CONFIRMADA",
+              pagoId: pago.id,
+              ...(input.vendedorId
+                ? { vendedorId: input.vendedorId, canal: "TAQUILLA" }
+                : {}),
+            },
+          });
+          const count = typeof upd?.count === "number" ? upd.count : 0;
+          if (count > 0) {
+            reservasConfirmadas.push(...pendientesIds);
+            for (const rId of pendientesIds) {
+              const emitido = await emitirTicketQr(
+                tx,
+                rId,
+                pendientesIds.length === 1 ? input.ticketCodigoUuid : undefined,
+              );
+              if (emitido) ticketQrEmitido = true;
+            }
+          }
+        }
+      } else if (input.estado === "FALLIDO") {
+        const pendientes = reservasExistentes.filter((r) => r.estado === "PENDIENTE_PAGO");
+        const pendientesIds = pendientes.map((r) => r.id);
+
+        if (pendientesIds.length > 0) {
+          const upd = await tx.reserva.updateMany({
+            where: { id: { in: pendientesIds }, estado: "PENDIENTE_PAGO" },
+            data: { estado: "CANCELADA_PAGO" },
+          });
+          const count = typeof upd?.count === "number" ? upd.count : 0;
+          if (count > 0) {
+            for (const r of pendientes) {
+              const restituido = await restituirFranja(tx, r);
+              if (restituido) franjaRestituida = true;
+            }
+          }
+        }
       }
-      const fila = await tx.reserva.findUnique({ where: { id: input.reservaId } });
-      reservaEstado = (fila?.estado as string | undefined) ?? null;
+
+      const reservasActualizadas = await tx.reserva.findMany({
+        where: { id: { in: targetReservaIds } },
+      });
+      for (const r of reservasActualizadas) {
+        if (r.id && r.estado) {
+          reservasEstado[r.id] = r.estado;
+        }
+      }
+
+      const primerId = targetReservaIds[0];
+      reservaEstado = reservasEstado[primerId] ?? null;
+      reservaConfirmada = reservasConfirmadas.length > 0;
     }
 
-    // 3. Activación de membresía — condicional e idempotente por el mismo motivo.
+    // 3. Activación de membresía
     let membresiaActivada = false;
     if (input.membresiaId != null && input.estado === "APROBADO") {
       const upd = await tx.membresia.updateMany({
@@ -204,19 +404,15 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
       estado: pago.estado as EstadoPagoValor,
       reservaConfirmada,
       reservaEstado,
+      ticketQrEmitido,
+      franjaRestituida,
       membresiaActivada,
+      reservasConfirmadas,
+      reservasEstado,
     };
   }) as Promise<ProcesarPagoResultado>;
 }
 
-/**
- * Procesa un evento de pago de Stripe de forma idempotente.
- *
- * Reintentos de webhook y carreras concurrentes: ante `P2002` (dos eventos
- * compitieron por el mismo `stripe_payment_intent_id`) se reintenta la
- * transacción completa hasta 3 veces; en el reintento la fila ya existe y el
- * resto de la lógica (confirmación/activación) es un no-op condicional.
- */
 export async function procesarPagoWebhook(
   input: ProcesarPagoInput,
   options: ProcesarPagoOptions = {},
@@ -231,8 +427,275 @@ export async function procesarPagoWebhook(
       return await procesarIntento(input, db);
     } catch (err: unknown) {
       if (!isUniqueViolation(err)) throw err;
-      ultimoError = err; // Carrera por el UNIQUE: reintentar la transacción.
+      ultimoError = err;
     }
   }
   throw ultimoError;
 }
+
+export interface ProcesarFacturaInput {
+  stripeInvoiceId: string;
+  stripeSubscriptionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  usuarioId?: string | null;
+  planId?: number | string | null;
+  monto: string | number;
+  estado: EstadoPagoValor;
+  periodEnd?: Date | null;
+  membresiaId?: number | null;
+}
+
+export interface ProcesarFacturaResultado {
+  pagoId: string;
+  pagoCreado: boolean;
+  duplicado: boolean;
+  estado: EstadoPagoValor;
+  membresiaRenovada: boolean;
+  membresiaVencida: boolean;
+  proximaRenovacion: Date | null;
+  membresiaId: number | null;
+  usuarioId: string;
+}
+
+/**
+ * TSK-BE-20 (RF-16 / RN-08, RN-09): Procesa eventos de factura recurrente de Stripe (invoice.paid e invoice.payment_failed).
+ * - invoice.paid: actualiza/mantiene estado VIGENTE y renueva `proxima_renovacion` (beneficios sin interrupción).
+ * - invoice.payment_failed: registra el fallo y transiciona la membresía a VENCIDA.
+ * Idempotente ante reenvíos de Stripe por event ID / invoice ID.
+ */
+export async function procesarFacturaWebhook(
+  input: ProcesarFacturaInput,
+  options: ProcesarPagoOptions = {},
+): Promise<ProcesarFacturaResultado> {
+  if (!input.stripeInvoiceId?.trim()) {
+    throw new PaymentError("Falta stripeInvoiceId.", "VALIDATION_ERROR", 400);
+  }
+  if (!ESTADOS_PAGO.includes(input.estado)) {
+    throw new PaymentError(`Estado de pago inválido: ${input.estado}`, "VALIDATION_ERROR", 400);
+  }
+  const db = options.db ?? prisma;
+  const monto = normalizeMonto(input.monto);
+  const paymentRefId =
+    input.stripePaymentIntentId?.trim() || `inv_${input.stripeInvoiceId.trim()}`;
+
+  const MAX_INTENTOS = 3;
+  let ultimoError: unknown;
+
+  for (let intento = 1; intento <= MAX_INTENTOS; intento += 1) {
+    try {
+      return await db.$transaction(async (tx: DbLike) => {
+        type MembresiaResumen = {
+          id: number;
+          usuarioId: string;
+          estado: string;
+          proximaRenovacion: Date;
+          stripeSubscriptionId?: string | null;
+          plan?: { id?: number; periodicidad?: string } | null;
+        };
+        let membresia: MembresiaResumen | null = null;
+        if (input.membresiaId != null) {
+          membresia = await tx.membresia.findUnique({
+            where: { id: input.membresiaId },
+            include: { plan: true },
+          });
+        }
+        if (!membresia && input.stripeSubscriptionId?.trim()) {
+          membresia = await tx.membresia.findFirst({
+            where: { stripeSubscriptionId: input.stripeSubscriptionId.trim() },
+            include: { plan: true },
+          });
+        }
+        if (!membresia && input.usuarioId?.trim()) {
+          membresia = await tx.membresia.findFirst({
+            where: {
+              usuarioId: input.usuarioId.trim(),
+              estado: "VIGENTE",
+            },
+            include: { plan: true },
+          });
+          if (!membresia) {
+            membresia = await tx.membresia.findFirst({
+              where: {
+                usuarioId: input.usuarioId.trim(),
+              },
+              orderBy: { id: "desc" },
+              include: { plan: true },
+            });
+          }
+        }
+
+        const resolvedUserId = input.usuarioId?.trim() || membresia?.usuarioId;
+        if (!resolvedUserId) {
+          throw new PaymentError(
+            "No se pudo resolver el usuario asociado a la factura.",
+            "MISSING_USER",
+            400,
+          );
+        }
+
+        // Si es el primer cobro exitoso de una suscripción y aún no existe membresía en la BD, se crea (alta de membresía).
+        let membresiaRecienCreada = false;
+        if (!membresia && input.estado === "APROBADO") {
+          const vigenteExistente = await tx.membresia.findFirst({
+            where: {
+              usuarioId: resolvedUserId,
+              estado: "VIGENTE",
+            },
+            include: { plan: true },
+          });
+
+          if (vigenteExistente) {
+            membresia = vigenteExistente;
+            if (
+              vigenteExistente.stripeSubscriptionId &&
+              input.stripeSubscriptionId &&
+              vigenteExistente.stripeSubscriptionId !== input.stripeSubscriptionId
+            ) {
+              console.warn(
+                `[ALERTA MEMBRESIA] Detectada suscripción concurrente en Stripe para usuario ${resolvedUserId}. Activa previa: ${vigenteExistente.stripeSubscriptionId}, Entrante adicional: ${input.stripeSubscriptionId}`,
+              );
+            }
+          } else {
+            const planIdNum = input.planId ? Number(input.planId) : null;
+            if (planIdNum && Number.isInteger(planIdNum) && planIdNum > 0) {
+              const plan = await tx.planMembresia.findUnique({
+                where: { id: planIdNum },
+              });
+              if (plan) {
+                const now = new Date();
+                const fechaInicio = now;
+                const proximaRenovacion = input.periodEnd
+                  ? input.periodEnd
+                  : calculateRenewalDate(now, plan.periodicidad as PeriodicidadPlan);
+
+                const nuevaMembresia = await tx.membresia.create({
+                  data: {
+                    usuarioId: resolvedUserId,
+                    planId: plan.id,
+                    estado: "VIGENTE",
+                    fechaInicio,
+                    proximaRenovacion,
+                    stripeSubscriptionId: input.stripeSubscriptionId?.trim() || null,
+                  },
+                  include: { plan: true },
+                });
+                membresia = nuevaMembresia;
+                membresiaRecienCreada = true;
+              }
+            }
+          }
+        }
+
+        // 2. Upsert de PAGO
+        let pago = await tx.pago.findUnique({
+          where: { stripePaymentIntentId: paymentRefId },
+        });
+        const pagoPrevioEstado = pago?.estado;
+        let pagoCreado = false;
+
+        if (!pago) {
+          pago = await tx.pago.create({
+            data: {
+              usuarioId: resolvedUserId,
+              membresiaId: membresia ? membresia.id : null,
+              tipo: "MEMBRESIA",
+              stripePaymentIntentId: paymentRefId,
+              monto,
+              estado: input.estado,
+            },
+          });
+          pagoCreado = true;
+        } else {
+          if (pago.estado !== "APROBADO" && pago.estado !== input.estado) {
+            await tx.pago.update({
+              where: { id: pago.id },
+              data: { estado: input.estado },
+            });
+            pago = { ...pago, estado: input.estado };
+          }
+          if (membresia && !pago.membresiaId) {
+            await tx.pago.update({
+              where: { id: pago.id },
+              data: { membresiaId: membresia.id },
+            });
+            pago = { ...pago, membresiaId: membresia.id };
+          }
+        }
+
+        // Reenvío idempotente si ya estaba previamente aprobado en la BD
+        if (pagoPrevioEstado === "APROBADO" && input.estado === "APROBADO") {
+          return {
+            pagoId: pago.id as string,
+            pagoCreado: false,
+            duplicado: true,
+            estado: "APROBADO",
+            membresiaRenovada: false,
+            membresiaVencida: false,
+            proximaRenovacion: membresia?.proximaRenovacion ?? null,
+            membresiaId: membresia?.id ?? null,
+            usuarioId: resolvedUserId,
+          };
+        }
+
+        let membresiaRenovada = false;
+        let membresiaVencida = false;
+        let proximaRenovacion: Date | null = membresia?.proximaRenovacion ?? null;
+
+        // 3. Actualización de membresía según resultado
+        if (input.estado === "APROBADO") {
+          if (membresiaRecienCreada) {
+            membresiaRenovada = true;
+          } else if (membresia) {
+            if (input.periodEnd) {
+              proximaRenovacion = input.periodEnd;
+            } else if (membresia.plan?.periodicidad) {
+              const base = membresia.proximaRenovacion ? new Date(membresia.proximaRenovacion) : new Date();
+              proximaRenovacion = calculateRenewalDate(base, membresia.plan.periodicidad as PeriodicidadPlan);
+            } else {
+              proximaRenovacion = calculateRenewalDate(new Date(), PeriodicidadPlan.MENSUAL);
+            }
+
+            await tx.membresia.update({
+              where: { id: membresia.id },
+              data: {
+                estado: "VIGENTE",
+                proximaRenovacion,
+                ...(input.stripeSubscriptionId && !membresia.stripeSubscriptionId
+                  ? { stripeSubscriptionId: input.stripeSubscriptionId }
+                  : {}),
+              },
+            });
+            membresiaRenovada = true;
+          }
+        } else if (input.estado === "FALLIDO") {
+          if (membresia) {
+            await tx.membresia.update({
+              where: { id: membresia.id },
+              data: {
+                estado: "VENCIDA",
+              },
+            });
+            membresiaVencida = true;
+          }
+        }
+
+        return {
+          pagoId: pago.id as string,
+          pagoCreado,
+          duplicado: !pagoCreado,
+          estado: pago.estado as EstadoPagoValor,
+          membresiaRenovada,
+          membresiaVencida,
+          proximaRenovacion,
+          membresiaId: membresia?.id ?? null,
+          usuarioId: resolvedUserId,
+        };
+      });
+    } catch (err: unknown) {
+      if (!isUniqueViolation(err)) throw err;
+      ultimoError = err;
+    }
+  }
+  throw ultimoError;
+}
+

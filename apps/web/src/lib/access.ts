@@ -1,11 +1,21 @@
-import { decideAccess, verifyTicketSignature } from "@sportcomplex/core";
+import {
+  ACCESS_ALREADY_USED_MESSAGE,
+  ACCESS_WINDOW_EXPIRED_MESSAGE,
+  decideAccess,
+  hasServiceMismatch,
+  getTicketAccessWindow,
+  verifyTicketSignature,
+} from "@sportcomplex/core";
 import {
   ejecutarLectura,
   getAsignacionVigente,
+  getServicioParaAccesoById,
   getTicketForScan,
   type ModoLecturaValor,
   type ResultadoLecturaValor,
 } from "@sportcomplex/db";
+
+export { getTicketAccessWindow, ACCESS_WINDOW_EXPIRED_MESSAGE };
 
 // TSK-BD-10 — orquestador del escáner (RF-13/RF-14/RF-15 · RN-05).
 // Orden fijo: 1) firma HMAC ANTES de tocar la BD → 2) cargar ticket →
@@ -51,6 +61,8 @@ export interface EscaneoResultado {
   access: "GRANTED" | "DENIED";
   /** Presente solo cuando `access === "DENIED"`. */
   code?: AccessDeniedCode;
+  /** Mensaje explicativo de la denegación (ej. RF-15 "Acceso denegado: Franja horaria vencida"). */
+  message?: string;
   modo: ModoLecturaValor;
   /** Fila persistida en `LECTURA_ACCESO` (siempre exactamente una). */
   resultado: ResultadoLecturaValor;
@@ -84,20 +96,6 @@ function deniedCodeToResultado(code: AccessDeniedCode): ResultadoLecturaValor {
   }
 }
 
-/** Ventana [inicio, fin] de la reserva = fecha + franja (patrón de bookings, TZ Bogotá). */
-export function getTicketAccessWindow(disponibilidad: {
-  fecha: Date;
-  franja: { horaInicio: Date; horaFin: Date };
-}): { start: Date; end: Date } {
-  const fecha = disponibilidad.fecha.toISOString().slice(0, 10);
-  const horaInicio = disponibilidad.franja.horaInicio.toISOString().slice(11, 19);
-  const horaFin = disponibilidad.franja.horaFin.toISOString().slice(11, 19);
-  return {
-    start: new Date(`${fecha}T${horaInicio}-05:00`),
-    end: new Date(`${fecha}T${horaFin}-05:00`),
-  };
-}
-
 export async function procesarEscaneo(
   input: EscaneoInput,
   options: EscaneoOptions,
@@ -111,14 +109,27 @@ export async function procesarEscaneo(
   const db = options.db;
   const ticket = await getTicketForScan(input.ticketId, db);
 
+  const ticketServiceId = ticket.reserva.disponibilidad.servicio.id;
+  const ticketServiceName = ticket.reserva.disponibilidad.servicio.nombre;
+  const serviceMismatch = hasServiceMismatch(ticketServiceId, input.postServiceId);
+  const stationService = serviceMismatch && input.postServiceId !== null
+    ? await getServicioParaAccesoById(input.postServiceId, db)
+    : null;
+  if (serviceMismatch && !stationService) {
+    throw new AccessError("El servicio del puesto no existe.", "SERVICE_NOT_FOUND", 404);
+  }
+  const serviceMismatchMessage = stationService
+    ? `Acceso denegado: El tiquete pertenece a ${ticketServiceName} y se encuentra en ${stationService.nombre}`
+    : undefined;
+
   const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
   const decision = decideAccess({
     now,
     start,
     end,
     ticketStatus: ticket.estado,
-    ticketServiceId: String(ticket.reserva.disponibilidad.servicio.id),
-    postServiceId: input.postServiceId === null ? null : String(input.postServiceId),
+    ticketServiceId,
+    postServiceId: input.postServiceId,
   });
 
   const modo: ModoLecturaValor = input.postServiceId === null ? "CONSULTA" : "TURNO";
@@ -158,10 +169,22 @@ export async function procesarEscaneo(
       ? "DENIED"
       : "GRANTED";
 
+  let message: string | undefined;
+  if (access === "DENIED") {
+    if (!decision.allowed && decision.code === "SERVICE_MISMATCH") {
+      message = serviceMismatchMessage ?? decision.message ?? ACCESS_ALREADY_USED_MESSAGE;
+    } else if (!decision.allowed) {
+      message = decision.message ?? ACCESS_ALREADY_USED_MESSAGE;
+    } else {
+      message = ACCESS_ALREADY_USED_MESSAGE;
+    }
+  }
+
   return {
     access,
     ...(access === "DENIED" && !decision.allowed ? { code: decision.code } : {}),
     ...(access === "DENIED" && decision.allowed ? { code: "ALREADY_USED" as const } : {}),
+    ...(message ? { message } : {}),
     modo,
     resultado: salida.resultado,
     canjeado: salida.canjeado,

@@ -42,6 +42,21 @@ enum EstadoServicio {
 enum TipoPago {
   RESERVA
   MEMBRESIA
+  TORNEO
+}
+
+enum EstadoTorneo {
+  BORRADOR
+  INSCRIPCIONES_ABIERTAS
+  EN_CURSO
+  FINALIZADO
+  CANCELADO
+}
+
+enum EstadoInscripcionTorneo {
+  PENDIENTE_PAGO
+  CONFIRMADA
+  CANCELADA
 }
 
 enum EstadoPago {
@@ -60,6 +75,7 @@ enum EstadoReserva {
   CONFIRMADA
   EXPIRADA
   CANCELADA_ADMINISTRATIVA
+  CANCELADA_PAGO
 }
 
 enum EstadoTicket {
@@ -120,16 +136,19 @@ model Usuario {
 
   // Relaciones
   // HU-21.DB: blindaje borrado — Restrict impide DELETE físico con historial; onUpdate Cascade preserva propagación.
-  rol                Rol                      @relation(fields: [rolId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  tokens             TokenVerificacion[]
-  reservasTitular    Reserva[]                @relation("ReservaTitular")
-  reservasVendedor   Reserva[]                @relation("ReservaVendedor")
-  ticketsUsados      TicketQr[]               @relation("TicketUsadoPor")
-  asignacionesPuesto AsignacionPuesto[]
-  lecturasAcceso     LecturaAcceso[]
-  membresias         Membresia[]
-  pagos              Pago[]
-  inhabilitaciones   InhabilitacionServicio[]
+  rol                    Rol                      @relation(fields: [rolId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tokens                 TokenVerificacion[]
+  reservasTitular        Reserva[]                @relation("ReservaTitular")
+  reservasVendedor       Reserva[]                @relation("ReservaVendedor")
+  ticketsUsados          TicketQr[]               @relation("TicketUsadoPor")
+  asignacionesPuesto     AsignacionPuesto[]
+  lecturasAcceso         LecturaAcceso[]
+  membresias             Membresia[]
+  pagos                  Pago[]
+  inhabilitaciones       InhabilitacionServicio[]
+  torneosCreados         Torneo[]                 @relation("TorneoAdmin")
+  inscripcionesTorneo    InscripcionTorneo[]
+  inscripcionesValidadas InscripcionTorneo[]      @relation("InscripcionUsadaPor")
 
   @@map("usuario")
 }
@@ -156,6 +175,7 @@ model CategoriaServicio {
   nombre    String                @unique @db.VarChar(60)
   tipo      TipoCategoriaServicio
   servicios Servicio[]
+  torneos   Torneo[]
 
   @@map("categoria_servicio")
 }
@@ -177,6 +197,7 @@ model Servicio {
   disponibilidades   Disponibilidad[]
   asignacionesPuesto AsignacionPuesto[]
   inhabilitaciones   InhabilitacionServicio[]
+  bloqueosTorneo     TorneoBloqueo[]
 
   @@map("servicio")
 }
@@ -235,9 +256,10 @@ model Pago {
   creadoEn              DateTime   @default(now()) @map("creado_en") @db.Timestamptz
 
   // HU-21.DB: historial financiero — Restrict bloquea borrado físico de usuarios con pagos.
-  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  membresia Membresia? @relation(fields: [membresiaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  reservas  Reserva[]
+  usuario             Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  membresia           Membresia?          @relation(fields: [membresiaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  reservas            Reserva[]
+  inscripcionesTorneo InscripcionTorneo[]
 
   @@map("pago")
 }
@@ -271,7 +293,11 @@ model Reserva {
   inhabilitacion InhabilitacionServicio? @relation(fields: [inhabilitacionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   ticketQr       TicketQr?
 
-  @@index([titularId, estado])
+  // TSK-BE-13 (#27): el historial pagina por keyset descendente sobre
+  // (creadoEn, id) filtrando por titular + estado. El compuesto cubre el prefijo
+  // de igualdad y el orden sin sort; reemplaza al índice [titularId, estado]
+  // previo (ver migración reserva_history_keyset_index).
+  @@index([titularId, estado, creadoEn, id])
   // TSK-BD-08: índice parcial TTL vive en SQL raw (migración reserva_ttl_partial_index):
   //   CREATE INDEX "reserva_expira_ttl_idx" ON "reserva"("expira_en")
   //     WHERE "estado" = 'PENDIENTE_PAGO';
@@ -384,4 +410,70 @@ model InhabilitacionServicio {
   reservasCanceladas Reserva[]
 
   @@map("inhabilitacion_servicio")
+}
+
+// 17. TORNEO — TSK-BD-12: Torneos y eventos deportivos
+model Torneo {
+  id                String       @id @default(uuid()) @db.Uuid
+  adminId           String       @map("admin_id") @db.Uuid
+  categoriaId       Int          @map("categoria_id")
+  titulo            String       @db.VarChar(120)
+  descripcion       String?      @db.Text
+  nivel             String       @db.VarChar(60)
+  fechaInicio       DateTime     @map("fecha_inicio") @db.Timestamptz
+  fechaFin          DateTime     @map("fecha_fin") @db.Timestamptz
+  cuposTotales      Int          @map("cupos_totales")
+  cuposOcupados     Int          @default(0) @map("cupos_ocupados")
+  precioInscripcion Decimal      @default(0.00) @map("precio_inscripcion") @db.Decimal(12, 2)
+  estado            EstadoTorneo @default(BORRADOR)
+  creadoEn          DateTime     @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn     DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  // Relaciones
+  admin         Usuario             @relation("TorneoAdmin", fields: [adminId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  categoria     CategoriaServicio   @relation(fields: [categoriaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  bloqueos      TorneoBloqueo[]
+  inscripciones InscripcionTorneo[]
+
+  @@index([fechaInicio, estado])
+  @@map("torneo")
+}
+
+// 18. TORNEO_BLOQUEO — TSK-BD-12: Bloqueo de pistas y horarios para torneos
+model TorneoBloqueo {
+  id         Int      @id @default(autoincrement())
+  torneoId   String   @map("torneo_id") @db.Uuid
+  servicioId Int      @map("servicio_id")
+  horaInicio DateTime @map("hora_inicio") @db.Timestamptz
+  horaFin    DateTime @map("hora_fin") @db.Timestamptz
+
+  torneo   Torneo   @relation(fields: [torneoId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  servicio Servicio @relation(fields: [servicioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([servicioId, horaInicio, horaFin])
+  @@map("torneo_bloqueo")
+}
+
+// 19. INSCRIPCION_TORNEO — TSK-BD-12: Inscripciones de usuarios con pago y QR
+model InscripcionTorneo {
+  id               String                  @id @default(uuid()) @db.Uuid
+  torneoId         String                  @map("torneo_id") @db.Uuid
+  usuarioId        String                  @map("usuario_id") @db.Uuid
+  pagoId           String?                 @map("pago_id") @db.Uuid
+  estado           EstadoInscripcionTorneo @default(PENDIENTE_PAGO)
+  nombrePareja     String?                 @map("nombre_pareja") @db.VarChar(120)
+  ticketCodigoUuid String?                 @unique @default(uuid()) @map("ticket_codigo_uuid") @db.Uuid
+  ticketEstado     EstadoTicket            @default(EMITIDO) @map("ticket_estado")
+  ticketUsadoEn    DateTime?               @map("ticket_usado_en") @db.Timestamptz
+  ticketUsadoPor   String?                 @map("ticket_usado_por") @db.Uuid
+  creadoEn         DateTime                @default(now()) @map("creado_en") @db.Timestamptz
+
+  torneo   Torneo   @relation(fields: [torneoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  pago     Pago?    @relation(fields: [pagoId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  empleado Usuario? @relation("InscripcionUsadaPor", fields: [ticketUsadoPor], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([torneoId, usuarioId])
+  @@index([usuarioId, estado])
+  @@map("inscripcion_torneo")
 }

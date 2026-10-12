@@ -41,10 +41,10 @@ export default function HomePage() {
           </h1>
           <p>Entrena, juega y recarga energía. Todo lo que te mueve, en un solo lugar.</p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/portal/book" className="action-button">
+            <Link href="/services" className="action-button">
               Reserva tu espacio <ArrowRight size={17} />
             </Link>
-            <Link href="/portal/book" className="hero-secondary">
+            <Link href="/services" className="hero-secondary">
               Explorar servicios
             </Link>
             <Link href="/register" className="hero-secondary">
@@ -97,7 +97,7 @@ export default function HomePage() {
               Encuentra tu <span>espacio.</span>
             </h2>
           </div>
-          <Link href="/portal/book" className="text-link">
+          <Link href="/services" className="text-link">
             Ver todos los servicios <ArrowRight size={16} />
           </Link>
         </div>
@@ -106,7 +106,7 @@ export default function HomePage() {
           {serviceCategories.map(({ slug, name, description, icon, tone, image }, index) => {
             const from = minPrice(initialCatalog, slug);
             return (
-              <Link className="category-card" key={slug} href="/portal/book">
+              <Link className="category-card" key={slug} href={`/services/${slug}`}>
                 <div className="category-media">
                   {image && (
                     <Image
