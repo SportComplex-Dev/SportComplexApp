@@ -1,67 +1,57 @@
-import Stripe from "stripe";
-import { z } from "zod";
-import { auth } from "@/auth";
+import { authorizeApiRequest } from "@/lib/api-auth";
+import { created, fail } from "@/lib/api-response";
+import { createPosPaymentIntent } from "@sportcomplex/core";
 import { prisma } from "@sportcomplex/db";
-import { buildPaymentMetadata, STRIPE_CURRENCY } from "@sportcomplex/core";
-import { fail, ok } from "@/lib/api-response";
+import { posPaymentIntentSchema } from "@sportcomplex/validation";
 
-const requestSchema = z.object({
-  reservationId: z.string().uuid(),
+const findReserva = (id: string) => prisma.reserva.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    titularId: true,
+    vendedorId: true,
+    pagoId: true,
+    estado: true,
+    total: true,
+    expiraEn: true,
+    disponibilidad: {
+      select: {
+        servicioId: true,
+        servicio: { select: { estado: true } },
+      },
+    },
+  },
 });
 
-function paymentIntentAmount(total: unknown): number | null {
-  const amount = Number(total);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  const minorUnits = Math.round(amount * 100);
-  return Number.isSafeInteger(minorUnits) ? minorUnits : null;
+interface PosReservation {
+  id: string;
+  titularId: string;
+  vendedorId: string | null;
+  pagoId: string | null;
+  estado: string;
+  total: number | string | { toString(): string };
+  expiraEn: Date | null;
+  disponibilidad: {
+    servicioId: number;
+    servicio: { estado: string } | null;
+  } | null;
 }
 
-function paymentIntentResponse(paymentIntent: Stripe.PaymentIntent) {
-  if (paymentIntent.status === "succeeded" || paymentIntent.status === "processing") {
-    return ok({
-      clientSecret: null,
-      paymentIntentId: paymentIntent.id,
-      status: paymentIntent.status,
-    });
-  }
+export function createPaymentIntentPostHandler(
+  dependencies: {
+    authorize?: typeof authorizeApiRequest;
+    findReserva?: (id: string) => Promise<PosReservation | null>;
+    createPaymentIntent?: typeof createPosPaymentIntent;
+  } = {},
+) {
+  const authorize = dependencies.authorize ?? authorizeApiRequest;
+  const loadReserva = dependencies.findReserva ?? findReserva;
+  const createIntent = dependencies.createPaymentIntent ?? createPosPaymentIntent;
 
-  const clientSecret = paymentIntent.client_secret;
-  if (!clientSecret) {
-    return fail(
-      "PAYMENT_NOT_AVAILABLE",
-      "El pago no está disponible en este momento. Inténtalo de nuevo más tarde.",
-      409,
-    );
-  }
-  return ok({
-    clientSecret,
-    paymentIntentId: paymentIntent.id,
-    status: paymentIntent.status,
-  });
-}
-
-import { authorizeApiRequest } from "@/lib/api-auth";
-
-export async function POST(request: Request) {
-  try {
-    let userId: string | null = null;
-    const authResult = await authorizeApiRequest(["Cliente"]);
-    if (authResult.authorized) {
-      userId = authResult.actor.id;
-    } else {
-      const session = await auth();
-      if (
-        session?.user?.id &&
-        (session.user.role?.toUpperCase() === "CLIENTE" || !session.user.role) &&
-        (session.user.estado === "ACTIVO" || !session.user.estado)
-      ) {
-        userId = session.user.id;
-      }
-    }
-
-    if (!userId) {
-      return fail("UNAUTHORIZED", "Debes iniciar sesión para pagar una reserva.", 401);
-    }
+  /** Crea el PaymentIntent de una reserva POS; la confirmación final llega por webhook. */
+  return async function POST(request: Request) {
+    const authorization = await authorize(["Administrador", "Empleado_Vendedor"]);
+    if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
     try {
@@ -70,167 +60,68 @@ export async function POST(request: Request) {
       return fail("INVALID_PAYLOAD", "El cuerpo debe ser JSON válido.", 400);
     }
 
-    const parsed = requestSchema.safeParse(body);
+    const parsed = posPaymentIntentSchema.safeParse(body);
     if (!parsed.success) {
-      return fail("VALIDATION_ERROR", "El identificador de la reserva no es válido.", 400);
+      return fail("VALIDATION_ERROR", "Datos de cobro POS inválidos.", 400, parsed.error.flatten());
     }
 
-    const now = new Date();
-    const reservation = await prisma.reserva.findFirst({
-      where: {
-        id: parsed.data.reservationId,
-        titularId: userId,
-      },
-      include: { pago: true },
-    });
+    try {
+      const reserva = await loadReserva(parsed.data.reservaId);
 
-    if (!reservation) {
-      // En entorno de desarrollo o pruebas de UI con sandbox, si la reserva fue creada en memoria/draft
-      // o el seed local no tiene el servicio persistido, permitimos crear el PaymentIntent
-      // para que el cliente pueda probar el formulario de Stripe Elements y los rechazos de tarjeta
-      const secretKey = process.env.STRIPE_SECRET_KEY;
-      if (!secretKey) {
-        return fail("PAYMENT_CONFIGURATION_ERROR", "El pago no está disponible en este momento.", 503);
-      }
-      const stripe = new Stripe(secretKey);
-      const testPaymentIntent = await stripe.paymentIntents.create(
-        {
-          amount: 4800000,
-          currency: STRIPE_CURRENCY,
-          automatic_payment_methods: { enabled: true },
-          metadata: buildPaymentMetadata({
-            bookingId: parsed.data.reservationId,
-            userId,
-          }),
-        },
-        { idempotencyKey: `reservation-${parsed.data.reservationId}` },
-      );
-      return paymentIntentResponse(testPaymentIntent);
-    }
-    if (
-      reservation.canal !== "ONLINE" ||
-      reservation.estado !== "PENDIENTE_PAGO" ||
-      !reservation.expiraEn ||
-      reservation.expiraEn <= now
-    ) {
-      return fail(
-        "RESERVATION_NOT_PAYABLE",
-        "Esta reserva ya no está pendiente de pago o su tiempo de reserva venció.",
-        409,
-      );
-    }
-
-    const amount = paymentIntentAmount(reservation.total);
-    if (amount === null) {
-      return fail("INVALID_RESERVATION_AMOUNT", "El valor de la reserva no es válido.", 409);
-    }
-
-    const secretKey = process.env.STRIPE_SECRET_KEY;
-    if (!secretKey) {
-      console.error("STRIPE_SECRET_KEY no está configurada.");
-      return fail("PAYMENT_CONFIGURATION_ERROR", "El pago no está disponible en este momento.", 503);
-    }
-
-    const stripe = new Stripe(secretKey);
-    let paymentIntent: Stripe.PaymentIntent;
-
-    if (reservation.pagoId) {
-      const payment = reservation.pago;
+      if (!reserva) return fail("BOOKING_NOT_FOUND", "La reserva no existe.", 404);
       if (
-        !payment ||
-        payment.usuarioId !== userId ||
-        payment.tipo !== "RESERVA" ||
-        Number(payment.monto) !== Number(reservation.total) ||
-        payment.estado !== "PENDIENTE"
+        reserva.estado !== "PENDIENTE_PAGO" ||
+        !reserva.expiraEn ||
+        reserva.expiraEn <= new Date() ||
+        reserva.pagoId
       ) {
-        return fail("PAYMENT_STATE_CONFLICT", "No se puede iniciar el pago de esta reserva.", 409);
+        return fail("BOOKING_NOT_PAYABLE", "La reserva no está pendiente o el hold venció.", 409);
+      }
+      if (reserva.vendedorId && reserva.vendedorId !== authorization.actor.id) {
+        return fail("POS_BOOKING_FORBIDDEN", "La reserva ya está asociada a otro vendedor.", 403);
+      }
+      if (reserva.disponibilidad?.servicio?.estado !== "ACTIVO") {
+        return fail("SERVICE_UNAVAILABLE", "El servicio no está activo.", 409);
       }
 
-      paymentIntent = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
-      if (paymentIntent.status === "canceled") {
-        return fail(
-          "PAYMENT_CANCELED",
-          "Este intento de pago fue cancelado. Consulta el estado de tu reserva.",
-          409,
-        );
-      }
-    } else {
-      paymentIntent = await stripe.paymentIntents.create(
+      const paymentIntent = await createIntent(
         {
-          amount,
-          currency: STRIPE_CURRENCY,
-          automatic_payment_methods: { enabled: true },
-          metadata: buildPaymentMetadata({
-            bookingId: reservation.id,
-            userId,
-          }),
+          bookingId: reserva.id,
+          userId: reserva.titularId,
+          serviceId: reserva.disponibilidad.servicioId,
+          vendedorId: authorization.actor.id,
+          total: reserva.total,
         },
-        { idempotencyKey: `reservation-${reservation.id}` },
+        { idempotencyKey: `sportcomplex-pos-${reserva.id}` },
       );
 
-      const associated = await prisma.$transaction(async (tx) => {
-        const current = await tx.reserva.findFirst({
-          where: {
-            id: reservation.id,
-            titularId: userId,
-            canal: "ONLINE",
-            estado: "PENDIENTE_PAGO",
-            expiraEn: { gt: new Date() },
-          },
-          select: { id: true },
-        });
-        if (!current) return false;
-
-        const payment = await tx.pago.upsert({
-          where: { stripePaymentIntentId: paymentIntent.id },
-          create: {
-            usuarioId: userId,
-            tipo: "RESERVA",
-            stripePaymentIntentId: paymentIntent.id,
-            monto: reservation.total,
-            estado: "PENDIENTE",
-          },
-          update: {},
-        });
-        if (payment.usuarioId !== userId || payment.tipo !== "RESERVA") return false;
-
-        const updated = await tx.reserva.updateMany({
-          where: {
-            id: reservation.id,
-            titularId: userId,
-            estado: "PENDIENTE_PAGO",
-            expiraEn: { gt: new Date() },
-            OR: [{ pagoId: null }, { pagoId: payment.id }],
-          },
-          data: { pagoId: payment.id },
-        });
-        return updated.count === 1;
+      return created({
+        reservaId: reserva.id,
+        paymentIntentId: paymentIntent.paymentIntentId,
+        clientSecret: paymentIntent.clientSecret,
+        client_secret: paymentIntent.clientSecret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
       });
-
-      if (!associated) {
-        try {
-          await stripe.paymentIntents.cancel(paymentIntent.id);
-        } catch (error: unknown) {
-          console.error("No se pudo cancelar un PaymentIntent sin reserva pagable:", error);
-        }
-        return fail(
-          "RESERVATION_NOT_PAYABLE",
-          "La reserva venció o cambió de estado. Vuelve a seleccionar el horario.",
-          409,
-        );
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes("STRIPE_NOT_CONFIGURED")) {
+        return fail("STRIPE_NOT_CONFIGURED", "La pasarela de pago no está configurada.", 503);
       }
+      if (error instanceof Error && error.message.includes("STRIPE_PAYMENT_INTENT")) {
+        console.error("Error creando PaymentIntent POS:", error);
+        return fail("PAYMENT_INTENT_FAILED", "No se pudo iniciar el cobro POS.", 502);
+      }
+      if (error instanceof Error && error.message.includes("POS_PAYMENT_INTENT_CONFLICT")) {
+        return fail("POS_PAYMENT_INTENT_CONFLICT", "La reserva ya tiene un intento de pago asociado a otro vendedor.", 409);
+      }
+      if (error instanceof Error && error.message.includes("INVALID_CHECKOUT_AMOUNT")) {
+        return fail("INVALID_RESERVATION_TOTAL", "El total de la reserva no puede cobrarse.", 422);
+      }
+      console.error("Error en POST /api/payments/intent:", error);
+      return fail("SERVER_ERROR", "Error al iniciar el cobro POS.", 500);
     }
-
-    return paymentIntentResponse(paymentIntent);
-  } catch (error: unknown) {
-    console.error("Error al crear el PaymentIntent de una reserva:", error);
-    if (error instanceof Stripe.errors.StripeError) {
-      return fail(
-        "PAYMENT_PROVIDER_ERROR",
-        "No pudimos preparar el pago. Inténtalo de nuevo.",
-        502,
-      );
-    }
-    return fail("SERVER_ERROR", "Error al preparar el pago de la reserva.", 500);
-  }
+  };
 }
+
+export const POST = createPaymentIntentPostHandler();

@@ -528,6 +528,13 @@ export async function createBookingHoldCart(input: {
       }
     }
 
+    const activeMembership = await tx.membresia.findFirst({
+      where: {
+        usuarioId: input.userId,
+        estado: "VIGENTE",
+      },
+    });
+
     const expiresAt = new Date(now.getTime() + HOLD_TTL_MINUTES * 60_000);
     const bookings = [];
     let total = 0;
@@ -541,18 +548,32 @@ export async function createBookingHoldCart(input: {
       const subtotal = Number(
         (Number(availability.servicio.tarifa) * item.cantidadCupos).toFixed(2),
       );
-      total += subtotal;
+
+      let descuentoPct = 0;
+      let itemTotal = subtotal;
+      let membresiaId: number | null = null;
+
+      if (activeMembership) {
+        descuentoPct = 30.0;
+        const rawDiscount = Number((subtotal * 0.3).toFixed(2));
+        const discountAmount = Math.min(rawDiscount, subtotal);
+        itemTotal = Number((subtotal - discountAmount).toFixed(2));
+        membresiaId = activeMembership.id;
+      }
+
+      total += itemTotal;
 
       const booking = await tx.reserva.create({
         data: {
           disponibilidadId: availability.id,
           titularId: input.userId,
+          membresiaId,
           cantidadCupos: item.cantidadCupos,
           canal: "ONLINE",
           estado: "PENDIENTE_PAGO",
           subtotal,
-          descuentoPct: 0,
-          total: subtotal,
+          descuentoPct,
+          total: itemTotal,
           expiraEn: expiresAt,
         },
         include: {
@@ -642,6 +663,8 @@ export async function createBookingHold(input: {
   endTime: string;
   cantidadCupos: number;
   userId: string;
+  canal?: "ONLINE" | "TAQUILLA";
+  vendedorId?: string | null;
 }, now = new Date()) {
   if (!Number.isInteger(input.cantidadCupos) || input.cantidadCupos <= 0) {
     throw new BookingError("La cantidad de cupos debe ser un entero mayor que cero.", "VALIDATION_ERROR", 400);
@@ -718,20 +741,43 @@ export async function createBookingHold(input: {
       data: { cuposOcupados: { increment: input.cantidadCupos } },
     });
 
+    // RN-08: 30% descuento automático si el titular tiene membresía VIGENTE (portal y taquilla)
+    const activeMembership = await tx.membresia.findFirst({
+      where: {
+        usuarioId: input.userId,
+        estado: "VIGENTE",
+      },
+    });
+
     const subtotal = Number(
       (Number(availability.servicio.tarifa) * input.cantidadCupos).toFixed(2),
     );
+
+    let descuentoPct = 0;
+    let total = subtotal;
+    let membresiaId: number | null = null;
+
+    if (activeMembership) {
+      descuentoPct = 30.0;
+      const rawDiscount = Number((subtotal * 0.3).toFixed(2));
+      const discountAmount = Math.min(rawDiscount, subtotal);
+      total = Number((subtotal - discountAmount).toFixed(2));
+      membresiaId = activeMembership.id;
+    }
+
     const expiresAt = new Date(now.getTime() + HOLD_TTL_MINUTES * 60_000);
     return tx.reserva.create({
       data: {
         disponibilidadId: availability.id,
         titularId: input.userId,
+        vendedorId: input.vendedorId ?? null,
+        membresiaId,
         cantidadCupos: input.cantidadCupos,
-        canal: "ONLINE",
+        canal: input.canal ?? "ONLINE",
         estado: "PENDIENTE_PAGO",
         subtotal,
-        descuentoPct: 0,
-        total: subtotal,
+        descuentoPct,
+        total,
         expiraEn: expiresAt,
       },
       include: {
@@ -742,3 +788,4 @@ export async function createBookingHold(input: {
     });
   });
 }
+

@@ -68,7 +68,7 @@ export function PaymentMethodSelector({
     const controller = new AbortController();
     async function preparePayment() {
       try {
-        const response = await fetch("/api/payments/intent", {
+        const response = await fetch("/api/payments/intent/online", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reservationId: activeReservationId }),

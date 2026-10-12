@@ -293,7 +293,11 @@ model Reserva {
   inhabilitacion InhabilitacionServicio? @relation(fields: [inhabilitacionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   ticketQr       TicketQr?
 
-  @@index([titularId, estado])
+  // TSK-BE-13 (#27): el historial pagina por keyset descendente sobre
+  // (creadoEn, id) filtrando por titular + estado. El compuesto cubre el prefijo
+  // de igualdad y el orden sin sort; reemplaza al índice [titularId, estado]
+  // previo (ver migración reserva_history_keyset_index).
+  @@index([titularId, estado, creadoEn, id])
   // TSK-BD-08: índice parcial TTL vive en SQL raw (migración reserva_ttl_partial_index):
   //   CREATE INDEX "reserva_expira_ttl_idx" ON "reserva"("expira_en")
   //     WHERE "estado" = 'PENDIENTE_PAGO';
