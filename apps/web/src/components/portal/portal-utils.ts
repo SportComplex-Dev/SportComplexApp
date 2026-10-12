@@ -109,6 +109,62 @@ export function obtenerSaludoContextual(horaBogota: number): string {
   return 'Buenas noches'
 }
 
+export interface ReceiptApiResponse {
+  membrete?: {
+    entidad?: string
+    nit?: string | null
+    direccion?: string | null
+    telefono?: string | null
+    correo?: string | null
+    pie?: string | null
+  }
+  reserva?: {
+    id: string
+    subtotal: string
+    total: string
+  }
+  servicio?: {
+    nombre: string
+    fecha: string
+    horaInicio: string
+    horaFin: string
+  }
+  titular?: {
+    nombre: string
+    correo?: string | null
+  }
+  qr?: {
+    payload: string
+    dataUrl: string
+  } | null
+}
+
+/**
+ * Consulta la estructura y datos oficiales del comprobante emitido desde el backend (TSK-BE-19).
+ */
+export async function fetchReceiptData(reservaId: string): Promise<ReceiptApiResponse | null> {
+  if (!reservaId) return null
+  try {
+    const res = await fetch(`/api/pdf/receipt?reservaId=${encodeURIComponent(reservaId)}&destinatario=PORTAL`)
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && json.data) {
+        return json.data as ReceiptApiResponse
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Sanitiza nombres de archivos para descarga evitando caracteres conflictivos en sistemas de archivos.
+ */
+export function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
 /**
  * Carga el historial de reservas de cliente desde el endpoint /api/bookings/history (TSK-BE-13).
  */
@@ -162,6 +218,7 @@ export async function fetchCustomerBookingHistory(
           status: statusMap[item.estado] ?? 'Confirmada',
           paymentMethod: item.pago?.metodo ?? 'card',
           transactionRef: item.pago?.referenciaExterna ?? undefined,
+          qrPayload: item.ticketQr?.codigoUuid ? `SC1:${item.ticketQr.codigoUuid}:verified_ticket_sig` : undefined,
         })
       })
     }
@@ -169,3 +226,4 @@ export async function fetchCustomerBookingHistory(
 
   return merged
 }
+

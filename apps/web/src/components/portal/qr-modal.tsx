@@ -58,13 +58,17 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
 
   const handleDownload = async () => {
     try {
-      const url = await generarQRDataUrl(ticket.code, 600)
+      const qrTarget = ticket.qrPayload || ticket.code
+      const url = await generarQRDataUrl(qrTarget, 600)
+      const safeFilename = `ticket-${ticket.code.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
       const link = document.createElement('a')
       link.href = url
-      link.download = `ticket-${ticket.code}.png`
+      link.download = safeFilename
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
     } catch {
-      // Fallback silencioso
+      // Fallback
     }
   }
 
@@ -94,8 +98,8 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
           Presenta este código en los torniquetes ópticos perimetrales de la sede.
         </p>
 
-        {/* Componente de código QR estándar real */}
-        <QRGraphicHD code={ticket.code} />
+        {/* Componente de código QR estándar real con payload firmado */}
+        <QRGraphicHD code={ticket.qrPayload || ticket.code} />
 
         <div className="qr-modal-code-tag">{ticket.code}</div>
 

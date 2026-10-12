@@ -8,7 +8,7 @@ import {
   generarQRDataUrl,
   obtenerSaludoContextual,
   formatSlotTime,
-} from "@/components/portal/portal-utils";
+} from "../../../../components/portal/portal-utils";
 
 // TSK-FE-13: Suite de Pruebas de Componentes y Lógica de UI del Portal de Autogestión (SCRUM-123 / HU-13 / RF-12)
 
@@ -253,4 +253,12 @@ test("TSK-FE-19: Comprobante PDF en formato compacto 58mm con desglose fiscal (R
   assert.ok(desglose.subtotalFormateado.length > 0, "El subtotal debe estar formateado en COP");
   assert.ok(desglose.totalFormateado.length > 0, "El total debe estar formateado en COP");
 });
+
+test("TSK-FE-11: Sanitización de nombres de archivo de descarga de tiquete (DOM-01)", async () => {
+  const { sanitizeFilename } = await import("../../../../components/portal/portal-utils");
+  assert.equal(sanitizeFilename("ALT:1234/5678"), "ALT_1234_5678");
+  assert.equal(sanitizeFilename("ticket-123.png"), "ticket-123_png");
+  assert.equal(sanitizeFilename("VALID_CODE-123"), "VALID_CODE-123");
+});
+
 
