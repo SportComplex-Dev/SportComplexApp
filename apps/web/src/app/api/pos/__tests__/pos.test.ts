@@ -6,15 +6,26 @@ const { createMockPrisma } = await import(
   "../../../../../../../packages/db/test/mock-prisma"
 );
 const mock = createMockPrisma();
+Reflect.set(process.env, "NODE_ENV", "test");
 (globalThis as any).__scPrisma = mock;
 
-const { POST } = await import("../checkout/route");
-const { verifyTicketSignature, parseTicketQrPayload } = await import("@sportcomplex/core");
+const { createPosCheckoutPostHandler } = await import("../checkout/route");
 
 const VENDEDOR_ID = "00000000-0000-4000-8000-000000000020";
 const CLIENTE_ID = "00000000-0000-4000-8000-000000000001";
-const QR_SECRET = "test-pos-qr-secret-12345";
-process.env.QR_HMAC_SECRET = QR_SECRET;
+
+// Handler con inyección controlada de Stripe para test
+const mockCreatePaymentIntent = async (input: any) => ({
+  paymentIntentId: `pi_test_${Date.now()}`,
+  clientSecret: `pi_test_${Date.now()}_secret_test`,
+  amount: input.total * 100,
+  currency: "cop",
+  status: "requires_payment_method",
+});
+
+const POST = createPosCheckoutPostHandler({
+  createPaymentIntent: mockCreatePaymentIntent as any,
+});
 
 function resetDb() {
   for (const key of [
@@ -25,12 +36,13 @@ function resetDb() {
     "reservas",
     "tickets",
     "pagos",
+    "membresias",
   ] as const) {
     mock._state[key].length = 0;
   }
 
   mock._state.usuarios.push(
-    { id: VENDEDOR_ID, nombre: "Vendedor Taquilla", correo: "vendedor@akros.test", estado: "ACTIVO", rolId: 2, rolNombre: "VENDEDOR" },
+    { id: VENDEDOR_ID, nombre: "Vendedor Taquilla", correo: "vendedor@akros.test", estado: "ACTIVO", rolId: 2, rolNombre: "Empleado_Vendedor" },
     { id: CLIENTE_ID, nombre: "Cliente Mostrador", correo: "cliente@akros.test", estado: "ACTIVO", rolId: 1, rolNombre: "CLIENTE" },
   );
 
@@ -116,7 +128,155 @@ test("POS API (RN-13 / RF-17): 400 si se intenta pagar en efectivo (cero efectiv
   assert.equal(data.error.code, "VALIDATION_ERROR");
 });
 
-test("POS API (TSK-FE-18 / RF-17): venta presencial exitosa 100% cashless con Stripe", async () => {
+test("POS API (SEC-03 / RN-08): cliente sin membresía VIGENTE no recibe descuento del 30% aunque envíe esSocio: true", async () => {
+  resetDb();
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  const req = new Request("http://localhost:3000/api/pos/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 10,
+      date: "2026-10-15",
+      slotTime: "08:00 a. m. - 09:00 a. m.",
+      cantidadCupos: 1,
+      clienteNombre: "Carlos NoSocio",
+      clienteDocumento: "1020304050",
+      clienteEmail: "nosocio@akros.test",
+      esSocio: true, // Intento de fraude en cliente
+      paymentMode: "stripe_card",
+    }),
+  });
+
+  const res = await POST(req);
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.success, true);
+  // Al no tener membresía VIGENTE en la BD, la tarifa se cobra completa (80000)
+  assert.equal(json.data.booking.amount, 80000);
+  assert.equal(json.data.booking.discount, 0);
+});
+
+test("POS API (SEC-03 / RN-08): cliente CON membresía VIGENTE sí recibe descuento automático del 30%", async () => {
+  resetDb();
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  // Registrar membresía VIGENTE en la BD para el cliente
+  mock._state.membresias.push({
+    id: 99,
+    usuarioId: CLIENTE_ID,
+    planId: 1,
+    estado: "VIGENTE",
+    fechaInicio: new Date(),
+    proximaRenovacion: new Date(Date.now() + 30 * 86400000),
+  });
+
+  const req = new Request("http://localhost:3000/api/pos/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 10,
+      date: "2026-10-15",
+      slotTime: "08:00 a. m. - 09:00 a. m.",
+      cantidadCupos: 1,
+      clienteNombre: "Cliente Mostrador",
+      clienteDocumento: "1020304050",
+      clienteEmail: "cliente@akros.test",
+      esSocio: true,
+      paymentMode: "stripe_card",
+    }),
+  });
+
+  const res = await POST(req);
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.success, true);
+  // Tarifa 80000 con 30% descuento = 56000
+  assert.equal(json.data.booking.amount, 56000);
+  assert.equal(json.data.booking.discount, 24000);
+});
+
+test("POS API (PERF-01): 409 CAPACITY_EXCEEDED si los cupos solicitados superan el límite", async () => {
+  resetDb();
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  mock._state.disponibilidades.push({
+    id: 101n,
+    servicioId: 10,
+    franjaId: 1,
+    fecha: new Date("2026-10-15T00:00:00.000Z"),
+    cuposTotales: 2,
+    cuposOcupados: 2, // Ya lleno
+    bloqueadaMantenimiento: false,
+  });
+
+  const req = new Request("http://localhost:3000/api/pos/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 10,
+      disponibilidadId: "101",
+      date: "2026-10-15",
+      slotTime: "08:00 a. m. - 09:00 a. m.",
+      cantidadCupos: 1,
+      clienteNombre: "Carlos",
+      clienteDocumento: "1020304050",
+      clienteEmail: "carlos@akros.test",
+      paymentMode: "stripe_card",
+    }),
+  });
+
+  const res = await POST(req);
+  assert.equal(res.status, 409);
+  const json = await res.json();
+  assert.equal(json.error.code, "CAPACITY_EXCEEDED");
+});
+
+test("POS API (PERF-01): 409 SLOT_BLOCKED si la franja está bloqueada por mantenimiento", async () => {
+  resetDb();
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  mock._state.disponibilidades.push({
+    id: 102n,
+    servicioId: 10,
+    franjaId: 1,
+    fecha: new Date("2026-10-15T00:00:00.000Z"),
+    cuposTotales: 4,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: true, // En mantenimiento
+  });
+
+  const req = new Request("http://localhost:3000/api/pos/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 10,
+      disponibilidadId: "102",
+      date: "2026-10-15",
+      slotTime: "08:00 a. m. - 09:00 a. m.",
+      cantidadCupos: 1,
+      clienteNombre: "Carlos",
+      clienteDocumento: "1020304050",
+      clienteEmail: "carlos@akros.test",
+      paymentMode: "stripe_card",
+    }),
+  });
+
+  const res = await POST(req);
+  assert.equal(res.status, 409);
+  const json = await res.json();
+  assert.equal(json.error.code, "SLOT_BLOCKED");
+});
+
+test("POS API (SEC-02 / ARCH-01): venta presencial emite PaymentIntent y crea reserva PENDIENTE_PAGO", async () => {
   resetDb();
   (globalThis as any).__scAuthSession = {
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
@@ -134,7 +294,6 @@ test("POS API (TSK-FE-18 / RF-17): venta presencial exitosa 100% cashless con St
       clienteDocumento: "1020304050",
       clienteEmail: "carlos@akros.test",
       clienteTelefono: "3001234567",
-      esSocio: true, // Debe aplicar 30% de descuento
       paymentMode: "stripe_card",
       cardLast4: "4242",
     }),
@@ -144,24 +303,15 @@ test("POS API (TSK-FE-18 / RF-17): venta presencial exitosa 100% cashless con St
   assert.equal(res.status, 200);
   const json = await res.json();
   assert.equal(json.success, true);
-  assert.equal(json.data.booking.status, "CONFIRMADA");
+  assert.equal(json.data.booking.status, "PENDIENTE_PAGO");
   assert.equal(json.data.booking.canal, "TAQUILLA");
   assert.equal(json.data.booking.vendedorId, VENDEDOR_ID);
-  // Tarifa 80000 con 30% de descuento = 56000
-  assert.equal(json.data.booking.amount, 56000);
-  assert.ok(json.data.booking.stripePaymentIntentId.startsWith("pi_pos_"));
-
-  // Verificar QR firmado generado
-  assert.ok(json.data.ticket.qrPayload);
-  const parsedQr = parseTicketQrPayload(json.data.ticket.qrPayload);
-  assert.ok(parsedQr);
-  if (parsedQr) {
-    const signatureValid = verifyTicketSignature(parsedQr.ticketId, parsedQr.signature, QR_SECRET);
-    assert.equal(signatureValid, true);
-  }
+  assert.equal(json.data.booking.amount, 80000);
+  assert.ok(json.data.paymentIntent.clientSecret);
+  assert.ok(json.data.paymentIntent.id.startsWith("pi_test_"));
 });
 
-test("POS API (SRS §11.1 Riesgo 2): genera enlace de pago alternativo si se solicita", async () => {
+test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo compatible con /checkout", async () => {
   resetDb();
   (globalThis as any).__scAuthSession = {
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
@@ -188,4 +338,6 @@ test("POS API (SRS §11.1 Riesgo 2): genera enlace de pago alternativo si se sol
   assert.equal(json.success, true);
   assert.equal(json.data.booking.paymentMode, "stripe_link");
   assert.ok(json.data.booking.alternativePaymentUrl.includes("checkout?session_id="));
+  assert.ok(json.data.booking.alternativePaymentUrl.includes("serviceId=10"));
+  assert.ok(json.data.booking.alternativePaymentUrl.includes("amount=80000"));
 });

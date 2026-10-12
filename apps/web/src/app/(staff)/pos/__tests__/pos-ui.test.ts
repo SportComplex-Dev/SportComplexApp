@@ -1,14 +1,50 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyMembershipDiscount } from "@sportcomplex/core";
+import React from "react";
+// @ts-expect-error react-dom/server types are omitted from dependencies
+import { renderToString } from "react-dom/server";
+
+// Asegurar React en globalThis para componentes JSX de paquetes externos
+(globalThis as any).React = React;
+
+import { applyMembershipDiscount, type CatalogItem, type Booking } from "@sportcomplex/core";
 import { posCheckoutSchema } from "@sportcomplex/validation";
 import { calcularDesgloseComprobante } from "@/components/portal/portal-utils";
 import QRCode from "qrcode";
 
-// TSK-FE-18: Suite de Pruebas de la Interfaz y Lógica del Punto de Venta (Taquilla POS) 100% Cashless (HU-18 / RF-17 / RN-13)
+import { PosCatalogSelector } from "../components/pos-catalog-selector";
+import { PosClientForm } from "../components/pos-client-form";
+import { PosPaymentStripe } from "../components/pos-payment-stripe";
+import { PosVoucherModal } from "../components/pos-voucher-modal";
+import { PosAltLinkModal } from "../components/pos-alt-link-modal";
+
+// TSK-FE-18: Suite de Pruebas de la Interfaz y Componentes POS 100% Cashless (HU-18 / RF-17 / RN-13)
+
+const dummyServices: CatalogItem[] = [
+  {
+    id: "serv-1",
+    name: "Cancha Pádel 1",
+    category: "canchas",
+    sede: "Poblado",
+    price: 80000,
+    status: "Disponible",
+    capacity: 4,
+    description: "Cancha de pádel techada",
+  },
+  {
+    id: "serv-2",
+    name: "Piscina Olímpica · Nado Libre",
+    category: "piscinas",
+    sede: "Laureles",
+    price: 25000,
+    status: "Disponible",
+    capacity: 8,
+    description: "Carril de nado libre",
+  },
+];
 
 test("TSK-FE-18 UI: Política 100% Cashless estricta — rechaza cualquier opción de efectivo", () => {
-  // Probar que el contrato del POS solo acepta tarjeta o enlace alternativo
   const invalidCashOptions = ["cash", "efectivo", "caja_menor", "billetes", "fisico"];
   for (const method of invalidCashOptions) {
     const result = posCheckoutSchema.safeParse({
@@ -24,7 +60,6 @@ test("TSK-FE-18 UI: Política 100% Cashless estricta — rechaza cualquier opci�
     assert.equal(result.success, false, `El método ${method} debió ser rechazado por la política 100% cashless`);
   }
 
-  // Métodos válidos
   assert.equal(
     posCheckoutSchema.safeParse({
       serviceId: 1,
@@ -40,50 +75,160 @@ test("TSK-FE-18 UI: Política 100% Cashless estricta — rechaza cualquier opci�
   );
 });
 
-test("TSK-FE-18 UI (RN-08): Descuento automático del 30% para socios en mostrador", () => {
-  const tarifaCancha = 80000; // COP
+test("TSK-FE-18 UI (RN-08): Descuento del 30% y desglose fiscal en taquilla", () => {
+  const tarifaCancha = 80000;
   const tarifaRegularCents = tarifaCancha * 100;
 
-  // Cliente regular (no socio)
   const totalRegularCents = applyMembershipDiscount(tarifaRegularCents, false);
   assert.equal(totalRegularCents / 100, 80000);
 
-  // Cliente socio (membresía activa)
   const totalSocioCents = applyMembershipDiscount(tarifaRegularCents, true);
-  // 80000 * 0.70 = 56000
   assert.equal(totalSocioCents / 100, 56000);
 
-  // Desglose fiscal sobre valor final de socio
   const { subtotal, iva, total } = calcularDesgloseComprobante(totalSocioCents / 100);
   assert.equal(total, 56000);
   assert.equal(subtotal + iva, 56000);
 });
 
-test("TSK-FE-18 UI (SRS §11.1 Riesgo 2): Generación de enlace alternativo y código QR para pago móvil", async () => {
-  const tempBookingId = "pos-alt-123456";
-  const appOrigin = "https://akros.sportcomplex.co";
-  const serviceName = "Cancha Pádel 1";
-  const total = 56000;
+test("TSK-FE-18 UI (TEST-01 / CODE-02): PosCatalogSelector renderiza categorías, servicios y cumple WCAG", () => {
+  const html = renderToString(
+    React.createElement(PosCatalogSelector, {
+      selectedCategory: "canchas",
+      onSelectCategory: () => {},
+      selectedServiceId: "serv-1",
+      onSelectServiceId: () => {},
+      selectedDate: "2026-10-15",
+      onSelectDate: () => {},
+      selectedSlot: "08:00 a. m. - 09:00 a. m.",
+      onSelectSlot: () => {},
+      attendees: 1,
+      onSetAttendees: () => {},
+      filteredServices: dummyServices,
+      currentService: dummyServices[0],
+      todayStr: "2026-10-15",
+      availableSlots: ["08:00 a. m. - 09:00 a. m.", "09:00 a. m. - 10:00 a. m."],
+    }),
+  );
 
-  const generatedUrl = `${appOrigin}/checkout?session_id=${tempBookingId}&service=${encodeURIComponent(serviceName)}&amount=${total}`;
-  assert.ok(generatedUrl.includes("session_id=pos-alt-123456"));
-  assert.ok(generatedUrl.includes("amount=56000"));
-
-  // Generar QR para escaneo en mostrador con el teléfono del cliente
-  const qrDataUrl = await QRCode.toDataURL(generatedUrl, { width: 320, margin: 2 });
-  assert.ok(qrDataUrl.startsWith("data:image/png;base64,"));
-  assert.ok(qrDataUrl.length > 500);
+  // Verificación de estructura y accesibilidad WCAG (CODE-02)
+  assert.ok(html.includes("Cancha Pádel 1"));
+  assert.ok(html.includes("id=\"pos-date-input\""));
+  assert.ok(html.includes("for=\"pos-date-input\""));
+  assert.ok(html.includes("aria-pressed=\"true\""));
+  assert.ok(html.includes("08:00 a. m."));
 });
 
-test("TSK-FE-18 UI (RF-17 / RNF-05): Comprobante de venta y pase con código QR para torniquete", async () => {
-  const ticketCode = "AKR-POS-2026-9988";
-  const qrData = `SC1:${ticketCode}:firma_hmac_sha256_mock`;
+test("TSK-FE-18 UI (TEST-01 / CODE-02): PosClientForm renderiza campos con etiquetas asociadas (WCAG)", () => {
+  const html = renderToString(
+    React.createElement(PosClientForm, {
+      clientDoc: "10203040",
+      onClientDocChange: () => {},
+      clientName: "Laura Gómez",
+      onClientNameChange: () => {},
+      clientEmail: "laura@akros.test",
+      onClientEmailChange: () => {},
+      clientPhone: "3001234567",
+      onClientPhoneChange: () => {},
+      isMember: true,
+      onIsMemberChange: () => {},
+      onQuickWalkIn: () => {},
+    }),
+  );
 
-  const qrDataUrl = await QRCode.toDataURL(qrData, { width: 260, margin: 2 });
-  assert.ok(qrDataUrl.startsWith("data:image/png;base64,"));
+  // Verifica que todos los inputs tienen id y su label correspondiente con for (htmlFor)
+  assert.ok(html.includes("for=\"pos-client-doc\""));
+  assert.ok(html.includes("id=\"pos-client-doc\""));
+  assert.ok(html.includes("for=\"pos-client-name\""));
+  assert.ok(html.includes("id=\"pos-client-name\""));
+  assert.ok(html.includes("for=\"pos-client-email\""));
+  assert.ok(html.includes("id=\"pos-client-email\""));
+  assert.ok(html.includes("for=\"pos-client-member\""));
+  assert.ok(html.includes("id=\"pos-client-member\""));
+  assert.ok(html.includes("Socio AKROS Vigente"));
+});
 
-  const desglose = calcularDesgloseComprobante(80000);
-  assert.equal(desglose.total, 80000);
-  assert.equal(desglose.subtotal, 67227); // 80000 / 1.19
-  assert.equal(desglose.iva, 12773);
+test("TSK-FE-18 UI (SEC-01 / PCI-DSS): PosPaymentStripe NO contiene campos planos para PAN ni CVC", () => {
+  const html = renderToString(
+    React.createElement(PosPaymentStripe, {
+      currentService: dummyServices[0],
+      subtotalBruto: 80000,
+      descuentoMonto: 24000,
+      subtotalNeto: 47059,
+      ivaMonto: 8941,
+      totalFinal: 56000,
+      isMember: true,
+      isProcessing: false,
+      processStep: "",
+      onProcessPayment: () => {},
+      onGenerateAltLink: () => {},
+    }),
+  );
+
+  // Criterio de seguridad SEC-01: CERO campos vulnerables a captura insegura de PAN/CVC
+  assert.ok(!html.includes("placeholder=\"4000"));
+  assert.ok(!html.includes("placeholder=\"CVC\""));
+  assert.ok(!html.includes("placeholder=\"MM/AA\""));
+
+  // Verificación de interfaz segura con Stripe
+  assert.ok(html.includes("Dat\u00e1fono Digital Stripe"));
+  assert.ok(html.includes("PCI-DSS Seguro"));
+  assert.ok(html.includes("Cobrar con Tarjeta Stripe"));
+  assert.ok(html.includes("56.000"));
+});
+
+test("TSK-FE-18 UI (TEST-01 / RNF-05): PosVoucherModal renderiza comprobante imprimible con QR y membrete", () => {
+  const dummyBooking: Booking = {
+    id: "book-12345",
+    code: "AKR-POS-9988",
+    client: "Carlos Santana",
+    category: "canchas",
+    service: "Cancha Pádel 1",
+    sede: "Poblado",
+    date: "2026-10-15",
+    time: "08:00 a. m. - 09:00 a. m.",
+    attendees: 1,
+    amount: 56000,
+    status: "Confirmada",
+    paymentMethod: "card",
+    paymentStatus: "Aprobada",
+    transactionRef: "pi_pos_test_123456",
+  };
+
+  const html = renderToString(
+    React.createElement(PosVoucherModal, {
+      booking: dummyBooking,
+      sellerName: "Andrés Muñoz",
+      receiptQrUrl: "data:image/png;base64,dummy_qr_code",
+      onPrint: () => {},
+      onNextSale: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("AKROS SPORTCOMPLEX"));
+  assert.ok(html.includes("AKR-POS-9988"));
+  assert.ok(html.includes("Carlos Santana"));
+  assert.ok(html.includes("id=\"pos-print-voucher\""));
+  assert.ok(html.includes("Imprimir Comprobante"));
+  assert.ok(html.includes("Nueva Venta"));
+});
+
+test("TSK-FE-18 UI (SRS §11.1 Riesgo 2 / ARCH-03): PosAltLinkModal renderiza enlace y QR para celular", async () => {
+  const tempUrl = "http://localhost:3000/checkout?session_id=pos_alt_123&service=Cancha&amount=56000";
+  const qrUrl = await QRCode.toDataURL(tempUrl, { width: 320, margin: 2 });
+
+  const html = renderToString(
+    React.createElement(PosAltLinkModal, {
+      isOpen: true,
+      onClose: () => {},
+      altLinkUrl: tempUrl,
+      altLinkQrUrl: qrUrl,
+      copiedLink: false,
+      onCopyLink: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Enlace de Pago Alternativo"));
+  assert.ok(html.includes("Escanear con la c\u00e1mara del celular"));
+  assert.ok(html.includes("id=\"pos-alt-link-input\""));
+  assert.ok(html.includes("btn-copy-alt-link"));
 });

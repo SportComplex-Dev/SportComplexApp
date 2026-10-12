@@ -49,9 +49,12 @@ export async function authorizeApiRequest(
   dependencies: AuthorizationDependencies = {},
 ): Promise<ApiAuthorization> {
   try {
-    const injectedSession = (globalThis as typeof globalThis & {
-      __scAuthSession?: SessionLike | null;
-    }).__scAuthSession;
+    const injectedSession =
+      process.env.NODE_ENV === "test"
+        ? (globalThis as typeof globalThis & {
+            __scAuthSession?: SessionLike | null;
+          }).__scAuthSession
+        : undefined;
     if (
       process.env.NODE_ENV !== "test" &&
       !dependencies.authenticate &&
@@ -114,7 +117,9 @@ export async function authorizeApiRequest(
 
     const db: AuthorizationDatabase =
       dependencies.db ??
-      (globalThis as unknown as { __scPrisma?: AuthorizationDatabase }).__scPrisma ??
+      (process.env.NODE_ENV === "test"
+        ? (globalThis as unknown as { __scPrisma?: AuthorizationDatabase }).__scPrisma
+        : undefined) ??
       prisma;
     const account = (await db.usuario.findUnique({
       where: { id: userId },

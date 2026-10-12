@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
   CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
@@ -30,13 +30,46 @@ const pseBanks = [
   'Lulo Bank',
 ]
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { session, notify } = useApp()
   const [catalog] = useCatalog()
   const [bookings, setBookings] = useBookings()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
+
+  // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
+  const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
+  const paramServiceId = searchParams.get('serviceId')
+  const paramServiceName = searchParams.get('service')
+  const paramDate = searchParams.get('date')
+  const paramTime = searchParams.get('time')
+  const paramAttendees = searchParams.get('attendees')
+
+  const paramItem = paramServiceId
+    ? catalog.find((entry) => String(entry.id) === String(paramServiceId))
+    : paramServiceName
+      ? catalog.find((entry) => entry.name.toLowerCase().includes(paramServiceName.toLowerCase()))
+      : sessionId ? catalog[0] : undefined
+
+  useEffect(() => {
+    if (!draft && paramItem) {
+      setDraft({
+        itemId: paramItem.id,
+        date: paramDate || new Date().toISOString().split('T')[0],
+        time: paramTime || '08:00 a. m. - 09:00 a. m.',
+        attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+      })
+    }
+  }, [draft, paramItem, paramDate, paramTime, paramAttendees, setDraft])
+
+  const activeDraft = draft || (paramItem ? {
+    itemId: paramItem.id,
+    date: paramDate || new Date().toISOString().split('T')[0],
+    time: paramTime || '08:00 a. m. - 09:00 a. m.',
+    attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+  } : null)
 
   // Payment states
   const [method, setMethod] = useState<PaymentMethod>('card')
@@ -60,10 +93,10 @@ export default function CheckoutPage() {
   // Wompi / Nequi state
   const [nequiPhone, setNequiPhone] = useState('')
 
-  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
+  const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
 
-  if (!draft || !item || !category) {
+  if (!activeDraft || !item || !category) {
     return (
       <main className="section-shell payment-page">
         <div className="dashboard-empty">
@@ -80,7 +113,7 @@ export default function CheckoutPage() {
   }
 
   const isCourt = item.category === 'canchas'
-  const total = calculateBookingPrice(item, draft.attendees)
+  const total = calculateBookingPrice(item, activeDraft.attendees)
   const Icon = categoryIcons[category.icon]
 
   // Formaters
@@ -141,8 +174,8 @@ export default function CheckoutPage() {
     const clash = bookings.some(
       (booking) =>
         booking.service === item.name &&
-        booking.date === draft.date &&
-        booking.time === draft.time &&
+        booking.date === activeDraft.date &&
+        booking.time === activeDraft.time &&
         booking.status !== 'Cancelada'
     )
     if (clash) {
@@ -164,7 +197,7 @@ export default function CheckoutPage() {
     }, 1400)
 
     setTimeout(() => {
-      const [, month, day] = draft.date.split('-')
+      const [, month, day] = activeDraft.date.split('-')
       const txRef = `WMP-ALT-${Math.floor(100000 + Math.random() * 900000)}`
       const booking: Booking = {
         id: `b${Date.now()}`,
@@ -173,9 +206,9 @@ export default function CheckoutPage() {
         category: item.category,
         service: item.name,
         sede: item.sede,
-        date: draft.date,
-        time: draft.time,
-        attendees: draft.attendees,
+        date: activeDraft.date,
+        time: activeDraft.time,
+        attendees: activeDraft.attendees,
         amount: total,
         status: 'Confirmada',
         paymentMethod: method,
@@ -513,20 +546,20 @@ export default function CheckoutPage() {
               <b>{item.name}</b>
               <span>
                 Sede {item.sede}
-                {!isCourt && <> · {draft.attendees} {draft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
+                {!isCourt && <> · {activeDraft.attendees} {activeDraft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
               </span>
             </div>
           </div>
           <div className="order-item">
             <span>
-              <CalendarDays size={15} /> {formatDate(draft.date)}
+              <CalendarDays size={15} /> {formatDate(activeDraft.date)}
             </span>
             <span>
-              <Clock3 size={15} /> {draft.time} · 60 minutos
+              <Clock3 size={15} /> {activeDraft.time} · 60 minutos
             </span>
           </div>
           <div className="order-price">
-            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
+            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${activeDraft.attendees}`}</span>
             <b>{formatMoney(total)}</b>
           </div>
           <div className="order-total">
@@ -567,4 +600,22 @@ export default function CheckoutPage() {
     </main>
   )
 }
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="section-shell payment-page">
+          <div className="dashboard-empty">
+            <b>Cargando pasarela de pago...</b>
+            <p>Por favor espera un momento.</p>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  )
+}
+
 
