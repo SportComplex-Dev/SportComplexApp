@@ -137,3 +137,17 @@ pnpm --filter web lint
   * `feat: implementa modo consulta informativo en escáner móvil (TSK-FE-15)`
   * `test: tests unitarios para parser de QR y contrato de consulta (TSK-FE-15)`
   * `docs: documentación técnica TSK-FE-15 en docs/`
+
+---
+
+## 7. Seguimiento CI del PR (hacia `develop`)
+
+Durante la revisión del PR se bloquearon los checks `ci / verificar (pull_request)` tres veces. Fixes aplicados en la misma rama:
+
+| # | Error CI | Causa | Fix |
+|---|----------|-------|-----|
+| 1 | `TS7016: Could not find a declaration file for module 'react-dom/server'` en `visual-consultation-render.test.tsx` | Faltaba `@types/react-dom` en `apps/web` (solo existía `@types/react`) | `apps/web/package.json`: agregado `"@types/react-dom": "19.0.0"` exacto + `pnpm-lock.yaml` |
+| 2 | `db:generate` falla solo en Windows (`"C:\Users\Leonardo" no se reconoce...`) + `WARN: "pnpm" field is no longer read` | Turbo 2.11.4 re-invoca tareas con la ruta absoluta de `pnpm.CMD` sin comillas; el usuario con espacio rompe `cmd.exe`. El campo `pnpm.onlyBuiltDependencies` está deprecado (ya vive como `allowBuilds` en `pnpm-workspace.yaml`) | Raíz `package.json`: eliminado campo `pnpm` deprecado; `db:generate` directo vía `pnpm --filter @sportcomplex/db exec prisma generate...`; `typecheck` encadenado vía `pnpm -r` sin turbo (compatible con CI en ubuntu) |
+| 3 | `TS2578: Unused '@ts-expect-error' directive` en `pos/__tests__/pos-ui.test.ts(5,1)` | Interacción entre PRs: el test POS (TSK-FE-18, venido de `develop`) suprimía el error de tipos de `react-dom/server`; al agregar `@types/react-dom` (fix #1) el error suprimido desapareció y la directiva quedó huérfana. Solo visible en el merge commit del CI | `git merge origin/develop` + eliminada la directiva huérfana (el `import` queda intacto y tipado) |
+
+**Verificación final local (equivalente a `ci.yml`):** `pnpm install --frozen-lockfile` OK · `pnpm typecheck` 5/5 OK · `pnpm lint` 5/5 OK (0 errores) · `pnpm --filter web build` OK · tests 20/20 (12 scanner TSK-FE-15 + 8 POS TSK-FE-18).
