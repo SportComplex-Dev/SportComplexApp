@@ -14,8 +14,6 @@ import {
   obtenerInscripcionPorTicket,
   canjearTicketTorneo,
   verificarPagoParaTorneo,
-  obtenerInscripcionesUsuarioParaTorneos,
-  obtenerInscripcionUsuario,
   obtenerDetallePublicoTorneo,
 } from "./tournaments.js";
 import { createMockPrisma } from "../../test/mock-prisma";
