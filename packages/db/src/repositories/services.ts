@@ -389,8 +389,12 @@ export async function getServicios(options?: ServiceFilterOptions) {
   });
 }
 
-export async function getServicioById(id: number) {
-  return prisma.servicio.findUnique({
+export async function getServicioById(
+  id: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any = prisma,
+) {
+  return db.servicio.findUnique({
     where: { id },
     include: {
       categoria: true,
@@ -400,6 +404,18 @@ export async function getServicioById(id: number) {
         orderBy: { fecha: "asc" },
       },
     },
+  });
+}
+
+/** Datos mínimos del servicio usados al resolver el mensaje de acceso. */
+export async function getServicioParaAccesoById(
+  id: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any = prisma,
+) {
+  return db.servicio.findUnique({
+    where: { id },
+    select: { id: true, nombre: true, estado: true },
   });
 }
 
