@@ -6,6 +6,7 @@ import {
   extractSupabaseAccessToken,
   extractSession,
   isAccountActive,
+  normalizeEmbeddedRole,
   normalizeRole,
   ROLE_HOME,
   type SessionUser,
@@ -199,79 +200,78 @@ export default withAuth(async (req) => {
     if (!sessionToRefresh.userId) {
       currentSession = null;
     } else {
-      let account;
+      let account: { id: string; estado: string; deletedAt: Date | null; rol: { nombre: string } | null } | null = null;
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!supabaseUrl || !supabaseServiceKey) {
-          throw new Error("SUPABASE_SERVICE_ROLE_KEY no configurado");
-        }
-        const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
-          auth: {
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-            persistSession: false,
-          },
-        });
-        const toAccount = (
-          row: { id: string; estado: string; deleted_at: string | null; rol: { nombre: string } | Array<{ nombre: string }> | null } | null,
-        ) =>
-          row
-            ? (() => {
-                const rolRow = Array.isArray(row.rol) ? row.rol[0] : row.rol;
-                return {
-                  id: row.id,
-                  estado: row.estado,
-                  deletedAt: row.deleted_at,
-                  rol: rolRow ? { nombre: rolRow.nombre } : null,
-                };
-              })()
-            : null;
-        const { data: byId } = await serviceClient
-          .from("usuario")
-          .select("id,estado,deleted_at,rol(nombre)")
-          .eq("id", sessionToRefresh.userId)
-          .maybeSingle();
-        account = toAccount(byId);
-        if (!account && supabasePrincipal?.email) {
-          const { data: byEmail } = await serviceClient
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
+        if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+          });
+          const { data: userById } = await supabase
             .from("usuario")
-            .select("id,estado,deleted_at,rol(nombre)")
-            .eq("correo", supabasePrincipal.email)
+            .select("id, estado, deleted_at, rol:rol_id(nombre)")
+            .eq("id", sessionToRefresh.userId)
             .maybeSingle();
-          account = toAccount(byEmail);
+
+          let row = userById;
+          if (!row && supabasePrincipal?.email) {
+            const { data: userByEmail } = await supabase
+              .from("usuario")
+              .select("id, estado, deleted_at, rol:rol_id(nombre)")
+              .ilike("correo", supabasePrincipal.email)
+              .maybeSingle();
+            row = userByEmail;
+          }
+
+          if (row) {
+            account = {
+              id: row.id,
+              estado: row.estado,
+              deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+              rol: normalizeEmbeddedRole(row.rol),
+            };
+          }
         }
       } catch (error: unknown) {
         console.error("Error al validar el estado de la sesión:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "AUTHORIZATION_UNAVAILABLE",
-              message: "No se pudo verificar el estado de la cuenta.",
+        if (!authUser) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "AUTHORIZATION_UNAVAILABLE",
+                message: "No se pudo verificar el estado de la cuenta.",
+              },
+              timestamp: new Date().toISOString(),
             },
-            timestamp: new Date().toISOString(),
-          },
-          { status: 503 },
-        );
+            { status: 503 },
+          );
+        }
       }
 
-      const currentRole = normalizeRole(account?.rol?.nombre);
       const isAuthenticationLanding =
         pathname === "/" || pathname === "/login" || pathname === "/register";
-      if (
-        !account ||
-        (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
-        !currentRole
-      ) {
+
+      if (account) {
+        const currentRole = normalizeRole(account.rol?.nombre);
+        if (
+          (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
+          !currentRole
+        ) {
+          currentSession = null;
+        } else {
+          currentSession = {
+            ...sessionToRefresh,
+            role: currentRole,
+            status: account.deletedAt ? "INACTIVO" : account.estado,
+            userId: account.id,
+          };
+        }
+      } else if (!authUser) {
+        // Solo descartar sesión si no proviene de un token NextAuth firmado
         currentSession = null;
-      } else {
-        currentSession = {
-          ...sessionToRefresh,
-          role: currentRole,
-          status: account.deletedAt ? "INACTIVO" : account.estado,
-          userId: account.id,
-        };
       }
     }
   }

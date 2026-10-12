@@ -1,4 +1,5 @@
 // Mock en memoria de PrismaClient para pruebas unitarias de repositorios
+import { randomUUID } from "node:crypto";
 
 export interface MockCategoria {
   id: number;
@@ -144,6 +145,9 @@ export function createMockPrisma() {
   const lecturas: MockLecturaAcceso[] = [];
   const asignaciones: MockAsignacionPuesto[] = [];
   const inhabilitaciones: Array<Record<string, unknown>> = [];
+  const torneos: any[] = [];
+  const bloqueosTorneo: any[] = [];
+  const inscripcionesTorneo: any[] = [];
 
   let catIdSeq = 1;
   let servIdSeq = 1;
@@ -192,6 +196,9 @@ export function createMockPrisma() {
       lecturas,
       asignaciones,
       inhabilitaciones,
+      torneos,
+      bloqueosTorneo,
+      inscripcionesTorneo,
     },
     $transaction: async (arg: any) => {
       if (typeof arg === "function") {
@@ -213,6 +220,9 @@ export function createMockPrisma() {
         const snapLecturas = [...lecturas];
         const snapAsignaciones = [...asignaciones];
         const snapInhabilitaciones = [...inhabilitaciones];
+        const snapTorneos = [...torneos];
+        const snapBloqueosTorneo = [...bloqueosTorneo];
+        const snapInscripcionesTorneo = [...inscripcionesTorneo];
         try {
           return await arg(mock);
         } catch (err) {
@@ -240,6 +250,12 @@ export function createMockPrisma() {
           asignaciones.push(...snapAsignaciones);
           inhabilitaciones.length = 0;
           inhabilitaciones.push(...snapInhabilitaciones);
+          torneos.length = 0;
+          torneos.push(...snapTorneos);
+          bloqueosTorneo.length = 0;
+          bloqueosTorneo.push(...snapBloqueosTorneo);
+          inscripcionesTorneo.length = 0;
+          inscripcionesTorneo.push(...snapInscripcionesTorneo);
           throw err;
         } finally {
           releaseTransaction();
@@ -441,21 +457,45 @@ export function createMockPrisma() {
       },
     },
     disponibilidad: {
-      async findMany({ where }: any = {}) {
+      async findMany({ where, include }: any = {}) {
         return disponibilidades
           .filter((d) => {
             if (where?.servicioId !== undefined && d.servicioId !== where.servicioId) return false;
+            if (where?.servicio?.estado !== undefined) {
+              const service = servicios.find((item) => item.id === d.servicioId);
+              if (service?.estado !== where.servicio.estado) return false;
+            }
             if (
               where?.fecha &&
               d.fecha.toISOString().slice(0, 10) !== where.fecha.toISOString().slice(0, 10)
             ) return false;
             return true;
           })
-          .map((d) => ({
-            ...d,
-            servicio: servicios.find((s) => s.id === d.servicioId),
-            franja: franjas.find((f) => f.id === d.franjaId),
-          }));
+          .map((d) => {
+            const result: Record<string, unknown> = {
+              ...d,
+              servicio: servicios.find((s) => s.id === d.servicioId),
+              franja: franjas.find((f) => f.id === d.franjaId),
+            };
+            if (include?.reservas) {
+              const relationWhere = include.reservas.where;
+              result.reservas = reservas
+                .filter((reservation) => {
+                  if (reservation.disponibilidadId !== d.id) return false;
+                  if (
+                    relationWhere?.estado !== undefined &&
+                    reservation.estado !== relationWhere.estado
+                  ) return false;
+                  const expiresAt = relationWhere?.expiraEn?.lte;
+                  if (expiresAt && (!reservation.expiraEn || reservation.expiraEn > expiresAt)) {
+                    return false;
+                  }
+                  return true;
+                })
+                .map(({ cantidadCupos }) => ({ cantidadCupos }));
+            }
+            return result;
+          });
       },
       async findUnique({ where, include }: any) {
         const disp = disponibilidades.find((d) => d.id === where.id);
@@ -552,6 +592,10 @@ export function createMockPrisma() {
           if (
             typeof where?.id === "string" &&
             reservation.id !== where.id
+          ) return false;
+          if (
+            Array.isArray(where?.id?.in) &&
+            !where.id.in.includes(reservation.id)
           ) return false;
           if (
             where?.disponibilidadId !== undefined &&
@@ -825,6 +869,27 @@ export function createMockPrisma() {
       },
     },
     ticketQr: {
+      async create({ data }: any) {
+        // Respeta el UNIQUE "ticket_qr_reserva_id_key" (TSK-BE-10).
+        if (tickets.some((t) => t.reservaId === data.reservaId)) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`reserva_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
+        const item: MockTicketQr = {
+          id: `ticket-${tickets.length + 1}`,
+          reservaId: data.reservaId,
+          codigoUuid: data.codigoUuid ?? randomUUID(),
+          usadoPor: null,
+          estado: data.estado ?? "EMITIDO",
+          usadoEn: null,
+          emitidoEn: new Date(),
+        };
+        tickets.push(item);
+        return item;
+      },
       async findUnique({ where, include, select }: any) {
         let ticket: MockTicketQr | undefined;
         if (where.id !== undefined) ticket = tickets.find((t) => t.id === where.id);
@@ -933,6 +998,212 @@ export function createMockPrisma() {
         if (!entry) throw new Error("Not found");
         Object.assign(entry, data);
         return entry;
+      },
+    },
+    torneo: {
+      async create({ data, include }: any) {
+        const item: any = {
+          id: data.id ?? `torneo-${torneos.length + 1}`,
+          adminId: data.adminId,
+          categoriaId: data.categoriaId,
+          titulo: data.titulo,
+          descripcion: data.descripcion ?? null,
+          nivel: data.nivel,
+          fechaInicio: new Date(data.fechaInicio),
+          fechaFin: new Date(data.fechaFin),
+          cuposTotales: data.cuposTotales,
+          cuposOcupados: data.cuposOcupados ?? 0,
+          precioInscripcion: data.precioInscripcion ?? 0,
+          estado: data.estado ?? "BORRADOR",
+          creadoEn: new Date(),
+          actualizadoEn: new Date(),
+        };
+        torneos.push(item);
+
+        if (data.bloqueos?.create) {
+          for (const b of data.bloqueos.create) {
+            bloqueosTorneo.push({
+              id: bloqueosTorneo.length + 1,
+              torneoId: item.id,
+              servicioId: b.servicioId,
+              horaInicio: new Date(b.horaInicio),
+              horaFin: new Date(b.horaFin),
+            });
+          }
+        }
+
+        const res: any = { ...item };
+        if (include?.categoria) {
+          res.categoria = categorias.find((c) => c.id === item.categoriaId) ?? null;
+        }
+        if (include?.bloqueos) {
+          res.bloqueos = bloqueosTorneo
+            .filter((b) => b.torneoId === item.id)
+            .map((b) => ({
+              ...b,
+              servicio: include.bloqueos.include?.servicio
+                ? servicios.find((s) => s.id === b.servicioId) ?? null
+                : undefined,
+            }));
+        }
+        return res;
+      },
+      async findUnique({ where, include }: any) {
+        const item = torneos.find((t) => t.id === where.id);
+        if (!item) return null;
+        const res: any = { ...item };
+        if (include?.categoria) {
+          res.categoria = categorias.find((c) => c.id === item.categoriaId) ?? null;
+        }
+        if (include?.bloqueos) {
+          res.bloqueos = bloqueosTorneo
+            .filter((b) => b.torneoId === item.id)
+            .map((b) => ({
+              ...b,
+              servicio: include.bloqueos.include?.servicio
+                ? servicios.find((s) => s.id === b.servicioId) ?? null
+                : undefined,
+            }));
+        }
+        if (include?.inscripciones) {
+          res.inscripciones = inscripcionesTorneo
+            .filter((i) => i.torneoId === item.id)
+            .map((i) => ({
+              ...i,
+              usuario: usuarios.find((u) => u.id === i.usuarioId) ?? null,
+            }));
+        }
+        return res;
+      },
+      async findMany({ where, include }: any = {}) {
+        let list = [...torneos];
+        if (where?.estado) {
+          if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
+            list = list.filter((t) => where.estado.in.includes(t.estado));
+          } else {
+            list = list.filter((t) => t.estado === where.estado);
+          }
+        }
+        if (where?.categoriaId) {
+          list = list.filter((t) => t.categoriaId === where.categoriaId);
+        }
+        return list.map((item) => {
+          const res: any = { ...item };
+          if (include?.categoria) {
+            res.categoria = categorias.find((c) => c.id === item.categoriaId) ?? null;
+          }
+          if (include?.bloqueos) {
+            res.bloqueos = bloqueosTorneo
+              .filter((b) => b.torneoId === item.id)
+              .map((b) => ({
+                ...b,
+                servicio: servicios.find((s) => s.id === b.servicioId) ?? null,
+              }));
+          }
+          if (include?._count?.select?.inscripciones) {
+            res._count = {
+              inscripciones: inscripcionesTorneo.filter((i) => i.torneoId === item.id).length,
+            };
+          }
+          return res;
+        });
+      },
+      async update({ where, data }: any) {
+        const item = torneos.find((t) => t.id === where.id);
+        if (!item) throw new Error("Torneo no encontrado");
+        if (data.estado !== undefined) item.estado = data.estado;
+        if (data.cuposOcupados?.increment !== undefined) {
+          item.cuposOcupados = (item.cuposOcupados ?? 0) + data.cuposOcupados.increment;
+        } else if (data.cuposOcupados !== undefined) {
+          item.cuposOcupados = data.cuposOcupados;
+        }
+        item.actualizadoEn = new Date();
+        return { ...item };
+      },
+    },
+    torneoBloqueo: {
+      async findMany({ where }: any = {}) {
+        return bloqueosTorneo.filter((b) => {
+          if (where?.torneoId && b.torneoId !== where.torneoId) return false;
+          if (where?.servicioId && b.servicioId !== where.servicioId) return false;
+          return true;
+        });
+      },
+    },
+    inscripcionTorneo: {
+      async create({ data, include }: any) {
+        const item: any = {
+          id: data.id ?? `inscripcion-${inscripcionesTorneo.length + 1}`,
+          torneoId: data.torneoId,
+          usuarioId: data.usuarioId,
+          nombrePareja: data.nombrePareja ?? null,
+          pagoId: data.pagoId ?? null,
+          estado: data.estado ?? "PENDIENTE_PAGO",
+          ticketCodigoUuid: data.ticketCodigoUuid ?? randomUUID(),
+          ticketEstado: data.ticketEstado ?? "EMITIDO",
+          ticketUsadoEn: null,
+          ticketUsadoPor: null,
+          creadoEn: new Date(),
+        };
+        inscripcionesTorneo.push(item);
+        const res: any = { ...item };
+        if (include?.torneo) {
+          res.torneo = torneos.find((t) => t.id === item.torneoId) ?? null;
+        }
+        if (include?.usuario) {
+          res.usuario = usuarios.find((u) => u.id === item.usuarioId) ?? null;
+        }
+        return res;
+      },
+      async findUnique({ where, include }: any) {
+        let item: any;
+        if (where?.id) {
+          item = inscripcionesTorneo.find((i) => i.id === where.id);
+        } else if (where?.ticketCodigoUuid) {
+          item = inscripcionesTorneo.find((i) => i.ticketCodigoUuid === where.ticketCodigoUuid);
+        } else if (where?.torneoId_usuarioId) {
+          item = inscripcionesTorneo.find(
+            (i) => i.torneoId === where.torneoId_usuarioId.torneoId &&
+                   i.usuarioId === where.torneoId_usuarioId.usuarioId,
+          );
+        }
+        if (!item) return null;
+        const res: any = { ...item };
+        if (include?.torneo) {
+          const t = torneos.find((tor) => tor.id === item.torneoId);
+          res.torneo = t
+            ? {
+                ...t,
+                categoria: include.torneo.include?.categoria
+                  ? categorias.find((c) => c.id === t.categoriaId) ?? null
+                  : undefined,
+              }
+            : null;
+        }
+        if (include?.usuario) {
+          res.usuario = usuarios.find((u) => u.id === item.usuarioId) ?? null;
+        }
+        return res;
+      },
+      async findMany({ where }: any = {}) {
+        return inscripcionesTorneo.filter((i) => {
+          if (where?.torneoId && i.torneoId !== where.torneoId) return false;
+          if (where?.usuarioId && i.usuarioId !== where.usuarioId) return false;
+          return true;
+        });
+      },
+      async update({ where, data, include }: any) {
+        const item = inscripcionesTorneo.find((i) => i.id === where.id);
+        if (!item) throw new Error("Inscripción no encontrada");
+        Object.assign(item, data);
+        const res: any = { ...item };
+        if (include?.torneo) {
+          res.torneo = torneos.find((t) => t.id === item.torneoId) ?? null;
+        }
+        if (include?.usuario) {
+          res.usuario = usuarios.find((u) => u.id === item.usuarioId) ?? null;
+        }
+        return res;
       },
     },
   };

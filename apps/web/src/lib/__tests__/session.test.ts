@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { extractSupabaseAccessToken } from "../session";
+import {
+  extractSupabaseAccessToken,
+  normalizeRole,
+  normalizeEmbeddedRole,
+  isAccountActive,
+  verifyScSessionToken,
+} from "../session";
 
 test("extracts Supabase access tokens from JSON cookies", () => {
   const request = new NextRequest("http://localhost/");
@@ -24,4 +30,47 @@ test("reassembles chunked base64 Supabase cookies before extracting the token", 
   request.cookies.set("sb-project-auth-token.0", encoded.slice(0, splitAt));
 
   assert.equal(extractSupabaseAccessToken(request), "verified-access-token");
+});
+
+// Regresión de la causa raíz del bug "el login da 200 pero se queda en /login":
+// la relación embebida usuario→rol llega como objeto (many-to-one), no como array.
+test("normalizeEmbeddedRole acepta el rol como OBJETO (PostgREST many-to-one)", () => {
+  assert.deepEqual(normalizeEmbeddedRole({ nombre: "ADMIN" }), { nombre: "ADMIN" });
+});
+
+test("normalizeEmbeddedRole acepta el rol como ARRAY (variante PostgREST)", () => {
+  assert.deepEqual(normalizeEmbeddedRole([{ nombre: "ADMIN" }]), { nombre: "ADMIN" });
+});
+
+test("normalizeEmbeddedRole tolera null/undefined/nombre ausente", () => {
+  assert.equal(normalizeEmbeddedRole(null), null);
+  assert.equal(normalizeEmbeddedRole(undefined), null);
+  assert.equal(normalizeEmbeddedRole([]), null);
+  assert.equal(normalizeEmbeddedRole({}), null);
+});
+
+test("normalizeRole mapea los nombres relacionales y de dominio a la forma canónica", () => {
+  assert.equal(normalizeRole("ADMIN"), "Administrador");
+  assert.equal(normalizeRole("VENDEDOR"), "Empleado_Vendedor");
+  assert.equal(normalizeRole("LECTOR"), "Empleado_Lector");
+  assert.equal(normalizeRole("CLIENTE"), "Cliente");
+  assert.equal(normalizeRole("empleado_vendedor"), "Empleado_Vendedor");
+  assert.equal(normalizeRole("desconocido"), null);
+  assert.equal(normalizeRole(null), null);
+});
+
+test("isAccountActive solo bloquea estados inactivos explícitos", () => {
+  assert.equal(isAccountActive("ACTIVO"), true);
+  assert.equal(isAccountActive("INACTIVO"), false);
+  assert.equal(isAccountActive("TEMP_INACTIVO"), false);
+});
+
+// Bloqueante de code review: un sc-token malformado NO debe lanzar (tumbaba el middleware con 500).
+test("verifyScSessionToken con token malformado devuelve null y no lanza", async () => {
+  process.env.AUTH_SECRET = process.env.AUTH_SECRET || "test-secret";
+  for (const malformed of ["aaaa.@@@@", "sin-punto", ".", "a.", "....", "abc.def"]) {
+    await assert.doesNotReject(async () => {
+      assert.equal(await verifyScSessionToken(malformed), null);
+    });
+  }
 });

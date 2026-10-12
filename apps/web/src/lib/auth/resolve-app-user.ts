@@ -20,8 +20,8 @@ export interface ResolvedAppUser {
 export async function resolveAppUserByEmail(
   email: string,
 ): Promise<ResolvedAppUser | null> {
-  const usuario = await prisma.usuario.findUnique({
-    where: { correo: email.toLowerCase().trim() },
+  const usuario = await prisma.usuario.findFirst({
+    where: { correo: { equals: email.trim(), mode: "insensitive" } },
     include: { rol: true },
   });
 

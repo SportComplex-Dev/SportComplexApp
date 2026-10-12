@@ -44,6 +44,23 @@ export function normalizeRole(roleStr?: string | null): CanonicalRole | null {
 }
 
 /**
+ * Normaliza el rol embebido que devuelve PostgREST/Supabase REST en la relación
+ * `usuario → rol`. Esa relación es many-to-one y PostgREST la entrega como **objeto**
+ * (`{ nombre }`), pero ciertas versiones/consultas la devuelven como **array**
+ * (`[{ nombre }]`). Asumir siempre array fue la causa raíz del bug "se queda en /login".
+ */
+export type EmbeddedRole =
+  | { nombre?: string | null }
+  | Array<{ nombre?: string | null }>
+  | null
+  | undefined;
+
+export function normalizeEmbeddedRole(rol: EmbeddedRole): { nombre: string } | null {
+  const row = Array.isArray(rol) ? rol[0] : rol;
+  return row && typeof row.nombre === "string" ? { nombre: row.nombre } : null;
+}
+
+/**
  * Comprueba si el estado de la cuenta permite el acceso perimetral.
  * RN-10: Cuentas inactivas o con borrado lógico tienen credenciales revocadas de inmediato.
  */
@@ -155,30 +172,40 @@ export async function signScSessionToken(claims: Omit<ScSessionClaims, "exp">): 
 }
 
 export async function verifyScSessionToken(token: string): Promise<ScSessionClaims | null> {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) return null;
-
-  const dotIndex = token.lastIndexOf(".");
-  if (dotIndex <= 0) return null;
-
-  const encoded = token.slice(0, dotIndex);
-  const signature = token.slice(dotIndex + 1);
-  const key = await importHmacKey(secret, "verify");
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    base64UrlToBytes(signature),
-    new TextEncoder().encode(encoded),
-  );
-  if (!valid) return null;
-
   try {
+    const secret = process.env.AUTH_SECRET;
+    if (!secret) return null;
+
+    const dotIndex = token.lastIndexOf(".");
+    if (dotIndex <= 0) return null;
+
+    const encoded = token.slice(0, dotIndex);
+    const signature = token.slice(dotIndex + 1);
+    // HMAC-SHA256 → 32 bytes → 43 caracteres base64url sin padding. Se valida
+    // antes de decodificar para que un token malformado no dispare atob().
+    if (!encoded || signature.length !== 43 || !/^[A-Za-z0-9_-]+$/.test(signature)) {
+      return null;
+    }
+
+    const key = await importHmacKey(secret, "verify");
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(signature),
+      new TextEncoder().encode(encoded),
+    );
+    if (!valid) return null;
+
     const payload = JSON.parse(base64UrlDecode(encoded)) as ScSessionClaims;
     if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
+    if (typeof payload.sub !== "string" || typeof payload.role !== "string") {
+      return null;
+    }
     return payload;
   } catch {
+    // Un `sc-token` corrupto (base64 inválido, JSON roto, etc.) nunca debe tumbar el middleware.
     return null;
   }
 }

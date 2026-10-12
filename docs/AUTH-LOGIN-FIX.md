@@ -15,7 +15,8 @@
 - **Se implementó** un **fallback de autenticación local estricto** para cuentas con `password_hash` (Argon2id) que aún no tienen identidad en Supabase Auth, emitiendo un token de sesión propio firmado (`sc-token`).
 - **Se corrigió** un fallo de empaquetado con **Turbopack + Argon2 nativo** (`@node-rs/argon2` no se externalizaba por un `import` dinámico con variable).
 - **Se migraron las 4 cuentas de staff** a Supabase Auth (4/4 creadas).
-- **Validación final:** matriz HTTP **34/34** + suites de test **121/121** + lint y typecheck limpios.
+- **Validación final:** matriz HTTP **34/34** + suites de test **154 pass / 1 skip** (web 56 · core 38 · db 60+1 skip) + lint y typecheck limpios.
+- **Integración con `develop`:** durante el cierre, `develop` ya había mergeado el mismo **fix de rol** y su propio `logout` con tests (PRs #42/#43). Este PR se fusionó con `develop` resolviendo los conflictos: se conservó el `middleware` de `develop` (fetch robusto a Supabase REST) y se le suma el `sc-token` (`await extractSession`), más la lógica de identidad Supabase en el alta y el fallback estricto.
 
 ---
 
@@ -26,7 +27,7 @@
 | Archivo | Qué hace |
 |---|---|
 | `apps/web/src/lib/auth/auth-gate.ts` | Guards de acceso: evalúa rol + estado de la cuenta (`ACTIVO`, bloqueo por `ACCOUNT_PENDING`/`ACCOUNT_INACTIVE`, respeta borrado lógico). |
-| `apps/web/src/lib/auth/resolve-app-user.ts` | Resuelve el usuario de aplicación (perfil `usuario` + rol) a partir del principal de Supabase (por `googleSub`/id → fallback por **email**). |
+| `apps/web/src/lib/auth/resolve-app-user.ts` | Resuelve el usuario de aplicación (perfil `usuario` + rol) a partir del principal de Supabase, buscando por **correo case-insensitive** (`mode: "insensitive"`). |
 | `apps/web/src/lib/auth/__tests__/auth-gate.test.ts` | Tests de los guards (estados, borrado lógico, roles). |
 | `apps/web/src/lib/supabase/admin.ts` | Cliente admin (service role) con `findSupabaseUserByEmail` y `createSupabaseAuthUser` para la migración/alta de identidades. |
 | `apps/web/src/app/api/auth/logout/route.ts` | Endpoint de cierre de sesión (limpia sesión Supabase y cookies propias). |
@@ -39,7 +40,7 @@
 
 | Archivo | Cambio clave |
 |---|---|
-| `apps/web/src/middleware.ts` | **Fix del rol** (`Array.isArray(row.rol) ? row.rol[0] : row.rol`). Resolución de la sesión con `await extractSession(req)` (ya no solo dev). Refresco de rol por id/email y redirección por `ROLE_HOME`. |
+| `apps/web/src/middleware.ts` | **Fix del rol** vía `normalizeEmbeddedRole` (acepta objeto y array). Fetch robusto a Supabase REST con `.ilike("correo", …)` (email case-insensitive). Resolución de la sesión con `await extractSession(req)` (ya no solo dev). Redirección por `ROLE_HOME`. |
 | `apps/web/src/lib/session.ts` | `signScSessionToken` / `verifyScSessionToken` (HMAC-SHA256 con `AUTH_SECRET`, Web Crypto, TTL 24h, formato `payload.sig`). `extractSession` pasa a ser **async** y **verifica la firma** del `sc-token`. |
 | `apps/web/src/app/api/auth/route.ts` | `buildLegacySession(email, password)`: fallback **estricto** (solo si el correo **no** existe en Supabase Auth), valida Argon2id vía `verifySecret`, aplica `authGateFor` y emite la cookie `sc-token` (`HttpOnly; SameSite=Lax; Max-Age=86400`). |
 | `apps/web/src/app/api/auth/register/route.ts` | Ajustes del alta para no duplicar identidades y respetar el nuevo flujo. |
@@ -55,7 +56,7 @@
 
 | Aspecto | Antes | Ahora |
 |---|---|---|
-| Resolución del rol | `row.rol?.[0]` (asumía array) → `null` → **redirect a `/login`** siempre | Acepta objeto y array (`Array.isArray(...) ? ...[0] : ...`) → rol correcto |
+| Resolución del rol | `row.rol?.[0]` (asumía array) → `null` → **redirect a `/login`** siempre | `normalizeEmbeddedRole` (objeto y array) → rol correcto |
 | Resultado del login | `POST /api/auth` = 200 pero la UI **no avanzaba** | 200 + redirección al home del rol (`/admin/dashboard`, `/pos`, `/scanner`, `/portal`) |
 | Cuentas con `password_hash` | No podían iniciar sesión (Argon2id real no validaba / flujo inexistente) | Login por **fallback local estricto** si no hay identidad Supabase |
 | Token de sesión propio | `sc-session`/`sc-role` **solo en dev**, sin firma | `sc-token` firmado con `AUTH_SECRET` (HMAC-SHA256), verificado en middleware, funciona también en producción |
@@ -70,7 +71,7 @@
 
 ## 4. Errores descubiertos y arreglados
 
-1. **Rol siempre `null` (array vs objeto de PostgREST).** El embebido many-to-one llega como objeto; `row.rol?.[0]` devolvía `undefined`. → *Fix:* comprobación `Array.isArray`. **Efecto:** era la causa del "se queda en `/login`".
+1. **Rol siempre `null` (array vs objeto de PostgREST).** El embebido many-to-one llega como objeto; `row.rol?.[0]` devolvía `undefined`. → *Fix:* helper `normalizeEmbeddedRole` (objeto **y** array) + test de regresión. **Efecto:** era la causa del "se queda en `/login`".
 2. **`@node-rs/argon2` no cargaba en Turbopack.** El `import` dinámico con specifier en variable no se externalizaba y el binario nativo no se resolvía en `.next/dev/server/chunks/[turbopack]_runtime.js`. → *Fix:* specifier **literal** + `serverExternalPackages: ["@node-rs/argon2"]` + sacar `security/token` del barril (entraba al bundle de cliente vía stores).
 3. **Doble sistema de hash (Argon2id vs bcrypt).** `verifySecret` es Argon2id; los 56 hashes bcrypt **nunca** validan. → *Decisión:* no perpetuar el sistema dual; migrar a Supabase Auth y usar el fallback solo como puente para las Argon2id restantes.
 4. **Cuentas `PENDIENTE` y borrado lógico.** Faltaba bloquear explícitamente estos casos. → *Fix:* `auth-gate.ts` (`ACCOUNT_PENDING` / `ACCOUNT_INACTIVE`, respeta borrado lógico).
@@ -96,7 +97,7 @@
 |---|---|
 | `apps/web` tests | **56 / 56** ✅ |
 | `packages/core` tests | **38 / 38** ✅ |
-| `packages/db` tests | **27 / 27** ✅ |
+| `packages/db` tests | **60 pass / 1 skip** ✅ |
 | Lint (`web`) | **0 errores** ✅ |
 | Typecheck `web` / `core` / `db` | **0 errores** ✅ |
 
@@ -110,7 +111,7 @@
 - **Pooler IPv4 obligatorio:** `db.<ref>.supabase.co` es IPv6-only en este entorno; usar el Session Pooler (`aws-0-us-west-2.pooler.supabase.com:5432`).
 - **hash legacy bcrypt (56 filas) no es recuperable** sin reset de contraseña: `verifySecret` es Argon2id.
 - **Pendientes de migración:** 56 cuentas `CLIENTE` (y 56 bcrypt) siguen dependiendo del fallback local.
-- **No existe columna `supabase_uid`** en `usuario` (solo `googleSub`); el middleware resuelve por id → **fallback por email**, por eso provisionar identidades basta (sin cambio de esquema).
+- **No existe columna `supabase_uid`** en `usuario` (solo `googleSub`); la resolución del usuario de aplicación se hace **por correo** (case-insensitive, tanto en Prisma como en el middleware vía `.ilike`), por eso provisionar identidades basta (sin cambio de esquema).
 - **Seguridad:** las contraseñas de la sección 7 son **credenciales de prueba**. No reutilizar en producción ni versionar credenciales reales.
 
 ---

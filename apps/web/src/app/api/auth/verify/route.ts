@@ -8,7 +8,7 @@ import {
 import {
   consumeRateLimit,
   resetRateLimit,
-} from "@sportcomplex/core/src/security/rate-limit";
+} from "@sportcomplex/core";
 import { prisma, findLatestByUsuarioId, markUsed } from "@sportcomplex/db";
 import { confirmSupabaseUserEmail } from "@/lib/supabase/admin";
 

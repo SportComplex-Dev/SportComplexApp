@@ -85,7 +85,7 @@ function deniedCodeToResultado(code: AccessDeniedCode): ResultadoLecturaValor {
 }
 
 /** Ventana [inicio, fin] de la reserva = fecha + franja (patrón de bookings, TZ Bogotá). */
-function ventanaDeReserva(disponibilidad: {
+export function getTicketAccessWindow(disponibilidad: {
   fecha: Date;
   franja: { horaInicio: Date; horaFin: Date };
 }): { start: Date; end: Date } {
@@ -111,7 +111,7 @@ export async function procesarEscaneo(
   const db = options.db;
   const ticket = await getTicketForScan(input.ticketId, db);
 
-  const { start, end } = ventanaDeReserva(ticket.reserva.disponibilidad);
+  const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
   const decision = decideAccess({
     now,
     start,

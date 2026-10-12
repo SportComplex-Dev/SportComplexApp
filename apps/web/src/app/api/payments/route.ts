@@ -1,7 +1,12 @@
 import Stripe from "stripe";
 import { PaymentError, procesarPagoWebhook } from "@sportcomplex/db";
-import { parsePaymentIntentMetadata, stripeAmountToMonto } from "@sportcomplex/core";
+import {
+  newTicketId,
+  parsePaymentIntentMetadata,
+  stripeAmountToMonto,
+} from "@sportcomplex/core";
 import { ok, fail } from "@/lib/api-response";
+import { sendContingencyWebhook } from "@/lib/contingency-webhook";
 
 // RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09).
 // Endpoint a registrar en el dashboard de Stripe:
@@ -51,8 +56,16 @@ export async function POST(request: Request) {
   }
 
   const intent = event.data.object as Stripe.PaymentIntent;
-  const { userId, bookingId, membershipId } = parsePaymentIntentMetadata(intent.metadata);
-  if (!intent.id || !userId || (!bookingId && !membershipId)) {
+  const { userId, bookingId, bookingIds, membershipId } = parsePaymentIntentMetadata(intent.metadata);
+  const effectiveBookingIds =
+    bookingIds && bookingIds.length > 0
+      ? bookingIds
+      : bookingId
+        ? [bookingId]
+        : [];
+  const hasBookings = effectiveBookingIds.length > 0;
+
+  if (!intent.id || !userId || (!hasBookings && !membershipId)) {
     // Evento sin nuestro metadato (otro flujo de Stripe): no es procesable.
     return ok({ received: true, ignored: true, reason: "MISSING_METADATA" });
   }
@@ -64,10 +77,43 @@ export async function POST(request: Request) {
       monto: stripeAmountToMonto(intent.amount ?? 0),
       estado:
         event.type === "payment_intent.succeeded" ? "APROBADO" : "FALLIDO",
-      tipo: bookingId ? "RESERVA" : "MEMBRESIA",
-      reservaId: bookingId,
+      tipo: hasBookings ? "RESERVA" : "MEMBRESIA",
+      ...(hasBookings
+        ? {
+            reservaId: effectiveBookingIds.length === 1 ? effectiveBookingIds[0] : undefined,
+            reservaIds: effectiveBookingIds,
+          }
+        : {}),
       membresiaId: membershipId ? Number(membershipId) : undefined,
+      // UUIDv4 no predecible para el TICKET_QR (TSK-BE-11), generado en core.
+      ticketCodigoUuid: newTicketId(),
     });
+    // Observación de @Its-JrDev: solo notificar a n8n si el pago falló Y NO es un reintento duplicado.
+    if (resultado.estado === "FALLIDO" && !resultado.duplicado) {
+      // RF-09: alerta de pago fallido. Fire-and-forget: no bloquea la respuesta
+      // a Stripe ni revierte la cancelación de la reserva ya aplicada.
+      void sendContingencyWebhook({
+        evento: "payment_intent.payment_failed",
+        paymentIntentId: intent.id,
+        usuarioId: userId,
+        reservaId: effectiveBookingIds[0] ?? bookingId ?? null,
+        membresiaId: membershipId ?? null,
+        reservaEstado: resultado.reservaEstado,
+        franjaRestituida: resultado.franjaRestituida,
+        monto: stripeAmountToMonto(intent.amount ?? 0),
+      })
+        .then((webhook) => {
+          if (!webhook.sent) {
+            console.error(
+              "Alerta de pago fallido no enviada a n8n:",
+              webhook.error,
+            );
+          }
+        })
+        .catch((err) => {
+          console.error("Error al despachar alerta de pago fallido a n8n:", err);
+        });
+    }
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
     return ok({ received: true, ...resultado });
   } catch (error: unknown) {
