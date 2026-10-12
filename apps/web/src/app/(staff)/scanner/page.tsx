@@ -150,7 +150,9 @@ export default function ScannerPage() {
         <ExpiredSlotScreen
           cameraError={cameraError}
           expiredDetails={result.expiredDetails}
+          message={result.message}
           onContinue={() => void continueScanning()}
+          reservationId={result.reservationId ?? ""}
           targetCourtName={result.targetCourtName ?? "Servicio"}
           ticketId={result.ticketId ?? ""}
           userName={result.userName ?? "Cliente"}

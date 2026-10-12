@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { Clock3, Ticket } from "lucide-react";
+import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
 import type { ExpiredSlotDetails } from "./scanner.service";
 
 interface ExpiredSlotScreenProps {
   userName: string;
   ticketId: string;
+  reservationId: string;
   targetCourtName: string;
   expiredDetails: ExpiredSlotDetails;
+  message?: string;
   cameraError?: string;
   onContinue: () => void;
 }
@@ -25,16 +28,19 @@ function formatTime(value: string): string {
 export default function ExpiredSlotScreen({
   userName,
   ticketId,
+  reservationId,
   targetCourtName,
   expiredDetails,
+  message,
   cameraError,
   onContinue,
 }: ExpiredSlotScreenProps) {
-  const delay = expiredDetails.minutesExceeded;
+  const isBeforeWindow = expiredDetails.windowPosition === "BEFORE";
+  const distance = expiredDetails.minutesFromBoundary;
 
   return (
     <section
-      aria-label="Acceso denegado: franja vencida"
+      aria-label={message ?? ACCESS_WINDOW_EXPIRED_MESSAGE}
       aria-modal="true"
       className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-md dark:bg-[#111815] sm:p-6"
       role="dialog"
@@ -46,11 +52,10 @@ export default function ExpiredSlotScreen({
           </div>
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 font-mono text-xs font-bold tracking-wide text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/60 dark:text-rose-300">
             <Ticket aria-hidden="true" size={14} />
-            [ESTADO: DENEGADO / TICKET_EXPIRED]
+            [ESTADO: DENEGADO_HORARIO / BOLETO EMITIDO]
           </p>
           <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            ACCESO DENEGADO
-            <span className="block text-rose-700 dark:text-rose-300">FRANJA VENCIDA</span>
+            {message ?? ACCESS_WINDOW_EXPIRED_MESSAGE}
           </h1>
           <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
             {userName} <span aria-hidden="true">·</span> {targetCourtName}
@@ -58,6 +63,11 @@ export default function ExpiredSlotScreen({
           <p className="mt-1 break-all font-mono text-xs text-slate-600 dark:text-slate-400">
             Ticket: {ticketId}
           </p>
+          {reservationId ? (
+            <p className="mt-1 break-all font-mono text-xs text-slate-600 dark:text-slate-400">
+              Reserva: {reservationId}
+            </p>
+          ) : null}
         </header>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
@@ -69,19 +79,19 @@ export default function ExpiredSlotScreen({
               {expiredDetails.slotStart} - {expiredDetails.slotEnd}
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Franja regular de 60 min
+              Hora legal de Colombia ({TIMEZONE})
             </p>
           </div>
 
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-500/30 dark:bg-rose-950/30">
             <p className="text-xs font-bold tracking-[0.16em] text-slate-600 dark:text-slate-300">
-              HORA DE ESCANEO
+              HORA DEL INTENTO ({TIMEZONE})
             </p>
             <p className="mt-3 font-mono text-3xl font-bold text-rose-700 dark:text-white">
               {formatTime(expiredDetails.scannedAt)}
             </p>
             <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-100 px-3 py-1 font-mono text-sm font-bold text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/60 dark:text-amber-300">
-              +{delay} min tarde
+              {isBeforeWindow ? `Faltan ${distance} min para iniciar` : `Finalizó hace ${distance} min`}
             </span>
           </div>
         </div>
@@ -89,9 +99,11 @@ export default function ExpiredSlotScreen({
         <aside className="mt-5 rounded-2xl bg-slate-100 p-4 text-sm leading-relaxed text-slate-700 dark:bg-[#111815] dark:text-slate-200 sm:p-5">
           <p className="font-bold">Guía para el empleado</p>
           <p className="mt-1">
-            Esta reserva finalizó hace <strong className="font-mono">{delay} minutos</strong>.
-            La tolerancia máxima de ingreso ha sido superada. Por normativa del club, el boleto
-            ha quedado sin validez de acceso.
+            {isBeforeWindow
+              ? <>El intento se registró antes del inicio de la franja. El acceso solo está permitido entre <strong className="font-mono">{expiredDetails.slotStart}</strong> y <strong className="font-mono">{expiredDetails.slotEnd}</strong>.</>
+              : <>El intento se registró después de finalizar la franja reservada.</>}
+            {" "}El acceso fue denegado únicamente por la restricción horaria: el boleto permanece
+            <strong className="font-mono"> EMITIDO</strong> y no fue consumido.
           </p>
         </aside>
 

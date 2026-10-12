@@ -1,14 +1,18 @@
+import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
+
 export interface ExpiredSlotDetails {
   slotStart: string;
   slotEnd: string;
   scannedAt: string;
-  minutesExceeded: number;
-  courtToleranceMinutes: number;
+  windowPosition: "BEFORE" | "AFTER";
+  ticketStatus: "EMITIDO";
+  minutesFromBoundary: number;
 }
 
 export interface TicketValidationResponse {
   isValid: boolean;
   ticketId?: string;
+  reservationId?: string;
   userName?: string;
   targetCourtName?: string;
   status: "VALID" | "WRONG_COURT" | "EXPIRED" | "ALREADY_USED" | "INVALID";
@@ -23,6 +27,7 @@ interface AccessApiResponse {
     code?: "SERVICE_MISMATCH" | "WINDOW_EXPIRED" | "ALREADY_USED" | "INVALID_STATE";
     resultado: string;
     ticket: {
+      reservaId: string;
       estado: "EMITIDO" | "USADO";
       servicioNombre: string;
       fecha: string;
@@ -30,6 +35,7 @@ interface AccessApiResponse {
       horaFin: string;
       titularNombre: string;
     };
+    message?: string;
   };
   error?: { message?: string };
   timestamp?: string;
@@ -55,7 +61,29 @@ export function parseTicketQr(value: string): { ticketId: string; signature: str
 }
 
 function toBogotaDate(fecha: string, hora: string): Date {
-  return new Date(`${fecha}T${hora}-05:00`);
+  const [year, month, day] = fecha.slice(0, 10).split("-").map(Number);
+  const [hours, minutes, seconds = 0] = hora.split(":").map(Number);
+  const localAsUtc = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(localAsUtc));
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const representedAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+  return new Date(localAsUtc - (representedAsUtc - localAsUtc));
 }
 
 function hhmm(value: string): string {
@@ -94,30 +122,39 @@ export async function validateTicket(
   const { data } = payload;
   const common = {
     ticketId,
+    reservationId: data.ticket.reservaId,
     userName: data.ticket.titularNombre,
     targetCourtName: data.ticket.servicioNombre,
   };
 
   if (data.code === "WINDOW_EXPIRED") {
+    if (data.ticket.estado !== "EMITIDO") {
+      throw new ScannerServiceError(
+        "La respuesta de franja vencida debe conservar el boleto en estado EMITIDO.",
+      );
+    }
     const timestamp = payload.timestamp;
     const scannedDate = timestamp ? new Date(timestamp) : new Date();
+    const slotStart = toBogotaDate(data.ticket.fecha, data.ticket.horaInicio);
     const slotEnd = toBogotaDate(data.ticket.fecha, data.ticket.horaFin);
-    const minutesExceeded = Math.max(
-      1,
-      Math.ceil((scannedDate.getTime() - slotEnd.getTime()) / 60_000),
-    );
+    const windowPosition = scannedDate.getTime() < slotStart.getTime() ? "BEFORE" : "AFTER";
+    const boundary = windowPosition === "BEFORE" ? slotStart : slotEnd;
 
     return {
       ...common,
       isValid: false,
       status: "EXPIRED",
-      message: "Acceso denegado: la franja horaria de esta reserva ha vencido.",
+      message: data.message ?? ACCESS_WINDOW_EXPIRED_MESSAGE,
       expiredDetails: {
         slotStart: hhmm(data.ticket.horaInicio),
         slotEnd: hhmm(data.ticket.horaFin),
         scannedAt: scannedDate.toISOString(),
-        minutesExceeded,
-        courtToleranceMinutes: 0,
+        windowPosition,
+        ticketStatus: data.ticket.estado,
+        minutesFromBoundary: Math.max(
+          1,
+          Math.ceil(Math.abs(boundary.getTime() - scannedDate.getTime()) / 60_000),
+        ),
       },
     };
   }

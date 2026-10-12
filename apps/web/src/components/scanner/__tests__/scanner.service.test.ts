@@ -5,6 +5,7 @@ import {
   ScannerServiceError,
   validateTicket,
 } from "../scanner.service";
+import { ACCESS_WINDOW_EXPIRED_MESSAGE } from "@sportcomplex/core";
 
 test("parseTicketQr separa el identificador y la firma", () => {
   assert.deepEqual(parseTicketQr("ticket-uuid.hmac-signature"), {
@@ -28,6 +29,7 @@ test("validateTicket normaliza WINDOW_EXPIRED al contrato de la pantalla", async
           code: "WINDOW_EXPIRED",
           resultado: "DENEGADO_HORARIO",
           ticket: {
+            reservaId: "reserva-1",
             estado: "EMITIDO",
             servicioNombre: "Cancha 1",
             fecha: "2026-10-10",
@@ -35,6 +37,7 @@ test("validateTicket normaliza WINDOW_EXPIRED al contrato de la pantalla", async
             horaFin: "11:00:00",
             titularNombre: "Cliente Uno",
           },
+          message: ACCESS_WINDOW_EXPIRED_MESSAGE,
         },
         timestamp: "2026-10-10T16:28:00.000Z",
       }),
@@ -46,13 +49,16 @@ test("validateTicket normaliza WINDOW_EXPIRED al contrato de la pantalla", async
     assert.equal(result.status, "EXPIRED");
     assert.equal(result.isValid, false);
     assert.equal(result.userName, "Cliente Uno");
+    assert.equal(result.reservationId, "reserva-1");
     assert.equal(result.targetCourtName, "Cancha 1");
+    assert.equal(result.message, ACCESS_WINDOW_EXPIRED_MESSAGE);
     assert.deepEqual(result.expiredDetails, {
       slotStart: "10:00",
       slotEnd: "11:00",
       scannedAt: "2026-10-10T16:28:00.000Z",
-      minutesExceeded: 28,
-      courtToleranceMinutes: 0,
+      windowPosition: "AFTER",
+      ticketStatus: "EMITIDO",
+      minutesFromBoundary: 28,
     });
   } finally {
     globalThis.fetch = previousFetch;
