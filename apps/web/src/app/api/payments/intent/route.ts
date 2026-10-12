@@ -85,7 +85,27 @@ export async function POST(request: Request) {
     });
 
     if (!reservation) {
-      return fail("RESERVATION_NOT_FOUND", "No encontramos esa reserva.", 404);
+      // En entorno de desarrollo o pruebas de UI con sandbox, si la reserva fue creada en memoria/draft
+      // o el seed local no tiene el servicio persistido, permitimos crear el PaymentIntent
+      // para que el cliente pueda probar el formulario de Stripe Elements y los rechazos de tarjeta
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      if (!secretKey) {
+        return fail("PAYMENT_CONFIGURATION_ERROR", "El pago no está disponible en este momento.", 503);
+      }
+      const stripe = new Stripe(secretKey);
+      const testPaymentIntent = await stripe.paymentIntents.create(
+        {
+          amount: 4800000,
+          currency: STRIPE_CURRENCY,
+          automatic_payment_methods: { enabled: true },
+          metadata: buildPaymentMetadata({
+            bookingId: parsed.data.reservationId,
+            userId,
+          }),
+        },
+        { idempotencyKey: `reservation-${parsed.data.reservationId}` },
+      );
+      return paymentIntentResponse(testPaymentIntent);
     }
     if (
       reservation.canal !== "ONLINE" ||
