@@ -37,7 +37,6 @@ function CheckoutContent() {
 
   const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
-  const [creationError, setCreationError] = useState<string | null>(null)
 
   const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
@@ -53,7 +52,6 @@ function CheckoutContent() {
     async function createHold() {
       if (!currentDraft || !currentItem) return
       setIsCreatingReservation(true)
-      setCreationError(null)
 
       try {
         // Intentar registrar la reserva en la DB mediante /api/bookings

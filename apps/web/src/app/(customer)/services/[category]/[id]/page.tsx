@@ -12,14 +12,13 @@ import { SportsSpecsGrid } from '@/components/sports-specs-grid'
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
 import { ReservationModal } from '@/components/reservation-modal'
 import { useApp } from '@/components/app-provider'
-import { useBookings, useCatalog, useDraft, type Booking } from '@/lib/stores'
+import { useCatalog, useDraft } from '@/lib/stores'
 
 export default function ServiceBookingPage() {
   const router = useRouter()
   const { category: slug, id } = useParams<{ category: string; id: string }>()
   const { notify, ready, session } = useApp()
   const [catalog] = useCatalog()
-  const [, setBookings] = useBookings()
   const [, setDraft] = useDraft()
   const category = categoryBySlug(slug)
   const item = catalog.find((entry) => entry.id === id && entry.category === slug)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CreditCard, Landmark, QrCode, Store } from "lucide-react";
+import { CreditCard, Landmark, QrCode } from "lucide-react";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
 
 type PaymentMethod = "card" | "pse" | "nequi" | "onsite";
