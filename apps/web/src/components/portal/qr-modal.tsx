@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Download, Printer, QrCode, ShieldCheck, X } from 'lucide-react'
 import { formatDate, type Booking } from '@sportcomplex/core'
-import { generarQRDataUrl } from './portal-utils'
+import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from './portal-utils'
 
 interface QrModalProps {
   ticket: Booking | null
@@ -15,11 +15,21 @@ interface QrModalProps {
  * Gráfico QR estándar de alta definición renderizado desde data URL PNG (RF-10 / RF-13).
  * Decodificable directamente por torniquetes ópticos perimetrales y lectores de mano.
  */
-export function QRGraphicHD({ code }: { code: string }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
+export function QRGraphicHD({
+  code,
+  dataUrl: initialDataUrl,
+}: {
+  code: string
+  dataUrl?: string | null
+}) {
+  const [dataUrl, setDataUrl] = useState<string | null>(initialDataUrl ?? null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (initialDataUrl) {
+      setDataUrl(initialDataUrl)
+      return
+    }
     let isCurrent = true
     generarQRDataUrl(code, 300)
       .then((url) => {
@@ -31,7 +41,7 @@ export function QRGraphicHD({ code }: { code: string }) {
     return () => {
       isCurrent = false
     }
-  }, [code])
+  }, [code, initialDataUrl])
 
   return (
     <div className="qr-modal-hd" aria-label={`Código QR de acceso para ticket ${code}`}>
@@ -54,17 +64,69 @@ export function QRGraphicHD({ code }: { code: string }) {
  * Modal interactivo de visualización de pase digital y código QR HD.
  */
 export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
-  if (!ticket) return null
+  const [currentTicket, setCurrentTicket] = useState<Booking | null>(ticket)
+  const [downloading, setDownloading] = useState(false)
+
+  useEffect(() => {
+    setCurrentTicket(ticket)
+    if (!ticket) return
+
+    // Si el ticket no posee payload firmado y tiene ID, obtener comprobante oficial (SEC-01 / NEW-02)
+    if (!ticket.qrPayload && ticket.id) {
+      let isCurrent = true
+      fetchReceiptData(ticket.id)
+        .then((receipt) => {
+          const qr = receipt?.qr
+          if (isCurrent && qr?.payload) {
+            setCurrentTicket((prev) =>
+              prev && prev.id === ticket.id
+                ? { ...prev, qrPayload: qr.payload, qrDataUrl: qr.dataUrl }
+                : prev
+            )
+          }
+        })
+        .catch(() => {})
+      return () => {
+        isCurrent = false
+      }
+    }
+  }, [ticket])
+
+  if (!currentTicket) return null
 
   const handleDownload = async () => {
+    if (downloading) return
+    setDownloading(true)
     try {
-      const url = await generarQRDataUrl(ticket.code, 600)
+      let dataUrl = currentTicket.qrDataUrl
+      let qrPayload = currentTicket.qrPayload
+
+      if (!dataUrl) {
+        if (!qrPayload && currentTicket.id) {
+          const receipt = await fetchReceiptData(currentTicket.id).catch(() => null)
+          if (receipt?.qr?.dataUrl) {
+            dataUrl = receipt.qr.dataUrl
+          } else if (receipt?.qr?.payload) {
+            qrPayload = receipt.qr.payload
+          }
+        }
+        if (!dataUrl) {
+          const qrTarget = qrPayload || currentTicket.code
+          dataUrl = await generarQRDataUrl(qrTarget, 600)
+        }
+      }
+
+      const safeFilename = `ticket-${sanitizeFilename(currentTicket.code)}.png`
       const link = document.createElement('a')
-      link.href = url
-      link.download = `ticket-${ticket.code}.png`
+      link.href = dataUrl
+      link.download = safeFilename
+      document.body.appendChild(link)
       link.click()
-    } catch {
-      // Fallback silencioso
+      document.body.removeChild(link)
+    } catch (err) {
+      console.error('Error al descargar código QR:', err)
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -94,30 +156,33 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
           Presenta este código en los torniquetes ópticos perimetrales de la sede.
         </p>
 
-        {/* Componente de código QR estándar real */}
-        <QRGraphicHD code={ticket.code} />
+        {/* Componente de código QR estándar real con payload firmado */}
+        <QRGraphicHD
+          code={currentTicket.qrPayload || currentTicket.code}
+          dataUrl={currentTicket.qrDataUrl}
+        />
 
-        <div className="qr-modal-code-tag">{ticket.code}</div>
+        <div className="qr-modal-code-tag">{currentTicket.code}</div>
 
         <div className="qr-modal-meta">
           <div className="qr-meta-item">
             <span>Servicio</span>
-            <strong>{ticket.service}</strong>
+            <strong>{currentTicket.service}</strong>
           </div>
           <div className="qr-meta-item">
             <span>Fecha y Hora</span>
             <strong>
-              {formatDate(ticket.date)} · {ticket.time}
+              {formatDate(currentTicket.date)} · {currentTicket.time}
             </strong>
           </div>
           <div className="qr-meta-item">
             <span>Sede</span>
-            <strong>Sede {ticket.sede} · Medellín</strong>
+            <strong>Sede {currentTicket.sede} · Medellín</strong>
           </div>
           <div className="qr-meta-item">
             <span>Cupos</span>
             <strong>
-              {ticket.attendees} {ticket.attendees === 1 ? 'persona' : 'personas'}
+              {currentTicket.attendees} {currentTicket.attendees === 1 ? 'persona' : 'personas'}
             </strong>
           </div>
         </div>
@@ -130,6 +195,7 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
           <button
             type="button"
             className="secondary-button"
+            disabled={downloading}
             onClick={handleDownload}
           >
             <Download size={16} /> Descargar Imagen
@@ -138,7 +204,7 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
             <button
               type="button"
               className="primary-button"
-              onClick={() => onPrint(ticket)}
+              onClick={() => onPrint(currentTicket)}
             >
               <Printer size={16} /> Imprimir Voucher
             </button>

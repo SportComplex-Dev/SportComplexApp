@@ -49,6 +49,7 @@ const {
   ACCESS_SERVICE_MISMATCH_MESSAGE,
   ACCESS_ALREADY_USED_MESSAGE,
   decideAccess,
+  hasServiceMismatch,
   isWithinAccessWindow,
   getTicketAccessWindow,
 } = await import("./access-control");
@@ -215,6 +216,13 @@ test("TSK-BE-17: decideAccess deniega servicio discrepante y boleto ya usado con
       message: ACCESS_ALREADY_USED_MESSAGE,
     },
   );
+});
+
+test("TSK-BE-16: la comparación compartida de servicios normaliza IDs y respeta el modo consulta", () => {
+  assert.equal(hasServiceMismatch(1, 1), false);
+  assert.equal(hasServiceMismatch("1", 1), false);
+  assert.equal(hasServiceMismatch(1, "2"), true);
+  assert.equal(hasServiceMismatch(1, null), false);
 });
 
 test("TSK-BE-17: robustez ante fechas inválidas, NaN o franjas invertidas", () => {
