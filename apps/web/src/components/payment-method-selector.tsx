@@ -39,15 +39,19 @@ function getApiErrorMessage(value: unknown): string | null {
   return typeof message === "string" ? message : null;
 }
 
-const paymentMethods: {
+type ConfiguredPaymentMethod = {
   id: PaymentMethod;
   label: string;
   Icon: typeof CreditCard;
-}[] = [
-  { id: "card", label: "Tarjeta", Icon: CreditCard },
-  { id: "pse", label: "PSE / Banco", Icon: Landmark },
-  { id: "nequi", label: "Nequi / QR", Icon: QrCode },
-  { id: "onsite", label: "En sede", Icon: Store },
+  enabled: boolean;
+};
+
+// Configuración extensible de métodos de pago.
+// Los métodos alternativos permanecen definidos pero inactivos hasta que se configure su backend.
+const paymentMethods: ConfiguredPaymentMethod[] = [
+  { id: "card", label: "Tarjeta", Icon: CreditCard, enabled: true },
+  { id: "pse", label: "PSE / Banco", Icon: Landmark, enabled: false },
+  { id: "nequi", label: "Nequi / QR", Icon: QrCode, enabled: false },
 ];
 
 export function PaymentMethodSelector({
@@ -60,6 +64,10 @@ export function PaymentMethodSelector({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntentState | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Filtramos únicamente los métodos activos para la interfaz del usuario
+  const availableMethods = paymentMethods.filter((method) => method.enabled);
+  const showMethodTabs = availableMethods.length > 1;
 
   useEffect(() => {
     if (reservationId === null) return;
@@ -115,40 +123,42 @@ export function PaymentMethodSelector({
 
   return (
     <>
-      <div
-        aria-label="Medio de pago"
-        className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-        role="tablist"
-      >
-        {paymentMethods.map(({ id, label, Icon }) => {
-          const selected = paymentMethod === id;
-          return (
-            <button
-              key={id}
-              id={`payment-tab-${id}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`payment-panel-${id}`}
-              onClick={() => setPaymentMethod(id)}
-              className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
-                selected
-                  ? "border-[#123e30] text-[#123e30] ring-1 ring-[#123e30] dark:border-[#b8dc83] dark:text-[#d9f29f] dark:ring-[#b8dc83]"
-                  : "border-[#e1e6df] text-[#526058] hover:border-[#9eafa1] dark:border-[#26352d] dark:text-[#b0beb6] dark:hover:border-[#53685a]"
-              }`}
-              style={{ backgroundColor: "var(--surface)" }}
-            >
-              <Icon aria-hidden="true" className="size-[1.1rem]" />
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {showMethodTabs && (
+        <div
+          aria-label="Medio de pago"
+          className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3"
+          role="tablist"
+        >
+          {availableMethods.map(({ id, label, Icon }) => {
+            const selected = paymentMethod === id;
+            return (
+              <button
+                key={id}
+                id={`payment-tab-${id}`}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`payment-panel-${id}`}
+                onClick={() => setPaymentMethod(id)}
+                className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+                  selected
+                    ? "border-[#123e30] text-[#123e30] ring-1 ring-[#123e30] dark:border-[#b8dc83] dark:text-[#d9f29f] dark:ring-[#b8dc83]"
+                    : "border-[#e1e6df] text-[#526058] hover:border-[#9eafa1] dark:border-[#26352d] dark:text-[#b0beb6] dark:hover:border-[#53685a]"
+                }`}
+                style={{ backgroundColor: "var(--surface)" }}
+              >
+                <Icon aria-hidden="true" className="size-[1.1rem]" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div
         id={`payment-panel-${paymentMethod}`}
         role="tabpanel"
-        aria-labelledby={`payment-tab-${paymentMethod}`}
+        aria-labelledby={showMethodTabs ? `payment-tab-${paymentMethod}` : undefined}
         className="rounded-2xl border border-[#e1e6df] bg-white p-5 shadow-[0_8px_28px_rgba(18,38,29,0.04)] dark:border-[#26352d] dark:bg-[#141d18] dark:shadow-black/20 sm:p-6"
       >
         {paymentMethod === "card" ? (
