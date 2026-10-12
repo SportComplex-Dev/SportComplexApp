@@ -28,6 +28,7 @@ export interface ScannedTicket {
 
 export interface RedeemTicketResponse {
   access: "GRANTED" | "DENIED";
+  resultado?: "CONCEDIDO" | "DENEGADO_USADO" | "DENEGADO_SERVICIO" | "DENEGADO_HORARIO";
   code?: "ALREADY_USED" | "SERVICE_MISMATCH" | "WINDOW_EXPIRED" | "INVALID_STATE";
   message?: string;
   ticket?: {
@@ -149,7 +150,12 @@ export const scannerService = {
     const apiError = getApiError(payload);
 
     if (apiError?.code === "SERVICE_MISMATCH") {
-      return { access: "DENIED", code: "SERVICE_MISMATCH", message: apiError.message };
+      return {
+        access: "DENIED",
+        resultado: "DENEGADO_SERVICIO",
+        code: "SERVICE_MISMATCH",
+        message: apiError.message,
+      };
     }
     if (!response.ok) {
       throw new Error(apiError?.message ?? "No se pudo procesar el canje.");
@@ -162,6 +168,15 @@ export const scannerService = {
     if (data.access !== "GRANTED" && data.access !== "DENIED") {
       throw new Error("La respuesta de canje no contiene un resultado de acceso válido.");
     }
+    if (
+      data.resultado !== undefined &&
+      data.resultado !== "CONCEDIDO" &&
+      data.resultado !== "DENEGADO_USADO" &&
+      data.resultado !== "DENEGADO_SERVICIO" &&
+      data.resultado !== "DENEGADO_HORARIO"
+    ) {
+      throw new Error("La respuesta de canje contiene un resultado desconocido.");
+    }
     if (data.code !== undefined && !isRedeemCode(data.code)) {
       throw new Error("La respuesta de canje contiene un código de denegación desconocido.");
     }
@@ -171,6 +186,12 @@ export const scannerService = {
 
     return {
       access: data.access,
+      ...(data.resultado === "CONCEDIDO" ||
+      data.resultado === "DENEGADO_USADO" ||
+      data.resultado === "DENEGADO_SERVICIO" ||
+      data.resultado === "DENEGADO_HORARIO"
+        ? { resultado: data.resultado }
+        : {}),
       ...(isRedeemCode(data.code) ? { code: data.code } : {}),
       ...(typeof data.message === "string" ? { message: data.message } : {}),
       ...(isRedeemTicket(data.ticket) ? { ticket: data.ticket } : {}),

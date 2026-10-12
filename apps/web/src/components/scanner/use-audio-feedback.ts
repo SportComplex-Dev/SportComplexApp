@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef } from "react";
 export function useAudioFeedback(enabled: boolean) {
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const ensureContext = useCallback(() => {
-    if (!enabled || typeof window === "undefined") {
+  const getOrCreateContext = useCallback(() => {
+    if (typeof window === "undefined") {
       return null;
     }
 
@@ -19,12 +19,23 @@ export function useAudioFeedback(enabled: boolean) {
       audioContextRef.current = new AudioCtor();
     }
 
-    if (audioContextRef.current.state === "suspended") {
-      void audioContextRef.current.resume();
-    }
-
     return audioContextRef.current;
-  }, [enabled]);
+  }, []);
+
+  const resumeContext = useCallback(() => {
+    const context = getOrCreateContext();
+    if (context?.state === "suspended") {
+      void context.resume().catch((error: unknown) => {
+        console.error("No se pudo reanudar el contexto de audio:", error);
+      });
+    }
+    return context;
+  }, [getOrCreateContext]);
+
+  const ensureContext = useCallback(
+    () => (enabled ? resumeContext() : null),
+    [enabled, resumeContext],
+  );
 
   const playTone = useCallback((
     type: OscillatorType,
@@ -76,5 +87,5 @@ export function useAudioFeedback(enabled: boolean) {
     };
   }, []);
 
-  return { playSuccess, playError };
+  return { activateAudio: resumeContext, playSuccess, playError };
 }

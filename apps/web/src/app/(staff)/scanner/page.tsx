@@ -34,7 +34,7 @@ export default function ScannerPage() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
 
-  const { playSuccess, playError } = useAudioFeedback(audioEnabled);
+  const { activateAudio, playSuccess, playError } = useAudioFeedback(audioEnabled);
   const { session } = useApp();
 
   useEffect(() => {
@@ -104,19 +104,6 @@ export default function ScannerPage() {
 
     return () => window.clearTimeout(timer);
   }, [activeShift, flowState]);
-
-  useEffect(() => {
-    if (!activeShift) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isModalOpen) setIsModalOpen(false);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeShift, isModalOpen]);
 
   const handleScan = useCallback((rawQr: string) => {
     if (!activeShift || !Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0) return;
@@ -213,7 +200,10 @@ export default function ScannerPage() {
         activeShift={activeShift}
         audioEnabled={audioEnabled}
         theme={theme}
-        onToggleAudio={() => setAudioEnabled((current) => !current)}
+        onToggleAudio={() => {
+          if (!audioEnabled) activateAudio();
+          setAudioEnabled((current) => !current);
+        }}
         onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
         onChangeShift={handleChangeShift}
       />
@@ -320,7 +310,7 @@ export default function ScannerPage() {
         message={modalMessage}
         employeeName={session?.name ?? ""}
         isRedeeming={isRedeeming}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleScanNext}
         onRedeem={handleRedeem}
         onScanNext={handleScanNext}
       />

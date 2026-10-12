@@ -42,13 +42,13 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
 
     await stopScanner();
 
-    const deviceId = facingMode === "environment" ? { facingMode } : { facingMode };
+    const videoConstraints = { facingMode };
     const qrCode = new Html5Qrcode(`reader-${readerId}`);
     qrCodeRef.current = qrCode;
 
     try {
       await qrCode.start(
-        deviceId,
+        videoConstraints,
         {
           fps: 10,
           qrbox: { width: 260, height: 260 },
@@ -62,11 +62,7 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
           void stopScanner();
           onScan(decodedText);
         },
-        (message) => {
-          if (message) {
-            setError(message);
-          }
-        },
+        () => {},
       );
 
       setCameraReady(true);
