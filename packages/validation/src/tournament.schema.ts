@@ -190,7 +190,12 @@ export const registerTournamentSchema = z.object({
     .max(120, "El nombre de la pareja no puede exceder 120 caracteres")
     .optional()
     .nullable(),
-  pagoId: z.string().trim().optional().nullable(),
+  pagoId: z
+    .string()
+    .trim()
+    .uuid("El ID de pago debe ser un UUID válido.")
+    .optional()
+    .nullable(),
   stripePaymentIntentId: z.string().trim().optional().nullable(),
 });
 export type RegisterTournamentInput = z.infer<typeof registerTournamentSchema>;

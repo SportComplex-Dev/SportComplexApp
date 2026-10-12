@@ -13,6 +13,10 @@ import {
   inscribirUsuarioTorneo,
   obtenerInscripcionPorTicket,
   canjearTicketTorneo,
+  verificarPagoParaTorneo,
+  obtenerInscripcionesUsuarioParaTorneos,
+  obtenerInscripcionUsuario,
+  obtenerDetallePublicoTorneo,
 } from "./tournaments.js";
 import { createMockPrisma } from "../../test/mock-prisma";
 
@@ -466,4 +470,165 @@ test("TSK-BE-25: actualizarTorneo y eliminarTorneo", async () => {
     () => obtenerTorneoPorId(torneo.id, { db: mock }),
     (err: any) => err instanceof TournamentError && err.code === "NOT_FOUND",
   );
+});
+
+test("TSK-BD-12: inscribirUsuarioTorneo ciclo de vida PENDIENTE_PAGO -> CONFIRMADA sin error P2002 (HIGH-03)", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  const torneo = await crearTorneo(
+    {
+      adminId: "admin-1",
+      categoriaId: 1,
+      titulo: "Torneo de Pago Ciclo Completo",
+      nivel: "Primera",
+      fechaInicio: new Date("2026-11-20T10:00:00Z"),
+      fechaFin: new Date("2026-11-20T18:00:00Z"),
+      cuposTotales: 4,
+      precioInscripcion: 60000,
+    },
+    { db: mock },
+  );
+  await actualizarEstadoTorneo(torneo.id, "INSCRIPCIONES_ABIERTAS", { db: mock });
+
+  // 1. Inscripción sin pago -> PENDIENTE_PAGO
+  const inscPendiente = await inscribirUsuarioTorneo(
+    { torneoId: torneo.id, usuarioId: "user-1", confirmado: false },
+    { db: mock },
+  );
+  assert.equal(inscPendiente.estado, "PENDIENTE_PAGO");
+
+  // Reintento sin pago -> devuelve la existente sin duplicar ni lanzar P2002
+  const reintento = await inscribirUsuarioTorneo(
+    { torneoId: torneo.id, usuarioId: "user-1", confirmado: false },
+    { db: mock },
+  );
+  assert.equal(reintento.id, inscPendiente.id);
+  assert.equal(reintento.estado, "PENDIENTE_PAGO");
+
+  // 2. Usuario completa pago -> Transiciona a CONFIRMADA sin colisión P2002
+  const inscConfirmada = await inscribirUsuarioTorneo(
+    {
+      torneoId: torneo.id,
+      usuarioId: "user-1",
+      pagoId: "00000000-0000-4000-8000-000000000001",
+      confirmado: true,
+    },
+    { db: mock },
+  );
+  assert.equal(inscConfirmada.id, inscPendiente.id);
+  assert.equal(inscConfirmada.estado, "CONFIRMADA");
+  assert.equal(inscConfirmada.ticketEstado, "EMITIDO");
+
+  // Verificar que el cupo ocupado aumentó en 1
+  const tActualizado = await obtenerTorneoPorId(torneo.id, { db: mock });
+  assert.equal(tActualizado.cuposOcupados, 1);
+});
+
+test("TSK-BD-12: verificarPagoParaTorneo valida autenticidad, usuario, estado y monto", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  mock._state.pagos.push(
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      usuarioId: "user-1",
+      tipo: "TORNEO",
+      stripePaymentIntentId: "pi_aprobado_valido",
+      monto: 50000,
+      estado: "APROBADO",
+      creadoEn: new Date(),
+    },
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      usuarioId: "user-1",
+      tipo: "TORNEO",
+      stripePaymentIntentId: "pi_pendiente",
+      monto: 50000,
+      estado: "PENDIENTE",
+      creadoEn: new Date(),
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      usuarioId: "user-2",
+      tipo: "TORNEO",
+      stripePaymentIntentId: "pi_otro_usuario",
+      monto: 50000,
+      estado: "APROBADO",
+      creadoEn: new Date(),
+    },
+  );
+
+  // 1. Pago válido aprobado que cubre el monto
+  const pagoValido = await verificarPagoParaTorneo(
+    "11111111-1111-4111-8111-111111111111",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.ok(pagoValido);
+  assert.equal(pagoValido.id, "11111111-1111-4111-8111-111111111111");
+
+  // 2. Búsqueda por stripePaymentIntentId
+  const pagoPorIntent = await verificarPagoParaTorneo(
+    "pi_aprobado_valido",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.ok(pagoPorIntent);
+
+  // 3. Pago pendiente -> null
+  const pagoPendiente = await verificarPagoParaTorneo(
+    "22222222-2222-4222-8222-222222222222",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.equal(pagoPendiente, null);
+
+  // 4. Pago de otro usuario -> null
+  const pagoOtroUser = await verificarPagoParaTorneo(
+    "33333333-3333-4333-8333-333333333333",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.equal(pagoOtroUser, null);
+
+  // 5. Monto insuficiente -> null
+  const pagoInsuficiente = await verificarPagoParaTorneo(
+    "11111111-1111-4111-8111-111111111111",
+    "user-1",
+    80000, // Torneo cuesta 80000 pero el pago es de 50000
+    undefined,
+    { db: mock },
+  );
+  assert.equal(pagoInsuficiente, null);
+});
+
+test("TSK-BD-12: obtenerDetallePublicoTorneo excluye lista de inscripciones (MED-02)", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  const torneo = await crearTorneo(
+    {
+      adminId: "admin-1",
+      categoriaId: 1,
+      titulo: "Torneo Detalle Público Test",
+      nivel: "Abierto",
+      fechaInicio: new Date("2026-11-20T10:00:00Z"),
+      fechaFin: new Date("2026-11-20T18:00:00Z"),
+      cuposTotales: 10,
+    },
+    { db: mock },
+  );
+
+  const detallePublico = await obtenerDetallePublicoTorneo(torneo.id, { db: mock });
+  assert.equal(detallePublico.id, torneo.id);
+  assert.equal((detallePublico as any).inscripciones, undefined);
 });

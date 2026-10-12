@@ -839,6 +839,21 @@ export function createMockPrisma() {
         }
         return null;
       },
+      async findFirst({ where }: any = {}) {
+        return (
+          pagos.find((p) => {
+            if (where?.id !== undefined && p.id !== where.id) return false;
+            if (
+              where?.stripePaymentIntentId !== undefined &&
+              p.stripePaymentIntentId !== where.stripePaymentIntentId
+            )
+              return false;
+            if (where?.usuarioId !== undefined && p.usuarioId !== where.usuarioId) return false;
+            if (where?.estado !== undefined && p.estado !== where.estado) return false;
+            return true;
+          }) ?? null
+        );
+      },
       async create({ data }: any) {
         // Respeta el UNIQUE "pago_stripe_payment_intent_id_key" (TSK-BD-06).
         if (
@@ -1346,6 +1361,29 @@ export function createMockPrisma() {
         }
         return res;
       },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const t of torneos) {
+          if (where?.id !== undefined && t.id !== where.id) continue;
+          if (
+            where?.cuposOcupados?.lt !== undefined &&
+            (t.cuposOcupados ?? 0) >= where.cuposOcupados.lt
+          ) {
+            continue;
+          }
+          if (data.cuposOcupados?.increment !== undefined) {
+            t.cuposOcupados = (t.cuposOcupados ?? 0) + data.cuposOcupados.increment;
+          } else if (data.cuposOcupados !== undefined) {
+            t.cuposOcupados = data.cuposOcupados;
+          }
+          if (data.estado !== undefined) {
+            t.estado = data.estado;
+          }
+          t.actualizadoEn = new Date();
+          count++;
+        }
+        return { count };
+      },
       async delete({ where }: any) {
         const idx = torneos.findIndex((t) => t.id === where.id);
         if (idx === -1) throw new Error("Torneo no encontrado");
@@ -1399,6 +1437,17 @@ export function createMockPrisma() {
     },
     inscripcionTorneo: {
       async create({ data, include }: any) {
+        if (
+          inscripcionesTorneo.some(
+            (i) => i.torneoId === data.torneoId && i.usuarioId === data.usuarioId,
+          )
+        ) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`torneo_id`,`usuario_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
         const item: any = {
           id: data.id ?? `inscripcion-${inscripcionesTorneo.length + 1}`,
           torneoId: data.torneoId,
@@ -1452,10 +1501,29 @@ export function createMockPrisma() {
         }
         return res;
       },
+      async findFirst({ where, include }: any = {}) {
+        const list = await this.findMany({ where });
+        if (!list || list.length === 0) return null;
+        return this.findUnique({ where: { id: list[0].id }, include });
+      },
       async findMany({ where }: any = {}) {
         return inscripcionesTorneo.filter((i) => {
-          if (where?.torneoId && i.torneoId !== where.torneoId) return false;
+          if (where?.torneoId) {
+            if (typeof where.torneoId === "object" && Array.isArray(where.torneoId.in)) {
+              if (!where.torneoId.in.includes(i.torneoId)) return false;
+            } else if (i.torneoId !== where.torneoId) {
+              return false;
+            }
+          }
           if (where?.usuarioId && i.usuarioId !== where.usuarioId) return false;
+          if (where?.pagoId && i.pagoId !== where.pagoId) return false;
+          if (where?.estado) {
+            if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
+              if (!where.estado.in.includes(i.estado)) return false;
+            } else if (i.estado !== where.estado) {
+              return false;
+            }
+          }
           return true;
         });
       },

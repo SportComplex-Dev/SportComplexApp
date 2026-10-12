@@ -1,7 +1,10 @@
 import { fail, ok } from "@/lib/api-response";
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { tournamentQuerySchema } from "@sportcomplex/validation";
-import { listarTorneos, prisma } from "@sportcomplex/db";
+import {
+  listarTorneos,
+  obtenerInscripcionesUsuarioParaTorneos,
+} from "@sportcomplex/db";
 
 /**
  * GET /api/tournaments
@@ -30,6 +33,15 @@ export async function GET(request: Request) {
       );
     }
 
+    const ESTADOS_CATALOGO_PUBLICO = ["INSCRIPCIONES_ABIERTAS", "EN_CURSO", "FINALIZADO"];
+    if (parsed.data.estado && !ESTADOS_CATALOGO_PUBLICO.includes(parsed.data.estado)) {
+      return fail(
+        "INVALID_FILTER",
+        "Estado de torneo no disponible para consulta pública.",
+        400,
+      );
+    }
+
     // Por defecto en el catálogo público, si no se especifica estado o soloActivos,
     // filtramos solo torneos activos (INSCRIPCIONES_ABIERTAS o EN_CURSO)
     const filtros = {
@@ -55,12 +67,11 @@ export async function GET(request: Request) {
 
     let inscripcionesUsuario: Set<string> = new Set();
     if (authResult && authResult.authorized) {
-      const misInscripciones = await prisma.inscripcionTorneo.findMany({
-        where: {
-          usuarioId: authResult.actor.id,
-          torneoId: { in: (torneos as TorneoItem[]).map((t: TorneoItem) => t.id) },
-        },
-      });
+      const torneoIds = (torneos as TorneoItem[]).map((t: TorneoItem) => t.id);
+      const misInscripciones = await obtenerInscripcionesUsuarioParaTorneos(
+        authResult.actor.id,
+        torneoIds,
+      );
       inscripcionesUsuario = new Set(misInscripciones.map((i: { torneoId: string }) => i.torneoId));
     }
 

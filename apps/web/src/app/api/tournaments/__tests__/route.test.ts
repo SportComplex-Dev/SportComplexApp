@@ -329,8 +329,33 @@ test("API: POST /api/tournaments/[id]/register maneja torneos con costo (PENDIEN
   assert.equal(dataPendiente.data.precioInscripcion, 45000);
   assert.equal(dataPendiente.data.ticket, null);
 
-  // 2. Inscripción con referencia de pago provista -> Queda CONFIRMADA y emite ticket
+  // 2. Intento de confirmar con referencia de pago inexistente/no aprobada -> Falla 400 PAYMENT_INVALID
   (globalThis as any).__scAuthSession = { user: { id: "user-cliente-3" } };
+
+  const resPagoInvalido = await registerRoute.POST(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_PAGO_ID}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stripePaymentIntentId: "pi_invalido_sin_registrar",
+      }),
+    }),
+    { params: Promise.resolve({ id: TORNEO_PAGO_ID }) },
+  );
+  assert.equal(resPagoInvalido.status, 400);
+  const dataInvalido = await resPagoInvalido.json();
+  assert.equal(dataInvalido.error.code, "PAYMENT_INVALID");
+
+  // 3. Inscripción con referencia de pago APROBADA en BD -> Queda CONFIRMADA y emite ticket
+  mock._state.pagos.push({
+    id: "99999999-9999-4999-8999-999999999999",
+    usuarioId: "user-cliente-3",
+    tipo: "TORNEO",
+    stripePaymentIntentId: "pi_tourn_test_12345",
+    monto: 45000,
+    estado: "APROBADO",
+    creadoEn: new Date(),
+  });
 
   const resPagada = await registerRoute.POST(
     new Request(`http://localhost:3000/api/tournaments/${TORNEO_PAGO_ID}/register`, {
@@ -349,4 +374,102 @@ test("API: POST /api/tournaments/[id]/register maneja torneos con costo (PENDIEN
   assert.equal(dataPagada.data.requierePago, false);
   assert.ok(dataPagada.data.ticket);
   assert.equal(dataPagada.data.ticket.estado, "EMITIDO");
+
+  // 4. Ciclo de vida real (HIGH-03): user-cliente-2 paga su inscripción PENDIENTE_PAGO previa
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-2" } };
+
+  mock._state.pagos.push({
+    id: "88888888-8888-4888-8888-888888888888",
+    usuarioId: "user-cliente-2",
+    tipo: "TORNEO",
+    stripePaymentIntentId: "pi_tourn_test_user2",
+    monto: 45000,
+    estado: "APROBADO",
+    creadoEn: new Date(),
+  });
+
+  const resReintentoPago = await registerRoute.POST(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_PAGO_ID}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pagoId: "88888888-8888-4888-8888-888888888888",
+      }),
+    }),
+    { params: Promise.resolve({ id: TORNEO_PAGO_ID }) },
+  );
+
+  assert.equal(resReintentoPago.status, 201);
+  const dataReintento = await resReintentoPago.json();
+  assert.equal(dataReintento.data.inscripcion.estado, "CONFIRMADA");
+  assert.ok(dataReintento.data.ticket);
+  assert.equal(dataReintento.data.ticket.estado, "EMITIDO");
+});
+
+test("API: POST /api/tournaments/[id]/register retorna 503 QR_NOT_CONFIGURED si falta QR_HMAC_SECRET (HIGH-01)", async () => {
+  const originalSecret = process.env.QR_HMAC_SECRET;
+  delete process.env.QR_HMAC_SECRET;
+
+  try {
+    (globalThis as any).__scAuthSession = { user: { id: "user-cliente-1" } };
+    const res = await registerRoute.POST(
+      new Request(`http://localhost:3000/api/tournaments/${TORNEO_ABIERTO_ID}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: TORNEO_ABIERTO_ID }) },
+    );
+
+    assert.equal(res.status, 503);
+    const body = await res.json();
+    assert.equal(body.error.code, "QR_NOT_CONFIGURED");
+  } finally {
+    process.env.QR_HMAC_SECRET = originalSecret;
+  }
+});
+
+test("API: GET /api/tournaments rechaza estado=BORRADOR en catálogo público (MED-03)", async () => {
+  const req = new Request("http://localhost:3000/api/tournaments?estado=BORRADOR");
+  const res = await listRoute.GET(req);
+  assert.equal(res.status, 400);
+
+  const body = await res.json();
+  assert.equal(body.error.code, "INVALID_FILTER");
+});
+
+test("API: GET /api/tournaments/[id] oculta torneos en BORRADOR a clientes (MED-03)", async () => {
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-1" } };
+  const res = await detailRoute.GET(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_BORRADOR_ID}`),
+    { params: Promise.resolve({ id: TORNEO_BORRADOR_ID }) },
+  );
+  assert.equal(res.status, 404);
+  const body = await res.json();
+  assert.equal(body.error.code, "NOT_FOUND");
+});
+
+test("API: POST /api/tournaments/[id]/register rechaza roles no autorizados (403)", async () => {
+  mock._state.usuarios.push({
+    id: "staff-lector",
+    nombre: "Lector Porteria",
+    correo: "lector@sportcomplex.com",
+    estado: "ACTIVO",
+    deletedAt: null,
+    rolId: 3,
+    rolNombre: "EMPLEADO_LECTOR",
+  });
+
+  (globalThis as any).__scAuthSession = { user: { id: "staff-lector" } };
+
+  const res = await registerRoute.POST(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_ABIERTO_ID}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    { params: Promise.resolve({ id: TORNEO_ABIERTO_ID }) },
+  );
+
+  assert.equal(res.status, 403);
 });

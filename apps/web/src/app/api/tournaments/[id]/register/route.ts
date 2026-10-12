@@ -7,6 +7,7 @@ import {
 import {
   inscribirUsuarioTorneo,
   obtenerTorneoPorId,
+  verificarPagoParaTorneo,
   TournamentError,
 } from "@sportcomplex/db";
 import { buildTicketQrPayload, signTicket } from "@sportcomplex/core";
@@ -22,6 +23,11 @@ interface RouteContext {
  */
 export async function POST(request: Request, context: RouteContext) {
   try {
+    const qrSecret = process.env.QR_HMAC_SECRET;
+    if (!qrSecret) {
+      return fail("QR_NOT_CONFIGURED", "Falta QR_HMAC_SECRET en el servidor.", 503);
+    }
+
     const authorization = await authorizeApiRequest(["Cliente", "Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
@@ -51,25 +57,43 @@ export async function POST(request: Request, context: RouteContext) {
       const torneo = await obtenerTorneoPorId(parsedId.data);
       const precio = Number(torneo.precioInscripcion ?? 0);
       const esGratuito = precio === 0;
-      const pagoRef = parsed.data.pagoId || parsed.data.stripePaymentIntentId || null;
-      const confirmado = esGratuito || Boolean(pagoRef);
+
+      let confirmado = false;
+      let pagoIdValido: string | null = null;
+      const paymentRef = parsed.data.pagoId || parsed.data.stripePaymentIntentId || null;
+
+      if (esGratuito) {
+        confirmado = true;
+      } else if (paymentRef) {
+        const pago = await verificarPagoParaTorneo(
+          paymentRef,
+          authorization.actor.id,
+          precio,
+          torneo.id,
+        );
+        if (!pago) {
+          return fail(
+            "PAYMENT_INVALID",
+            "El identificador de pago no es válido, no está aprobado o no cubre el monto requerido.",
+            400,
+          );
+        }
+        confirmado = true;
+        pagoIdValido = pago.id;
+      }
 
       // 2. Transacción atómica de inscripción y control de cupos (ARC-01)
       const inscripcion = await inscribirUsuarioTorneo({
         torneoId: parsedId.data,
         usuarioId: authorization.actor.id,
         nombrePareja: parsed.data.nombrePareja,
-        pagoId: pagoRef,
+        pagoId: pagoIdValido,
         confirmado,
       });
 
       // 3. Emisión criptográfica de entrada QR con firma HMAC-SHA256 (RNF-03 / RF-13)
       let ticketData = null;
       if (inscripcion.ticketCodigoUuid && inscripcion.estado === "CONFIRMADA") {
-        const qrSecret =
-          process.env.QR_HMAC_SECRET ||
-          process.env.NEXTAUTH_SECRET ||
-          "sportcomplex-secret";
         const signature = signTicket(inscripcion.ticketCodigoUuid, qrSecret);
         const qrPayload = buildTicketQrPayload(inscripcion.ticketCodigoUuid, signature);
 

@@ -1,7 +1,11 @@
 import { fail, ok } from "@/lib/api-response";
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { tournamentIdParamSchema } from "@sportcomplex/validation";
-import { obtenerTorneoPorId, prisma, TournamentError } from "@sportcomplex/db";
+import {
+  obtenerDetallePublicoTorneo,
+  obtenerInscripcionUsuario,
+  TournamentError,
+} from "@sportcomplex/db";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -21,11 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     try {
-      const torneo = await obtenerTorneoPorId(parsedId.data);
-
-      const cuposDisponibles = Math.max(0, torneo.cuposTotales - torneo.cuposOcupados);
-      const inscripcionesAbiertas =
-        torneo.estado === "INSCRIPCIONES_ABIERTAS" && cuposDisponibles > 0;
+      const torneo = await obtenerDetallePublicoTorneo(parsedId.data);
 
       // Verificación opcional de sesión para adjuntar inscripción del usuario actual
       const authResult = await authorizeApiRequest([
@@ -33,30 +33,30 @@ export async function GET(request: Request, context: RouteContext) {
         "Administrador",
       ]).catch(() => null);
 
-      let miInscripcion = null;
-      if (authResult && authResult.authorized) {
-        miInscripcion = await prisma.inscripcionTorneo.findUnique({
-          where: {
-            torneoId_usuarioId: {
-              torneoId: torneo.id,
-              usuarioId: authResult.actor.id,
-            },
-          },
-          include: {
-            usuario: { select: { id: true, nombre: true, correo: true } },
-          },
-        });
+      if (torneo.estado === "BORRADOR") {
+        const isAdmin =
+          authResult && authResult.authorized && authResult.actor.role === "Administrador";
+        if (!isAdmin) {
+          return fail("NOT_FOUND", "Torneo no encontrado.", 404);
+        }
       }
 
-      // No exponer lista completa de inscripciones ajenas en endpoint de cliente
-      const torneoData = { ...torneo } as Record<string, unknown>;
-      delete torneoData.inscripciones;
+      const cuposDisponibles = Math.max(0, torneo.cuposTotales - torneo.cuposOcupados);
+      const inscripcionesAbiertas =
+        torneo.estado === "INSCRIPCIONES_ABIERTAS" && cuposDisponibles > 0;
+
+      let miInscripcion = null;
+      if (authResult && authResult.authorized) {
+        miInscripcion = await obtenerInscripcionUsuario(torneo.id, authResult.actor.id);
+      }
+
+      const yaInscrito = Boolean(miInscripcion && miInscripcion.estado !== "CANCELADA");
 
       return ok({
-        ...torneoData,
+        ...torneo,
         cuposDisponibles,
         inscripcionesAbiertas,
-        yaInscrito: Boolean(miInscripcion),
+        yaInscrito,
         miInscripcion: miInscripcion ?? null,
       });
     } catch (err: unknown) {
