@@ -255,7 +255,7 @@ export default function CheckoutPage() {
         initialSeconds={1800}
         onExpire={handleExpire}
         onRetry={handleRetry}
-        isExpired={isExpired}
+        isExpired={paymentBlocked}
         className="mb-8 max-w-[960px] mx-auto"
       />
 
@@ -587,8 +587,8 @@ export default function CheckoutPage() {
           </div>
           <div className="order-item py-2 border-b border-[var(--line)] flex items-center justify-between text-[12px]">
             <span>Estado de cupo</span>
-            <b className={isExpired ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
-              {isExpired ? 'Expirado' : 'Bloqueado (30 min)'}
+            <b className={paymentBlocked ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
+              {paymentBlocked ? 'Expirado' : 'Bloqueado (30 min)'}
             </b>
           </div>
           <div className="order-total">
