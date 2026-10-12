@@ -1508,6 +1508,13 @@ export function createMockPrisma() {
       },
       async findMany({ where }: any = {}) {
         return inscripcionesTorneo.filter((i) => {
+          if (where?.id) {
+            if (typeof where.id === "object" && where.id.not !== undefined) {
+              if (i.id === where.id.not) return false;
+            } else if (i.id !== where.id) {
+              return false;
+            }
+          }
           if (where?.torneoId) {
             if (typeof where.torneoId === "object" && Array.isArray(where.torneoId.in)) {
               if (!where.torneoId.in.includes(i.torneoId)) return false;

@@ -473,3 +473,96 @@ test("API: POST /api/tournaments/[id]/register rechaza roles no autorizados (403
 
   assert.equal(res.status, 403);
 });
+
+test("API: POST /api/tournaments/[id]/register rechaza pagos que no sean de tipo TORNEO (CRIT-03)", async () => {
+  mock._state.usuarios.push({
+    id: "user-cliente-4",
+    nombre: "Laura Sanchez",
+    correo: "laura@sportcomplex.com",
+    estado: "ACTIVO",
+    deletedAt: null,
+    rolId: 2,
+    rolNombre: "CLIENTE",
+  });
+
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-4" } };
+
+  // Crear pago de tipo RESERVA para el usuario
+  mock._state.pagos.push({
+    id: "77777777-1111-4111-8111-777777777777",
+    usuarioId: "user-cliente-4",
+    tipo: "RESERVA",
+    stripePaymentIntentId: "pi_reserva_bypass_attempt",
+    monto: 80000,
+    estado: "APROBADO",
+    creadoEn: new Date(),
+  });
+
+  const res = await registerRoute.POST(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_PAGO_ID}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pagoId: "77777777-1111-4111-8111-777777777777",
+      }),
+    }),
+    { params: Promise.resolve({ id: TORNEO_PAGO_ID }) },
+  );
+
+  assert.equal(res.status, 400);
+  const data = await res.json();
+  assert.equal(data.error.code, "PAYMENT_INVALID");
+});
+
+test("API: POST /api/tournaments/[id]/register rechaza pago ya consumido en otra inscripción (HIGH-04)", async () => {
+  mock._state.usuarios.push({
+    id: "user-cliente-5",
+    nombre: "Pedro Pascal",
+    correo: "pedro@sportcomplex.com",
+    estado: "ACTIVO",
+    deletedAt: null,
+    rolId: 2,
+    rolNombre: "CLIENTE",
+  });
+
+  const pagoDuplicadoId = "99999999-5555-4555-8555-999999999999";
+  mock._state.pagos.push({
+    id: pagoDuplicadoId,
+    usuarioId: "user-cliente-5",
+    tipo: "TORNEO",
+    stripePaymentIntentId: "pi_torneo_consumido",
+    monto: 45000,
+    estado: "APROBADO",
+    creadoEn: new Date(),
+  });
+
+  mock._state.inscripcionesTorneo.push({
+    id: "inscripcion-previa-existente",
+    torneoId: TORNEO_ABIERTO_ID,
+    usuarioId: "user-cliente-5",
+    nombrePareja: null,
+    pagoId: pagoDuplicadoId,
+    estado: "CONFIRMADA",
+    ticketCodigoUuid: "aaaaaaa1-1111-4111-8111-111111111111",
+    ticketEstado: "EMITIDO",
+    creadoEn: new Date(),
+  });
+
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-5" } };
+
+  const res = await registerRoute.POST(
+    new Request(`http://localhost:3000/api/tournaments/${TORNEO_PAGO_ID}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pagoId: pagoDuplicadoId,
+      }),
+    }),
+    { params: Promise.resolve({ id: TORNEO_PAGO_ID }) },
+  );
+
+  assert.ok([400, 409].includes(res.status));
+  const data = await res.json();
+  assert.ok(["PAYMENT_INVALID", "PAYMENT_ALREADY_USED"].includes(data.error.code));
+});
+

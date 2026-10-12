@@ -632,3 +632,164 @@ test("TSK-BD-12: obtenerDetallePublicoTorneo excluye lista de inscripciones (MED
   assert.equal(detallePublico.id, torneo.id);
   assert.equal((detallePublico as any).inscripciones, undefined);
 });
+
+test("CRIT-03: verificarPagoParaTorneo rechaza pagos de tipo RESERVA o MEMBRESIA", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  mock._state.pagos.push(
+    {
+      id: "44444444-4444-4444-8444-444444444444",
+      usuarioId: "user-1",
+      tipo: "RESERVA",
+      stripePaymentIntentId: "pi_reserva_aprobada",
+      monto: 80000,
+      estado: "APROBADO",
+      creadoEn: new Date(),
+    },
+    {
+      id: "55555555-5555-4555-8555-555555555555",
+      usuarioId: "user-1",
+      tipo: "MEMBRESIA",
+      stripePaymentIntentId: "pi_membresia_aprobada",
+      monto: 120000,
+      estado: "APROBADO",
+      creadoEn: new Date(),
+    },
+  );
+
+  // Pago de reserva debe ser rechazado aunque cubra el monto
+  const pagoReserva = await verificarPagoParaTorneo(
+    "44444444-4444-4444-8444-444444444444",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.equal(pagoReserva, null);
+
+  // Pago de membresía debe ser rechazado
+  const pagoMembresia = await verificarPagoParaTorneo(
+    "55555555-5555-4555-8555-555555555555",
+    "user-1",
+    50000,
+    undefined,
+    { db: mock },
+  );
+  assert.equal(pagoMembresia, null);
+});
+
+test("HIGH-04: inscribirUsuarioTorneo rechaza pagoId ya consumido en otra inscripción (PAYMENT_ALREADY_USED 409)", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  const t1 = await crearTorneo(
+    {
+      adminId: "admin-1",
+      categoriaId: 1,
+      titulo: "Torneo 1 Con Costo",
+      nivel: "Abierto",
+      fechaInicio: new Date("2026-11-20T10:00:00Z"),
+      fechaFin: new Date("2026-11-20T18:00:00Z"),
+      cuposTotales: 10,
+      precioInscripcion: 50000,
+    },
+    { db: mock },
+  );
+  await actualizarEstadoTorneo(t1.id, "INSCRIPCIONES_ABIERTAS", { db: mock });
+
+  const t2 = await crearTorneo(
+    {
+      adminId: "admin-1",
+      categoriaId: 1,
+      titulo: "Torneo 2 Con Costo",
+      nivel: "Abierto",
+      fechaInicio: new Date("2026-12-01T10:00:00Z"),
+      fechaFin: new Date("2026-12-01T18:00:00Z"),
+      cuposTotales: 10,
+      precioInscripcion: 50000,
+    },
+    { db: mock },
+  );
+  await actualizarEstadoTorneo(t2.id, "INSCRIPCIONES_ABIERTAS", { db: mock });
+
+  const pagoCompartidoId = "77777777-7777-4777-8777-777777777777";
+
+  // Primera inscripción usa el pagoId exitosamente
+  const insc1 = await inscribirUsuarioTorneo(
+    {
+      torneoId: t1.id,
+      usuarioId: "user-1",
+      pagoId: pagoCompartidoId,
+      confirmado: true,
+    },
+    { db: mock },
+  );
+  assert.equal(insc1.estado, "CONFIRMADA");
+
+  // Segunda inscripción intenta reutilizar el mismo pagoId para otro torneo
+  await assert.rejects(
+    () =>
+      inscribirUsuarioTorneo(
+        {
+          torneoId: t2.id,
+          usuarioId: "user-1",
+          pagoId: pagoCompartidoId,
+          confirmado: true,
+        },
+        { db: mock },
+      ),
+    (err: any) =>
+      err instanceof TournamentError &&
+      err.code === "PAYMENT_ALREADY_USED" &&
+      err.status === 409,
+  );
+});
+
+test("MED-06: inscribirUsuarioTorneo maneja colisión de unicidad P2002 convirtiéndola a ALREADY_REGISTERED 409", async () => {
+  const mock = createMockPrisma();
+  setupTestData(mock);
+
+  const t = await crearTorneo(
+    {
+      adminId: "admin-1",
+      categoriaId: 1,
+      titulo: "Torneo Concurrencia P2002",
+      nivel: "Abierto",
+      fechaInicio: new Date("2026-11-20T10:00:00Z"),
+      fechaFin: new Date("2026-11-20T18:00:00Z"),
+      cuposTotales: 10,
+    },
+    { db: mock },
+  );
+  await actualizarEstadoTorneo(t.id, "INSCRIPCIONES_ABIERTAS", { db: mock });
+
+  // Simulamos colisión de carrera donde mock.inscripcionTorneo.create arroja P2002
+  const originalCreate = mock.inscripcionTorneo.create;
+  mock.inscripcionTorneo.create = async () => {
+    const err = new Error(
+      "Unique constraint failed on the fields: (`torneo_id`,`usuario_id`)",
+    ) as Error & { code: string };
+    err.code = "P2002";
+    throw err;
+  };
+
+  await assert.rejects(
+    () =>
+      inscribirUsuarioTorneo(
+        {
+          torneoId: t.id,
+          usuarioId: "user-1",
+          confirmado: true,
+        },
+        { db: mock },
+      ),
+    (err: any) =>
+      err instanceof TournamentError &&
+      err.code === "ALREADY_REGISTERED" &&
+      err.status === 409,
+  );
+
+  mock.inscripcionTorneo.create = originalCreate;
+});
+

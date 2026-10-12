@@ -6,7 +6,7 @@ import {
 } from "@sportcomplex/validation";
 import {
   inscribirUsuarioTorneo,
-  obtenerTorneoPorId,
+  obtenerDetallePublicoTorneo,
   verificarPagoParaTorneo,
   TournamentError,
 } from "@sportcomplex/db";
@@ -53,8 +53,8 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     try {
-      // 1. Validar torneo y condiciones de costo
-      const torneo = await obtenerTorneoPorId(parsedId.data);
+      // 1. Validar torneo y condiciones de costo (MED-05: proyección liviana sin over-fetching de inscripciones)
+      const torneo = await obtenerDetallePublicoTorneo(parsedId.data);
       const precio = Number(torneo.precioInscripcion ?? 0);
       const esGratuito = precio === 0;
 

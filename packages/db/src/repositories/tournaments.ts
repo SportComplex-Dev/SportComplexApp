@@ -779,6 +779,24 @@ export async function inscribirUsuarioTorneo(
       }
     }
 
+    // HIGH-04: Si se suministra un pagoId, validar atómicamente dentro de la transacción
+    // que no haya sido utilizado ya en otra inscripción a cualquier torneo
+    if (input.pagoId) {
+      const pagoEnUso = await tx.inscripcionTorneo.findFirst({
+        where: {
+          pagoId: input.pagoId,
+          ...(inscripcionExistente ? { id: { not: inscripcionExistente.id } } : {}),
+        },
+      });
+      if (pagoEnUso) {
+        throw new TournamentError(
+          "El comprobante de pago ya ha sido utilizado en otra inscripción.",
+          "PAYMENT_ALREADY_USED",
+          409,
+        );
+      }
+    }
+
     const estadoInicial: EstadoInscripcionTorneoValor = input.confirmado
       ? "CONFIRMADA"
       : Number(torneo.precioInscripcion) === 0
@@ -821,20 +839,34 @@ export async function inscribirUsuarioTorneo(
       });
     }
 
-    return tx.inscripcionTorneo.create({
-      data: {
-        torneoId: input.torneoId,
-        usuarioId: input.usuarioId,
-        nombrePareja: input.nombrePareja?.trim() ?? null,
-        pagoId: input.pagoId ?? null,
-        estado: estadoInicial,
-        ticketEstado: "EMITIDO",
-      },
-      include: {
-        torneo: true,
-        usuario: { select: { id: true, nombre: true, correo: true } },
-      },
-    });
+    try {
+      return await tx.inscripcionTorneo.create({
+        data: {
+          torneoId: input.torneoId,
+          usuarioId: input.usuarioId,
+          nombrePareja: input.nombrePareja?.trim() ?? null,
+          pagoId: input.pagoId ?? null,
+          estado: estadoInicial,
+          ticketEstado: "EMITIDO",
+        },
+        include: {
+          torneo: true,
+          usuario: { select: { id: true, nombre: true, correo: true } },
+        },
+      });
+    } catch (err: any) {
+      if (err instanceof TournamentError) {
+        throw err;
+      }
+      if (err?.code === "P2002" || err?.message?.includes("Unique constraint")) {
+        throw new TournamentError(
+          "El usuario ya se encuentra inscrito en este torneo.",
+          "ALREADY_REGISTERED",
+          409,
+        );
+      }
+      throw err;
+    }
   });
 }
 
@@ -935,6 +967,7 @@ export async function verificarPagoParaTorneo(
   if (!pago) return null;
   if (pago.usuarioId !== usuarioId) return null;
   if (pago.estado !== "APROBADO") return null;
+  if (pago.tipo !== "TORNEO") return null;
   if (Number(pago.monto) < montoRequerido) return null;
 
   // Verificar si ya fue utilizado en otra inscripción a un torneo diferente
