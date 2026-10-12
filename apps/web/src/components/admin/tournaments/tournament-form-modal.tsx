@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Plus, Trash2, AlertCircle, ShieldAlert } from 'lucide-react'
 import { Modal } from '@/components/modal'
 import { ActionButton } from '@/components/action-button'
+import { createTournamentSchema } from '@sportcomplex/validation'
 
 export interface BloqueoFormItem {
   servicioId: number
@@ -62,13 +63,46 @@ const NIVELES_SUGERIDOS = [
   'Mixto Recreativo',
 ]
 
-// Convierte un objeto Date o ISO string a formato local para input datetime-local 'YYYY-MM-DDTHH:mm'
-function toDatetimeLocal(isoOrDate: string | Date | undefined): string {
+export const TIMEZONE_BOGOTA = 'America/Bogota'
+
+/**
+ * Convierte un objeto Date o ISO string a formato local 'YYYY-MM-DDTHH:mm'
+ * forzando estrictamente la zona horaria legal de Colombia (America/Bogota, UTC-5).
+ */
+export function toDatetimeLocal(isoOrDate: string | Date | undefined): string {
   if (!isoOrDate) return ''
   const d = new Date(isoOrDate)
   if (isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE_BOGOTA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+
+  const parts = formatter.formatToParts(d)
+  const map: Record<string, string> = {}
+  for (const p of parts) {
+    map[p.type] = p.value
+  }
+  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`
+}
+
+/**
+ * Convierte un string de input 'YYYY-MM-DDTHH:mm' a ISO UTC preservando el huso de Colombia (UTC-5).
+ */
+export function parseDatetimeLocalToUtcIso(datetimeStr: string): string {
+  if (!datetimeStr) return ''
+  const trimmed = datetimeStr.trim()
+  if (trimmed.endsWith('Z') || trimmed.includes('+') || (trimmed.includes('-') && trimmed.length > 19)) {
+    return new Date(trimmed).toISOString()
+  }
+  const isoWithBogotaOffset = trimmed.length === 16 ? `${trimmed}:00-05:00` : `${trimmed}-05:00`
+  return new Date(isoWithBogotaOffset).toISOString()
 }
 
 export function TournamentFormModal({
@@ -97,6 +131,12 @@ export function TournamentFormModal({
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+
+  // BUG-01: Filtrar pistas exclusivamente por la categoría/deporte seleccionada
+  const filteredServices = useMemo(() => {
+    return services.filter((s) => s.categoriaId === Number(formData.categoriaId))
+  }, [services, formData.categoriaId])
 
   useEffect(() => {
     if (tournamentToEdit) {
@@ -120,20 +160,17 @@ export function TournamentFormModal({
           : [],
       })
     } else {
-      // Valores por defecto para nuevo torneo
       const now = new Date()
-      now.setDate(now.getDate() + 7)
-      now.setHours(8, 0, 0, 0)
-      const end = new Date(now)
-      end.setHours(18, 0, 0, 0)
+      const nextMonth = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+      const finMonth = new Date(nextMonth.getTime() + 2 * 24 * 60 * 60 * 1000)
 
       setFormData({
         titulo: '',
         descripcion: '',
         categoriaId: categories[0]?.id ?? 1,
         nivel: NIVELES_SUGERIDOS[1],
-        fechaInicio: toDatetimeLocal(now),
-        fechaFin: toDatetimeLocal(end),
+        fechaInicio: toDatetimeLocal(nextMonth),
+        fechaFin: toDatetimeLocal(finMonth),
         cuposTotales: 16,
         precioInscripcion: 0,
         estado: 'BORRADOR',
@@ -141,17 +178,13 @@ export function TournamentFormModal({
       })
     }
     setErrorMsg(null)
+    setFieldErrors({})
   }, [tournamentToEdit, categories, isOpen])
 
   if (!isOpen) return null
 
-  // Filtrar servicios/pistas de la categoría seleccionada
-  const filteredServices = services.filter(
-    (s) => s.categoriaId === Number(formData.categoriaId)
-  )
-
   const handleAddBloqueo = () => {
-    const defaultServiceId = filteredServices[0]?.id || services[0]?.id || 1
+    const defaultServiceId = filteredServices[0]?.id ?? services[0]?.id ?? 1
     setFormData((prev) => ({
       ...prev,
       bloqueos: [
@@ -187,62 +220,43 @@ export function TournamentFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
-
-    if (!formData.titulo.trim() || formData.titulo.trim().length < 3) {
-      setErrorMsg('El título del torneo debe tener al menos 3 caracteres.')
-      return
-    }
+    setFieldErrors({})
 
     if (!formData.fechaInicio || !formData.fechaFin) {
       setErrorMsg('Debes especificar las fechas y horas de inicio y fin.')
       return
     }
 
-    const dInicio = new Date(formData.fechaInicio)
-    const dFin = new Date(formData.fechaFin)
-
-    if (dFin.getTime() <= dInicio.getTime()) {
-      setErrorMsg('La fecha y hora de fin debe ser posterior a la de inicio.')
-      return
+    const payload = {
+      titulo: formData.titulo.trim(),
+      descripcion: formData.descripcion.trim() || null,
+      categoriaId: Number(formData.categoriaId),
+      nivel: formData.nivel.trim(),
+      fechaInicio: parseDatetimeLocalToUtcIso(formData.fechaInicio),
+      fechaFin: parseDatetimeLocalToUtcIso(formData.fechaFin),
+      cuposTotales: Number(formData.cuposTotales),
+      precioInscripcion: Number(formData.precioInscripcion),
+      estado: formData.estado,
+      bloqueos: formData.bloqueos.map((b) => ({
+        servicioId: Number(b.servicioId),
+        horaInicio: parseDatetimeLocalToUtcIso(b.horaInicio),
+        horaFin: parseDatetimeLocalToUtcIso(b.horaFin),
+      })),
     }
 
-    if (formData.cuposTotales < 2) {
-      setErrorMsg('Los cupos totales deben ser al menos 2.')
+    // VAL-01: Validación cliente utilizando createTournamentSchema de @sportcomplex/validation
+    const validationResult = createTournamentSchema.safeParse(payload)
+    if (!validationResult.success) {
+      const flattened = validationResult.error.flatten()
+      setFieldErrors(flattened.fieldErrors as Record<string, string[]>)
+      const firstError = Object.values(flattened.fieldErrors)[0]?.[0]
+      setErrorMsg(firstError || 'Por favor verifica los campos del formulario.')
       return
-    }
-
-    // Validar bloqueos
-    for (const b of formData.bloqueos) {
-      if (!b.horaInicio || !b.horaFin) {
-        setErrorMsg('Cada pista bloqueada debe tener horario de inicio y fin.')
-        return
-      }
-      if (new Date(b.horaFin).getTime() <= new Date(b.horaInicio).getTime()) {
-        setErrorMsg('El horario de fin del bloqueo debe ser posterior al inicio.')
-        return
-      }
     }
 
     setLoading(true)
 
     try {
-      const payload = {
-        titulo: formData.titulo.trim(),
-        descripcion: formData.descripcion.trim() || null,
-        categoriaId: Number(formData.categoriaId),
-        nivel: formData.nivel.trim(),
-        fechaInicio: dInicio.toISOString(),
-        fechaFin: dFin.toISOString(),
-        cuposTotales: Number(formData.cuposTotales),
-        precioInscripcion: Number(formData.precioInscripcion),
-        estado: formData.estado,
-        bloqueos: formData.bloqueos.map((b) => ({
-          servicioId: Number(b.servicioId),
-          horaInicio: new Date(b.horaInicio).toISOString(),
-          horaFin: new Date(b.horaFin).toISOString(),
-        })),
-      }
-
       const url = isEditing
         ? `/api/admin/tournaments/${formData.id}`
         : '/api/admin/tournaments'
@@ -257,6 +271,9 @@ export function TournamentFormModal({
       const json = await res.json()
 
       if (!res.ok || !json.success) {
+        if (json.details?.fieldErrors) {
+          setFieldErrors(json.details.fieldErrors)
+        }
         if (json.error?.code === 'COURT_SLOT_CONFLICT') {
           setErrorMsg(
             'Conflicto de disponibilidad: Una de las pistas seleccionadas ya tiene reservas activas en ese horario.'
@@ -279,9 +296,9 @@ export function TournamentFormModal({
 
       onSaved(json.data)
       onClose()
-    } catch (err: unknown) {
-      console.error('Error al guardar torneo:', err)
-      setErrorMsg('Ocurrió un error inesperado al conectar con el servidor.')
+    } catch (err) {
+      console.error('Error saving tournament:', err)
+      setErrorMsg('Error de red al intentar guardar el torneo.')
     } finally {
       setLoading(false)
     }
@@ -296,7 +313,10 @@ export function TournamentFormModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4 pt-2">
         {errorMsg && (
-          <div className="p-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded-lg flex items-center gap-2">
+          <div
+            role="alert"
+            className="p-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded-lg flex items-center gap-2"
+          >
             <AlertCircle size={16} className="shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -304,10 +324,14 @@ export function TournamentFormModal({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-titulo"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Título del Torneo *
             </label>
             <input
+              id="torneo-titulo"
               type="text"
               required
               minLength={3}
@@ -319,13 +343,20 @@ export function TournamentFormModal({
               }
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {fieldErrors.titulo && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.titulo[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-categoria"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Deporte / Categoría *
             </label>
             <select
+              id="torneo-categoria"
               value={formData.categoriaId}
               onChange={(e) =>
                 setFormData({
@@ -341,13 +372,20 @@ export function TournamentFormModal({
                 </option>
               ))}
             </select>
+            {fieldErrors.categoriaId && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.categoriaId[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-nivel"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Nivel de Competición *
             </label>
             <input
+              id="torneo-nivel"
               type="text"
               list="niveles-list"
               required
@@ -363,13 +401,20 @@ export function TournamentFormModal({
                 <option key={niv} value={niv} />
               ))}
             </datalist>
+            {fieldErrors.nivel && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.nivel[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Fecha y Hora de Inicio *
+            <label
+              htmlFor="torneo-fechainicio"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
+              Fecha y Hora de Inicio (Hora Colombia) *
             </label>
             <input
+              id="torneo-fechainicio"
               type="datetime-local"
               required
               value={formData.fechaInicio}
@@ -378,13 +423,20 @@ export function TournamentFormModal({
               }
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {fieldErrors.fechaInicio && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.fechaInicio[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Fecha y Hora de Fin *
+            <label
+              htmlFor="torneo-fechafin"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
+              Fecha y Hora de Fin (Hora Colombia) *
             </label>
             <input
+              id="torneo-fechafin"
               type="datetime-local"
               required
               value={formData.fechaFin}
@@ -393,13 +445,20 @@ export function TournamentFormModal({
               }
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {fieldErrors.fechaFin && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.fechaFin[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-cupostotales"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Cupos Totales (Jugadores / Parejas) *
             </label>
             <input
+              id="torneo-cupostotales"
               type="number"
               min={2}
               max={256}
@@ -413,13 +472,20 @@ export function TournamentFormModal({
               }
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {fieldErrors.cuposTotales && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.cuposTotales[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-precio"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Precio de Inscripción (COP)
             </label>
             <input
+              id="torneo-precio"
               type="number"
               min={0}
               step={1000}
@@ -437,13 +503,20 @@ export function TournamentFormModal({
                 ? 'Gratuito para participantes'
                 : `$${Number(formData.precioInscripcion).toLocaleString('es-CO')}`}
             </span>
+            {fieldErrors.precioInscripcion && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.precioInscripcion[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-estado"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Estado del Torneo
             </label>
             <select
+              id="torneo-estado"
               value={formData.estado}
               onChange={(e) =>
                 setFormData({
@@ -462,10 +535,14 @@ export function TournamentFormModal({
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="torneo-descripcion"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+            >
               Descripción / Reglas / Formato
             </label>
             <textarea
+              id="torneo-descripcion"
               rows={2}
               placeholder="Información sobre premios, fases de grupos, reglamento..."
               value={formData.descripcion}
@@ -474,6 +551,9 @@ export function TournamentFormModal({
               }
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+            {fieldErrors.descripcion && (
+              <p className="text-rose-500 text-[11px] mt-1">{fieldErrors.descripcion[0]}</p>
+            )}
           </div>
         </div>
 
@@ -510,7 +590,14 @@ export function TournamentFormModal({
                   className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row items-stretch md:items-center gap-2"
                 >
                   <div className="flex-1">
+                    <label
+                      htmlFor={`bloqueo-servicio-${idx}`}
+                      className="sr-only"
+                    >
+                      Pista deportiva
+                    </label>
                     <select
+                      id={`bloqueo-servicio-${idx}`}
                       value={bloqueo.servicioId}
                       onChange={(e) =>
                         handleBloqueoChange(
@@ -521,15 +608,28 @@ export function TournamentFormModal({
                       }
                       className="w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                     >
-                      {services.map((serv) => (
-                        <option key={serv.id} value={serv.id}>
-                          {serv.nombre}
+                      {filteredServices.length === 0 ? (
+                        <option value={0} disabled>
+                          No hay pistas disponibles para este deporte
                         </option>
-                      ))}
+                      ) : (
+                        filteredServices.map((serv) => (
+                          <option key={serv.id} value={serv.id}>
+                            {serv.nombre}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <label
+                      htmlFor={`bloqueo-inicio-${idx}`}
+                      className="sr-only"
+                    >
+                      Hora inicio bloqueo
+                    </label>
                     <input
+                      id={`bloqueo-inicio-${idx}`}
                       type="datetime-local"
                       value={bloqueo.horaInicio}
                       onChange={(e) =>
@@ -538,7 +638,14 @@ export function TournamentFormModal({
                       className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                     />
                     <span className="text-xs text-slate-400">a</span>
+                    <label
+                      htmlFor={`bloqueo-fin-${idx}`}
+                      className="sr-only"
+                    >
+                      Hora fin bloqueo
+                    </label>
                     <input
+                      id={`bloqueo-fin-${idx}`}
                       type="datetime-local"
                       value={bloqueo.horaFin}
                       onChange={(e) =>
@@ -551,7 +658,7 @@ export function TournamentFormModal({
                     type="button"
                     onClick={() => handleRemoveBloqueo(idx)}
                     className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded self-end md:self-center"
-                    aria-label="Eliminar bloqueo"
+                    aria-label={`Eliminar bloqueo de pista ${idx + 1}`}
                   >
                     <Trash2 size={14} />
                   </button>

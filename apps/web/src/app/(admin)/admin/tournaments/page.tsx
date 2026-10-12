@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Trophy,
   Plus,
@@ -25,7 +25,7 @@ import {
 import { TournamentFormModal } from '@/components/admin/tournaments/tournament-form-modal'
 import { TournamentDetailModal } from '@/components/admin/tournaments/tournament-detail-modal'
 
-interface TorneoAdminItem {
+export interface TorneoAdminItem {
   id: string
   titulo: string
   descripcion: string | null
@@ -38,9 +38,17 @@ interface TorneoAdminItem {
   cuposOcupados: number
   precioInscripcion: number | string
   estado: EstadoTorneoTipo
-  bloqueos?: Array<{ id: number; servicioId: number; servicio?: { nombre: string } }>
+  bloqueos?: Array<{
+    id: number
+    servicioId: number
+    horaInicio: string
+    horaFin: string
+    servicio?: { nombre: string }
+  }>
   _count?: { inscripciones: number }
 }
+
+const PAGE_SIZE = 10
 
 export default function AdminTournamentsPage() {
   const { notify } = useApp()
@@ -51,14 +59,33 @@ export default function AdminTournamentsPage() {
 
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('todas')
   const [selectedStatus, setSelectedStatus] = useState<string>('todos')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Referencia a AbortController para cancelar peticiones en vuelo (PERF-01)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Modales
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingTournament, setEditingTournament] = useState<TorneoAdminItem | null>(null)
   const [detailTournamentId, setDetailTournamentId] = useState<string | null>(null)
   const [deletingTournament, setDeletingTournament] = useState<TorneoAdminItem | null>(null)
+
+  // PERF-01: Debounce de 300ms sobre el campo de búsqueda
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [search])
+
+  // Reiniciar a página 1 cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedCategory, selectedStatus])
 
   // Carga de categorías y servicios para los selectores
   const loadPrerequisites = useCallback(async () => {
@@ -84,8 +111,14 @@ export default function AdminTournamentsPage() {
     }
   }, [])
 
-  // Carga de torneos desde la API
+  // Carga de torneos desde la API con soporte de AbortController
   const loadTournaments = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -95,24 +128,27 @@ export default function AdminTournamentsPage() {
       if (selectedCategory !== 'todas') {
         params.append('categoriaId', selectedCategory)
       }
-      if (search.trim()) {
-        params.append('search', search.trim())
+      if (debouncedSearch.trim()) {
+        params.append('search', debouncedSearch.trim())
       }
 
-      const res = await fetch(`/api/admin/tournaments?${params.toString()}`)
+      const res = await fetch(`/api/admin/tournaments?${params.toString()}`, {
+        signal: controller.signal,
+      })
       const json = await res.json()
       if (json.success && Array.isArray(json.data)) {
         setTournaments(json.data)
       } else {
         notify('Error al obtener la lista de torneos', 'error')
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      if ((err as Error)?.name === 'AbortError') return
       console.error('Error fetching tournaments:', err)
       notify('Error de red al consultar los torneos', 'error')
     } finally {
       setLoading(false)
     }
-  }, [selectedStatus, selectedCategory, search, notify])
+  }, [selectedStatus, selectedCategory, debouncedSearch, notify])
 
   useEffect(() => {
     loadPrerequisites()
@@ -120,15 +156,27 @@ export default function AdminTournamentsPage() {
 
   useEffect(() => {
     loadTournaments()
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [loadTournaments])
 
-  // Métricas de cabecera
+  // Métricas de cabecera (KPIs globales)
   const totalTorneos = tournaments.length
   const torneosAbiertos = tournaments.filter((t) => t.estado === 'INSCRIPCIONES_ABIERTAS').length
   const torneosEnCurso = tournaments.filter((t) => t.estado === 'EN_CURSO').length
   const totalInscripciones = tournaments.reduce(
     (acc, t) => acc + (t.cuposOcupados ?? t._count?.inscripciones ?? 0),
     0
+  )
+
+  // SCAL-01: Paginación reactiva
+  const totalPages = Math.max(1, Math.ceil(tournaments.length / PAGE_SIZE))
+  const paginatedTournaments = tournaments.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
   )
 
   const handleOpenCreate = () => {
@@ -188,6 +236,7 @@ export default function AdminTournamentsPage() {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
+      timeZone: 'America/Bogota',
     })
   }
 
@@ -252,12 +301,16 @@ export default function AdminTournamentsPage() {
         </div>
       </section>
 
-      {/* Consola de Filtros */}
+      {/* Consola de Filtros con Accesibilidad WCAG */}
       <section className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Input de Búsqueda */}
         <div className="relative flex-1">
+          <label htmlFor="admin-search-tournament" className="sr-only">
+            Buscar torneo por título
+          </label>
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            id="admin-search-tournament"
             type="text"
             placeholder="Buscar torneo por título..."
             value={search}
@@ -268,7 +321,11 @@ export default function AdminTournamentsPage() {
 
         {/* Filtro por Categoría / Deporte */}
         <div className="flex items-center gap-2">
+          <label htmlFor="admin-category-filter" className="sr-only">
+            Filtrar por deporte o categoría
+          </label>
           <select
+            id="admin-category-filter"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -282,7 +339,11 @@ export default function AdminTournamentsPage() {
           </select>
 
           {/* Filtro por Estado */}
+          <label htmlFor="admin-status-filter" className="sr-only">
+            Filtrar por estado del torneo
+          </label>
           <select
+            id="admin-status-filter"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -298,24 +359,24 @@ export default function AdminTournamentsPage() {
       </section>
 
       {/* Tabla de Torneos */}
-      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-            <Loader2 size={32} className="animate-spin text-emerald-500" />
-            <span className="text-xs">Cargando torneos y asignación de pistas...</span>
+          <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <Loader2 size={24} className="animate-spin text-emerald-500" />
+            <span className="text-xs">Cargando torneos y disponibilidades...</span>
           </div>
         ) : tournaments.length === 0 ? (
-          <div className="py-16 text-center text-slate-500 dark:text-slate-400 space-y-3">
-            <Trophy size={40} className="mx-auto text-slate-300 dark:text-slate-700" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+            <Trophy size={32} className="text-slate-300 dark:text-slate-700" />
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               No se encontraron torneos
-            </h3>
-            <p className="text-xs max-w-sm mx-auto text-slate-500">
-              {search || selectedCategory !== 'todas' || selectedStatus !== 'todos'
-                ? 'No hay resultados que coincidan con los filtros seleccionados.'
-                : 'Aún no se han configurado torneos deportivos en la plataforma.'}
             </p>
-            <ActionButton size="sm" onClick={handleOpenCreate}>
+            <p className="text-xs text-slate-400">
+              {search || selectedCategory !== 'todas' || selectedStatus !== 'todos'
+                ? 'Prueba modificando los filtros de búsqueda.'
+                : 'Crea tu primer torneo deportivo para iniciar.'}
+            </p>
+            <ActionButton onClick={handleOpenCreate} className="mt-2">
               <Plus size={14} /> Crear Primer Torneo
             </ActionButton>
           </div>
@@ -324,17 +385,17 @@ export default function AdminTournamentsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3 px-4">Torneo & Nivel</th>
-                  <th className="py-3 px-4">Deporte</th>
-                  <th className="py-3 px-4">Fechas</th>
-                  <th className="py-3 px-4">Aforo / Cupos</th>
-                  <th className="py-3 px-4">Inscripción</th>
-                  <th className="py-3 px-4">Estado</th>
-                  <th className="py-3 px-4 text-right">Acciones</th>
+                  <th scope="col" className="py-3 px-4">Torneo & Nivel</th>
+                  <th scope="col" className="py-3 px-4">Deporte</th>
+                  <th scope="col" className="py-3 px-4">Fechas</th>
+                  <th scope="col" className="py-3 px-4">Aforo / Cupos</th>
+                  <th scope="col" className="py-3 px-4">Inscripción</th>
+                  <th scope="col" className="py-3 px-4">Estado</th>
+                  <th scope="col" className="py-3 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {tournaments.map((torneo) => {
+                {paginatedTournaments.map((torneo) => {
                   const ocupados = torneo.cuposOcupados ?? torneo._count?.inscripciones ?? 0
                   const totales = torneo.cuposTotales
                   const pct = Math.min(100, Math.round((ocupados / totales) * 100))
@@ -361,22 +422,22 @@ export default function AdminTournamentsPage() {
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {torneo.categoria?.nombre || 'General'}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {torneo.categoria?.nombre ?? 'General'}
                         </span>
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="flex flex-col text-slate-600 dark:text-slate-400">
+                        <div className="flex flex-col text-[11px] text-slate-600 dark:text-slate-400">
                           <span>{formatFecha(torneo.fechaInicio)}</span>
-                          <span className="text-[10px] text-slate-400">
-                            al {formatFecha(torneo.fechaFin)}
+                          <span className="text-slate-400 text-[10px]">
+                            hasta {formatFecha(torneo.fechaFin)}
                           </span>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 min-w-[140px]">
-                        <div className="space-y-1">
+                      <td className="py-3 px-4">
+                        <div className="w-28 space-y-1">
                           <div className="flex justify-between text-[11px]">
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
                               {ocupados}/{totales}
@@ -415,7 +476,7 @@ export default function AdminTournamentsPage() {
                             onClick={() => setDetailTournamentId(torneo.id)}
                             className="p-1.5 rounded text-slate-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition"
                             title="Ver inscritos y detalle"
-                            aria-label="Ver inscritos"
+                            aria-label={`Ver inscritos y detalle del torneo ${torneo.titulo}`}
                           >
                             <Eye size={15} />
                           </button>
@@ -425,7 +486,7 @@ export default function AdminTournamentsPage() {
                             onClick={() => handleOpenEdit(torneo)}
                             className="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-500/10 transition"
                             title="Editar parámetros"
-                            aria-label="Editar torneo"
+                            aria-label={`Editar torneo ${torneo.titulo}`}
                           >
                             <Pencil size={15} />
                           </button>
@@ -438,6 +499,7 @@ export default function AdminTournamentsPage() {
                               }
                               className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600/20 transition"
                               title="Abrir inscripciones al público"
+                              aria-label={`Publicar e iniciar inscripciones del torneo ${torneo.titulo}`}
                             >
                               Publicar
                             </button>
@@ -449,7 +511,7 @@ export default function AdminTournamentsPage() {
                               onClick={() => setDeletingTournament(torneo)}
                               className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-500/10 transition"
                               title="Cancelar torneo"
-                              aria-label="Cancelar torneo"
+                              aria-label={`Cancelar torneo ${torneo.titulo}`}
                             >
                               <Trash2 size={15} />
                             </button>
@@ -461,11 +523,42 @@ export default function AdminTournamentsPage() {
                 })}
               </tbody>
             </table>
+
+            {/* SCAL-01: Controles de Paginación */}
+            {tournaments.length > PAGE_SIZE && (
+              <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 gap-2">
+                <span>
+                  Mostrando {(currentPage - 1) * PAGE_SIZE + 1} a{' '}
+                  {Math.min(currentPage * PAGE_SIZE, tournaments.length)} de {tournaments.length} torneos
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    Anterior
+                  </button>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
 
-      {/* Modal Formulario Crear / Editar */}
+      {/* Modal de Creación / Edición */}
       <TournamentFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -476,24 +569,21 @@ export default function AdminTournamentsPage() {
         notify={notify}
       />
 
-      {/* Modal Detalle e Inscritos */}
+      {/* Modal de Detalle y Participantes */}
       <TournamentDetailModal
         isOpen={Boolean(detailTournamentId)}
-        onClose={() => setDetailTournamentId(null)}
         tournamentId={detailTournamentId}
-        onStatusChange={(id, newStatus) => {
-          handleStatusTransition(id, newStatus)
-          setDetailTournamentId(null)
-        }}
+        onClose={() => setDetailTournamentId(null)}
         notify={notify}
+        onStatusChange={loadTournaments}
       />
 
-      {/* Diálogo de Confirmación para Cancelar/Eliminar */}
+      {/* Diálogo de Confirmación para Cancelar Torneo */}
       {deletingTournament && (
         <ConfirmDialog
-          title="¿Confirmas la cancelación del torneo?"
-          message={`El torneo «${deletingTournament.titulo}» pasará a estado cancelado y se liberarán de inmediato los bloqueos automáticos de las pistas asignadas.`}
-          confirmLabel="Cancelar Torneo"
+          title="Cancelar Torneo Deportivo"
+          message={`¿Estás seguro de que deseas cancelar el torneo «${deletingTournament.titulo}»? Se liberarán todas las pistas bloqueadas automáticamente.`}
+          confirmLabel="Sí, cancelar torneo"
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeletingTournament(null)}
         />
