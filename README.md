@@ -36,32 +36,6 @@ pnpm dev
 
 Variables: copiar `apps/web/.env.example` a `apps/web/.env.local`.
 
-## Lector de accesos y canje de tickets
-
-El portal de operador está disponible en `/scanner` para cuentas activas con rol
-`Administrador` o `Empleado_Lector`. Antes de activar la cámara, el operador
-debe seleccionar un servicio deportivo activo; el lector envía su ID entero y
-positivo como `postServiceId`.
-
-Los códigos QR de acceso deben tener el formato firmado
-`SC1:<ticket UUID>:<firma HMAC-SHA256 hexadecimal>`. Al confirmar **Dar Acceso**,
-la web envía `ticketId`, `signature` y `postServiceId` a
-`POST /api/access/redeem`. El servidor realiza la validación y el canje; el
-cliente no considera concedido el acceso hasta recibir `access: "GRANTED"`.
-
-La pantalla distingue el acceso concedido de las denegaciones `ALREADY_USED`
-(boleto usado), `SERVICE_MISMATCH` (el ticket corresponde a otro servicio) y
-`WINDOW_EXPIRED` (fuera de la franja de acceso). Los datos de titular, reserva,
-servicio y horario se muestran con el resultado entregado por el servidor.
-
-La lista de servicios del lector se obtiene de `GET /api/access/services`,
-protegido por los mismos roles. Para validar el frontend:
-
-```bash
-pnpm --dir apps/web run typecheck
-pnpm --dir apps/web run lint
-```
-
 ## Convenciones
 
 - Ramas: `main` (prod VPS), `develop` (integración), `feature/*` según ARCHITECTURE §9.1.
