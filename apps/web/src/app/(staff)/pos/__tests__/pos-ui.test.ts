@@ -232,3 +232,40 @@ test("TSK-FE-18 UI (SRS §11.1 Riesgo 2 / ARCH-03): PosAltLinkModal renderiza en
   assert.ok(html.includes("id=\"pos-alt-link-input\""));
   assert.ok(html.includes("btn-copy-alt-link"));
 });
+
+test("TSK-FE-18 UI (ARCH-02 / BLOQUEANTE 2): PosVoucherModal muestra indicador de espera cuando no hay QR del servidor y no inventa QR apócrifo", () => {
+  const pendingBooking: Booking = {
+    id: "book-pending-1",
+    code: "AKR-POS-PEND",
+    client: "Carlos Santana",
+    category: "canchas",
+    service: "Cancha Pádel 1",
+    sede: "Poblado",
+    date: "2026-10-15",
+    time: "08:00 a. m. - 09:00 a. m.",
+    attendees: 1,
+    amount: 56000,
+    status: "Pendiente",
+    paymentMethod: "card",
+    paymentStatus: "Pendiente",
+    transactionRef: "pi_pos_pending_123",
+  };
+
+  const html = renderToString(
+    React.createElement(PosVoucherModal, {
+      booking: pendingBooking,
+      sellerName: "Andrés Muñoz",
+      receiptQrUrl: null,
+      onPrint: () => {},
+      onNextSale: () => {},
+    }),
+  );
+
+  // Debe mostrar aviso de espera y estado pendiente
+  assert.ok(html.includes("Esperando confirmación de pago y emisión de pase..."));
+  assert.ok(html.includes("Reserva PENDIENTE DE PAGO · Canal TAQUILLA"));
+  assert.ok(html.includes("Venta en Proceso en Mostrador"));
+  // NUNCA debe contener imagen de QR si el servidor no ha emitido el pase oficial
+  assert.ok(!html.includes("Código QR de Acceso en Puerta"));
+  assert.ok(!html.includes("AKROS_POS_VERIFIED"));
+});

@@ -33,10 +33,10 @@ export function PosVoucherModal({
             <CheckCircle2 size={28} />
           </div>
           <h2 id="pos-voucher-title" className="text-lg font-bold text-[var(--ink)]">
-            ¡Venta Exitosa en Mostrador!
+            {booking.status === 'Confirmada' ? '¡Venta Exitosa en Mostrador!' : 'Venta en Proceso en Mostrador'}
           </h2>
-          <Badge variant="success" className="text-xs mt-1">
-            Reserva CONFIRMADA · Canal TAQUILLA
+          <Badge variant={booking.status === 'Confirmada' ? 'success' : 'warning'} className="text-xs mt-1">
+            {booking.status === 'Confirmada' ? 'Reserva CONFIRMADA · Canal TAQUILLA' : 'Reserva PENDIENTE DE PAGO · Canal TAQUILLA'}
           </Badge>
         </div>
 
@@ -87,13 +87,13 @@ export function PosVoucherModal({
               <span>Stripe Cashless ({booking.transactionRef?.slice(0, 16)})</span>
             </div>
             <div className="flex justify-between pt-1 border-t border-[var(--line)] font-bold">
-              <span>TOTAL PAGADO:</span>
+              <span>TOTAL {booking.paymentStatus === 'Aprobada' ? 'PAGADO' : 'A COBRAR'}:</span>
               <span>{formatMoney(booking.amount)} COP</span>
             </div>
           </div>
 
           {/* QR de acceso centrado para torniquete óptico */}
-          {receiptQrUrl && (
+          {receiptQrUrl ? (
             <div className="text-center my-4 pt-3 border-t border-[var(--line)]">
               <p className="text-[10px] font-bold text-[var(--subtle)] uppercase tracking-wider mb-2">
                 Código QR de Acceso en Puerta
@@ -105,6 +105,15 @@ export function PosVoucherModal({
               />
               <p className="text-[9px] text-[var(--subtle)] mt-1">
                 Firma HMAC verificada para torniquetes (RF-13)
+              </p>
+            </div>
+          ) : (
+            <div className="text-center my-4 pt-3 border-t border-[var(--line)] p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+              <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                Esperando confirmación de pago y emisión de pase...
+              </p>
+              <p className="text-[10px] text-[var(--subtle)] mt-1">
+                El código QR firmado por el servidor se emitirá una vez confirmada la transacción en Stripe.
               </p>
             </div>
           )}

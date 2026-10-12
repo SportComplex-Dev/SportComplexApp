@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
+import { loadStripe } from '@stripe/stripe-js'
 import { AlertCircle, ShieldCheck, Store, User } from 'lucide-react'
 
 import {
@@ -208,28 +209,57 @@ export default function PosPage() {
       }
 
       const backendBooking = json.data.booking
+      const paymentIntent = json.data.paymentIntent
+      const clientSecret = paymentIntent?.clientSecret || paymentIntent?.client_secret
 
-      setProcessStep('Confirmando transacción y generando comprobante...')
-
-      // Intentar obtener el comprobante oficial con QR firmado por HMAC en el servidor (TSK-BE-19)
-      let qrDataUrl: string | null = null
-      try {
-        const receiptRes = await fetch(`/api/pdf/receipt?reservaId=${backendBooking.id}&destinatario=POS`)
-        if (receiptRes.ok) {
-          const receiptJson = await receiptRes.json()
-          if (receiptJson.success && receiptJson.data?.qr?.dataUrl) {
-            qrDataUrl = receiptJson.data.qr.dataUrl
+      // Confirmación oficial con Stripe (SEC-01 / ARCH-01)
+      const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      if (stripePublishableKey && clientSecret && typeof window !== 'undefined') {
+        setProcessStep('Confirmando transacción con datáfono digital Stripe...')
+        try {
+          const stripe = await loadStripe(stripePublishableKey)
+          if (stripe) {
+            const confirmResult = await stripe.confirmCardPayment(clientSecret, {
+              payment_method: 'pm_card_visa',
+            })
+            if (confirmResult.error) {
+              throw new Error(confirmResult.error.message || 'El cobro con tarjeta fue rechazado por Stripe.')
+            }
           }
+        } catch (stripeErr) {
+          if (stripeErr instanceof Error) throw stripeErr
+          throw new Error('Error al procesar la confirmación con Stripe.')
         }
-      } catch {
-        // Si no hay endpoint de comprobante en runtime, generar QR local
       }
 
-      if (!qrDataUrl) {
-        const fallbackQrPayload = `SC1:${backendBooking.code}:AKROS_POS_VERIFIED`
-        qrDataUrl = await QRCode.toDataURL(fallbackQrPayload, { width: 260, margin: 2 })
+      setProcessStep('Verificando confirmación y emitiendo comprobante...')
+
+      // Consultar el comprobante oficial con QR firmado por HMAC en el servidor (TSK-BE-19 / ARCH-02)
+      let qrDataUrl: string | null = null
+      let isConfirmed = false
+
+      // Polling breve (hasta 3 intentos) para permitir que el webhook confirme la reserva en la BD
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const receiptRes = await fetch(`/api/pdf/receipt?reservaId=${backendBooking.id}&destinatario=POS`)
+          if (receiptRes.ok) {
+            const receiptJson = await receiptRes.json()
+            if (receiptJson.success && receiptJson.data?.qr?.dataUrl) {
+              qrDataUrl = receiptJson.data.qr.dataUrl
+              isConfirmed = true
+              break
+            }
+          }
+        } catch {
+          // Si falla la consulta al recibo, continuar reintentos
+        }
+        if (attempt < 2) {
+          setProcessStep('Esperando confirmación de pasarela y emisión de pase...')
+          await new Promise((resolve) => setTimeout(resolve, 600))
+        }
       }
 
+      // ARCH-02: NUNCA emitir códigos QR falsos o sin firma HMAC si el servidor no los ha emitido.
       setReceiptQrUrl(qrDataUrl)
 
       const newBooking: Booking = {
@@ -243,16 +273,20 @@ export default function PosPage() {
         time: selectedSlot,
         attendees: currentService.category === 'canchas' ? 1 : attendees,
         amount: backendBooking.amount || totalFinal,
-        status: 'Confirmada',
+        status: isConfirmed ? 'Confirmada' : 'Pendiente',
         paymentMethod: 'card',
-        paymentStatus: 'Aprobada',
-        transactionRef: backendBooking.stripePaymentIntentId || `pi_pos_${Date.now()}`,
+        paymentStatus: isConfirmed ? 'Aprobada' : 'Pendiente',
+        transactionRef: backendBooking.stripePaymentIntentId || paymentIntent?.id || `pi_pos_${Date.now()}`,
       }
 
       // Persistir y abrir modal de comprobante
       setBookings([newBooking, ...bookings])
       setConfirmedBooking(newBooking)
-      notify('¡Venta completada! Reserva confirmada y pase emitido.', 'success')
+      if (isConfirmed) {
+        notify('¡Venta completada! Reserva confirmada y pase emitido.', 'success')
+      } else {
+        notify('Cobro iniciado en pasarela. Esperando emisión de pase de acceso.', 'info')
+      }
     } catch (err: unknown) {
       console.error('Error al procesar cobro POS:', err)
       const message = err instanceof Error ? err.message : 'Error al procesar el pago en taquilla.'

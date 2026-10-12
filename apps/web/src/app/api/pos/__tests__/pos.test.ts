@@ -341,3 +341,64 @@ test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo
   assert.ok(json.data.booking.alternativePaymentUrl.includes("serviceId=10"));
   assert.ok(json.data.booking.alternativePaymentUrl.includes("amount=80000"));
 });
+
+test("POS API (ARCH-03): genera sesión real de Stripe Checkout cuando createCheckoutSession está inyectado", async () => {
+  resetDb();
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  const handlerConStripe = createPosCheckoutPostHandler({
+    createPaymentIntent: mockCreatePaymentIntent as any,
+    createCheckoutSession: (async () => ({
+      sessionId: "cs_test_pos_alt_999",
+      url: "https://checkout.stripe.com/c/pay/cs_test_pos_alt_999",
+      paymentIntentId: null,
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    })) as any,
+  });
+
+  const req = new Request("http://localhost:3000/api/pos/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 10,
+      date: "2026-10-15",
+      slotTime: "08:00 a. m. - 09:00 a. m.",
+      cantidadCupos: 1,
+      clienteNombre: "Carlos Santana",
+      clienteDocumento: "1020304050",
+      clienteEmail: "carlos@akros.test",
+      paymentMode: "stripe_link",
+    }),
+  });
+
+  const res = await handlerConStripe(req);
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.success, true);
+  assert.equal(json.data.booking.paymentMode, "stripe_link");
+  assert.equal(json.data.booking.stripeCheckoutSessionId, "cs_test_pos_alt_999");
+  assert.equal(json.data.alternativePaymentUrl, "https://checkout.stripe.com/c/pay/cs_test_pos_alt_999");
+});
+
+test("POS API (ARCH-02): rechaza el código QR apócrifo SC1:AKR-POS-XXXX:AKROS_POS_VERIFIED y valida el QR oficial firmado por el servidor", async () => {
+  const { parseTicketQrPayload, verifyTicketSignature, buildTicketQrPayload, signTicket } = await import("@sportcomplex/core");
+
+  // 1. Verificar que el formato apócrifo anterior es rechazado rotundamente por el lector de torniquetes
+  const fakePayload = "SC1:AKR-POS-1234:AKROS_POS_VERIFIED";
+  const fakeParsed = parseTicketQrPayload(fakePayload);
+  assert.equal(fakeParsed, null, "El lector de torniquetes debe rechazar el QR apócrifo sin UUID ni firma HMAC");
+
+  // 2. Verificar que el QR oficial con UUID y firma HMAC-SHA256 supera parseTicketQrPayload y verifyTicketSignature
+  const secret = "secreto-seguro-hmac-test";
+  const validTicketUuid = "00000000-0000-4000-8000-000000000099";
+  const signature = signTicket(validTicketUuid, secret);
+  const officialPayload = buildTicketQrPayload(validTicketUuid, signature);
+
+  const officialParsed = parseTicketQrPayload(officialPayload);
+  assert.ok(officialParsed);
+  assert.equal(officialParsed.ticketId, validTicketUuid);
+  assert.equal(officialParsed.signature, signature);
+  assert.equal(verifyTicketSignature(officialParsed.ticketId, officialParsed.signature, secret), true);
+});

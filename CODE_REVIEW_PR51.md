@@ -1,4 +1,4 @@
-# Reporte de Revisión de Código — Pull Request #51
+# Reporte de Revisión de Código — Pull Request #51 (Auditoría Final Independiente HEAD)
 
 ## Metadatos de la Revisión
 
@@ -8,366 +8,174 @@
 | **Título** | `feat(pos): (TSK-FE-18) interfaz de punto de venta 100% cashless` |
 | **Rama Origen** | `feature/tsk-fe-18-interfaz-de-punto-de-venta` |
 | **Rama Base** | `origin/develop` |
-| **Commit Evaluado** | `fac203c0727c52c84d405a0b8fc529eb21bb35f9` (HEAD) |
-| **Commits en el PR** | `2241cce`, `8594d77`, `fac203c` |
-| **Fecha de Revisión** | 2026-10-12 |
-| **Rol del Revisor** | Senior Staff Software Engineer & Security Reviewer |
-| **Estado de Pruebas** | Suite ejecutada: 127 tests OK (`pnpm test`), Typecheck OK (`tsc --noEmit`), Lint OK (`eslint .`) |
+| **Commit Original Evaluado** | `fac203c0727c52c84d405a0b8fc529eb21bb35f9` (Rechazado inicialmente) |
+| **Commit Actual Evaluado (HEAD)** | `8ba2ba8232bb2e0c6c5fc25283773e8df78b6137` (HEAD con correcciones locales) |
+| **Fecha de Auditoría Final** | 2026-10-12 |
+| **Rol del Auditor** | Senior Staff Software Engineer & Principal Security Reviewer |
+| **Estado Empírico de Pruebas** | Suite ejecutada: **134/134 tests OK** en `web`, **26/26 tests OK** en `validation`, **93/94 tests OK** en `db` (1 skip BD real), **71/71 tests OK** en `core`. Typecheck OK en los 6 paquetes (`pnpm typecheck`). |
 
 ---
 
 ## Resumen Ejecutivo y Dictamen
 
-### Dictamen: 🛑 **RECHAZADO (CAMBIOS REQUERIDOS CRÍTICOS / BLOCKER)**
+### Dictamen: ❌ **CAMBIOS SOLICITADOS (CHANGES_REQUESTED)**
 
-El PR #51 implementa la interfaz de Taquilla POS presencial y su soporte backend con el objetivo de dar cumplimiento a la tarea **TSK-FE-18** (asociada a los requisitos RF-17, RN-13 y RNF-05). La interfaz visual y la experiencia de usuario mostrador son estéticamente atractivas y bien integradas en Tailwind con la paleta AKROS; sin embargo, **el código contiene fallas de seguridad de severidad CRÍTICA, violaciones de estándares PCI-DSS, riesgo de fraude financiero por cobros simulados, condiciones de carrera sin transaccionalidad con sobreventa ilimitada, y una ruptura estructural con la arquitectura de backend preexistente (TSK-BE-18)**.
+Tras una auditoría exhaustiva, independiente y empírica del código fuente real en HEAD (`8ba2ba8`), se determina que **el PR no se encuentra listo para integración a `develop` debido a la presencia de bloqueantes críticos de arquitectura, seguridad de pagos y fiabilidad operativa que fueron pasados por alto en la revisión previa**.
 
-A pesar de que la suite automatizada reporta 127 pruebas en verde, esto es producto de pruebas que evalúan mocks convenientes y esquemas Zod en aislamiento, ocultando que **el flujo real de pago con tarjeta en la taquilla no interactúa con Stripe, no recauda fondos y emite tiquetes y reservas 100% gratuitos y confirmados**.
-
-Bajo ningún concepto este Pull Request debe ser fusionado a `develop` ni desplegado en un entorno productivo o pre-productivo sin antes corregir los bloqueadores detallados a continuación.
-
----
-
-## Matriz de Hallazgos por Severidad
-
-| Código | Severidad | Categoría | Archivo(s) Afectado(s) | Resumen del Hallazgo |
-| :--- | :--- | :--- | :--- | :--- |
-| **SEC-01** | 🔴 **CRÍTICA** | Seguridad / PCI-DSS | `apps/web/src/app/(staff)/pos/page.tsx` | Captura insegura de PAN/CVC en texto plano en React state; violación de PCI-DSS. |
-| **SEC-02** | 🔴 **CRÍTICA** | Seguridad / Finanzas | `apps/web/src/app/api/pos/checkout/route.ts` | Cobro simulado ("Zero-Fund Booking"): se aprueban pagos y emiten reservas sin llamar a Stripe. |
-| **ARCH-01** | 🔴 **CRÍTICA** | Arquitectura | `apps/web/src/app/api/pos/checkout/route.ts` | Bypass de la arquitectura empresarial TSK-BE-18 (`/api/payments/intent` + Webhooks). |
-| **SEC-03** | 🟠 **ALTA** | Seguridad / Negocio | `apps/web/src/app/api/pos/checkout/route.ts` | Descuento de socio (30%) no validado en servidor; vulnerable a manipulación de cliente (RN-08). |
-| **SEC-04** | 🟠 **ALTA** | Seguridad / Auth | `apps/web/src/lib/api-auth.ts` | Eliminación del guard `NODE_ENV === "test"` para sesión y BD en `globalThis`. |
-| **ARCH-02** | 🟠 **ALTA** | Arquitectura / Fiabilidad | `apps/web/src/app/(staff)/pos/page.tsx` | Generación silenciosa de reservas falsas y QR con firma inválida ante fallo de API. |
-| **ARCH-03** | 🟠 **ALTA** | Arquitectura / Integración | `apps/web/src/app/(staff)/pos/page.tsx` | Enlace alternativo (Riesgo 2 SRS §11.1) roto e incompatible con `/checkout`. |
-| **PERF-01** | 🟠 **ALTA** | Base de Datos / Concurrencia | `apps/web/src/app/api/pos/checkout/route.ts` | Ausencia de `$transaction` y condición de carrera: sobreventa (overbooking) descontrolada. |
-| **PERF-02** | 🟠 **ALTA** | Lógica de Negocio | `apps/web/src/app/api/pos/checkout/route.ts` | Incompatibilidad de franjas horarias: se asigna siempre la primera franja del día sin importar `slotTime`. |
-| **TEST-01** | 🟡 **MEDIA** | Testing / Cobertura | `apps/web/src/app/(staff)/pos/__tests__/pos-ui.test.ts` | 0% de pruebas sobre el componente React `PosPage` (falsa sensación de cobertura). |
-| **CODE-01** | 🟡 **MEDIA** | Mantenibilidad | `apps/web/src/app/(staff)/pos/page.tsx` | Componente monolítico de 908 líneas; violación de responsabilidad única (SRP). |
-| **CODE-02** | 🟢 **BAJA** | Accesibilidad / Estándares | `apps/web/src/app/(staff)/pos/page.tsx` | Inputs de formulario sin etiquetas vinculadas por `id`/`htmlFor` (violación WCAG 1.3.1 y 4.1.2). |
-| **DOC-01** | 🟢 **BAJA** | Documentación | Monorepo / Raíz | Inconsistencia entre la documentación declarada ("100% cashless Stripe") y la ejecución real. |
+Si bien el commit `8ba2ba8` corrigió aspectos importantes del backend (transaccionalidad con `$transaction`, validación de aforo, chequeo autoritativo de membresías y eliminación de `pago` simulado en base de datos), **el flujo de punto de venta presencial (POS) en el cliente React (`pos/page.tsx`) quedó desconectado del ciclo de vida financiero de Stripe y contiene una regresión crítica**:
+1. **Cobro Presencial Fantasma (Ghost Sale / Uncollected Payment):** Al pulsar *"Cobrar con Tarjeta Stripe"*, la UI llama a `POST /api/pos/checkout`, que crea una reserva en estado `PENDIENTE_PAGO` y un `PaymentIntent` en Stripe con estado `requires_payment_method`. Sin embargo, la interfaz de usuario **nunca presenta Stripe Elements, ni terminal, ni invoca `stripe.confirmCardPayment()`**. Ignora el `clientSecret` recibido, asume la venta como exitosa, marca localmente la reserva como `Confirmada` / `Aprobada` y felicita al cajero. **El cliente nunca paga, Stripe nunca cobra y la reserva en la base de datos expirará en 30 minutos.**
+2. **Emisión de Código QR Apócrifo e Inválido (Regresión Crítica de ARCH-02):** Como la reserva permanece en `PENDIENTE_PAGO` en la base de datos, el endpoint oficial `GET /api/pdf/receipt` retorna `qr: null` (comportamiento contractual de TSK-BE-19). Ante esto, `pos/page.tsx` (línea 228) ejecuta un fallback en cliente:
+   ```typescript
+   const fallbackQrPayload = `SC1:${backendBooking.code}:AKROS_POS_VERIFIED`;
+   ```
+   Este payload **no contiene un UUID de ticket ni una firma criptográfica HMAC-SHA256 de 64 caracteres**. Cuando el cliente intente acceder a las instalaciones, el lector de torniquetes (`/api/access/redeem` / `parseTicketQrPayload`) rechazará el boleto con error 400.
+3. **Contingencia Móvil Inoperativa y Vulnerable a PCI-DSS (ARCH-03 Incompleto):** El enlace alternativo (`stripe_link`) envía al usuario a `/checkout`, el cual es un componente mock en memoria que simula pagos con `setTimeout`, solicita números de tarjeta (PAN) y CVC en texto plano dentro del estado de React (no cumple PCI-DSS SAQ A) y nunca confirma la reserva real en la base de datos.
 
 ---
 
-## Análisis Exhaustivo por Áreas
+## Matriz de Verificación de Hallazgos Previos
+
+| Código | Severidad | Categoría | Archivo(s) | Estado Previo | **Estado Real Auditado** | Veredicto y Evidencia Empírica |
+| :--- | :--- | :--- | :--- | :---: | :---: | :--- |
+| **SEC-01** | 🔴 CRÍTICA | Seguridad / PCI-DSS | `pos/page.tsx`, `pos-payment-stripe.tsx` | RESUELTO | **PARCIAL** | En el POS UI se eliminaron los inputs de PAN/CVC. Sin embargo, no se implementó la interfaz tokenizada real (Stripe Elements / Terminal SDK), y el flujo alternativo `/checkout` continúa capturando PAN/CVC en texto plano. |
+| **SEC-02** | 🔴 CRÍTICA | Seguridad / Finanzas | `api/pos/checkout/route.ts`, `pos/page.tsx` | RESUELTO | **PARCIAL** | El backend ya no inserta pagos aprobados falsos. Pero la UI simula una confirmación local ("Zero-Fund Booking" en cliente), emitiendo comprobantes de venta "aprobada" sin haber cobrado fondos. |
+| **ARCH-01** | 🔴 CRÍTICA | Arquitectura / Pagos | `api/pos/checkout/route.ts`, `pos/page.tsx` | RESUELTO | **PARCIAL** | El backend genera `PaymentIntent` oficial de Stripe, pero el frontend no está cableado para confirmarlo ni para esperar la resolución del webhook de Stripe antes de emitir el voucher. |
+| **SEC-03** | 🟠 ALTA | Seguridad / Negocio | `api/pos/checkout/route.ts` | RESUELTO | **RESUELTO** | Verificado empíricamente: consulta autoritativa a `db.membresia.findFirst({ where: { usuarioId, estado: "VIGENTE" } })`. Ignora el flag manipulado del cliente (`esSocio`). |
+| **SEC-04** | 🟠 ALTA | Seguridad / Auth | `apps/web/src/lib/api-auth.ts` | RESUELTO | **RESUELTO** | Verificado: guard estricto `process.env.NODE_ENV === "test"` restablecido para `__scAuthSession` y `__scPrisma`. |
+| **ARCH-02** | 🟠 ALTA | Fiabilidad / Integridad | `pos/page.tsx` | RESUELTO | **PENDIENTE (REGRESIÓN)** | Si la API de comprobantes no devuelve QR (porque la reserva está pendiente de pago), el cliente genera un QR sintético sin firma HMAC (`SC1:${backendBooking.code}:AKROS_POS_VERIFIED`), el cual es inválido para torniquetes. |
+| **ARCH-03** | 🟠 ALTA | Arquitectura / Integración | `checkout/page.tsx`, `pos/page.tsx` | RESUELTO | **PENDIENTE (INCOMPLETO)** | `/checkout` lee parámetros de URL envuelto en `<Suspense>`, pero es un mock desconectado del backend. Al pagar en `/checkout`, no se confirma la reserva de taquilla y el hold expira en 30 minutos. |
+| **PERF-01** | 🟠 ALTA | BD / Concurrencia | `api/pos/checkout/route.ts` | RESUELTO | **RESUELTO** | Mutación atómica en `db.$transaction`, verificación estricta de cupos (`cuposOcupados + cantidad <= cuposTotales`) y rechazo de mantenimiento (409 `SLOT_BLOCKED`). |
+| **PERF-02** | 🟠 ALTA | Lógica de Negocio | `api/pos/checkout/route.ts` | RESUELTO | **RESUELTO** | Resolución correcta de franja horaria mediante `disponibilidadId` o matching por hora de `slotTime`. |
+| **TEST-01** | 🟡 MEDIA | Cobertura de Tests | `pos-ui.test.ts`, `pos.test.ts` | RESUELTO | **PARCIAL** | 7 tests de API sólidos. Los 6 tests de UI solo validan renderizado estático de cadenas (`renderToString`); no prueban el ciclo de vida de pago en el cliente ni la validez del QR emitido contra el lector de acceso. |
+| **CODE-01** | 🟡 MEDIA | Mantenibilidad | `pos/page.tsx`, `pos/components/*` | RESUELTO | **RESUELTO** | Código modularizado en 5 submódulos (`pos-catalog-selector`, `pos-client-form`, `pos-payment-stripe`, `pos-voucher-modal`, `pos-alt-link-modal`). |
+| **CODE-02** | 🟢 BAJA | Accesibilidad / WCAG | `pos/components/*` | RESUELTO | **RESUELTO** | Inputs con `htmlFor`/`id`, selectores con `role="group"`, `aria-labelledby`, botones con `aria-pressed`. |
+| **DOC-01** | 🟢 BAJA | Documentación | `docs/TSK-FE-18-interfaz-pos-cashless.md` | RESUELTO | **RESUELTO** | Documentación técnica completa creada, aunque describe un flujo de confirmación de Stripe que el frontend actual no implementa. |
+
+---
+
+## Hallazgos Críticos y Bloqueantes Nuevos / No Resueltos
+
+### 🔴 BLOQUEANTE 1: Venta Fantasma en UI — Pago no cobrado y reserva expirada (SEC-02 / ARCH-01)
+
+- **Ubicación:** `apps/web/src/app/(staff)/pos/page.tsx` (Líneas 165–264) y `pos-payment-stripe.tsx` (Líneas 99–116).
+- **Descripción:** 
+  Al pulsar el botón *"Cobrar con Tarjeta Stripe"*, la función `handleProcessStripePayment` envía la petición a `POST /api/pos/checkout`. La API responde con:
+  ```json
+  {
+    "success": true,
+    "booking": { "id": "...", "status": "PENDIENTE_PAGO" },
+    "paymentIntent": { "id": "pi_...", "clientSecret": "pi_..._secret_..." }
+  }
+  ```
+  La función en el cliente **ignora por completo el `clientSecret` y el `paymentIntent`**. No interactúa con Stripe SDK, ni abre Stripe Elements, ni solicita datos de cobro a un datáfono. En su lugar, ejecuta inmediatamente:
+  ```typescript
+  const newBooking: Booking = {
+    ...
+    status: 'Confirmada',
+    paymentMethod: 'card',
+    paymentStatus: 'Aprobada',
+  };
+  setBookings([newBooking, ...bookings]);
+  setConfirmedBooking(newBooking);
+  notify('¡Venta completada! Reserva confirmada y pase emitido.', 'success');
+  ```
+- **Impacto:**
+  1. **Impacto Financiero:** No se debita dinero de ninguna tarjeta. El negocio pierde el 100% de los ingresos de las ventas en taquilla.
+  2. **Inconsistencia de Datos:** La UI reporta la reserva como "Confirmada", pero en la base de datos PostgreSQL permanece como `PENDIENTE_PAGO`.
+  3. **Cancelación Automática:** A los 30 minutos, el job cron de limpieza (`TSK-BD-08`) marca la reserva como `EXPIRADA` y libera los cupos, anulando la reserva del cliente.
+
+---
+
+### 🔴 BLOQUEANTE 2: Emisión de Códigos QR Falsos e Inválidos para Torniquetes (Regresión ARCH-02)
+
+- **Ubicación:** `apps/web/src/app/(staff)/pos/page.tsx` (Líneas 228–233).
+- **Código Vulnerable:**
+  ```typescript
+  if (!qrDataUrl) {
+    const fallbackQrPayload = `SC1:${backendBooking.code}:AKROS_POS_VERIFIED`;
+    qrDataUrl = await QRCode.toDataURL(fallbackQrPayload, { width: 260, margin: 2 });
+  }
+  ```
+- **Descripción:**
+  Dado que la reserva sigue en `PENDIENTE_PAGO`, la consulta a `GET /api/pdf/receipt` devuelve `qr: null` y `ticket: null` (según las reglas de negocio de TSK-BE-19, los boletos solo se emiten una vez aprobado el pago). Ante la ausencia de QR, el cliente genera un QR sintético inventado.
+- **Impacto de Seguridad y Operativo:**
+  El estándar de control de acceso óptico (`packages/core/src/security/qr.ts`) define:
+  ```typescript
+  export function parseTicketQrPayload(text: string): { ticketId: string; signature: string } | null {
+    // Exige: prefijo "SC1", ticketId UUID v4 válido, firma HMAC-SHA256 de 64 hex
+  }
+  ```
+  El string `SC1:AKR-POS-XXXX:AKROS_POS_VERIFIED` falla ambas validaciones (`AKR-POS-XXXX` no es un UUID y `AKROS_POS_VERIFIED` no es una firma hexadecimal de 64 caracteres). `parseTicketQrPayload` retorna `null`.
+  **Resultado:** El comprobante impreso en la taquilla muestra un código QR inútil. Cuando el usuario lo presente en el torniquete de acceso, el lector responderá `400 Bad Request` y no abrirá la puerta.
+
+---
+
+### 🟠 BLOQUEANTE 3: Contingencia Móvil `/checkout` es un Mock Inseguro (ARCH-03 / SEC-01)
+
+- **Ubicación:** `apps/web/src/app/(customer)/checkout/page.tsx` (Líneas 80–84 y 199–224).
+- **Descripción:**
+  La solución propuesta para el Riesgo 2 de SRS §11.1 (contingencia para tarjetas 3DS) genera un enlace hacia `/checkout?session_id=pos_alt_...&reservaId=...`. Sin embargo:
+  1. `checkout/page.tsx` maneja un formulario que captura número de tarjeta, fecha de vencimiento y código CVC en texto plano dentro del estado de React (`cardNumber`, `cardCvc`), violando los estándares PCI-DSS SAQ A.
+  2. Al pulsar pagar, ejecuta un `setTimeout` simulado:
+     ```typescript
+     setTimeout(() => {
+       const booking = { id: `b${Date.now()}`, ... };
+       setBookings([booking, ...bookings]);
+       router.push('/confirmation');
+     }, 2100);
+     ```
+     No realiza ninguna petición HTTP hacia el backend ni hacia Stripe. La reserva creada en taquilla (`reservaId`) queda abandonada y expira tras 30 minutos.
+
+---
+
+## Análisis Exhaustivo por las 6 Áreas
 
 ### 1. Arquitectura y Patrones de Diseño
+- **Backend POS (`api/pos/checkout/route.ts`):** Excelente diseño en la capa transaccional. La orquestación con `$transaction`, validación de aforo, creación de usuario walk-in y generación de `PaymentIntent` con idempotencia cumple rigurosamente con los patrones empresariales de TSK-BE-18.
+- **Frontend POS (`pos/page.tsx`):** Desconexión arquitectónica. No respeta el diagrama de secuencia documentado en `docs/TSK-FE-18-interfaz-pos-cashless.md`. Se salta el paso de confirmación de Stripe y asume que crear un `PaymentIntent` equivale a completar el pago.
+- **Integración Webhook:** El webhook en `/api/payments` está preparado para recibir `payment_intent.succeeded` con metadatos POS y emitir el `TicketQr` firmado. La falla radica en que el cliente nunca gatilla dicho evento en Stripe.
 
-#### 1.1 Duplicación y Bypass de la Arquitectura Existente (TSK-BE-18) — [ARCH-01]
-En el sprint anterior, la arquitectura para cobros POS fue definida y probada en `TSK-BE-18` a través de los siguientes componentes:
-1. `POST /api/bookings`: Genera un hold de reserva con canal `TAQUILLA`, vendedor asociado `vendedorId`, estado `PENDIENTE_PAGO` y expiración autoritativa en 30 minutos (`RESERVA.expira_en`).
-2. `POST /api/payments/intent` (`apps/web/src/app/api/payments/intent/route.ts`): Emite un `PaymentIntent` oficial en Stripe utilizando `createPosPaymentIntent()` de `@sportcomplex/core`, asociando metadatos criptográficos (`bookingId`, `userId`, `vendedorId`, `servicio_id`, `cashless: true`).
-3. **Stripe Webhook** (`apps/web/src/app/api/payments/route.ts` y `/api/webhooks/stripe/route.ts`): Al recibir `payment_intent.succeeded`, transiciona la reserva a `CONFIRMADA`, crea el registro `PAGO` con el `monto` y `stripePaymentIntentId` real, y emite el `TicketQr` firmado con HMAC-SHA256.
-
-**Lo que hizo este PR:**
-En lugar de conectar la interfaz de usuario `PosPage` con este pipeline ya existente y probado, el PR introdujo un nuevo endpoint completamente aislado: `POST /api/pos/checkout/route.ts`. Este nuevo endpoint implementa un script monolítico procedural que:
-- No reserva cupo previo mediante hold.
-- No utiliza `createPosPaymentIntent()`.
-- No invoca al SDK de Stripe.
-- No utiliza el Webhook de confirmación.
-- Asume transaccionalidad manual inventando IDs de pago.
-
-Esto genera dos fuentes de verdad contradictorias en el backend para la misma funcionalidad de negocio.
-
-#### 1.2 Anti-patrón de "Fallback Silencioso con Datos Falsos" — [ARCH-02]
-En `apps/web/src/app/(staff)/pos/page.tsx` (líneas 212-254):
-```typescript
-let apiResponse: PosApiResponse | null = null;
-try {
-  const res = await fetch('/api/pos/checkout', { ... });
-  if (res.ok) {
-    const json = await res.json();
-    if (json.success) apiResponse = json.data as PosApiResponse;
-  }
-} catch {
-  // Fallback local robusto
-}
-
-// Emite como CONFIRMADA aunque res.ok haya sido false o haya ocurrido error de red:
-const randomCode = `AKR-POS-...`;
-const newBooking: Booking = {
-  id: apiResponse?.booking?.id || `book-pos-${Date.now()}`,
-  code: apiResponse?.booking?.code || randomCode,
-  ...
-  status: 'Confirmada',
-};
-const qrData: string = apiResponse?.ticket?.qrPayload || `SC1:${newBooking.code}:pos_voucher_signature`;
-```
-**Impacto Arquitectónico:**
-Si el backend responde `403 Forbidden`, `400 Bad Request`, `500 Internal Server Error`, o si la red se cae:
-- El componente **ignora el error**.
-- Genera en memoria un objeto `Booking` con ID inventado `book-pos-...`.
-- Genera un código QR con una firma apócrifa (`pos_voucher_signature`).
-- Muestra el modal verde de "¡Venta Exitosa en Mostrador!".
-- Imprime el comprobante al cliente.
-
-Cuando el cliente se acerque al torniquete óptico o al personal con lector móvil (`apps/web/src/app/api/access/route.ts`), el sistema validará la firma con `verifyTicketSignature()` y buscará el ticket en la base de datos: el ticket **será rechazado inmediatamente como fraudulento o inexistente**. Esto es inaceptable en una aplicación de misión crítica.
-
-#### 1.3 Incompatibilidad del Enlace Alternativo (Riesgo 2 SRS §11.1) — [ARCH-03]
-El requerimiento de contingencia para tarjetas con 3DS o fallas de datáfono físico/virtual estipula que el vendedor puede generar un enlace para que el cliente pague en su propio celular.
-El PR construye el siguiente enlace (`pos/page.tsx`, línea 274):
-```typescript
-const link = `${origin}/checkout?session_id=${tempBookingId}&service=${encodeURIComponent(currentService.name)}&amount=${totalFinal}`;
-```
-Sin embargo, al auditar `apps/web/src/app/(customer)/checkout/page.tsx` (líneas 66-80):
-```typescript
-const [draft, setDraft] = useDraft();
-if (!draft || !item || !category) {
-  return (
-    <main className="section-shell payment-page">
-      <div className="dashboard-empty">
-        <b>No tienes una reserva en curso</b>
-        <p>Elige un espacio y un horario para continuar.</p>
-      </div>
-    </main>
-  );
-}
-```
-La pantalla `/checkout` **no lee ni procesa los parámetros de URL `session_id`, `service` ni `amount`**, sino que depende exclusivamente del estado `useDraft()` persistido en el `localStorage` del navegador. Cuando el cliente escanea el código QR desde su teléfono móvil personal, su navegador móvil no tiene ningún `draft` en almacenamiento local, resultando invariablemente en una pantalla en blanco con el mensaje *"No tienes una reserva en curso"*.
-
----
-
-### 2. Calidad del Código y Mejores Prácticas
-
-#### 2.1 Monolito UI y Falta de Modularización — [CODE-01]
-`apps/web/src/app/(staff)/pos/page.tsx` cuenta con **908 líneas de código** en un único archivo `'use client'`.
-Este componente asume demasiadas responsabilidades que violan el principio de responsabilidad única (SRP):
-1. Gestión de estado de filtros y catálogo (categorías y servicios).
-2. Lógica de selección de fecha y turnos.
-3. Formulario y validación de cliente / walk-in rápido.
-4. Formateo y captura de datos de tarjeta de crédito (máscaras y restricciones).
-5. Desglose contable financiero (cálculo de subtotal e IVA).
-6. Comunicación HTTP con API y fallbacks locales.
-7. Generación gráfica de códigos QR con `QRCode.toDataURL`.
-8. Renderizado del comprobante térmico imprimible.
-9. Modales de enlace alternativo y confirmación.
-
-**Recomendación de Refactorización:**
-Desacoplar en submódulos especializados dentro de `apps/web/src/app/(staff)/pos/components/`:
-- `pos-catalog-selector.tsx`
-- `pos-client-form.tsx`
-- `pos-payment-stripe.tsx`
-- `pos-voucher-modal.tsx`
-- `pos-alt-link-modal.tsx`
-- Hook de estado: `use-pos-checkout.ts`
-
-#### 2.2 Variables Hardcodeadas y Datos Descartados
-- **Horarios estáticos:** `defaultTimeSlots` (líneas 36-50 de `pos/page.tsx`) define horarios quemados (`'06:00 a. m. - 07:00 a. m.'` hasta `'08:00 p. m. - 09:00 p. m.'`), ignorando las franjas horarias reales configuradas en la base de datos (`franjaHoraria`) por servicio.
-- **Datos de tarjeta ficticios:** En `pos/page.tsx`, el usuario ingresa número de tarjeta, fecha de expiración, titular, CVC y número de cuotas. Luego de validar su formato, los campos `cardExp`, `cardCvc`, `cardHolder` e `installments` son **descartados**; únicamente se envía `cardLast4` a la API.
-- **Contraseña insegura por defecto:** En `route.ts` (línea 78), al registrar un cliente presencial nuevo se asigna:
-  `passwordHash: "$2b$10$pos_dummy_hash_for_cashless_walk_in"`. No se provee mecanismo de activación o invitación para que el usuario reclame su cuenta posteriormente.
-
----
+### 2. Calidad de Código y Mantenibilidad
+- **Modularización (CODE-01):** Notable mejora respecto al commit original (`fac203c`). Los submódulos bajo `pos/components/` son legibles, desacoplados y respetan el paso de propiedades tipadas.
+- **Accesibilidad WCAG (CODE-02):** Se cumple WCAG 1.3.1 y 4.1.2 mediante atributos semánticos `htmlFor`/`id`, `role="group"`, `aria-labelledby` y `aria-pressed`.
+- **Anti-patrón de degradación:** El bloque `try/catch` alrededor de `/api/pdf/receipt` que degenera en un QR inventado oculta fallos de negocio y rompe el principio de fallo explícito.
 
 ### 3. Seguridad y Validación de Entrada
-
-#### 3.1 Violación Crítica de PCI-DSS en Formulario de Tarjeta — [SEC-01]
-En `apps/web/src/app/(staff)/pos/page.tsx` (líneas 78-83 y 656-684):
-```typescript
-const [cardNumber, setCardNumber] = useState<string>('')
-const [cardHolder, setCardHolder] = useState<string>('')
-const [cardExp, setCardExp] = useState<string>('')
-const [cardCvc, setCardCvc] = useState<string>('')
-...
-<Input placeholder="4000 1234 5678 9010" value={cardNumber} ... />
-<Input placeholder="CVC" type="password" value={cardCvc} ... />
-```
-**Análisis de Vulnerabilidad:**
-La captura de datos de tarjeta de crédito (PAN) y código de validación (CVV/CVC) directamente en campos `<input>` no encapsulados en un iframe seguro certificado (como **Stripe Elements** o el SDK de **Stripe Terminal**) coloca a la aplicación web entera bajo el alcance de auditoría **PCI-DSS SAQ D** (el nivel más exigente y de mayor riesgo legal).
-Si un script malicioso (XSS, dependencia npm vulnerada o extensión de navegador del empleado) se ejecuta en la máquina de taquilla, puede capturar en texto plano los números de tarjeta y CVV de los clientes de mostrador.
-Además, dado que el sistema no llama a Stripe, estos datos son recolectados inútilmente en memoria.
-
-#### 3.2 Cobro Simulado / Creación de Reservas Gratuitas ("Zero-Fund Booking") — [SEC-02]
-En `apps/web/src/app/api/pos/checkout/route.ts` (líneas 145-160):
-```typescript
-// 6. Si es cobro directo con tarjeta Stripe en POS
-const stripePaymentIntentId = `pi_pos_${Date.now()}_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
-const pago = await db.pago.create({
-  data: {
-    usuarioId: cliente.id,
-    tipo: "RESERVA",
-    stripePaymentIntentId,
-    monto: totalFinal,
-    estado: "APROBADO",
-  },
-});
-
-await db.reserva.update({
-  where: { id: reserva.id },
-  data: { pagoId: pago.id },
-});
-
-// 7. Emitir Ticket QR firmado
-const ticketId = newTicketId();
-const qrSecret = process.env.QR_HMAC_SECRET || "akros-qr-hmac-secret-dev";
-const signature = signTicket(ticketId, qrSecret);
-```
-**Impacto:**
-El backend **falsifica** el cobro de Stripe generando una cadena arbitraria `pi_pos_...` e inserta inmediatamente en la tabla `pago` un registro con `estado: "APROBADO"`.
-Cualquier usuario con rol `Empleado_Vendedor` o `Administrador` (o cualquier persona que envíe un HTTP POST a `/api/pos/checkout`) puede reservar cualquier cancha, piscina o servicio del complejo deportivo **sin pagar un solo centavo**, obteniendo boletos QR con firma criptográfica legítima que permitirán el paso en torniquetes. Esto representa un agujero financiero y de auditoría crítico.
-
-#### 3.3 Fraude en Descuento de Membresía (RN-08) — [SEC-03]
-El esquema de validación en `packages/validation/src/booking.schema.ts` contiene:
-```typescript
-esSocio: z.boolean().default(false),
-```
-Y en `apps/web/src/app/api/pos/checkout/route.ts` (líneas 58-60):
-```typescript
-const totalCents = applyMembershipDiscount(subtotalBruto * 100, input.esSocio);
-const totalFinal = Math.round(totalCents / 100);
-const descuentoPct = input.esSocio ? 30 : 0;
-```
-El servidor confía ciegamente en el booleano `input.esSocio` enviado en el cuerpo de la petición. No existe ninguna consulta en la base de datos a la tabla `membresia` para constatar si `cliente.id` o `input.clienteDocumento` posee un registro con `estado: "VIGENTE"`. Cualquier cliente u operador puede forzar el descuento del 30% simplemente marcando el checkbox en UI o enviando `{"esSocio": true}` en el JSON.
-
-#### 3.4 Eliminación del Guard de Entorno de Pruebas en `api-auth.ts` — [SEC-04]
-En `apps/web/src/lib/api-auth.ts`:
-```diff
-- const injectedSession =
--   process.env.NODE_ENV === "test"
--     ? (globalThis as typeof globalThis & {
--         __scAuthSession?: SessionLike | null;
--       }).__scAuthSession
--     : undefined;
-+ const injectedSession = (globalThis as typeof globalThis & {
-+   __scAuthSession?: SessionLike | null;
-+ }).__scAuthSession;
-```
-Y para la base de datos:
-```typescript
-const db: AuthorizationDatabase =
-  dependencies.db ??
-  (globalThis as unknown as { __scPrisma?: AuthorizationDatabase }).__scPrisma ??
-  prisma;
-```
-Al remover la restricción `process.env.NODE_ENV === "test"`, estas variables globales quedan activas en entornos de staging o producción. Si una librería externa de terceros o código ejecutado en el servidor Next.js manipula `globalThis.__scAuthSession` o `globalThis.__scPrisma`, la autorización perimetral quedará completamente vulnerada.
-
----
+- **PCI-DSS:** En `PosPaymentStripe` no hay captura de PAN/CVC, lo cual es positivo. Sin embargo, no hay formulario seguro de Stripe Elements montado para procesar la tarjeta real. En `checkout/page.tsx`, existe captura insegura de CVC/PAN en texto plano.
+- **Bypass de Autorización:** El guard de `authorizeApiRequest` en `api/pos/checkout/route.ts` restringe exitosamente el endpoint a roles `Empleado_Vendedor` y `Administrador`.
+- **Aislamiento de Perímetro (SEC-04):** `api-auth.ts` y `route.ts` ahora protegen el acceso a `globalThis.__scAuthSession` y `globalThis.__scPrisma` bajo `process.env.NODE_ENV === "test"`. En producción no existe vector de inyección de sesiones simuladas mediante cabeceras no sanitizadas.
+- **Validación Autoritativa de Membresías (SEC-03):** La regla RN-08 se aplica de forma segura consultando la base de datos. Manipular `esSocio: true` en el payload JSON no otorga descuento indebido.
 
 ### 4. Tests y Cobertura
+- **Resultados de Ejecución:**
+  - `pnpm test`: **324 pruebas totales exitosas** en todo el monorepo (134 en `web`, 26 en `validation`, 93 en `db`, 71 en `core`).
+  - `pnpm typecheck`: **0 errores de TypeScript** en los 6 paquetes.
+- **Gaps Críticos en Pruebas:**
+  - `pos-ui.test.ts` utiliza `renderToString` para probar fragmentos HTML estáticos. No contiene pruebas de interacción (`fireEvent` / render interactivo) que simulen el flujo de `handleProcessStripePayment`.
+  - No existe prueba de integración que verifique que el QR emitido tras el cobro sea verificable por `parseTicketQrPayload()` y `verifyTicketSignature()`.
 
-#### 4.1 Análisis del Resultado de la Suite Automatizada
-Al ejecutar `pnpm test`, la consola reporta:
-```
-Tasks: 9 successful, 9 total
-Tests: 127 pass, 0 fail
-```
-Y `pnpm typecheck` (`tsc --noEmit`):
-```
-Tasks: 6 successful, 6 total
-```
-
-#### 4.2 Ilusión de Cobertura en `pos-ui.test.ts` — [TEST-01]
-A pesar de ubicarse en `apps/web/src/app/(staff)/pos/__tests__/pos-ui.test.ts`, este archivo **no realiza pruebas de interfaz de usuario**:
-- No utiliza React Testing Library, `jsdom`, ni ningún entorno de simulación del DOM.
-- Solo prueba funciones de cálculo (`applyMembershipDiscount`, `calcularDesgloseComprobante`), generación de Data URL de QR (`QRCode.toDataURL`) y validación de esquemas Zod (`posCheckoutSchema`).
-- **Líneas cubiertas del componente `PosPage` (908 líneas): 0%**.
-- No se prueba el comportamiento de los botones de cobro, el formateo de tarjetas, la visualización de modales, el manejo de errores de API, ni la impresión del comprobante.
-
-#### 4.3 Pruebas de API Acopladas a Mocks Sesgados
-En `apps/web/src/app/api/pos/__tests__/pos.test.ts`:
-- Se mockea toda la base de datos mediante mutación forzada de `globalThis.__scPrisma`.
-- La prueba `"POS API: venta presencial exitosa 100% cashless con Stripe"` valida que el ID comience por `pi_pos_`, validando el comportamiento simulado en lugar de detectar la ausencia de integración con Stripe.
-- No existen casos de prueba para:
-  - Capacidad máxima excedida (aforo lleno).
-  - Conflictos de concurrencia.
-  - Franja horaria bloqueada por mantenimiento.
-  - Fallo en pasarela de pagos.
-  - Reversión transaccional en fallo de emisión de ticket QR.
-
----
-
-### 5. Performance y Escalabilidad
-
-#### 5.1 Falta de Transacciones y Condición de Carrera de Sobreventa (Overbooking) — [PERF-01]
-En `apps/web/src/app/api/pos/checkout/route.ts`, el proceso de venta ejecuta **10 operaciones secuenciales no atómicas**:
-1. `db.servicio.findUnique`
-2. `db.usuario.findFirst`
-3. `db.usuario.create` (condicional)
-4. `db.disponibilidad.findFirst`
-5. `db.franjaHoraria.findFirst` / `create` (condicional)
-6. `db.disponibilidad.create` o `db.disponibilidad.update`
-7. `db.reserva.create`
-8. `db.pago.create`
-9. `db.reserva.update`
-10. `db.ticketQr.create`
-
-**Problemas detectados:**
-1. **Ausencia de `$transaction`:** Si falla el paso 8 o 10 (por ejemplo, timeout en la base de datos o colisión de UUID en `ticketQr`), la disponibilidad ya quedó incrementada y la reserva creada en estado huérfano, sin pago ni boletos asociados.
-2. **Sobreventa descontrolada:** En el paso 6:
-   ```typescript
-   await db.disponibilidad.update({
-     where: { id: disponibilidad.id },
-     data: { cuposOcupados: { increment: input.cantidadCupos } },
-   });
-   ```
-   **No se verifica si `cuposOcupados + input.cantidadCupos <= cuposTotales`**. Incluso si una cancha tiene capacidad para 4 personas y ya tiene 4 ocupantes, el código incrementa a 5, 6 o más sin límite alguno.
-3. **Pérdida de comprobación de mantenimiento:** No se valida `disponibilidad.bloqueadaMantenimiento === true`. Se pueden vender turnos en canchas clausuradas por reparaciones.
-
-#### 5.2 Error Crítico en Resolución de Franjas Horarias — [PERF-02]
-En las líneas 86-90 de `route.ts`:
-```typescript
-let disponibilidad = await db.disponibilidad.findFirst({
-  where: {
-    servicioId: input.serviceId,
-    fecha: new Date(`${input.date}T00:00:00.000Z`),
-  },
-  include: { franja: true },
-});
-```
-En el modelo Prisma (`schema.prisma`), la unicidad es:
-`@@unique([servicioId, franjaId, fecha])`.
-Un servicio tiene múltiples franjas a lo largo de un día (ej. 8:00 a. m. - 9:00 a. m., 9:00 a. m. - 10:00 a. m., 6:00 p. m. - 7:00 p. m.).
-Al hacer `findFirst` filtrando **únicamente por `servicioId` y `fecha`** sin filtrar por `franjaId` o por el horario `input.slotTime`:
-- La consulta siempre recuperará la **primera franja horaria** del día.
-- Todas las ventas del día para ese servicio (sea a las 8 a. m. o a las 8 p. m.) se registrarán sobre la misma franja de la mañana, incrementando sus cupos erróneamente mientras las demás franjas quedan vacías en el sistema.
-- El parámetro `input.disponibilidadId` presente en el schema Zod es completamente ignorado.
-
----
+### 5. Performance y Concurrencia
+- **Control de Aforo y Sobreventa (PERF-01):** Resuelto satisfactoriamente. La verificación `cuposOcupados + cantidad <= cuposTotales` dentro de `tx` previene condiciones de carrera en ventas simultáneas.
+- **Mapeo de Franjas (PERF-02):** Resuelto. Soporta `disponibilidadId` explícito o correlación horaria contra `slotTime`.
 
 ### 6. Documentación
-
-#### 6.1 Discrepancias Técnicas — [DOC-01]
-- El título del PR y sus comentarios afirman: *"interfaz de punto de venta 100% cashless con Stripe"*, pero en el código no existe ninguna dependencia o llamada a las APIs de Stripe para el cobro en mostrador.
-- No se documentaron las restricciones operativas del terminal de taquilla en los manuales de despliegue ni en el `README.md`.
-- No hay especificación sobre la impresora térmica de 58mm/80mm recomendada para el comprobante emitido (`window.print()`).
+- `docs/TSK-FE-18-interfaz-pos-cashless.md` está bien estructurada y detalla la arquitectura de hardware de impresión térmica (58 mm y 80 mm). Sin embargo, describe un flujo de pasarela que actualmente no está implementado en la UI.
 
 ---
 
-## Plan de Acción Detallado para Aprobación
+## Plan de Remediación Obligatorio (Para Aprobación)
 
-Para que este Pull Request pueda ser reconsiderado y aprobado, el autor debe ejecutar las siguientes fases de remediación:
-
-### Fase 1: Arquitectura de Pagos y Seguridad (Bloqueador Inmediato)
-1. **Eliminar el endpoint ad-hoc `apps/web/src/app/api/pos/checkout/route.ts`**.
-2. **Reconectar `PosPage` al flujo estándar de TSK-BE-18:**
-   - Al seleccionar servicio, fecha y horario, solicitar disponibilidad real mediante `GET /api/bookings?serviceId=...&date=...`.
-   - Al presionar cobrar, llamar a `POST /api/bookings` para generar la reserva hold en estado `PENDIENTE_PAGO` con `canal: "TAQUILLA"` y `vendedorId: session.user.id`.
-   - Llamar a `POST /api/payments/intent` con el `reservaId` para que el backend cree el `PaymentIntent` oficial de Stripe y devuelva el `clientSecret`.
-3. **Integrar Stripe de forma segura en el cliente (Cumplimiento PCI-DSS):**
-   - Eliminar los campos planos de número de tarjeta, CVV y expiración de React state.
-   - Montar el componente seguro `@stripe/react-stripe-js` (`<Elements>` + `<PaymentElement>`) o integrar con lector Stripe Terminal SDK.
-   - Procesar la confirmación con `stripe.confirmPayment({ clientSecret, ... })`.
-   - Permitir que el Webhook existente de Stripe (`/api/payments/route.ts`) confirme la reserva y emita el `TicketQr` firmado.
-4. **Restaurar el guard de entorno en `apps/web/src/lib/api-auth.ts`:**
-   - Reincorporar la comprobación estricta de `process.env.NODE_ENV === "test"` antes de consultar `__scAuthSession` y `__scPrisma` en `globalThis`.
-
-### Fase 2: Lógica de Disponibilidad y Concurrencia
-1. **Validación real de Membresía (RN-08):**
-   - En el backend, comprobar `db.membresia.findFirst({ where: { usuarioId: cliente.id, estado: "VIGENTE" } })` antes de aplicar cualquier descuento de socio del 30%.
-2. **Corrección de Disponibilidad y Cupos:**
-   - La selección de horario en el POS debe usar el `disponibilidadId` o `franjaId` exacto.
-   - Envolver la creación/actualización en `prisma.$transaction()`.
-   - Realizar una verificación atómica de cupos: `WHERE cuposOcupados + cantidad <= cuposTotales` para impedir la sobreventa.
-
-### Fase 3: Contingencia de Pago Alternativo (Riesgo 2 SRS §11.1)
-1. **Ajustar `/checkout`:**
-   - Permitir que la ruta `/checkout` reciba `?reservaId=...` o `?session_id=...` y recupere del backend la reserva pendiente generada en taquilla, para que el cliente que escanee el QR desde su celular pueda pagar directamente la reserva existente sin requerir `useDraft()` en su navegador.
-
-### Fase 4: Calidad de Código y Pruebas
-1. **Desacoplar `pos/page.tsx`:**
-   - Dividir el archivo de 908 líneas en submódulos especializados en `pos/components/`.
-2. **Implementar pruebas reales de UI:**
-   - Crear pruebas con `@testing-library/react` para validar el flujo de UI de `PosPage`, cubriendo escenarios de carga, validación de formularios, selección de servicios y manejo de errores.
+1. **Integrar Stripe Elements o Confirmación de Terminal en `PosPaymentStripe`:**
+   - Montar `@stripe/react-stripe-js` (`PaymentElement` o captura segura tokenizada) o integrar la confirmación del `clientSecret` mediante `stripe.confirmCardPayment(clientSecret)`.
+   - No considerar la venta como finalizada ni marcar `status: 'Confirmada'` hasta que Stripe devuelva confirmación exitosa o el webhook procese el pago.
+2. **Eliminar el Fallback Apócrifo del Código QR:**
+   - Eliminar `fallbackQrPayload = SC1:...:AKROS_POS_VERIFIED`.
+   - Si la reserva no posee `ticketQr` emitido por el servidor, la taquilla debe mostrar un indicador de *"Esperando confirmación de pago y emisión de pase..."* o consultar el comprobante una vez que el estado de la reserva sea `CONFIRMADA`.
+3. **Conectar la Contingencia Móvil con Stripe Checkout Real:**
+   - Si `paymentMode === "stripe_link"`, generar una sesión real de Stripe Checkout (ej. `createStripeCheckoutSession()`) para que el cliente pague de forma segura en su móvil sin capturar tarjetas en texto plano en `/checkout`.
 
 ---
 
-**Conclusión:** El PR queda en estado **RECHAZADO**. Se solicita al desarrollador no realizar mezclas a `develop` hasta que se implementen las correcciones de la Fase 1 y Fase 2.
+**Conclusión:** Se rechaza temporalmente la integración del PR #51 hasta que se solventen los 3 bloqueantes críticos señalados.
+
+VERDICT: CHANGES_REQUESTED

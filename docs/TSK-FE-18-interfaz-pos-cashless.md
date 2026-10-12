@@ -59,8 +59,8 @@ El flujo de pago respeta la arquitectura empresarial definida en **TSK-BE-18** y
 
 Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en smartphone) o hay fallas en el datáfono virtual de mostrador:
 1. El vendedor presiona **"Enlace Alternativo / QR Móvil"**.
-2. El sistema genera una URL protegida apuntando a `/checkout?session_id=pos_alt_...&serviceId=...&date=...&time=...&attendees=...&amount=...`.
-3. El cliente escanea el código QR desde su celular, cargando de inmediato los detalles de su reserva hold en la pantalla de pago móvil del portal.
+2. El sistema genera dinámicamente una sesión oficial de Stripe Checkout (`createStripeCheckoutSession`) con URL cifrada de pago directo (`https://checkout.stripe.com/...`) o enlace compatible de contingencia.
+3. El cliente escanea el código QR desde su celular, completando el pago de forma segura sin manipulación de números de tarjeta en texto plano (cumplimiento estricto de PCI-DSS SAQ A).
 
 ---
 

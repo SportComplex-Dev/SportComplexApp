@@ -5,6 +5,7 @@ import { prisma } from "@sportcomplex/db";
 import {
   applyMembershipDiscount,
   createPosPaymentIntent,
+  createStripeCheckoutSession,
 } from "@sportcomplex/core";
 
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export interface PosCheckoutHandlerDependencies {
   authorize?: typeof authorizeApiRequest;
   createPaymentIntent?: typeof createPosPaymentIntent;
+  createCheckoutSession?: typeof createStripeCheckoutSession;
 }
 
 /**
@@ -31,6 +33,7 @@ export function createPosCheckoutPostHandler(
 ) {
   const authorize = dependencies.authorize ?? authorizeApiRequest;
   const createPaymentIntent = dependencies.createPaymentIntent ?? createPosPaymentIntent;
+  const createCheckoutSession = dependencies.createCheckoutSession ?? createStripeCheckoutSession;
 
   return async function POST(request: Request) {
     try {
@@ -266,7 +269,33 @@ export function createPosCheckoutPostHandler(
 
       // 4. Modo Enlace Alternativo (Riesgo 2 SRS §11.1 / ARCH-03)
       if (input.paymentMode === "stripe_link") {
-        const alternativePaymentUrl = `${appUrl}/checkout?session_id=pos_alt_${reserva.id}&reservaId=${reserva.id}&serviceId=${servicio.id}&date=${input.date}&time=${encodeURIComponent(input.slotTime)}&attendees=${input.cantidadCupos}&amount=${totalFinal}`;
+        let checkoutSession;
+        try {
+          checkoutSession = await createCheckoutSession({
+            reservaIds: [reserva.id],
+            userId: cliente.id,
+            total: totalFinal,
+            items: [
+              {
+                reservaId: reserva.id,
+                servicioNombre: servicio.nombre,
+                cantidadCupos: input.cantidadCupos,
+                subtotal: totalFinal,
+              },
+            ],
+            successUrl: `${appUrl}/portal/tickets?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${appUrl}/checkout?cancelled=${reserva.id}`,
+          });
+        } catch (err: unknown) {
+          if (err instanceof Error && err.message.includes("STRIPE_NOT_CONFIGURED")) {
+            // Entorno de test o sin claves Stripe configuradas; usar fallback
+          } else {
+            console.error("Error creando Checkout Session para enlace alternativo:", err);
+          }
+        }
+
+        const fallbackUrl = `${appUrl}/checkout?session_id=${checkoutSession?.sessionId || `pos_alt_${reserva.id}`}&reservaId=${reserva.id}&serviceId=${servicio.id}&date=${input.date}&time=${encodeURIComponent(input.slotTime)}&attendees=${input.cantidadCupos}&amount=${totalFinal}`;
+        const alternativePaymentUrl = checkoutSession?.url || fallbackUrl;
 
         return ok({
           success: true,
@@ -288,8 +317,10 @@ export function createPosCheckoutPostHandler(
             canal: "TAQUILLA",
             vendedorId: sellerId,
             paymentMode: input.paymentMode,
+            stripeCheckoutSessionId: checkoutSession?.sessionId,
             alternativePaymentUrl,
           },
+          stripeCheckoutSessionId: checkoutSession?.sessionId,
           alternativePaymentUrl,
         });
       }
