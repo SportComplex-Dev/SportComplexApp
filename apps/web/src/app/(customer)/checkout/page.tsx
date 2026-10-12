@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
-  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
+  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Store,
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
@@ -30,25 +30,51 @@ const pseBanks = [
   'Lulo Bank',
 ]
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { session, notify } = useApp()
   const [catalog] = useCatalog()
   const [bookings, setBookings] = useBookings()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
+  // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
+  const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
+  const paramServiceId = searchParams.get('serviceId')
+  const paramServiceName = searchParams.get('service')
+  const paramDate = searchParams.get('date')
+  const paramTime = searchParams.get('time')
+  const paramAttendees = searchParams.get('attendees')
+
+  const paramItem = paramServiceId
+    ? catalog.find((entry) => String(entry.id) === String(paramServiceId))
+    : paramServiceName
+      ? catalog.find((entry) => entry.name.toLowerCase().includes(paramServiceName.toLowerCase()))
+      : sessionId ? catalog[0] : undefined
+
+  useEffect(() => {
+    if (!draft && paramItem) {
+      setDraft({
+        itemId: paramItem.id,
+        date: paramDate || new Date().toISOString().split('T')[0],
+        time: paramTime || '08:00 a. m. - 09:00 a. m.',
+        attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+      })
+    }
+  }, [draft, paramItem, paramDate, paramTime, paramAttendees, setDraft])
+
+  const activeDraft = draft || (paramItem ? {
+    itemId: paramItem.id,
+    date: paramDate || new Date().toISOString().split('T')[0],
+    time: paramTime || '08:00 a. m. - 09:00 a. m.',
+    attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+  } : null)
+
   // Payment states
   const [method, setMethod] = useState<PaymentMethod>('card')
   const [isProcessing, setIsProcessing] = useState(false)
   const [processStep, setProcessStep] = useState(1)
-
-  // Card form state
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardHolder, setCardHolder] = useState(session?.name ?? '')
-  const [cardExp, setCardExp] = useState('')
-  const [cardCvc, setCardCvc] = useState('')
-  const [installments, setInstallments] = useState('1')
 
   // PSE form state
   const [pseBank, setPseBank] = useState(pseBanks[0])
@@ -60,10 +86,10 @@ export default function CheckoutPage() {
   // Wompi / Nequi state
   const [nequiPhone, setNequiPhone] = useState('')
 
-  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
+  const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
 
-  if (!draft || !item || !category) {
+  if (!activeDraft || !item || !category) {
     return (
       <main className="section-shell payment-page">
         <div className="dashboard-empty">
@@ -80,49 +106,12 @@ export default function CheckoutPage() {
   }
 
   const isCourt = item.category === 'canchas'
-  const total = calculateBookingPrice(item, draft.attendees)
+  const total = calculateBookingPrice(item, activeDraft.attendees)
   const Icon = categoryIcons[category.icon]
-
-  // Formaters
-  const handleCardNumberChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 16)
-    const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ')
-    setCardNumber(formatted)
-  }
-
-  const handleExpChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 4)
-    if (raw.length > 2) {
-      setCardExp(`${raw.slice(0, 2)}/${raw.slice(2)}`)
-    } else {
-      setCardExp(raw)
-    }
-  }
-
-  const fillTestCard = () => {
-    setCardNumber('4532 8912 3456 8821')
-    setCardHolder(session?.name || 'MARÍA CAMILA RESTREPO')
-    setCardExp('09/29')
-    setCardCvc('821')
-    notify('Tarjeta de prueba Visa precargada.', 'success')
-  }
 
   const confirmPayment = async () => {
     // Form validation based on method
-    if (method === 'card') {
-      if (!cardNumber.trim() || cardNumber.replace(/\s/g, '').length < 15) {
-        notify('Ingresa un número de tarjeta válido.', 'error')
-        return
-      }
-      if (!cardExp.trim() || cardExp.length < 5) {
-        notify('Ingresa la fecha de vencimiento (MM/AA).', 'error')
-        return
-      }
-      if (!cardCvc.trim() || cardCvc.length < 3) {
-        notify('Ingresa el código CVC de 3 dígitos.', 'error')
-        return
-      }
-    } else if (method === 'pse') {
+    if (method === 'pse') {
       if (!pseDocNumber.trim()) {
         notify('Ingresa tu número de documento para PSE.', 'error')
         return
@@ -141,14 +130,46 @@ export default function CheckoutPage() {
     const clash = bookings.some(
       (booking) =>
         booking.service === item.name &&
-        booking.date === draft.date &&
-        booking.time === draft.time &&
+        booking.date === activeDraft.date &&
+        booking.time === activeDraft.time &&
         booking.status !== 'Cancelada'
     )
     if (clash) {
       notify('Ese horario acaba de ser reservado. Elige otro.', 'error')
       router.push(`/services/${item.category}/${item.id}`)
       return
+    }
+
+    // Cobro seguro con tarjeta vía Stripe Checkout (PCI-DSS SAQ A / ARCH-03)
+    if (method === 'card') {
+      setIsProcessing(true)
+      try {
+        const lockRes = await fetch('/api/bookings/lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId: Number(item.id) || 1,
+            date: activeDraft.date,
+            slotTime: activeDraft.time,
+            cantidadCupos: isCourt ? 1 : activeDraft.attendees,
+            canal: 'ONLINE',
+          }),
+        })
+
+        if (lockRes.ok) {
+          const lockJson = await lockRes.json()
+          if (lockJson.success && lockJson.data?.checkout?.url) {
+            window.location.href = lockJson.data.checkout.url
+            return
+          }
+        }
+        const errJson = await lockRes.json().catch(() => null)
+        throw new Error(errJson?.error?.message || 'Error al iniciar la sesión de pago con Stripe.')
+      } catch (err: unknown) {
+        setIsProcessing(false)
+        const msg = err instanceof Error ? err.message : 'No se pudo conectar con la pasarela de pagos.'
+        notify(msg, 'error')
+      }
     }
 
     setIsProcessing(true)
@@ -164,7 +185,7 @@ export default function CheckoutPage() {
     }, 1400)
 
     setTimeout(() => {
-      const [, month, day] = draft.date.split('-')
+      const [, month, day] = activeDraft.date.split('-')
       const txRef = `WMP-ALT-${Math.floor(100000 + Math.random() * 900000)}`
       const booking: Booking = {
         id: `b${Date.now()}`,
@@ -173,9 +194,9 @@ export default function CheckoutPage() {
         category: item.category,
         service: item.name,
         sede: item.sede,
-        date: draft.date,
-        time: draft.time,
-        attendees: draft.attendees,
+        date: activeDraft.date,
+        time: activeDraft.time,
+        attendees: activeDraft.attendees,
         amount: total,
         status: 'Confirmada',
         paymentMethod: method,
@@ -263,96 +284,22 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Visual Card Preview */}
-              <div className="card-visual-preview">
-                <div className="flex justify-between items-start">
-                  <div className="card-chip" />
-                  <span className="text-[12px] font-extrabold tracking-widest text-[#c9ef75]">ALTURA CLUB</span>
+              {/* Pasarela Segura Stripe Checkout (Cumplimiento PCI-DSS SAQ A / SEC-01) */}
+              <div className="p-4 rounded-xl border border-[#c9ef75]/40 bg-[#c9ef75]/10 flex flex-col gap-3 my-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-[#123e30] dark:text-[#c9ef75]" />
+                  <strong className="text-sm text-[#123e30] dark:text-[#c9ef75]">
+                    Pasarela Oficial Stripe Checkout (PCI-DSS SAQ A)
+                  </strong>
                 </div>
-                <div className="card-preview-number">
-                  {cardNumber || '•••• •••• •••• ••••'}
-                </div>
-                <div className="card-preview-footer">
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">TITULAR</small>
-                    <span className="card-preview-name">{cardHolder || 'NOMBRE DEL TITULAR'}</span>
-                  </div>
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">VENCE</small>
-                    <span className="card-preview-exp">{cardExp || 'MM/AA'}</span>
-                  </div>
+                <p className="text-xs text-[var(--subtle)] leading-relaxed">
+                  Por seguridad y estricto cumplimiento del estándar internacional PCI-DSS SAQ A, los datos de tu tarjeta no se capturan ni manipulan en esta aplicación. Al pulsar <strong>Pagar y confirmar reserva</strong>, serás redirigido a la pasarela cifrada de Stripe para completar el pago de forma segura.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink)] pt-2 border-t border-[#c9ef75]/30">
+                  <Lock size={12} className="text-[#5e8b48]" />
+                  <span>Cifrado bancario de extremo a extremo · Soporta Visa, Mastercard y AMEX</span>
                 </div>
               </div>
-
-              <div className="flex justify-end -mt-2 mb-2">
-                <button
-                  type="button"
-                  onClick={fillTestCard}
-                  className="text-[12px] font-semibold text-[#4b7652] dark:text-[#9ee285] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Sparkles size={13} /> Cargar datos de tarjeta de prueba
-                </button>
-              </div>
-
-              <label className="demo-field">
-                Número de tarjeta
-                <Input
-                  value={cardNumber}
-                  onChange={(e) => handleCardNumberChange(e.target.value)}
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                  required
-                />
-              </label>
-
-              <label className="demo-field">
-                Nombre del titular (como figura en el plástico)
-                <Input
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                  placeholder="JUAN PÉREZ"
-                  required
-                />
-              </label>
-
-              <div className="form-row">
-                <label className="demo-field">
-                  Vencimiento (MM/AA)
-                  <Input
-                    value={cardExp}
-                    onChange={(e) => handleExpChange(e.target.value)}
-                    placeholder="MM/AA"
-                    maxLength={5}
-                    required
-                  />
-                </label>
-                <label className="demo-field">
-                  Código de seguridad (CVC)
-                  <Input
-                    type="password"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="•••"
-                    maxLength={4}
-                    required
-                  />
-                </label>
-              </div>
-
-              <label className="demo-field">
-                Número de cuotas
-                <select
-                  value={installments}
-                  onChange={(e) => setInstallments(e.target.value)}
-                  className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                >
-                  <option value="1">1 cuota (sin intereses)</option>
-                  <option value="2">2 cuotas</option>
-                  <option value="3">3 cuotas</option>
-                  <option value="6">6 cuotas</option>
-                  <option value="12">12 cuotas</option>
-                </select>
-              </label>
             </div>
           )}
 
@@ -513,20 +460,20 @@ export default function CheckoutPage() {
               <b>{item.name}</b>
               <span>
                 Sede {item.sede}
-                {!isCourt && <> · {draft.attendees} {draft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
+                {!isCourt && <> · {activeDraft.attendees} {activeDraft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
               </span>
             </div>
           </div>
           <div className="order-item">
             <span>
-              <CalendarDays size={15} /> {formatDate(draft.date)}
+              <CalendarDays size={15} /> {formatDate(activeDraft.date)}
             </span>
             <span>
-              <Clock3 size={15} /> {draft.time} · 60 minutos
+              <Clock3 size={15} /> {activeDraft.time} · 60 minutos
             </span>
           </div>
           <div className="order-price">
-            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
+            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${activeDraft.attendees}`}</span>
             <b>{formatMoney(total)}</b>
           </div>
           <div className="order-total">
@@ -567,4 +514,22 @@ export default function CheckoutPage() {
     </main>
   )
 }
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="section-shell payment-page">
+          <div className="dashboard-empty">
+            <b>Cargando pasarela de pago...</b>
+            <p>Por favor espera un momento.</p>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  )
+}
+
 

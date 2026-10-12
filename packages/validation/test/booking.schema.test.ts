@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { availabilityQuerySchema, bookingRequestSchema } from "../src/booking.schema.ts";
+import { availabilityQuerySchema, bookingRequestSchema, posCheckoutSchema } from "../src/booking.schema.ts";
 
 test("bookingRequestSchema accepts integer service IDs and defaults to one seat", () => {
   const parsed = bookingRequestSchema.safeParse({
@@ -38,6 +38,64 @@ test("availabilityQuerySchema validates service and calendar date", () => {
   );
   assert.equal(
     availabilityQuerySchema.safeParse({ serviceId: "0", date: "2026-02-30" }).success,
+    false,
+  );
+});
+
+test("posCheckoutSchema (TSK-FE-18 / RF-17): acepta cobro cashless con tarjeta y enlace alternativo", () => {
+  const cardPayload = {
+    serviceId: 1,
+    date: "2026-10-15",
+    slotTime: "10:00 a. m. - 11:00 a. m.",
+    cantidadCupos: 2,
+    clienteNombre: "Carlos Santana",
+    clienteDocumento: "1020304050",
+    clienteEmail: "carlos@example.com",
+    clienteTelefono: "3001234567",
+    esSocio: true,
+    paymentMode: "stripe_card",
+    cardLast4: "4242",
+  };
+  const parsedCard = posCheckoutSchema.safeParse(cardPayload);
+  assert.equal(parsedCard.success, true);
+  if (parsedCard.success) {
+    assert.equal(parsedCard.data.paymentMode, "stripe_card");
+    assert.equal(parsedCard.data.esSocio, true);
+  }
+
+  const linkPayload = {
+    ...cardPayload,
+    paymentMode: "stripe_link",
+  };
+  const parsedLink = posCheckoutSchema.safeParse(linkPayload);
+  assert.equal(parsedLink.success, true);
+});
+
+test("posCheckoutSchema (RF-17 / RN-13): rechaza terminantemente pagos en efectivo (cero efectivo)", () => {
+  const cashPayload = {
+    serviceId: 1,
+    date: "2026-10-15",
+    slotTime: "10:00 a. m.",
+    cantidadCupos: 1,
+    clienteNombre: "Carlos Santana",
+    clienteDocumento: "1020304050",
+    clienteEmail: "carlos@example.com",
+    paymentMode: "cash", // Prohibido
+  };
+  const parsed = posCheckoutSchema.safeParse(cashPayload);
+  assert.equal(parsed.success, false);
+});
+
+test("posCheckoutSchema: rechaza cliente sin nombre o con email inválido", () => {
+  assert.equal(
+    posCheckoutSchema.safeParse({
+      serviceId: 1,
+      date: "2026-10-15",
+      slotTime: "10:00 a. m.",
+      clienteNombre: "A",
+      clienteDocumento: "123",
+      clienteEmail: "invalido",
+    }).success,
     false,
   );
 });
