@@ -10,6 +10,7 @@ import {
   QrCode,
   ShieldCheck,
   Ticket,
+  Trophy,
   X,
 } from 'lucide-react'
 import {
@@ -29,8 +30,24 @@ import {
 import { QRGraphicHD } from '@/components/portal/qr-modal'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
 
-type TabType = 'activas' | 'historial' | 'canceladas'
+type TabType = 'activas' | 'historial' | 'canceladas' | 'torneos'
 
+interface UserTournamentItem {
+  id: string
+  titulo: string
+  descripcion?: string | null
+  nivel: string
+  categoria?: { id: number; nombre: string }
+  fechaInicio: string
+  fechaFin: string
+  precioInscripcion: number | string
+  miInscripcion?: {
+    id: string
+    estado: string
+    nombrePareja?: string | null
+    ticket?: { id: string; codigo: string }
+  }
+}
 
 export default function TicketsPage() {
   const { session } = useApp()
@@ -40,6 +57,7 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Booking | null>(null)
   const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
   const [dbBookings, setDbBookings] = useState<Booking[]>([])
+  const [userTournaments, setUserTournaments] = useState<UserTournamentItem[]>([])
 
   // Cargar historial real desde el endpoint TSK-BE-13
   useEffect(() => {
@@ -53,6 +71,31 @@ export default function TicketsPage() {
       .catch(() => {
         // Fallback a almacenamiento local
       })
+
+    // Cargar torneos en los que el usuario se ha inscrito
+    fetch('/api/tournaments')
+      .then((res) => res.json())
+      .then(async (json) => {
+        if (!isMounted || !json.success || !Array.isArray(json.data)) return
+        const registered = json.data.filter((t: { yaInscrito?: boolean }) => t.yaInscrito)
+        if (registered.length === 0) return
+
+        const detailed = await Promise.all(
+          registered.map(async (t: { id: string }) => {
+            try {
+              const r = await fetch(`/api/tournaments/${t.id}`)
+              const j = await r.json()
+              return j.success && j.data ? j.data : t
+            } catch {
+              return t
+            }
+          })
+        )
+        if (isMounted) {
+          setUserTournaments(detailed)
+        }
+      })
+      .catch(() => {})
 
     return () => {
       isMounted = false
@@ -83,6 +126,8 @@ export default function TicketsPage() {
         return historyBookings
       case 'canceladas':
         return cancelledBookings
+      case 'torneos':
+        return []
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
@@ -139,6 +184,15 @@ export default function TicketsPage() {
                 Cancelados
                 <span className="portal-tab-badge">{cancelledBookings.length}</span>
               </button>
+              <button
+                type="button"
+                className={`portal-tab-btn ${activeTab === 'torneos' ? 'active' : ''}`}
+                onClick={() => setActiveTab('torneos')}
+              >
+                <Trophy size={13} className="text-amber-500 inline-block mr-1" />
+                Torneos
+                <span className="portal-tab-badge">{userTournaments.length}</span>
+              </button>
             </div>
 
             <Link href="/services" className="calendar-shortcut text-xs py-2.5 px-3.5 gap-2 w-full md:w-auto justify-center">
@@ -146,7 +200,129 @@ export default function TicketsPage() {
             </Link>
           </div>
 
-          {currentTabItems.length === 0 ? (
+          {activeTab === 'torneos' ? (
+            userTournaments.length === 0 ? (
+              <div className="demo-card text-center py-12">
+                <Trophy size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
+                <b className="block text-base">No tienes inscripciones a torneos activas</b>
+                <p className="text-sm text-[var(--subtle)] mt-1 mb-5">
+                  Inscríbete en nuestros torneos competitivos y eventos deportivos desde la página de inicio o el catálogo.
+                </p>
+                <Link href="/" className="action-button text-xs py-2 px-4">
+                  Ver Torneos Disponibles <ArrowRight size={14} />
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {userTournaments.map((tournament) => {
+                  const ins = tournament.miInscripcion
+                  const estadoIns = ins?.estado ?? 'CONFIRMADA'
+                  const isConfirmed = estadoIns === 'CONFIRMADA'
+                  const ticketCode = ins?.ticket?.codigo || `TRN-${tournament.id.slice(0, 8)}`
+                  const precioNum = Number(tournament.precioInscripcion ?? 0)
+
+                  const handleOpenTournamentQR = () => {
+                    const fakeBooking: Booking = {
+                      id: tournament.id,
+                      code: ticketCode,
+                      service: `Torneo: ${tournament.titulo}`,
+                      category: tournament.categoria?.nombre || 'Torneo',
+                      sede: 'Sede Principal',
+                      date: tournament.fechaInicio.split('T')[0],
+                      time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      attendees: ins?.nombrePareja ? 2 : 1,
+                      amount: precioNum,
+                      status: isConfirmed ? 'Confirmada' : 'Pendiente',
+                      client: session?.name || 'Socio',
+                    }
+                    setSelectedTicket(fakeBooking)
+                  }
+
+                  const handlePrintTournamentTicket = () => {
+                    const fakeBooking: Booking = {
+                      id: tournament.id,
+                      code: ticketCode,
+                      service: `Torneo: ${tournament.titulo}`,
+                      category: tournament.categoria?.nombre || 'Torneo',
+                      sede: 'Sede Principal',
+                      date: tournament.fechaInicio.split('T')[0],
+                      time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      attendees: ins?.nombrePareja ? 2 : 1,
+                      amount: precioNum,
+                      status: isConfirmed ? 'Confirmada' : 'Pendiente',
+                      client: session?.name || 'Socio',
+                    }
+                    handlePrintTicket(fakeBooking)
+                  }
+
+                  return (
+                    <div key={tournament.id} className="portal-ticket-item">
+                      <div className="portal-ticket-info">
+                        <div className="flex items-center gap-2.5">
+                          <b className="text-base tracking-tight">{tournament.titulo}</b>
+                          <Badge
+                            variant={isConfirmed ? 'success' : 'secondary'}
+                            className="text-[11px] px-2 py-0.5 shrink-0"
+                          >
+                            {isConfirmed ? 'Confirmada' : 'Pendiente Pago'}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-[var(--subtle)] flex flex-wrap items-center gap-2 mt-1">
+                          <span>
+                            <strong className="text-[var(--ink)] font-semibold">{ticketCode}</strong>
+                          </span>
+                          <span>·</span>
+                          <span>
+                            {new Date(tournament.fechaInicio).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          <span>·</span>
+                          <span>Nivel: {tournament.nivel}</span>
+                          {ins?.nombrePareja && (
+                            <>
+                              <span>·</span>
+                              <span>Pareja: <strong>{ins.nombrePareja}</strong></span>
+                            </>
+                          )}
+                          <span>·</span>
+                          <span>
+                            {precioNum === 0 ? 'Gratuito' : `${formatMoney(precioNum)} COP`}
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="portal-ticket-actions">
+                        <button
+                          type="button"
+                          onClick={handleOpenTournamentQR}
+                          className="action-button text-xs py-2 px-3.5 gap-2"
+                        >
+                          <QrCode size={15} /> Ver QR de Acceso
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePrintTournamentTicket}
+                          className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
+                          title="Descargar comprobante en PDF"
+                        >
+                          <Download size={14} /> PDF
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          ) : currentTabItems.length === 0 ? (
             <div className="demo-card text-center py-12">
               <Ticket size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
               <b className="block text-base">No hay pases registrados</b>

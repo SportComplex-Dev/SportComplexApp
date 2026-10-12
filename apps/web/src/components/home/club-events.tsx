@@ -1,12 +1,16 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowRight, Calendar, Clock, MapPin, Trophy, Users } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { ArrowRight, Calendar, Clock, MapPin, Trophy, Users, CheckCircle2 } from 'lucide-react'
+import {
+  TournamentRegistrationModal,
+  type TournamentRegisterTarget,
+} from './tournament-registration-modal'
 
-interface ClubEvent {
+interface ClubEventView {
   id: string
   title: string
-  category: 'Pádel' | 'Tenis' | 'Natación' | 'Wellness'
+  category: string
   tone: 'lime' | 'blue' | 'orange' | 'purple'
   date: string
   time: string
@@ -17,9 +21,12 @@ interface ClubEvent {
   level: string
   description: string
   tag: string
+  isDynamic?: boolean
+  yaInscrito?: boolean
+  rawTournament?: TournamentRegisterTarget
 }
 
-const EVENTS: ClubEvent[] = [
+const STATIC_EVENTS: ClubEventView[] = [
   {
     id: 'padel-night',
     title: 'Torneo Relámpago Nocturno de Pádel',
@@ -82,7 +89,120 @@ const EVENTS: ClubEvent[] = [
   },
 ]
 
+function getCategoryTone(categoryName: string = ''): 'lime' | 'blue' | 'orange' | 'purple' {
+  const norm = categoryName.toLowerCase()
+  if (norm.includes('pádel') || norm.includes('padel')) return 'lime'
+  if (norm.includes('tenis')) return 'orange'
+  if (norm.includes('piscina') || norm.includes('natación') || norm.includes('acuát')) return 'blue'
+  return 'purple'
+}
+
 export function ClubEvents() {
+  const [events, setEvents] = useState<ClubEventView[]>(STATIC_EVENTS)
+  const [selectedTournament, setSelectedTournament] = useState<TournamentRegisterTarget | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Cargar torneos reales desde la API pública /api/tournaments
+  useEffect(() => {
+    let active = true
+
+    fetch('/api/tournaments?estado=INSCRIPCIONES_ABIERTAS')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!active) return
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const dynamicList: ClubEventView[] = json.data.map((t: TournamentRegisterTarget) => {
+            const catNombre = t.categoria?.nombre || 'Deporte'
+            const tone = getCategoryTone(catNombre)
+            const fInicio = new Date(t.fechaInicio)
+            const fFin = new Date(t.fechaFin)
+
+            const dateStr = fInicio.toLocaleDateString('es-CO', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+            })
+
+            const timeStr = `${fInicio.toLocaleTimeString('es-CO', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })} - ${fFin.toLocaleTimeString('es-CO', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}`
+
+            const precio = Number(t.precioInscripcion ?? 0)
+            const tag = precio === 0 ? 'GRATUITO' : `$${precio.toLocaleString('es-CO')} COP`
+            const spotsLeft = t.cuposDisponibles ?? Math.max(0, t.cuposTotales - t.cuposOcupados)
+
+            return {
+              id: t.id,
+              title: t.titulo,
+              category: catNombre,
+              tone,
+              date: dateStr,
+              time: timeStr,
+              sede: 'Sede Principal',
+              court: 'Pistas Asignadas',
+              spotsLeft,
+              totalSpots: t.cuposTotales,
+              level: t.nivel,
+              description: t.descripcion || 'Torneo oficial del club con control de cupos y entrada digital.',
+              tag,
+              isDynamic: true,
+              yaInscrito: t.yaInscrito,
+              rawTournament: t,
+            }
+          })
+
+          setEvents(dynamicList)
+        }
+      })
+      .catch((err) => {
+        console.error('Error cargando torneos dinámicos:', err)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleOpenRegister = (eventItem: ClubEventView) => {
+    if (eventItem.rawTournament) {
+      setSelectedTournament(eventItem.rawTournament)
+    } else {
+      // Mock para eventos estáticos si aún no hay backend poblado
+      setSelectedTournament({
+        id: eventItem.id,
+        titulo: eventItem.title,
+        descripcion: eventItem.description,
+        nivel: eventItem.level,
+        categoria: { id: 1, nombre: eventItem.category },
+        fechaInicio: new Date().toISOString(),
+        fechaFin: new Date(Date.now() + 86400000).toISOString(),
+        cuposTotales: eventItem.totalSpots,
+        cuposDisponibles: eventItem.spotsLeft,
+        cuposOcupados: eventItem.totalSpots - eventItem.spotsLeft,
+        precioInscripcion: 0,
+      })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleRegistrationSuccess = (tournamentId: string) => {
+    setEvents((prev) =>
+      prev.map((ev) =>
+        ev.id === tournamentId
+          ? {
+              ...ev,
+              spotsLeft: Math.max(0, ev.spotsLeft - 1),
+              yaInscrito: true,
+            }
+          : ev
+      )
+    )
+  }
+
   return (
     <section className="section-shell club-events-section">
       <div className="section-header-block">
@@ -99,7 +219,7 @@ export function ClubEvents() {
       </div>
 
       <div className="events-grid">
-        {EVENTS.map((event) => {
+        {events.map((event) => {
           const isAlmostFull = event.spotsLeft <= 3
           return (
             <article key={event.id} className="event-card">
@@ -132,17 +252,32 @@ export function ClubEvents() {
 
               <div className="event-card-foot">
                 <span className="event-level-label">Nivel: <b>{event.level}</b></span>
-                <Link
-                  href="/portal/book"
-                  className="event-register-btn"
-                >
-                  Inscribirme <ArrowRight size={14} />
-                </Link>
+                {event.yaInscrito ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+                    <CheckCircle2 size={13} /> Inscrito
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRegister(event)}
+                    className="event-register-btn cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    Inscribirme <ArrowRight size={14} />
+                  </button>
+                )}
               </div>
             </article>
           )
         })}
       </div>
+
+      {/* Modal de Inscripción Reactivo */}
+      <TournamentRegistrationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        tournament={selectedTournament}
+        onRegistrationSuccess={handleRegistrationSuccess}
+      />
     </section>
   )
 }
