@@ -169,3 +169,29 @@ test("createTournamentSchema: rechaza bloqueos fuera del intervalo del torneo (V
   }
 });
 
+test("registerTournamentSchema: valida nombrePareja opcional y datos de pago", async () => {
+  const { registerTournamentSchema } = await import("../src/tournament.schema.ts");
+
+  // Válido vacío (inscripción individual en torneo gratuito)
+  const emptyRes = registerTournamentSchema.safeParse({});
+  assert.equal(emptyRes.success, true);
+
+  // Válido con pareja y datos de pago
+  const withPartner = registerTournamentSchema.safeParse({
+    nombrePareja: "Carlos Valderrama",
+    pagoId: "pay-12345",
+    stripePaymentIntentId: "pi_3Mtw",
+  });
+  assert.equal(withPartner.success, true);
+  if (withPartner.success) {
+    assert.equal(withPartner.data.nombrePareja, "Carlos Valderrama");
+    assert.equal(withPartner.data.pagoId, "pay-12345");
+  }
+
+  // Rechazo de nombre de pareja demasiado corto (< 2 caracteres)
+  const shortPartner = registerTournamentSchema.safeParse({
+    nombrePareja: "A",
+  });
+  assert.equal(shortPartner.success, false);
+});
+

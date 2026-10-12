@@ -182,3 +182,15 @@ export const tournamentQuerySchema = z.object({
 });
 export type TournamentQueryInput = z.infer<typeof tournamentQuerySchema>;
 
+export const registerTournamentSchema = z.object({
+  nombrePareja: z
+    .string()
+    .trim()
+    .min(2, "El nombre de la pareja debe tener al menos 2 caracteres")
+    .max(120, "El nombre de la pareja no puede exceder 120 caracteres")
+    .optional()
+    .nullable(),
+  pagoId: z.string().trim().optional().nullable(),
+  stripePaymentIntentId: z.string().trim().optional().nullable(),
+});
+export type RegisterTournamentInput = z.infer<typeof registerTournamentSchema>;
