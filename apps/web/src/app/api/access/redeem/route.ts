@@ -1,8 +1,9 @@
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { AccessError, procesarEscaneo } from "@/lib/access";
+import { accessResultResponse } from "@/lib/access-response";
 import { accessRedeemSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
-import { fail, ok } from "@/lib/api-response";
+import { fail } from "@/lib/api-response";
 
 type SessionLike = { user?: { id?: string | null; role?: string | null } | null } | null;
 
@@ -64,14 +65,7 @@ export async function handleAccessRedeem(
       qrSecret,
       now: opts.now,
     });
-    if (resultado.code === "SERVICE_MISMATCH") {
-      return fail(
-        resultado.code,
-        resultado.message ?? "Acceso denegado por discrepancia de servicio.",
-        403,
-      );
-    }
-    return ok(resultado);
+    return accessResultResponse(resultado);
   } catch (error: unknown) {
     if (error instanceof AccessError || error instanceof TicketError) {
       return fail(error.code, error.message, error.status);

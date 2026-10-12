@@ -407,6 +407,18 @@ export async function getServicioById(
   });
 }
 
+/** Datos mínimos del servicio usados al resolver el mensaje de acceso. */
+export async function getServicioParaAccesoById(
+  id: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any = prisma,
+) {
+  return db.servicio.findUnique({
+    where: { id },
+    select: { id: true, nombre: true, estado: true },
+  });
+}
+
 export async function getServicioByNombre(nombre: string) {
   return prisma.servicio.findUnique({
     where: { nombre: nombre.trim() },

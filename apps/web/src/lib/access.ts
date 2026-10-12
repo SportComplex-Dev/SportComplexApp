@@ -2,13 +2,14 @@ import {
   ACCESS_ALREADY_USED_MESSAGE,
   ACCESS_WINDOW_EXPIRED_MESSAGE,
   decideAccess,
+  hasServiceMismatch,
   getTicketAccessWindow,
   verifyTicketSignature,
 } from "@sportcomplex/core";
 import {
   ejecutarLectura,
   getAsignacionVigente,
-  getServicioById,
+  getServicioParaAccesoById,
   getTicketForScan,
   type ModoLecturaValor,
   type ResultadoLecturaValor,
@@ -110,10 +111,9 @@ export async function procesarEscaneo(
 
   const ticketServiceId = ticket.reserva.disponibilidad.servicio.id;
   const ticketServiceName = ticket.reserva.disponibilidad.servicio.nombre;
-  const serviceMismatch =
-    input.postServiceId !== null && input.postServiceId !== ticketServiceId;
-  const stationService = input.postServiceId !== null && serviceMismatch
-    ? await getServicioById(input.postServiceId, db)
+  const serviceMismatch = hasServiceMismatch(ticketServiceId, input.postServiceId);
+  const stationService = serviceMismatch && input.postServiceId !== null
+    ? await getServicioParaAccesoById(input.postServiceId, db)
     : null;
   if (serviceMismatch && !stationService) {
     throw new AccessError("El servicio del puesto no existe.", "SERVICE_NOT_FOUND", 404);
@@ -128,8 +128,8 @@ export async function procesarEscaneo(
     start,
     end,
     ticketStatus: ticket.estado,
-    ticketServiceId: String(ticketServiceId),
-    postServiceId: input.postServiceId === null ? null : String(input.postServiceId),
+    ticketServiceId,
+    postServiceId: input.postServiceId,
   });
 
   const modo: ModoLecturaValor = input.postServiceId === null ? "CONSULTA" : "TURNO";
@@ -169,12 +169,16 @@ export async function procesarEscaneo(
       ? "DENIED"
       : "GRANTED";
 
-  const message =
-    access === "DENIED"
-      ? !decision.allowed && decision.code === "SERVICE_MISMATCH"
-        ? serviceMismatchMessage ?? decision.message ?? ACCESS_ALREADY_USED_MESSAGE
-        : (!decision.allowed ? (decision.message ?? ACCESS_ALREADY_USED_MESSAGE) : ACCESS_ALREADY_USED_MESSAGE)
-      : undefined;
+  let message: string | undefined;
+  if (access === "DENIED") {
+    if (!decision.allowed && decision.code === "SERVICE_MISMATCH") {
+      message = serviceMismatchMessage ?? decision.message ?? ACCESS_ALREADY_USED_MESSAGE;
+    } else if (!decision.allowed) {
+      message = decision.message ?? ACCESS_ALREADY_USED_MESSAGE;
+    } else {
+      message = ACCESS_ALREADY_USED_MESSAGE;
+    }
+  }
 
   return {
     access,

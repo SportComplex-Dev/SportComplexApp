@@ -23,7 +23,15 @@ const EMPLEADO = "lector-1";
 const ADENTRO = new Date("2026-10-10T15:30:00.000Z");
 const FUERA = new Date("2026-10-10T17:00:00.000Z");
 
-function seed({ asignacion = true } = {}) {
+function seed({
+  asignacion = true,
+  serviceNames = ["Cancha 1", "Piscina"],
+  stationServiceEstado = "ACTIVO",
+}: {
+  asignacion?: boolean;
+  serviceNames?: [string, string];
+  stationServiceEstado?: string;
+} = {}) {
   // Estado limpio: cada test arranca con UN solo ticket EMITIDO.
   for (const key of [
     "usuarios",
@@ -58,7 +66,7 @@ function seed({ asignacion = true } = {}) {
   mock._state.servicios.push({
     id: 1,
     categoriaId: 1,
-    nombre: "Cancha 1",
+    nombre: serviceNames[0],
     capacidadMaxima: 10,
     tarifa: 75000,
     modalidad: "EXCLUSIVA",
@@ -68,12 +76,12 @@ function seed({ asignacion = true } = {}) {
   mock._state.servicios.push({
     id: 2,
     categoriaId: 1,
-    nombre: "Piscina",
+    nombre: serviceNames[1],
     capacidadMaxima: 30,
     tarifa: 25000,
     modalidad: "AFORO",
     tipoPiscina: "PUBLICA",
-    estado: "ACTIVO",
+    estado: stationServiceEstado,
   });
   mock._state.franjas.push({
     id: 1,
@@ -219,9 +227,10 @@ test("TSK-BD-10 API: servicio del puesto ≠ servicio de la reserva → DENIED S
 });
 
 test("TSK-BE-16: la ruta de escaneo devuelve 403 con servicios identificados y audita sin alterar el tiquete", async () => {
-  seed();
-  mock._state.servicios[0].nombre = "Piscina";
-  mock._state.servicios[1].nombre = "Canchas";
+  seed({
+    serviceNames: ["Piscina", "Canchas"],
+    stationServiceEstado: "INHABILITADO",
+  });
   const request = new Request("http://localhost:3000/api/access", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -240,6 +249,7 @@ test("TSK-BE-16: la ruta de escaneo devuelve 403 con servicios identificados y a
   assert.equal(response.status, 403);
   assert.equal(body.success, false);
   assert.equal(body.error.code, "SERVICE_MISMATCH");
+  assert.equal(mock._state.servicios[1].estado, "INHABILITADO");
   assert.equal(
     body.error.message,
     "Acceso denegado: El tiquete pertenece a Piscina y se encuentra en Canchas",
