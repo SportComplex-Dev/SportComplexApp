@@ -24,21 +24,27 @@ import { useBookings, useLastCode } from '@/lib/stores'
 import {
   clasificarReservas,
   fetchCustomerBookingHistory,
+  fetchReceiptData,
   generarQRDataUrl,
+  sanitizeFilename,
+  type ReceiptApiResponse,
 } from '@/components/portal/portal-utils'
 import { QRGraphicHD } from '@/components/portal/qr-modal'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
 
 type TabType = 'activas' | 'historial' | 'canceladas'
 
-
 export default function TicketsPage() {
-  const { session } = useApp()
+  const { session, notify } = useApp()
   const [localBookings] = useBookings()
   const [, setLastCode] = useLastCode()
   const [activeTab, setActiveTab] = useState<TabType>('activas')
   const [selectedTicket, setSelectedTicket] = useState<Booking | null>(null)
   const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
+  const [printingReceipt, setPrintingReceipt] = useState<ReceiptApiResponse | null>(null)
+  const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [isPrinting, setIsPrinting] = useState<boolean>(false)
   const [dbBookings, setDbBookings] = useState<Booking[]>([])
 
   // Cargar historial real desde el endpoint TSK-BE-13
@@ -70,8 +76,6 @@ export default function TicketsPage() {
     return combined
   }, [dbBookings, localBookings])
 
-  const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
-
   const { activas: activeBookings, historial: historyBookings, canceladas: cancelledBookings } =
     useMemo(() => clasificarReservas(allBookings), [allBookings])
 
@@ -86,18 +90,115 @@ export default function TicketsPage() {
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
+  const handleOpenQrModal = useCallback(async (ticket: Booking) => {
+    setSelectedTicket(ticket)
+    if (!ticket.qrPayload && ticket.id) {
+      try {
+        const receipt = await fetchReceiptData(ticket.id)
+        const qr = receipt?.qr
+        if (qr?.payload) {
+          setSelectedTicket((prev) =>
+            prev && prev.id === ticket.id
+              ? { ...prev, qrPayload: qr.payload, qrDataUrl: qr.dataUrl }
+              : prev
+          )
+        }
+      } catch {
+        // Fallback manteniendo ticket
+      }
+    }
+  }, [])
+
   const handlePrintTicket = useCallback(async (ticket: Booking) => {
     try {
-      const qrUrl = await generarQRDataUrl(ticket.code, 260)
+      setIsPrinting(true)
+      const receipt = await fetchReceiptData(ticket.id).catch(() => null)
+      const qrTarget = receipt?.qr?.payload || ticket.qrPayload || ticket.code
+      const qrUrl = receipt?.qr?.dataUrl || (await generarQRDataUrl(qrTarget, 260))
       setPrintingQrUrl(qrUrl)
-    } catch {
+      setPrintingReceipt(receipt)
+      setPrintingTicket(ticket)
+
+      // Inyectar regla @page 58mm temporalmente para esta impresión (CSS-01)
+      let styleTag = document.getElementById('thermal-print-page-style')
+      if (!styleTag) {
+        styleTag = document.createElement('style')
+        styleTag.id = 'thermal-print-page-style'
+        styleTag.innerHTML = '@page { size: 58mm auto; margin: 0; }'
+        document.head.appendChild(styleTag)
+      }
+
+      document.body.classList.add('printing-thermal-receipt')
+
+      let cleanedUp = false
+      const cleanupPrintStyles = () => {
+        if (cleanedUp) return
+        cleanedUp = true
+        document.body.classList.remove('printing-thermal-receipt')
+        document.getElementById('thermal-print-page-style')?.remove()
+        setPrintingTicket(null)
+        setPrintingQrUrl(null)
+        setPrintingReceipt(null)
+        setIsPrinting(false)
+        window.removeEventListener('afterprint', handleAfterPrint)
+      }
+
+      const handleAfterPrint = () => {
+        cleanupPrintStyles()
+      }
+      window.addEventListener('afterprint', handleAfterPrint)
+
+      // Doble ciclo para renderizado seguro en DOM y rescate si no emite afterprint (NEW-01 & RACE-01)
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          window.print()
+          setTimeout(cleanupPrintStyles, 2500)
+        }, 300)
+      })
+    } catch (err) {
+      console.error('Error al preparar impresión:', err)
+      document.body.classList.remove('printing-thermal-receipt')
+      document.getElementById('thermal-print-page-style')?.remove()
+      setPrintingTicket(null)
       setPrintingQrUrl(null)
+      setPrintingReceipt(null)
+      setIsPrinting(false)
+      notify('Error al preparar el comprobante para impresión.', 'error')
     }
-    setPrintingTicket(ticket)
-    setTimeout(() => {
-      window.print()
-    }, 200)
-  }, [])
+  }, [notify])
+
+  const handleDownloadQr = useCallback(async (ticket: Booking) => {
+    if (downloadingId) return
+    setDownloadingId(ticket.id)
+    try {
+      let dataUrl = ticket.qrDataUrl
+      let qrPayload = ticket.qrPayload
+
+      if (!dataUrl) {
+        const receipt = await fetchReceiptData(ticket.id).catch(() => null)
+        if (receipt?.qr?.dataUrl) {
+          dataUrl = receipt.qr.dataUrl
+        } else {
+          qrPayload = receipt?.qr?.payload || ticket.qrPayload || ticket.code
+          dataUrl = await generarQRDataUrl(qrPayload, 600)
+        }
+      }
+
+      const safeFilename = `ticket-${sanitizeFilename(ticket.code)}.png`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = safeFilename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      notify('Imagen QR descargada correctamente.', 'success')
+    } catch (err) {
+      console.error('Error al descargar QR:', err)
+      notify('No se pudo descargar el código QR.', 'error')
+    } finally {
+      setDownloadingId(null)
+    }
+  }, [downloadingId, notify])
 
   return (
     <>
@@ -203,18 +304,28 @@ export default function TicketsPage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => setSelectedTicket(booking)}
+                            onClick={() => handleOpenQrModal(booking)}
                             className="action-button text-xs py-2 px-3.5 gap-2"
                           >
                             <QrCode size={15} /> Ver QR de Acceso
                           </button>
                           <button
                             type="button"
-                            onClick={() => handlePrintTicket(booking)}
+                            onClick={() => handleDownloadQr(booking)}
+                            disabled={downloadingId === booking.id}
                             className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-                            title="Descargar comprobante en PDF"
+                            title="Descargar imagen QR transferible (PNG)"
                           >
-                            <Download size={14} /> PDF
+                            <Download size={14} /> Descargar QR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintTicket(booking)}
+                            disabled={isPrinting}
+                            className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
+                            title="Imprimir comprobante en formato térmico 58mm"
+                          >
+                            <Printer size={14} /> Imprimir Recibo (58mm)
                           </button>
                           <Link
                             href="/confirmation"
@@ -230,9 +341,10 @@ export default function TicketsPage() {
                           <button
                             type="button"
                             onClick={() => handlePrintTicket(booking)}
+                            disabled={isPrinting}
                             className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
                           >
-                            <Printer size={14} /> Recibo
+                            <Printer size={14} /> Imprimir Recibo (58mm)
                           </button>
                           <Link href="/services" className="calendar-shortcut text-xs py-2 px-3">
                             Reservar de nuevo <ArrowRight size={13} />
@@ -275,7 +387,10 @@ export default function TicketsPage() {
               Sede {selectedTicket.sede} · {formatDate(selectedTicket.date)}, {selectedTicket.time}
             </p>
 
-            <QRGraphicHD code={selectedTicket.code} />
+            <QRGraphicHD
+              code={selectedTicket.qrPayload || selectedTicket.code}
+              dataUrl={selectedTicket.qrDataUrl}
+            />
 
             <div className="mt-2 mb-3">
               <b className="text-lg font-mono tracking-widest block text-[var(--ink)]">
@@ -289,16 +404,25 @@ export default function TicketsPage() {
 
             <div className="qr-turnstile-hint">
               <ShieldCheck size={16} className="text-[var(--brand-accent)] shrink-0" />
-              <span>Pase transferible sin biometría. Acerca la pantalla al lector óptico del torniquete.</span>
+              <span>Pase transferible sin biometría (RF-10 / RF-12). Acerca la pantalla o la imagen al lector óptico.</span>
             </div>
 
-            <div className="qr-modal-actions">
+            <div className="qr-modal-actions flex-wrap gap-2">
               <button
                 type="button"
                 className="action-button text-xs py-2 px-4 gap-2"
+                disabled={downloadingId === selectedTicket.id}
+                onClick={() => handleDownloadQr(selectedTicket)}
+              >
+                <Download size={15} /> Descargar Imagen QR (PNG)
+              </button>
+              <button
+                type="button"
+                className="calendar-shortcut text-xs py-2 px-4 gap-2"
+                disabled={isPrinting}
                 onClick={() => handlePrintTicket(selectedTicket)}
               >
-                <Printer size={15} /> Imprimir / PDF
+                <Printer size={15} /> Imprimir Recibo (58mm)
               </button>
               <button
                 type="button"
@@ -313,7 +437,11 @@ export default function TicketsPage() {
       )}
 
       {/* Comprobante en formato imprimible PDF */}
-      <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} />
+      <PrintableReceipt
+        ticket={printingTicket}
+        qrDataUrl={printingQrUrl}
+        receiptData={printingReceipt}
+      />
     </>
   )
 }

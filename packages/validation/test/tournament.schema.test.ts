@@ -144,6 +144,31 @@ test("tournamentIdParamSchema: valida UUID v4 y rechaza IDs inválidos", async (
   assert.equal(tournamentIdParamSchema.safeParse(null).success, false);
 });
 
+test("createTournamentSchema: rechaza bloqueos fuera del intervalo del torneo (VAL-01)", () => {
+  const input = {
+    titulo: "Torneo Fuera de Rango",
+    categoriaId: 1,
+    nivel: "INTERMEDIO",
+    fechaInicio: "2026-11-01T08:00:00Z",
+    fechaFin: "2026-11-02T18:00:00Z",
+    cuposTotales: 8,
+    bloqueos: [
+      {
+        servicioId: 1,
+        horaInicio: "2026-11-05T08:00:00Z",
+        horaFin: "2026-11-05T12:00:00Z",
+      },
+    ],
+  };
+
+  const parsed = createTournamentSchema.safeParse(input);
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    const errorPaths = parsed.error.issues.map((i) => i.path.join("."));
+    assert.ok(errorPaths.includes("bloqueos"));
+  }
+});
+
 test("registerTournamentSchema: valida nombrePareja opcional y datos de pago", async () => {
   const { registerTournamentSchema } = await import("../src/tournament.schema.ts");
 
@@ -152,16 +177,23 @@ test("registerTournamentSchema: valida nombrePareja opcional y datos de pago", a
   assert.equal(emptyRes.success, true);
 
   // Válido con pareja y datos de pago
+  const validPagoUuid = "123e4567-e89b-12d3-a456-426614174000";
   const withPartner = registerTournamentSchema.safeParse({
     nombrePareja: "Carlos Valderrama",
-    pagoId: "pay-12345",
+    pagoId: validPagoUuid,
     stripePaymentIntentId: "pi_3Mtw",
   });
   assert.equal(withPartner.success, true);
   if (withPartner.success) {
     assert.equal(withPartner.data.nombrePareja, "Carlos Valderrama");
-    assert.equal(withPartner.data.pagoId, "pay-12345");
+    assert.equal(withPartner.data.pagoId, validPagoUuid);
   }
+
+  // Rechazo de pagoId no UUID
+  const invalidPago = registerTournamentSchema.safeParse({
+    pagoId: "no-es-uuid-12345",
+  });
+  assert.equal(invalidPago.success, false);
 
   // Rechazo de nombre de pareja demasiado corto (< 2 caracteres)
   const shortPartner = registerTournamentSchema.safeParse({

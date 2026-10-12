@@ -16,16 +16,36 @@ export const estadoInscripcionTorneoSchema = z.enum([
 ]);
 export type EstadoInscripcionTorneoInput = z.infer<typeof estadoInscripcionTorneoSchema>;
 
+const BOGOTA_TZ = "America/Bogota";
+function getBogotaDateString(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BOGOTA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export const torneoBloqueoInputSchema = z
   .object({
     servicioId: z.coerce.number().int().positive("El servicioId debe ser un número entero positivo"),
-    horaInicio: z.iso.datetime({ message: "horaInicio debe ser una fecha/hora ISO válida" }),
-    horaFin: z.iso.datetime({ message: "horaFin debe ser una fecha/hora ISO válida" }),
+    horaInicio: z.iso.datetime({ offset: true, message: "horaInicio debe ser una fecha/hora ISO válida" }),
+    horaFin: z.iso.datetime({ offset: true, message: "horaFin debe ser una fecha/hora ISO válida" }),
   })
   .refine(
     (data) => new Date(data.horaFin).getTime() > new Date(data.horaInicio).getTime(),
     {
       message: "horaFin debe ser posterior a horaInicio",
+      path: ["horaFin"],
+    },
+  )
+  .refine(
+    (data) => getBogotaDateString(data.horaInicio) === getBogotaDateString(data.horaFin),
+    {
+      message: "El bloqueo de pista no puede cruzar la medianoche; debe pertenecer al mismo día calendario en America/Bogota",
       path: ["horaFin"],
     },
   );
@@ -45,8 +65,8 @@ export const createTournamentSchema = z
       .trim()
       .min(1, "El nivel del torneo es obligatorio")
       .max(60, "El nivel no puede exceder 60 caracteres"),
-    fechaInicio: z.iso.datetime({ message: "fechaInicio debe ser una fecha/hora ISO válida" }),
-    fechaFin: z.iso.datetime({ message: "fechaFin debe ser una fecha/hora ISO válida" }),
+    fechaInicio: z.iso.datetime({ offset: true, message: "fechaInicio debe ser una fecha/hora ISO válida" }),
+    fechaFin: z.iso.datetime({ offset: true, message: "fechaFin debe ser una fecha/hora ISO válida" }),
     cuposTotales: z.coerce
       .number()
       .int()
@@ -64,6 +84,22 @@ export const createTournamentSchema = z
       message: "fechaFin debe ser posterior a fechaInicio",
       path: ["fechaFin"],
     },
+  )
+  .refine(
+    (data) => {
+      if (!data.bloqueos || data.bloqueos.length === 0) return true;
+      const tStart = new Date(data.fechaInicio).getTime();
+      const tEnd = new Date(data.fechaFin).getTime();
+      return data.bloqueos.every(
+        (b) =>
+          new Date(b.horaInicio).getTime() >= tStart &&
+          new Date(b.horaFin).getTime() <= tEnd,
+      );
+    },
+    {
+      message: "Todos los bloqueos de pista deben estar contenidos en el rango del torneo",
+      path: ["bloqueos"],
+    },
   );
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>;
 
@@ -78,8 +114,8 @@ export const updateTournamentSchema = z
     descripcion: z.string().trim().max(2000).optional().nullable(),
     categoriaId: z.coerce.number().int().positive().optional(),
     nivel: z.string().trim().min(1).max(60).optional(),
-    fechaInicio: z.iso.datetime({ message: "fechaInicio debe ser una fecha/hora ISO válida" }).optional(),
-    fechaFin: z.iso.datetime({ message: "fechaFin debe ser una fecha/hora ISO válida" }).optional(),
+    fechaInicio: z.iso.datetime({ offset: true, message: "fechaInicio debe ser una fecha/hora ISO válida" }).optional(),
+    fechaFin: z.iso.datetime({ offset: true, message: "fechaFin debe ser una fecha/hora ISO válida" }).optional(),
     cuposTotales: z.coerce.number().int().min(2).optional(),
     precioInscripcion: z.coerce.number().min(0).optional(),
     estado: estadoTorneoSchema.optional(),
@@ -95,6 +131,25 @@ export const updateTournamentSchema = z
     {
       message: "fechaFin debe ser posterior a fechaInicio",
       path: ["fechaFin"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (!data.bloqueos || data.bloqueos.length === 0) return true;
+      if (data.fechaInicio && data.fechaFin) {
+        const tStart = new Date(data.fechaInicio).getTime();
+        const tEnd = new Date(data.fechaFin).getTime();
+        return data.bloqueos.every(
+          (b) =>
+            new Date(b.horaInicio).getTime() >= tStart &&
+            new Date(b.horaFin).getTime() <= tEnd,
+        );
+      }
+      return true;
+    },
+    {
+      message: "Todos los bloqueos de pista deben estar contenidos en el rango del torneo",
+      path: ["bloqueos"],
     },
   );
 export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>;
@@ -135,7 +190,12 @@ export const registerTournamentSchema = z.object({
     .max(120, "El nombre de la pareja no puede exceder 120 caracteres")
     .optional()
     .nullable(),
-  pagoId: z.string().trim().optional().nullable(),
+  pagoId: z
+    .string()
+    .trim()
+    .uuid("El ID de pago debe ser un UUID válido.")
+    .optional()
+    .nullable(),
   stripePaymentIntentId: z.string().trim().optional().nullable(),
 });
 export type RegisterTournamentInput = z.infer<typeof registerTournamentSchema>;
