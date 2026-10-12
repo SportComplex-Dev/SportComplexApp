@@ -75,6 +75,7 @@ const protectedRoutePrefixes = [
   "/portal",
   "/api/admin",
   "/api/pos",
+  "/api/payments/intent",
   "/api/access",
   "/api/tickets/verify",
   "/api/pdf/receipt",
