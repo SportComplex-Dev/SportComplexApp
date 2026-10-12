@@ -65,6 +65,13 @@ test("isAccountActive solo bloquea estados inactivos explícitos", () => {
   assert.equal(isAccountActive("TEMP_INACTIVO"), false);
 });
 
+test("isAccountActive es fail-closed ante estado ausente/vacío (RN-10)", () => {
+  assert.equal(isAccountActive(undefined), false);
+  assert.equal(isAccountActive(null), false);
+  assert.equal(isAccountActive(""), false);
+  assert.equal(isAccountActive("   "), false);
+});
+
 // Bloqueante de code review: un sc-token malformado NO debe lanzar (tumbaba el middleware con 500).
 test("verifyScSessionToken con token malformado devuelve null y no lanza", async () => {
   process.env.AUTH_SECRET = process.env.AUTH_SECRET || "test-secret";

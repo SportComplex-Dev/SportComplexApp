@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseRestClient } from "@/lib/supabase/admin";
 import { authConfig } from "@/auth.config";
 import {
   extractSupabaseAccessToken,
@@ -28,13 +28,7 @@ async function verifySupabasePrincipal(req: NextRequest): Promise<SupabasePrinci
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!accessToken || !supabaseUrl || !supabaseAnonKey) return null;
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: false,
-    },
-  });
+  const supabase = createSupabaseRestClient(supabaseAnonKey);
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error) {
     if (error.status === 400 || error.status === 401 || error.status === 403) {
@@ -206,9 +200,7 @@ export default withAuth(async (req) => {
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
         if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
-          const supabase = createClient(supabaseUrl, supabaseKey, {
-            auth: { autoRefreshToken: false, persistSession: false },
-          });
+          const supabase = createSupabaseRestClient(supabaseKey);
           const { data: userById } = await supabase
             .from("usuario")
             .select("id, estado, deleted_at, rol:rol_id(nombre)")

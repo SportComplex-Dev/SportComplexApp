@@ -10,23 +10,40 @@ export function isSupabaseAdminConfigured(): boolean {
   );
 }
 
-export function createSupabaseAdminClient(): SupabaseClient {
+/**
+ * Cliente Supabase REST reutilizable. Si no se pasa `apiKey`, usa la service role.
+ * Permite compartir la misma fábrica entre la Admin API y el middleware (que puede
+ * operar con la anon key cuando no hay service role disponible).
+ */
+export function createSupabaseRestClient(apiKey?: string): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = apiKey || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !key) {
     throw new Error(
-      "Configura NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY para usar la Admin API de Supabase.",
+      "Configura NEXT_PUBLIC_SUPABASE_URL y una API key (service role o anon) para el cliente Supabase REST.",
     );
   }
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient(supabaseUrl, key, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
       persistSession: false,
     },
   });
+}
+
+export function createSupabaseAdminClient(): SupabaseClient {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !serviceRoleKey) {
+    throw new Error(
+      "Configura NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY para usar la Admin API de Supabase.",
+    );
+  }
+
+  return createSupabaseRestClient(serviceRoleKey);
 }
 
 /**
@@ -85,28 +102,40 @@ export interface AuthAdminUser {
 }
 
 export async function findSupabaseUserByEmail(email: string) {
+  const normalized = email.toLowerCase().trim();
+  // La Admin API de GoTrue solo soporta `page`/`per_page` (no `filter`), así que
+  // se pagina hasta agotar los resultados, con salida temprana al encontrar el correo.
+  const perPage = 1000;
   try {
-    const data = await adminJsonGet(
-      `/admin/users?per_page=1000&filter=${encodeURIComponent(email)}`,
-    );
-    const users = Array.isArray(data.users) ? (data.users as Array<Record<string, unknown>>) : [];
-    const normalized = email.toLowerCase();
-    const candidate = users.find(
-      (row) => String(row.email ?? "").toLowerCase() === normalized,
-    );
-    const user: AuthAdminUser | null = candidate
-      ? { id: String(candidate.id ?? ""), email: String(candidate.email ?? "") }
-      : null;
-    return { data: { user }, error: null };
+    for (let page = 1; ; page += 1) {
+      const data = await adminJsonGet(`/admin/users?page=${page}&per_page=${perPage}`);
+      const users = Array.isArray(data.users) ? (data.users as Array<Record<string, unknown>>) : [];
+      const candidate = users.find(
+        (row) => String(row.email ?? "").toLowerCase() === normalized,
+      );
+      if (candidate) {
+        const user: AuthAdminUser = {
+          id: String(candidate.id ?? ""),
+          email: String(candidate.email ?? ""),
+        };
+        return { data: { user }, error: null };
+      }
+      if (users.length < perPage) break;
+    }
+    return { data: { user: null as AuthAdminUser | null }, error: null };
   } catch (error: unknown) {
     return { data: null, error: error as Error };
   }
 }
 
-/** Rollback best-effort de una identidad Auth cuando falla la inserción en `usuario`. */
+/**
+ * Rollback best-effort de una identidad Auth cuando falla la inserción en `usuario`.
+ * Usa hard-delete (no soft-delete) porque la identidad se acaba de crear y un
+ * soft-delete bloquearía reintentar el registro con el mismo correo.
+ */
 export async function deleteSupabaseAuthUser(id: string): Promise<boolean> {
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.auth.admin.deleteUser(id, true);
+  const { error } = await supabase.auth.admin.deleteUser(id, false);
   return !error;
 }
 

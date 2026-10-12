@@ -31,7 +31,7 @@
 | `apps/web/src/lib/auth/__tests__/auth-gate.test.ts` | Tests de los guards (estados, borrado lógico, roles). |
 | `apps/web/src/lib/supabase/admin.ts` | Cliente admin (service role) con `findSupabaseUserByEmail` y `createSupabaseAuthUser` para la migración/alta de identidades. |
 | `apps/web/src/app/api/auth/logout/route.ts` | Endpoint de cierre de sesión (limpia sesión Supabase y cookies propias). |
-| `packages/db/scripts/align-supabase-auth.mts` | Script de migración **idempotente** de cuentas con `password_hash` hacia Supabase Auth. Dry-run por defecto; `--execute` + `MIGRATION_PASSWORD`; filtro `--only=email1,email2`. |
+| `packages/db/scripts/align-supabase-auth.mts` | Script de migración **idempotente** de cuentas con `password_hash` hacia Supabase Auth. Dry-run por defecto; `--execute` (crea identidades con contraseña secuencial por usuario `SportComplex{n}!`), `--reset` (rota la contraseña de identidades ya existentes) y filtro `--only=email1,email2`. Las credenciales se escriben en `.auth-passwords.local.txt` (gitignored). |
 | `packages/db/scripts/supabase-auth-audit.sql` | Consulta de auditoría de `password_hash` (por estado y tipo de hash). |
 | `packages/db/scripts/usuario-align.sql` | Utilidad SQL de alineación de usuarios. |
 | `docs/PLAN-AUTH-BACKEND.md` | Plan de trabajo del backend de autenticación. |
@@ -116,27 +116,30 @@
 
 ---
 
-## 7. Tabla de usuarios y contraseñas
+## 7. Usuarios de prueba
 
-> ⚠️ **Credenciales de prueba** (`SportComplex1!`, asignada vía Supabase Admin API). Cambiar antes de cualquier entorno real.
+> Las contraseñas **no se versionan**. Se generan por usuario de forma secuencial
+> (`SportComplex1!`, `SportComplex2!`, …) durante la migración y se guardan en
+> `packages/db/scripts/.auth-passwords.local.txt` (gitignored). Cámbialas antes de
+> cualquier entorno real.
 
-### 7.1 Las 4 cuentas a las que se (re)asignó contraseña
+### 7.1 Cuentas a las que se (re)asignó contraseña
 
-| Correo | Contraseña | Rol | Home |
-|---|---|---|---|
-| `test@example.com` | `SportComplex1!` | Cliente | `/portal` |
-| `admin@example.com` | `SportComplex1!` | Administrador | `/admin/dashboard` |
-| `cliente@sportcomplex.com` | `SportComplex1!` | Cliente | `/portal` |
-| `admin@sportcomplex.com` | `SportComplex1!` | Administrador | `/admin/dashboard` |
+| Correo | Rol | Home |
+|---|---|---|
+| `test@example.com` | Cliente | `/portal` |
+| `admin@example.com` | Administrador | `/admin/dashboard` |
+| `cliente@sportcomplex.com` | Cliente | `/portal` |
+| `admin@sportcomplex.com` | Administrador | `/admin/dashboard` |
 
-### 7.2 Las 4 cuentas de staff migradas a Supabase Auth (misma contraseña)
+### 7.2 Cuentas de staff migradas a Supabase Auth
 
-| Correo | Contraseña | Rol | Home |
-|---|---|---|---|
-| `vendedor@example.com` | `SportComplex1!` | Empleado_Vendedor | `/pos` |
-| `lector@example.com` | `SportComplex1!` | Empleado_Lector | `/scanner` |
-| `laura.taquilla@sportcomplex.com` | `SportComplex1!` | Empleado_Vendedor | `/pos` |
-| `carlos.lector@sportcomplex.com` | `SportComplex1!` | Empleado_Lector | `/scanner` |
+| Correo | Rol | Home |
+|---|---|---|
+| `vendedor@example.com` | Empleado_Vendedor | `/pos` |
+| `lector@example.com` | Empleado_Lector | `/scanner` |
+| `laura.taquilla@sportcomplex.com` | Empleado_Vendedor | `/pos` |
+| `carlos.lector@sportcomplex.com` | Empleado_Lector | `/scanner` |
 
 ---
 

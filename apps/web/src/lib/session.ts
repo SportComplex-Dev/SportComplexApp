@@ -65,7 +65,9 @@ export function normalizeEmbeddedRole(rol: EmbeddedRole): { nombre: string } | n
  * RN-10: Cuentas inactivas o con borrado lógico tienen credenciales revocadas de inmediato.
  */
 export function isAccountActive(statusStr?: string | null): boolean {
-  if (!statusStr) return true; // Si no se declara estado explícito (modo dev / cookie simple), se asume activo
+  // Fail-closed: sin estado explícito no se asume activo (RN-10). El middleware
+  // re-verifica el estado real contra la tabla `usuario` en rutas protegidas.
+  if (!statusStr || !statusStr.trim()) return false;
   const s = statusStr.trim().toUpperCase();
   if (s === "INACTIVO" || s === "TEMP_INACTIVO" || s === "TEMPORALMENTE_INACTIVO" || s === "INACTIVE") {
     return false;

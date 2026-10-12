@@ -13,14 +13,14 @@
 |----|----------|----------------|
 | **D1** | **(b) mínimo** — Google sigue en NextAuth; Supabase queda para correo/contraseña. Unificar a (a) pendiente. | — |
 | **D2** | **(b) por ahora** — enlace por correo normalizado (minúsculas; tabla ya alineada). Migración a `usuario.supabase_uid` (a) queda pendiente de coordinar con DB. | `lib/auth/resolve-app-user.ts` |
-| **D3** | **(a)** — `password_hash` legacy; solo fallback local si Supabase no está configurado. | `app/api/auth/route.ts` |
+| **D3** | **(a)** — `password_hash` legacy; fallback local **estricto**: solo cuando el correo **no** tiene identidad en Supabase **y** `AUTH_ALLOW_LOCAL_FALLBACK=true` (fail-closed si la Admin API falla). | `app/api/auth/route.ts`, `lib/auth/auth-gate.ts` |
 | **D4** | **(b)** — Admin API con `email_confirm: true` al registrar y al verificar. | `lib/supabase/admin.ts`, `register/route.ts`, `verify/route.ts` |
 
 Realizado:
 - **Login** resuelve autorización desde `usuario`.rol/estado (`resolveAppUserByEmail` + `authGateFor`), ya no lee `user_metadata.role`; `PENDIENTE` → `ACCOUNT_PENDING` (frontend redirige a `/verify`).
 - **Registro** crea la identidad en Supabase Auth (email confirmado) **y** la fila `usuario` en `PENDIENTE`, con rollback best-effort de la identidad si falla la fila DB y recuperación de huérfanos Auth.
 - **Verify** confirma el email en Supabase al activar la cuenta (best-effort).
-- **`POST /api/auth/logout`** agregado (`supabase.auth.signOut()`).
+- **`POST /api/auth/logout`** expira `sc-token`/`sc-session`/`sc-role`/`sc-status` + cookies de Auth.js y llama `supabase.auth.signOut()` (best-effort); está cableado en la UI (`app-provider.tsx`).
 - Tests unitarios de `authGateFor` (`lib/auth/__tests__/auth-gate.test.ts`).
 
 Pendiente (coordinación con DB): migración `usuario.supabase_uid` (si se decide D2=a), E2E en /login con las dos cuentas admin provisionadas, y evaluar D1 en sesión posterior.
@@ -97,8 +97,7 @@ Arquitectura objetivo:
 - Devolver `role = normalizeRole(user.rol.nombre)` (`apps/web/src/lib/session.ts:23`).
 - Aplicar estado: `PENDIENTE` → `ACCOUNT_PENDING` (redirige a `/verify`); `!== 'ACTIVO'` o
   `deletedAt` → `ACCOUNT_INACTIVE`.
-- La rama local con `password_hash` (`:55-83`): mantener solo como **fallback** cuando
-  `isSupabaseAuthConfigured()` sea falso, o eliminar según D3.
+- La rama local con `password_hash` (`:55-83`): fallback **estricto** — si `isSupabaseAuthConfigured()` es verdadero, solo habilitarlo si `AUTH_ALLOW_LOCAL_FALLBACK=true` y el correo **no** existe en Supabase Auth; fallar cerrado ante errores de la Admin API. Cuando no esté configurado, solo fallback contra BD local (Argon2id).
 
 ### 5.2 Registro — `apps/web/src/app/api/auth/register/route.ts`
 - Crear el usuario en **Supabase Auth** con la Admin API (`SUPABASE_SERVICE_ROLE_KEY`,
