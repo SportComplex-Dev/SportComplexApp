@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -13,6 +13,11 @@ import {
 } from '@sportcomplex/core'
 import { Badge, Input } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
+import { CheckoutTimer } from '@/components/booking/checkout-timer'
+import {
+  isPaymentBlocked,
+  calculateRemainingSeconds,
+} from '@/components/booking/checkout-timer-utils'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
@@ -86,8 +91,37 @@ function CheckoutContent() {
   // Wompi / Nequi state
   const [nequiPhone, setNequiPhone] = useState('')
 
+  // Timer & Cupo state (TSK-FE-09 / SCRUM-117)
+  const [isExpired, setIsExpired] = useState(false)
+
+  // Sincronizar o inicializar el TTL de 30 minutos (1800 seg) del cupo
+  useEffect(() => {
+    if (!draft) return
+
+    if (!draft.expiresAt) {
+      const expiresAt = Date.now() + 30 * 60 * 1000
+      setDraft({ ...draft, expiresAt })
+    } else if (draft.expiresAt <= Date.now()) {
+      setIsExpired(true)
+    }
+  }, [draft, setDraft])
+
   const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
+
+  const handleExpire = useCallback(() => {
+    setIsExpired(true)
+    notify('El tiempo de reserva de 30 minutos ha finalizado. El cupo ha sido liberado.', 'error')
+  }, [notify])
+
+  const handleRetry = useCallback(() => {
+    setDraft(null)
+    if (item) {
+      router.push(`/services/${item.category}/${item.id}`)
+    } else {
+      router.push('/services')
+    }
+  }, [item, router, setDraft])
 
   if (!activeDraft || !item || !category) {
     return (
@@ -109,7 +143,15 @@ function CheckoutContent() {
   const total = calculateBookingPrice(item, activeDraft.attendees)
   const Icon = categoryIcons[category.icon]
 
+  const remainingSeconds = calculateRemainingSeconds(draft?.expiresAt, Date.now())
+  const paymentBlocked = isExpired || isPaymentBlocked(remainingSeconds)
+
   const confirmPayment = async () => {
+    if (paymentBlocked) {
+      notify('El tiempo de reserva ha expirado. Por favor selecciona un nuevo turno.', 'error')
+      return
+    }
+
     // Form validation based on method
     if (method === 'pse') {
       if (!pseDocNumber.trim()) {
@@ -227,6 +269,16 @@ function CheckoutContent() {
         <i />
         <span className="progress-step">3&nbsp; Confirmación</span>
       </div>
+
+      {/* Temporizador regresivo visible en todo momento (TSK-FE-09 / SCRUM-117) */}
+      <CheckoutTimer
+        expiresAt={draft?.expiresAt}
+        initialSeconds={1800}
+        onExpire={handleExpire}
+        onRetry={handleRetry}
+        isExpired={paymentBlocked}
+        className="mb-8 max-w-[960px] mx-auto"
+      />
 
       <div className="payment-layout">
         <section className="payment-form">
@@ -424,12 +476,16 @@ function CheckoutContent() {
           {/* Action button */}
           <ActionButton
             onClick={confirmPayment}
-            disabled={isProcessing}
+            disabled={isProcessing || paymentBlocked}
             className="w-full justify-center text-[14px]"
           >
             {isProcessing ? (
               <>
                 <Loader2 size={17} className="animate-spin" /> Procesando pago...
+              </>
+            ) : paymentBlocked ? (
+              <>
+                Cupo liberado (Tiempo expirado)
               </>
             ) : (
               <>
@@ -471,6 +527,12 @@ function CheckoutContent() {
             <span>
               <Clock3 size={15} /> {activeDraft.time} · 60 minutos
             </span>
+          </div>
+          <div className="order-item py-2 border-b border-[var(--line)] flex items-center justify-between text-[12px]">
+            <span>Estado de cupo</span>
+            <b className={paymentBlocked ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
+              {paymentBlocked ? 'Expirado' : 'Bloqueado (30 min)'}
+            </b>
           </div>
           <div className="order-price">
             <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${activeDraft.attendees}`}</span>
