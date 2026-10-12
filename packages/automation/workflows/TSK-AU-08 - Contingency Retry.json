@@ -1,0 +1,331 @@
+{
+  "name": "TSK-AU-08 - Contingency Retry",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contingency",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -96
+      ],
+      "id": "0428f2a4-33d1-4c5b-9466-8ddd98840eee",
+      "name": "Webhook",
+      "webhookId": "cbf1d59a-cf5b-4863-a488-06e4f610a0e8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7cb00868-8123-4082-84a0-d0fa8521196a",
+              "leftValue": "={{ $json.body.serviceId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "efe856f4-4387-431e-807f-3d767a8f921f",
+              "leftValue": "={{ $json.body.motivo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "7fd11f81-633a-4006-baaf-eafc15d8affc",
+              "leftValue": "={{ $json.headers['x-sportcomplex-signature'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "a102f804-4174-4924-b35e-5685088c42a5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d5e29545-187f-49a7-8590-6bd31ed19d0a",
+              "name": "attempt",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "d78ab14d-416e-4799-8c6a-200f0c4fd37d",
+              "name": "maxAttempts",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "a6e29bb4-2d52-4947-93c5-e599b6376a0b",
+              "name": "eventId",
+              "value": "={{ $today.format('T') }}",
+              "type": "string"
+            },
+            {
+              "id": "1a177997-9bf6-43e1-befd-739f51239d44",
+              "name": "payload",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        448,
+        -160
+      ],
+      "id": "ca2cf396-37d0-4f8b-9a92-2628fd4cd8f1",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bc68e565-ddeb-4106-b063-85d39d7f8274",
+              "leftValue": "={{ $json.attempt }}",
+              "rightValue": "={{ $json.maxAttempts }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        656,
+        -160
+      ],
+      "id": "285fdf75-9bac-4061-a27e-c1ffb39daeff",
+      "name": "¿Superó Intentos?"
+    },
+    {
+      "parameters": {
+        "amount": "={{ 5 * Math.pow(2, $json.attempt) }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        -96
+      ],
+      "id": "fad514bb-35d6-47f5-983b-a7592bf9108a",
+      "name": "Wait",
+      "webhookId": "021859b9-3888-4e13-adda-e69c77d0689f"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "17410951-213c-4d92-9ed8-07884d673c2b",
+              "name": "attempt",
+              "value": "={{ $json.attempt + 1 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1104,
+        -144
+      ],
+      "id": "d376628f-53b6-42a0-9666-cc2ebb08babb",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00d891a2-9fd6-4382-9596-d72ad7a47782",
+              "name": "eventId",
+              "value": "={{ $json.eventId }}",
+              "type": "string"
+            },
+            {
+              "id": "92a61a3c-29b8-4da5-958d-ecf9f489e0a6",
+              "name": "payload",
+              "value": "={{ $json.payload }}",
+              "type": "object"
+            },
+            {
+              "id": "5f3b2306-6c37-497f-b2aa-68de5c47fe14",
+              "name": "attempts",
+              "value": "={{ $json.attempt }}",
+              "type": "number"
+            },
+            {
+              "id": "12f946d2-9568-4def-9737-6958d3f24a40",
+              "name": "lastError",
+              "value": "Se agotaron los reintentos tras alcanzar el limite configurado",
+              "type": "string"
+            },
+            {
+              "id": "f77005a1-9f0b-4acb-90ba-c9f4b4954199",
+              "name": "failedAt",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "3f02f832-c799-4039-8508-1fbc0e07c662",
+              "name": "status",
+              "value": "PENDING_REVIEW",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        880,
+        -256
+      ],
+      "id": "a95fef8c-58bf-4e98-86d2-420fdb6f3225",
+      "name": "Dead-Letter Queue"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "¿Superó Intentos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Superó Intentos?": {
+      "main": [
+        [
+          {
+            "node": "Dead-Letter Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "¿Superó Intentos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a78b4e85-cd5a-42af-b128-19c8339e079e",
+  "meta": {
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "AEtKOZqJrPKnBNDN",
+  "tags": []
+}
