@@ -124,7 +124,6 @@ export function TournamentRegistrationModal({
 
   return (
     <Modal
-      isOpen={isOpen}
       onClose={handleClose}
       title="Inscripción a Torneo Deportivo"
       maxWidth="max-w-lg"
