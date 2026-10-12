@@ -21,7 +21,7 @@ interface RouteContext {
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
+    const authorization = await authorizeApiRequest(["Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
@@ -51,7 +51,7 @@ export async function GET(request: Request, context: RouteContext) {
  */
 async function handleUpdate(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
+    const authorization = await authorizeApiRequest(["Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
@@ -98,7 +98,7 @@ export { handleUpdate as PUT, handleUpdate as PATCH };
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador", "SuperAdministrador"]);
+    const authorization = await authorizeApiRequest(["Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
     const { id } = await context.params;
