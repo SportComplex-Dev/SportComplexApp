@@ -3,14 +3,51 @@ import { prisma } from '@sportcomplex/db'
 import { loginSchema } from '@sportcomplex/validation'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'
 import { verifySecret } from '@sportcomplex/core/src/security/token'
-import { normalizeRole } from '@/lib/session'
+import { normalizeRole, signScSessionToken } from '@/lib/session'
+import { authGateFor } from '@/lib/auth/auth-gate'
+import { resolveAppUserByEmail } from '@/lib/auth/resolve-app-user'
+import { findSupabaseUserByEmail } from '@/lib/supabase/admin'
 
-const supportedRoles = [
-  'Administrador',
-  'Empleado_Vendedor',
-  'Empleado_Lector',
-  'Cliente',
-] as const
+/**
+ * Fallback estricto D3: valida contra `usuario.password_hash` (Argon2id) SOLO cuando
+ * el correo no tiene identidad en Supabase Auth. Verifica Argon2id (nunca bcrypt) y
+ * emite un `sc-token` firmado con AUTH_SECRET para dar sesión sin cuenta Auth.
+ */
+async function buildLegacySession(email: string, password: string): Promise<Response | null> {
+  const user = await prisma.usuario.findUnique({
+    where: { correo: email.toLowerCase().trim() },
+    include: { rol: true },
+  })
+
+  const passwordOk =
+    !!user?.passwordHash && !user.deletedAt && (await verifySecret(user.passwordHash, password))
+  if (!user || !passwordOk) return null
+
+  const role = normalizeRole(user.rol.nombre)
+  if (!role) return null
+
+  const gate = authGateFor(user.estado, Boolean(user.deletedAt))
+  if (gate.gate !== 'OK') return fail(gate.code, gate.message, gate.status)
+
+  const token = await signScSessionToken({ sub: user.id, email: user.correo, role, status: user.estado })
+  const headers: HeadersInit = {}
+  if (token) {
+    headers['Set-Cookie'] = `sc-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400; ${
+      process.env.NODE_ENV === 'production' ? 'Secure; ' : ''
+    }`
+  }
+  return ok(
+    {
+      user: {
+        id: user.id,
+        email: user.correo,
+        name: user.nombre,
+        role,
+      },
+    },
+    headers,
+  )
+}
 
 export async function POST(request: Request) {
   try {
@@ -25,60 +62,73 @@ export async function POST(request: Request) {
     const { email, password } = validation.data
 
     if (isSupabaseAuthConfigured()) {
+      // ruta primaria: Supabase Auth valida la identidad (quién eres)
       const supabase = await createSupabaseServerClient()
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error || !data.user) {
+        // Fallback estricto: solo si NO existe cuenta de Supabase para este correo.
+        if (process.env.AUTH_ALLOW_LOCAL_FALLBACK === 'true') {
+          const { data: supabaseMatch } = await findSupabaseUserByEmail(email)
+          if (!supabaseMatch?.user) {
+            const legacy = await buildLegacySession(email, password)
+            if (legacy) return legacy
+          }
+        }
         return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
       }
 
-      const metadata = data.user.user_metadata
-      const metadataRole = metadata.role
-      const role = typeof metadataRole === 'string'
-        ? supportedRoles.find((supportedRole) => supportedRole === metadataRole) ?? 'Cliente'
-        : 'Cliente'
-      const metadataName = metadata.name ?? metadata.full_name
-      const name = typeof metadataName === 'string' && metadataName.trim()
-        ? metadataName.trim()
-        : data.user.email?.split('@')[0] ?? 'Usuario'
+      // Autorización (qué puedes): rol y estado salen de la tabla `usuario`, nunca de user_metadata.
+      const resolved = await resolveAppUserByEmail(data.user.email ?? email)
+      if (!resolved || !resolved.role) {
+        return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
+      }
+
+      const gate = authGateFor(resolved.status, resolved.deleted)
+      if (gate.gate !== 'OK') {
+        return fail(gate.code, gate.message, gate.status)
+      }
 
       return ok({
         user: {
-          id: data.user.id,
-          email: data.user.email ?? email,
-          name,
-          role,
+          id: resolved.id,
+          email: resolved.email,
+          name: resolved.name,
+          role: resolved.role,
         },
       })
     }
 
-    // 2. Buscar al usuario en la base de datos
+    // Fallback local (solo cuando Supabase Auth NO está configurado): verifica contra
+    // password_hash legacy Argon2id (D3=a; ver token.ts y README de packages/db).
     const user = await prisma.usuario.findUnique({
       where: { correo: email.toLowerCase().trim() },
       include: { rol: true },
     })
 
-    // 3. Comparar contraseña contra el hash Argon2id (nunca en texto plano)
     const passwordOk =
       !!user?.passwordHash && !user.deletedAt && (await verifySecret(user.passwordHash, password))
     if (!user || !passwordOk) {
       return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
     }
 
-    if (user.estado === 'PENDIENTE') {
-      return fail('ACCOUNT_PENDING', 'Verifica tu correo antes de ingresar.', 403)
-    }
-    if (user.estado !== 'ACTIVO') {
-      return fail('ACCOUNT_INACTIVE', 'Tu cuenta está inactiva.', 403)
+    const role = normalizeRole(user.rol.nombre)
+    if (!role) {
+      return fail('INVALID_CREDENTIALS', 'Credenciales incorrectas.', 401)
     }
 
-    // 4. Responder con los datos del usuario para autorizar el acceso
+    const gate = authGateFor(user.estado, Boolean(user.deletedAt))
+    if (gate.gate !== 'OK') {
+      return fail(gate.code, gate.message, gate.status)
+    }
+
+    // Responder con los datos del usuario para autorizar el acceso
     return ok({
       user: {
         id: user.id,
         email: user.correo,
         name: user.nombre,
-        role: normalizeRole(user.rol.nombre) ?? 'Cliente',
+        role,
       },
     })
   } catch (error: unknown) {

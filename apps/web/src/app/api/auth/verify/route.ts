@@ -10,6 +10,7 @@ import {
   resetRateLimit,
 } from "@sportcomplex/core/src/security/rate-limit";
 import { prisma, findLatestByUsuarioId, markUsed } from "@sportcomplex/db";
+import { confirmSupabaseUserEmail } from "@/lib/supabase/admin";
 
 /** Intentos máximos de verificación por token antes de invalidarlo. */
 const VERIFY_MAX_ATTEMPTS_PER_TOKEN = 5;
@@ -148,6 +149,10 @@ export async function POST(request: Request) {
     where: { id: usuario.id },
     data: { estado: "ACTIVO" },
   });
+
+  // Consistencia con Supabase Auth (best-effort, D4=b): el email de la identidad
+  // queda confirmado; no bloquea la respuesta si el fallo de red lo impide.
+  await confirmSupabaseUserEmail(usuario.correo);
 
   return ok({
     message: "Cuenta verificada exitosamente",

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
 import { createClient } from "@supabase/supabase-js";
-import { prisma } from "@sportcomplex/db";
 import { authConfig } from "@/auth.config";
 import {
   extractSupabaseAccessToken,
@@ -189,7 +188,7 @@ export default withAuth(async (req) => {
           userId: "dev-override",
           email: "admin@sportcomplex.co",
         }
-      : (isDev ? extractSession(req) : null));
+      : (await extractSession(req)));
   let currentSession = session;
   if (
     needsFreshAccount &&
@@ -202,25 +201,45 @@ export default withAuth(async (req) => {
     } else {
       let account;
       try {
-        account = await prisma.usuario.findUnique({
-          where: { id: sessionToRefresh.userId },
-          select: {
-            id: true,
-            estado: true,
-            deletedAt: true,
-            rol: { select: { nombre: true } },
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!supabaseUrl || !supabaseServiceKey) {
+          throw new Error("SUPABASE_SERVICE_ROLE_KEY no configurado");
+        }
+        const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+          auth: {
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            persistSession: false,
           },
         });
+        const toAccount = (
+          row: { id: string; estado: string; deleted_at: string | null; rol: { nombre: string } | Array<{ nombre: string }> | null } | null,
+        ) =>
+          row
+            ? (() => {
+                const rolRow = Array.isArray(row.rol) ? row.rol[0] : row.rol;
+                return {
+                  id: row.id,
+                  estado: row.estado,
+                  deletedAt: row.deleted_at,
+                  rol: rolRow ? { nombre: rolRow.nombre } : null,
+                };
+              })()
+            : null;
+        const { data: byId } = await serviceClient
+          .from("usuario")
+          .select("id,estado,deleted_at,rol(nombre)")
+          .eq("id", sessionToRefresh.userId)
+          .maybeSingle();
+        account = toAccount(byId);
         if (!account && supabasePrincipal?.email) {
-          account = await prisma.usuario.findUnique({
-            where: { correo: supabasePrincipal.email },
-            select: {
-              id: true,
-              estado: true,
-              deletedAt: true,
-              rol: { select: { nombre: true } },
-            },
-          });
+          const { data: byEmail } = await serviceClient
+            .from("usuario")
+            .select("id,estado,deleted_at,rol(nombre)")
+            .eq("correo", supabasePrincipal.email)
+            .maybeSingle();
+          account = toAccount(byEmail);
         }
       } catch (error: unknown) {
         console.error("Error al validar el estado de la sesión:", error);
