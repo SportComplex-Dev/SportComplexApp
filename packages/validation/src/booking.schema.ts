@@ -6,6 +6,8 @@ export const bookingRequestSchema = z.object({
   startTime: z.iso.datetime(),
   endTime: z.iso.datetime(),
   cantidadCupos: z.coerce.number().int().positive().default(1),
+  titularId: z.string().uuid().optional(),
+  canal: z.enum(["ONLINE", "TAQUILLA"]).optional(),
 });
 
 export const cartCheckoutSchema = z.object({

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PaymentError, procesarPagoWebhook } from "./payments.js";
+import { PaymentError, procesarPagoWebhook, procesarFacturaWebhook } from "./payments.js";
 import { createMockPrisma } from "../../test/mock-prisma";
 
 function seedReserva(mock: any, overrides: Record<string, unknown> = {}) {
@@ -435,3 +435,249 @@ test("SCRUM-163: evento FALLIDO tardío tras APROBADO en multi-reserva nunca deg
   assert.equal(mock._state.reservas[0].estado, "CONFIRMADA");
   assert.equal(mock._state.reservas[1].estado, "CONFIRMADA");
 });
+
+test("TSK-BE-20: invoice.paid renueva proxima_renovacion y mantiene beneficios VIGENTE sin interrupción", async () => {
+  const mock = createMockPrisma();
+  const userId = "00000000-0000-4000-8000-000000000099";
+  mock._state.membresias.push({
+    id: 10,
+    usuarioId: userId,
+    planId: 2, // Mensual
+    estado: "VIGENTE",
+    fechaInicio: new Date("2026-09-15"),
+    proximaRenovacion: new Date("2026-10-15"),
+    stripeSubscriptionId: "sub_mensual_99",
+  });
+
+  const res = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_sub_99_1",
+      stripeSubscriptionId: "sub_mensual_99",
+      stripePaymentIntentId: "pi_in_99_1",
+      monto: 180000,
+      estado: "APROBADO",
+      periodEnd: new Date("2026-11-15T12:00:00Z"),
+    },
+    { db: mock },
+  );
+
+  assert.equal(res.estado, "APROBADO");
+  assert.equal(res.membresiaRenovada, true);
+  assert.equal(res.pagoCreado, true);
+  assert.equal(res.duplicado, false);
+
+  const m = mock._state.membresias.find((item: any) => item.id === 10);
+  assert.equal(m.estado, "VIGENTE");
+  assert.equal(m.proximaRenovacion.toISOString().slice(0, 10), "2026-11-15");
+
+  const pago = mock._state.pagos.find((p: any) => p.stripePaymentIntentId === "pi_in_99_1");
+  assert.ok(pago);
+  assert.equal(pago.tipo, "MEMBRESIA");
+  assert.equal(pago.estado, "APROBADO");
+});
+
+test("TSK-BE-20: reenviar el mismo invoice.paid es idempotente (no duplica PAGO)", async () => {
+  const mock = createMockPrisma();
+  const userId = "00000000-0000-4000-8000-000000000099";
+  mock._state.membresias.push({
+    id: 11,
+    usuarioId: userId,
+    planId: 2,
+    estado: "VIGENTE",
+    fechaInicio: new Date("2026-09-15"),
+    proximaRenovacion: new Date("2026-10-15"),
+    stripeSubscriptionId: "sub_mensual_dup",
+  });
+
+  const input = {
+    stripeInvoiceId: "in_dup_1",
+    stripeSubscriptionId: "sub_mensual_dup",
+    stripePaymentIntentId: "pi_dup_1",
+    monto: 180000,
+    estado: "APROBADO" as const,
+    periodEnd: new Date("2026-11-15T12:00:00Z"),
+  };
+
+  const primera = await procesarFacturaWebhook(input, { db: mock });
+  assert.equal(primera.pagoCreado, true);
+  assert.equal(primera.duplicado, false);
+
+  const segunda = await procesarFacturaWebhook(input, { db: mock });
+  assert.equal(segunda.pagoCreado, false);
+  assert.equal(segunda.duplicado, true);
+  assert.equal(mock._state.pagos.length, 1);
+});
+
+test("TSK-BE-20: invoice.payment_failed transiciona la membresía a VENCIDA y registra fallo", async () => {
+  const mock = createMockPrisma();
+  const userId = "00000000-0000-4000-8000-000000000099";
+  mock._state.membresias.push({
+    id: 12,
+    usuarioId: userId,
+    planId: 2,
+    estado: "VIGENTE",
+    fechaInicio: new Date("2026-09-15"),
+    proximaRenovacion: new Date("2026-10-15"),
+    stripeSubscriptionId: "sub_mensual_fail",
+  });
+
+  const res = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_fail_1",
+      stripeSubscriptionId: "sub_mensual_fail",
+      stripePaymentIntentId: "pi_fail_1",
+      monto: 180000,
+      estado: "FALLIDO",
+    },
+    { db: mock },
+  );
+
+  assert.equal(res.estado, "FALLIDO");
+  assert.equal(res.membresiaVencida, true);
+  const m = mock._state.membresias.find((item: any) => item.id === 12);
+  assert.equal(m.estado, "VENCIDA");
+
+  const pago = mock._state.pagos.find((p: any) => p.stripePaymentIntentId === "pi_fail_1");
+  assert.ok(pago);
+  assert.equal(pago.estado, "FALLIDO");
+});
+
+test("TSK-BE-20: procesarFacturaWebhook recupera y reactiva a VIGENTE si un invoice fallido es posteriormente pagado", async () => {
+  const mock = createMockPrisma();
+  const userId = "00000000-0000-4000-8000-000000000001";
+  mock._state.usuarios.push({ id: userId, correo: "recover@test.com" });
+  mock._state.planesMembresia.push({
+    id: 2,
+    nombre: "Plan Mensual",
+    periodicidad: "MENSUAL",
+    precio: 180000,
+    descuentoPct: 30,
+    activo: true,
+  });
+  mock._state.membresias.push({
+    id: 15,
+    usuarioId: userId,
+    planId: 2,
+    estado: "VIGENTE",
+    fechaInicio: new Date("2026-09-15"),
+    proximaRenovacion: new Date("2026-10-15"),
+    stripeSubscriptionId: "sub_recover_test",
+  });
+
+  // 1. Fallo inicial
+  const resFail = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_rec_1",
+      stripeSubscriptionId: "sub_recover_test",
+      stripePaymentIntentId: "pi_rec_1",
+      monto: 180000,
+      estado: "FALLIDO",
+    },
+    { db: mock },
+  );
+  assert.equal(resFail.estado, "FALLIDO");
+  assert.equal(resFail.membresiaVencida, true);
+  assert.equal(mock._state.membresias[0].estado, "VENCIDA");
+
+  // 2. Reintento exitoso (cliente actualizó tarjeta)
+  const resSuccess = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_rec_1",
+      stripeSubscriptionId: "sub_recover_test",
+      stripePaymentIntentId: "pi_rec_1",
+      monto: 180000,
+      estado: "APROBADO",
+      periodEnd: new Date("2026-11-15T00:00:00.000Z"),
+    },
+    { db: mock },
+  );
+  assert.equal(resSuccess.estado, "APROBADO");
+  assert.equal(resSuccess.membresiaRenovada, true);
+  assert.equal(mock._state.membresias[0].estado, "VIGENTE");
+  assert.equal(resSuccess.usuarioId, userId);
+
+  // 3. Reenvío idempotente del aprobado no vuelve a reactivar
+  const resDuplicate = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_rec_1",
+      stripeSubscriptionId: "sub_recover_test",
+      stripePaymentIntentId: "pi_rec_1",
+      monto: 180000,
+      estado: "APROBADO",
+      periodEnd: new Date("2026-11-15T00:00:00.000Z"),
+    },
+    { db: mock },
+  );
+  assert.equal(resDuplicate.duplicado, true);
+  assert.equal(resDuplicate.membresiaRenovada, false);
+});
+
+test("TSK-BE-20: procesarFacturaWebhook da de alta la membresía en el primer invoice.paid si no existe previamente", async () => {
+  const mock = createMockPrisma();
+  const userId = "00000000-0000-4000-8000-0000000000new";
+  mock._state.usuarios.push({ id: userId, correo: "newsub@test.com" });
+  mock._state.planesMembresia.push({
+    id: 1,
+    nombre: "Plan Semanal",
+    periodicidad: "SEMANAL",
+    precio: 50000,
+    descuentoPct: 30,
+    activo: true,
+  });
+
+  // El usuario NO tiene ninguna membresía previa en la BD
+  assert.equal(mock._state.membresias.length, 0);
+
+  const res = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_first_charge_100",
+      stripeSubscriptionId: "sub_brand_new_100",
+      stripePaymentIntentId: "pi_first_charge_100",
+      usuarioId: userId,
+      planId: 1,
+      monto: 50000,
+      estado: "APROBADO",
+      periodEnd: new Date("2026-10-25T00:00:00.000Z"),
+    },
+    { db: mock },
+  );
+
+  assert.equal(res.estado, "APROBADO");
+  assert.equal(res.pagoCreado, true);
+  assert.equal(res.membresiaRenovada, true);
+  assert.ok(res.membresiaId);
+
+  // Se dio de alta 1 membresía VIGENTE en la BD vinculada al usuario y a Stripe
+  assert.equal(mock._state.membresias.length, 1);
+  const m = mock._state.membresias[0];
+  assert.equal(m.usuarioId, userId);
+  assert.equal(m.planId, 1);
+  assert.equal(m.estado, "VIGENTE");
+  assert.equal(m.stripeSubscriptionId, "sub_brand_new_100");
+  assert.equal(m.proximaRenovacion.toISOString(), "2026-10-25T00:00:00.000Z");
+
+  // El pago se vinculó a la nueva membresía
+  const pago = mock._state.pagos.find((p: any) => p.stripePaymentIntentId === "pi_first_charge_100");
+  assert.ok(pago);
+  assert.equal(pago.membresiaId, m.id);
+
+  // Idempotencia: reenviar el mismo invoice.paid no duplica la membresía
+  const resDup = await procesarFacturaWebhook(
+    {
+      stripeInvoiceId: "in_first_charge_100",
+      stripeSubscriptionId: "sub_brand_new_100",
+      stripePaymentIntentId: "pi_first_charge_100",
+      usuarioId: userId,
+      planId: 1,
+      monto: 50000,
+      estado: "APROBADO",
+      periodEnd: new Date("2026-10-25T00:00:00.000Z"),
+    },
+    { db: mock },
+  );
+
+  assert.equal(resDup.duplicado, true);
+  assert.equal(resDup.membresiaRenovada, false);
+  assert.equal(mock._state.membresias.length, 1);
+});
+

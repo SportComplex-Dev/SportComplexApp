@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const authorization = await authorizeApiRequest(["Cliente"]);
+    const authorization = await authorizeApiRequest(["Cliente", "Empleado_Vendedor", "Administrador"]);
     if (!authorization.authorized) return authorization.response;
 
     let body: unknown;
@@ -40,9 +40,16 @@ export async function POST(request: Request) {
       return fail("VALIDATION_ERROR", "Datos de reserva inválidos.", 400, parsed.error.flatten());
     }
 
+    const isStaff = authorization.actor.role === "Empleado_Vendedor" || authorization.actor.role === "Administrador";
+    const titularId = isStaff ? (parsed.data.titularId ?? authorization.actor.id) : authorization.actor.id;
+    const canal = isStaff ? (parsed.data.canal ?? "TAQUILLA") : "ONLINE";
+    const vendedorId = isStaff ? authorization.actor.id : null;
+
     const reservation = await createBookingHold({
       ...parsed.data,
-      userId: authorization.actor.id,
+      userId: titularId,
+      canal,
+      vendedorId,
     });
     return created(reservation);
   } catch (error: unknown) {
