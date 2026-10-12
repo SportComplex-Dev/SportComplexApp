@@ -161,6 +161,10 @@ button { cursor: pointer; }
 .action-button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 12px; padding: 0 20px; border: 0; border-radius: 9px; background: var(--brand-accent); color: var(--content-on-accent); font-size: 13px; font-weight: 750; transition: transform .18s, background .18s; }
 .action-secondary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px; padding: 0 20px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; transition: transform .18s, background .18s, border-color .18s; }
 .action-secondary:hover { transform: translateY(-1px); background: var(--surface-soft); border-color: var(--brand-green-soft, #88ac54); }
+@keyframes hero-pill-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
 .hero-wrap { position: relative; display: flex; min-height: 565px; max-height: 650px; align-items: center; overflow: hidden; background: var(--brand-hero-surface); color: var(--content-on-dark); }
 .hero-image { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8, 29, 21, .91) 0%, rgba(8, 29, 21, .78) 38%, rgba(8, 29, 21, .14) 100%), linear-gradient(0deg, rgba(10, 29, 22, .43), transparent 35%), url('/images/club-hero.png') center 47% / cover; }
 .hero-content { position: relative; z-index: 1; width: min(100%, 1280px); margin: 0 auto; padding: 72px 42px 88px; }
