@@ -145,6 +145,30 @@ export function hhmm(value: string): string {
   return value.slice(0, 5);
 }
 
+export interface ZoneMismatch {
+  /** Servicio al que pertenece el tiquete: zona a la que se debe dirigir al usuario. */
+  ticketService: string;
+  /** Servicio del puesto actual donde se realizó la lectura. */
+  postService: string;
+}
+
+const ZONE_MISMATCH_PATTERN = /pertenece a (.+?) y se encuentra en (.+?)\s*$/i;
+
+/**
+ * TSK-FE-16 (HU-16 / RF-14): extrae ambos servicios del mensaje literal del
+ * 403 de discrepancia de zona (TSK-BE-16):
+ * "Acceso denegado: El tiquete pertenece a {X} y se encuentra en {Y}".
+ * Devuelve `null` si el mensaje no sigue ese formato.
+ */
+export function parseZoneMismatch(message: string): ZoneMismatch | null {
+  const match = ZONE_MISMATCH_PATTERN.exec(message.trim());
+  if (!match) return null;
+  const ticketService = match[1].trim();
+  const postService = match[2].trim();
+  if (ticketService.length === 0 || postService.length === 0) return null;
+  return { ticketService, postService };
+}
+
 export function buildExpiredSlotDetails(
   ticket: {
     fecha: string;
