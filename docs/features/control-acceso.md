@@ -742,3 +742,14 @@ La suite automatizada se ubica en:
 - **Typecheck:** `tsc --noEmit` sin errores en los 5 workspaces del monorepo (`validation`, `ui`, `db`, `core`, `web`).
 - **Lint:** ESLint v9 en modo estricto sin advertencias ni errores en ningún paquete del monorepo.
 
+
+---
+
+## Pantalla de inhabilitación por contingencia (PR #72, RF-19)
+
+El admin puede inhabilitar servicios por contingencia desde `apps/web/src/app/(admin)/admin/incident/page.tsx`, con API en `apps/web/src/app/api/admin/incident/route.ts` y persistencia en `packages/db/src/repositories/contingencies.ts`.
+
+- **Motivo obligatorio**: 3–255 caracteres (`isIncidentReasonValid` en `incident-utils.ts`).
+- **Fechas/horas en UTC**: `formatIncidentDate`/`formatIncidentHour` fuerzan `timeZone: 'UTC'` para evitar off-by-one en `America/Bogota` (las columnas son `@db.Date`/`@db.Time` de Postgres).
+- La inhabilitación alimenta el flujo de notificación por contingencia (ver `docs/automation/workflows.md` y webhook `N8N_CONTINGENCY_WEBHOOK_URL`).
+- Tests: `incident-ui.test.ts` + `route.test.ts`.

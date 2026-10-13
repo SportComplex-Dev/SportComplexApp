@@ -170,3 +170,14 @@ transacciones con `ROLLBACK` (sin datos residuales):
 - 1ª `VIGENTE` OK · 2ª `VIGENTE` rechazada `23505` · `VIGENTE`+`VENCIDA` OK
 - plan con `descuento_pct = 15` rechazado `23514`
 - smoke ORM: `prisma.membresia.findMany` con `include: { plan: true }` OK
+
+---
+
+## Portal de membresías con descuento en reservas (PR #71)
+
+El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) muestra planes con periodicidad `SEMANAL | MENSUAL | ANUAL` y la membresía activa del usuario (`VIGENTE | VENCIDA | CANCELADA`).
+
+- **Descuento del 30 %**: cada plan confiere `descuentoPct` que se aplica automáticamente al alquilar pistas/canchas. El desglose (`apps/web/src/components/portal/membership-utils.ts`, `PlanDisplayBreakdown`) transparenta precio original, monto de descuento y precio final antes del cobro en Stripe.
+- **Cobro transparente**: el monto que ve el usuario es el que se cobra; sin cargos ocultos.
+- **Beneficios por periodicidad** (`BENEFICIOS_POR_PERIODICIDAD`): acceso a gimnasio/piscina/zona húmeda según plan, pase de invitado mensual, QR digital para torniquetes, reserva preferente 48 h.
+- Tests: `membership-utils.test.ts` (144+ casos de cálculo y formato).
