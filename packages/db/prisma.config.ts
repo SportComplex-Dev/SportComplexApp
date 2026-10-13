@@ -4,6 +4,9 @@ import { defineConfig } from '@prisma/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 try {
+  process.loadEnvFile(path.resolve(__dirname, '../../apps/web/.env.local'));
+} catch {}
+try {
   process.loadEnvFile(path.resolve(__dirname, '../../apps/web/.env'));
 } catch {}
 try {
