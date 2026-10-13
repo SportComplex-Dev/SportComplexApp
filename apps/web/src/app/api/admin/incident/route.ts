@@ -9,7 +9,6 @@ import { disableServiceForContingencySchema } from "@sportcomplex/validation";
 import { auth } from "@/auth";
 import { fail, ok } from "@/lib/api-response";
 import { authorizeApiRequest } from "@/lib/api-auth";
-import { normalizeRole } from "@/lib/session";
 import { sendContingencyWebhook } from "@/lib/contingency-webhook";
 
 interface IncidentSession {

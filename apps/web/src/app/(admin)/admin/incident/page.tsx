@@ -16,7 +16,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react'
-import { Badge, Input } from '@sportcomplex/ui'
+import { Badge } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
 import { Modal } from '@/components/modal'
 import { PageHeading } from '@/components/page-heading'
