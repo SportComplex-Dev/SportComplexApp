@@ -892,6 +892,7 @@ export default function ScannerPage() {
               onClose={handleScanNextTurno}
               onRedeem={handleRedeem}
               onScanNext={handleScanNextTurno}
+              postServiceName={activeShift?.courtName}
             />
           </div>
         )}

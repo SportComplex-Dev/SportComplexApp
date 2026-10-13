@@ -9,6 +9,7 @@ import type {
   ScannerFlowState,
   ScannedTicket,
 } from "@/components/scanner/scanner.service";
+import { ServiceMismatchAlert } from "@/components/scanner/service-mismatch-alert";
 
 type TicketValidationModalProps = {
   isOpen: boolean;
@@ -20,6 +21,8 @@ type TicketValidationModalProps = {
   onClose: () => void;
   onRedeem: () => void;
   onScanNext: () => void;
+  /** Nombre del puesto actual; se muestra como contexto en la alerta de zona (TSK-FE-16). */
+  postServiceName?: string;
 };
 
 function TicketDetails({ ticket }: { ticket: NonNullable<RedeemTicketResponse["ticket"]> }) {
@@ -70,6 +73,7 @@ export function TicketValidationModal({
   onClose,
   onRedeem,
   onScanNext,
+  postServiceName,
 }: TicketValidationModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -185,13 +189,17 @@ export function TicketValidationModal({
               </div>
             ) : isDenied ? (
               <div className="space-y-4">
-                <div role="alert" className="rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-4 text-brand-danger-text">
-                  <div className="flex items-center gap-2 text-base font-semibold">
-                    <ShieldAlert className="h-5 w-5" />
-                    {denial ?? "ACCESO DENEGADO"}
+                {result?.code === "SERVICE_MISMATCH" ? (
+                  <ServiceMismatchAlert message={message} postServiceName={postServiceName} />
+                ) : (
+                  <div role="alert" className="rounded-2xl border border-brand-danger-border bg-brand-danger-bg p-4 text-brand-danger-text">
+                    <div className="flex items-center gap-2 text-base font-semibold">
+                      <ShieldAlert className="h-5 w-5" />
+                      {denial ?? "ACCESO DENEGADO"}
+                    </div>
+                    <p className="mt-2 text-sm">{message}</p>
                   </div>
-                  <p className="mt-2 text-sm">{message}</p>
-                </div>
+                )}
                 {detailTicket ? <TicketDetails ticket={detailTicket} /> : null}
                 <button
                   type="button"
