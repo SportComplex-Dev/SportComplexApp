@@ -332,14 +332,20 @@ test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo
     }),
   });
 
-  const res = await POST(req);
-  assert.equal(res.status, 200);
-  const json = await res.json();
-  assert.equal(json.success, true);
-  assert.equal(json.data.booking.paymentMode, "stripe_link");
-  assert.ok(json.data.booking.alternativePaymentUrl.includes("checkout?session_id="));
-  assert.ok(json.data.booking.alternativePaymentUrl.includes("serviceId=10"));
-  assert.ok(json.data.booking.alternativePaymentUrl.includes("amount=80000"));
+  const prevStripeKey = process.env.STRIPE_SECRET_KEY;
+  delete process.env.STRIPE_SECRET_KEY;
+  try {
+    const res = await POST(req);
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.booking.paymentMode, "stripe_link");
+    assert.ok(json.data.booking.alternativePaymentUrl.includes("checkout?session_id="));
+    assert.ok(json.data.booking.alternativePaymentUrl.includes("serviceId=10"));
+    assert.ok(json.data.booking.alternativePaymentUrl.includes("amount=80000"));
+  } finally {
+    if (prevStripeKey !== undefined) process.env.STRIPE_SECRET_KEY = prevStripeKey;
+  }
 });
 
 test("POS API (ARCH-03): genera sesión real de Stripe Checkout cuando createCheckoutSession está inyectado", async () => {
