@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { z } from "zod";
 import { auth } from "@/auth";
@@ -44,10 +45,27 @@ function paymentIntentResponse(paymentIntent: Stripe.PaymentIntent) {
   });
 }
 
+export interface OnlinePaymentDependencies {
+  stripeClient?: Stripe;
+}
+
+// Sobrecargas de función: una para Next.js Route Handler runtime y otra para tests con inyección de dependencias
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<Record<string, string | string[] | undefined>> },
+): Promise<Response>;
 export async function POST(
   request: Request,
-  dependencies: { stripeClient?: Stripe } = {},
+  dependencies?: OnlinePaymentDependencies,
+): Promise<Response>;
+export async function POST(
+  request: Request | NextRequest,
+  ctxOrDeps: unknown = {},
 ) {
+  const dependencies: OnlinePaymentDependencies =
+    ctxOrDeps && typeof ctxOrDeps === "object" && "stripeClient" in ctxOrDeps
+      ? (ctxOrDeps as OnlinePaymentDependencies)
+      : {};
   try {
     let userId: string | null = null;
     const authResult = await authorizeApiRequest(["Cliente"]);
