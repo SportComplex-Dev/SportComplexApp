@@ -165,3 +165,22 @@ Reglas frontend:
 - Ante `409`, refrescar la grilla de slots en vez de reintentar el POST.
 - Validar en UI la ventana `[hoy, hoy+15]` pero dejar la decisión final al repo (hora `America/Bogota` del servidor).
 - Mostrar el TTL de pago (`expiraEn`) para `PENDIENTE_PAGO`.
+
+---
+
+## Módulo: Torneos y Boletos de Entrada (`tournaments.ts`)
+
+Gestión de catálogo, inscripción atómica, verificación de pagos y control de acceso seguro para torneos deportivos (TSK-BD-12, TSK-BE-25, TSK-BE-26).
+
+### Contratos de Repositorio
+
+- `inscribirUsuarioTorneo(input, options)`:
+  - Control de concurrencia atómico: reserva de cupo mediante `tx.torneo.updateMany({ where: { id, cuposOcupados: { lt: cuposTotales } }, data: { cuposOcupados: { increment: 1 } } })` para prevenir sobreventa (*overbooking*).
+  - Manejo de reintentos y unicidad `@@unique([torneoId, usuarioId])`: si el usuario ya tiene inscripción en `PENDIENTE_PAGO`, no duplica registros; transiciona a `CONFIRMADA` una vez acreditado el pago.
+  - Genera `ticketCodigoUuid` para emisión de código QR seguro con estándar `SC1:<uuid>:<hmac>`.
+- `verificarPagoParaTorneo(identificador, usuarioId, montoRequerido, torneoId?, options)`:
+  - Valida que el pago (por `id` UUID o `stripePaymentIntentId`) exista, pertenezca a `usuarioId`, esté en estado `APROBADO`, cubra al menos `montoRequerido`, y no haya sido utilizado en otro torneo.
+- `obtenerInscripcionPorTicket(ticketCodigoUuid, options)`:
+  - Resuelve inscripción y datos del torneo/usuario para auditoría y validación en portería de acceso.
+- `canjearTicketTorneo(ticketCodigoUuid, empleadoId, options)`:
+  - Transición atómica irreversible de ticket (`EMITIDO` -> `USADO`), registrando `ticketUsadoEn` y `ticketUsadoPor`. Rechaza con `409 ALREADY_USED` si ya fue canjeado.
