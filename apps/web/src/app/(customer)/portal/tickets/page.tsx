@@ -15,7 +15,6 @@ import {
 import {
   formatDate,
   formatMoney,
-  type Booking,
 } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { PageHeading } from '@/components/page-heading'
@@ -31,6 +30,8 @@ import {
 } from '@/components/portal/portal-utils'
 import { QRGraphicHD } from '@/components/portal/qr-modal'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
+import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
+import type { PortalTicket } from '@/components/portal/portal-utils'
 
 type TabType = 'activas' | 'historial' | 'canceladas'
 
@@ -39,13 +40,13 @@ export default function TicketsPage() {
   const [localBookings] = useBookings()
   const [, setLastCode] = useLastCode()
   const [activeTab, setActiveTab] = useState<TabType>('activas')
-  const [selectedTicket, setSelectedTicket] = useState<Booking | null>(null)
-  const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
+  const [printingTicket, setPrintingTicket] = useState<PortalTicket | null>(null)
   const [printingReceipt, setPrintingReceipt] = useState<ReceiptApiResponse | null>(null)
   const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [isPrinting, setIsPrinting] = useState<boolean>(false)
-  const [dbBookings, setDbBookings] = useState<Booking[]>([])
+  const [dbBookings, setDbBookings] = useState<PortalTicket[]>([])
 
   // Cargar historial real desde el endpoint TSK-BE-13
   useEffect(() => {
@@ -65,8 +66,8 @@ export default function TicketsPage() {
     }
   }, [session])
 
-  const allBookings = useMemo(() => {
-    const combined = [...dbBookings]
+  const allBookings = useMemo<PortalTicket[]>(() => {
+    const combined: PortalTicket[] = [...dbBookings]
     const dbCodes = new Set(dbBookings.map((b) => b.code))
     localBookings.forEach((b) => {
       if (!dbCodes.has(b.code)) {
@@ -90,7 +91,7 @@ export default function TicketsPage() {
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
-  const handleOpenQrModal = useCallback(async (ticket: Booking) => {
+  const handleOpenQrModal = useCallback(async (ticket: PortalTicket) => {
     setSelectedTicket(ticket)
     if (!ticket.qrPayload && ticket.id) {
       try {
@@ -109,7 +110,7 @@ export default function TicketsPage() {
     }
   }, [])
 
-  const handlePrintTicket = useCallback(async (ticket: Booking) => {
+  const handlePrintTicket = useCallback(async (ticket: PortalTicket) => {
     try {
       setIsPrinting(true)
       const receipt = await fetchReceiptData(ticket.id).catch(() => null)
@@ -167,7 +168,7 @@ export default function TicketsPage() {
     }
   }, [notify])
 
-  const handleDownloadQr = useCallback(async (ticket: Booking) => {
+  const handleDownloadQr = useCallback(async (ticket: PortalTicket) => {
     if (downloadingId) return
     setDownloadingId(ticket.id)
     try {
@@ -284,6 +285,15 @@ export default function TicketsPage() {
                           {booking.status}
                         </Badge>
                       </div>
+                      {booking.status === 'Confirmada' && (
+                        <AccessWindowIndicator
+                          compact
+                          date={booking.date}
+                          time={booking.time}
+                          accessWindowStart={booking.accessWindowStart}
+                          accessWindowEnd={booking.accessWindowEnd}
+                        />
+                      )}
                       <span className="text-xs text-[var(--subtle)] flex flex-wrap items-center gap-2 mt-1">
                         <span>
                           <strong className="text-[var(--ink)] font-semibold">{booking.code}</strong>
@@ -390,6 +400,13 @@ export default function TicketsPage() {
             <QRGraphicHD
               code={selectedTicket.qrPayload || selectedTicket.code}
               dataUrl={selectedTicket.qrDataUrl}
+            />
+
+            <AccessWindowIndicator
+              date={selectedTicket.date}
+              time={selectedTicket.time}
+              accessWindowStart={selectedTicket.accessWindowStart}
+              accessWindowEnd={selectedTicket.accessWindowEnd}
             />
 
             <div className="mt-2 mb-3">

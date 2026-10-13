@@ -8,11 +8,13 @@ import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
 import { ScannerHeader } from "@/components/scanner/scanner-header";
 import { ShiftSelector } from "@/components/scanner/shift-selector";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
+import ExpiredSlotScreen from "@/components/scanner/ExpiredSlotScreen";
 import {
   type ScannerFlowState,
   type ScannedTicket,
   type ShiftOption,
   type RedeemTicketResponse,
+  buildExpiredSlotDetails,
   scannerService,
 } from "@/components/scanner/scanner.service";
 import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
@@ -194,6 +196,8 @@ export default function ScannerPage() {
     (flowState === "starting-camera" || flowState === "scanning"),
   );
 
+  const isExpired = ticket?.result?.code === "WINDOW_EXPIRED" && Boolean(ticket.result.ticket);
+
   return (
     <main data-scanner-theme={theme} className="min-h-screen bg-brand-dark text-brand-text">
       <ScannerHeader
@@ -304,7 +308,7 @@ export default function ScannerPage() {
       )}
 
       <TicketValidationModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && !isExpired}
         state={flowState}
         ticket={ticket}
         message={modalMessage}
@@ -314,6 +318,22 @@ export default function ScannerPage() {
         onRedeem={handleRedeem}
         onScanNext={handleScanNext}
       />
+
+      {isExpired && ticket?.result?.ticket ? (
+        <ExpiredSlotScreen
+          cameraError=""
+          expiredDetails={buildExpiredSlotDetails(
+            ticket.result.ticket,
+            ticket.result.timestamp,
+          )}
+          message={ticket.result.message}
+          onContinue={handleScanNext}
+          reservationId={ticket.result.ticket.reservaId}
+          targetCourtName={ticket.result.ticket.servicioNombre}
+          ticketId={ticket.result.ticket.id ?? ticket.ticketId}
+          userName={ticket.result.ticket.titularNombre}
+        />
+      ) : null}
     </main>
   );
 }
