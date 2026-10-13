@@ -1,11 +1,15 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../../apps/web/.env.local") });
-dotenv.config({ path: path.resolve(__dirname, "../../apps/web/.env") });
-dotenv.config();
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../apps/web/.env.local"));
+  } catch {}
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../apps/web/.env"));
+  } catch {}
+}
 
 import { PeriodicidadPlan } from "@prisma/client";
 import { prisma } from "../src/client";
@@ -72,8 +76,13 @@ async function main() {
     const adminPassword = process.env.SEED_ADMIN_PASSWORD || "Admin123*";
 
     // Hash Argon2id con parámetros estándar (compatible con verifySecret de @sportcomplex/core)
-    const { hashSecret } = await import("../../core/src/security/token.js");
-    const passwordHash = await hashSecret(adminPassword);
+    const { hash } = await import("@node-rs/argon2");
+    const passwordHash = await hash(adminPassword, {
+      algorithm: 2,
+      memoryCost: 19456,
+      timeCost: 2,
+      parallelism: 1,
+    });
 
     await prisma.usuario.upsert({
       where: { correo: adminEmail },

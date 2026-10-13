@@ -31,15 +31,21 @@ export interface IncidentDependencies {
   markWebhookSent: typeof markContingencyWebhookSent;
 }
 
+const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const defaultDependencies: IncidentDependencies = {
   authenticate: auth,
-  findAccount: (identifier) =>
-    prisma.usuario.findFirst({
+  findAccount: (identifier) => {
+    const isEmail = identifier.includes("@");
+    const validUuid = isUuid.test(identifier);
+    if (!isEmail && !validUuid) return Promise.resolve(null);
+
+    return prisma.usuario.findFirst({
       where: {
         OR: [
-          { id: identifier.includes("@") ? undefined : identifier },
-          { correo: identifier.toLowerCase() },
-        ],
+          validUuid ? { id: identifier } : undefined,
+          isEmail ? { correo: identifier.toLowerCase() } : undefined,
+        ].filter(Boolean) as any,
       },
       select: {
         id: true,
@@ -47,7 +53,8 @@ const defaultDependencies: IncidentDependencies = {
         deletedAt: true,
         rol: { select: { nombre: true } },
       },
-    }),
+    });
+  },
   disableService: disableServiceForContingency,
   previewContingency: getContingencyPreview,
   sendWebhook: sendContingencyWebhook,

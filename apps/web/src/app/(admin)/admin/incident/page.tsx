@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertOctagon,
   AlertTriangle,
@@ -21,6 +21,11 @@ import { ActionButton } from '@/components/action-button'
 import { Modal } from '@/components/modal'
 import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
+import {
+  formatIncidentDate,
+  formatIncidentHour,
+  isIncidentReasonValid,
+} from './incident-utils'
 
 interface ServiceOption {
   id: number
@@ -118,6 +123,8 @@ export default function AdminIncidentPage() {
     loadServices()
   }, [loadServices])
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   // Cargar preview cuando cambia el servicio seleccionado
   const fetchPreview = useCallback(async (serviceId: string) => {
     if (!serviceId) {
@@ -126,21 +133,32 @@ export default function AdminIncidentPage() {
       return
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setLoadingPreview(true)
     setPreviewError(null)
     try {
-      const res = await fetch(`/api/admin/incident?serviceId=${encodeURIComponent(serviceId)}`)
+      const res = await fetch(`/api/admin/incident?serviceId=${encodeURIComponent(serviceId)}`, {
+        signal: controller.signal,
+      })
       const json = await res.json()
       if (!res.ok || !json.success) {
         throw new Error(json.error?.message || 'Error al obtener el impacto de contingencia.')
       }
       setPreview(json.data)
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       const msg = err instanceof Error ? err.message : 'Error al obtener el impacto de contingencia'
       setPreviewError(msg)
       setPreview(null)
     } finally {
-      setLoadingPreview(false)
+      if (abortControllerRef.current === controller) {
+        setLoadingPreview(false)
+      }
     }
   }, [])
 
@@ -151,13 +169,16 @@ export default function AdminIncidentPage() {
     if (val) {
       fetchPreview(val)
     } else {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
       setPreview(null)
       setPreviewError(null)
     }
   }
 
   // Validación de formulario
-  const isReasonValid = motivo.trim().length >= 3 && motivo.trim().length <= 255
+  const isReasonValid = isIncidentReasonValid(motivo)
   const canSubmit = Boolean(selectedServiceId) && isReasonValid && !loadingPreview && !submitting
 
   // Disparo de inhabilitación (POST /api/admin/incident)
@@ -196,28 +217,8 @@ export default function AdminIncidentPage() {
   const selectedService = services.find((s) => String(s.id) === selectedServiceId)
   const isAlreadyDisabled = selectedService?.estado === 'INHABILITADO'
 
-  const formatHour = (val: string | Date) => {
-    if (!val) return ''
-    if (typeof val === 'string') {
-      if (val.includes('T')) {
-        const d = new Date(val)
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-      return val.substring(0, 5)
-    }
-    return new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const formatDateString = (val: string | Date) => {
-    if (!val) return ''
-    const d = new Date(val)
-    if (isNaN(d.getTime())) return String(val)
-    return d.toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
+  const formatHour = formatIncidentHour
+  const formatDateString = formatIncidentDate
 
   return (
     <div className="demo-page p-6 max-w-6xl mx-auto space-y-6">
@@ -394,6 +395,7 @@ export default function AdminIncidentPage() {
               <textarea
                 id="incident-reason"
                 rows={4}
+                maxLength={255}
                 value={motivo}
                 onBlur={() => setMotivoTouched(true)}
                 onChange={(e) => setMotivo(e.target.value)}
