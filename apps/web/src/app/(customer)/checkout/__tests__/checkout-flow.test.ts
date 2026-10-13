@@ -25,7 +25,8 @@ test("pollPaymentConfirmation: detecta confirmación mediante fetchReceipt y ret
     maxAttempts: 2,
     pollIntervalMs: 0,
     fetchReceipt: async (id: string) => ({
-      reserva: { id },
+      reserva: { id, estado: "CONFIRMADA" },
+      ticket: { id: "ticket-123", estado: "EMITIDO" },
       qr: { payload: "SC1:res-123-uuid:signature123456" },
     }),
     fetchHistory: async () => [],
@@ -33,6 +34,50 @@ test("pollPaymentConfirmation: detecta confirmación mediante fetchReceipt y ret
 
   assert.equal(result.confirmed, true);
   assert.equal(result.bookingCode, "SC1:res-123-uuid");
+});
+
+test("pollPaymentConfirmation: sigue sondeando si el comprobante aún no tiene reserva confirmada ni tiquete", async () => {
+  let receiptAttempts = 0;
+  const result = await pollPaymentConfirmation({
+    reservationId: "res-789",
+    userName: "Cliente Test",
+    maxAttempts: 3,
+    pollIntervalMs: 0,
+    fetchReceipt: async (id: string) => {
+      receiptAttempts++;
+      if (receiptAttempts < 3) {
+        return { reserva: { id, estado: "PENDIENTE_PAGO" }, ticket: null, qr: null };
+      }
+      return {
+        reserva: { id, estado: "CONFIRMADA" },
+        ticket: { id: "ticket-789", estado: "EMITIDO" },
+        qr: { payload: "SC1:ticket-789:signature" },
+      };
+    },
+    fetchHistory: async () => [],
+  });
+
+  assert.equal(receiptAttempts, 3);
+  assert.equal(result.confirmed, true);
+  assert.equal(result.bookingCode, "SC1:ticket-789:s");
+});
+
+test("pollPaymentConfirmation: no confirma una reserva confirmada sin tiquete/QR emitido", async () => {
+  const result = await pollPaymentConfirmation({
+    reservationId: "res-no-ticket",
+    userName: "Cliente Test",
+    maxAttempts: 2,
+    pollIntervalMs: 0,
+    fetchReceipt: async (id: string) => ({
+      reserva: { id, estado: "CONFIRMADA" },
+      ticket: null,
+      qr: null,
+    }),
+    fetchHistory: async () => [],
+  });
+
+  assert.equal(result.confirmed, false);
+  assert.equal(result.bookingCode, null);
 });
 
 test("pollPaymentConfirmation: detecta confirmación mediante fetchHistory si receipt aún no está listo", async () => {
@@ -43,12 +88,38 @@ test("pollPaymentConfirmation: detecta confirmación mediante fetchHistory si re
     pollIntervalMs: 0,
     fetchReceipt: async () => null,
     fetchHistory: async () => [
-      { id: "res-456", status: "Confirmada", code: "OFICIAL-789" },
+      { id: "res-456", status: "Confirmada", code: "OFICIAL-789", ticketIssued: true },
     ],
   });
 
   assert.equal(result.confirmed, true);
   assert.equal(result.bookingCode, "OFICIAL-789");
+});
+
+test("pollPaymentConfirmation: no acepta un código alternativo del historial sin tiquete emitido", async () => {
+  let historyAttempts = 0;
+  const result = await pollPaymentConfirmation({
+    reservationId: "res-history-ticket",
+    userName: "Cliente Test",
+    maxAttempts: 2,
+    pollIntervalMs: 0,
+    fetchReceipt: async () => null,
+    fetchHistory: async () => {
+      historyAttempts++;
+      return [
+        {
+          id: "res-history-ticket",
+          status: "Confirmada",
+          code: "ALT-RES-HISTORY",
+          ticketIssued: historyAttempts === 2,
+        },
+      ];
+    },
+  });
+
+  assert.equal(historyAttempts, 2);
+  assert.equal(result.confirmed, true);
+  assert.equal(result.bookingCode, "ALT-RES-HISTORY");
 });
 
 test("pollPaymentConfirmation: cuando vence el sondeo sin confirmación, NO inventa ningún código ni comprobante", async () => {

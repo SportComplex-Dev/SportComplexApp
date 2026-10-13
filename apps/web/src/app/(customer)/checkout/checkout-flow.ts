@@ -8,8 +8,17 @@ export interface PollingOptions {
   userName: string;
   maxAttempts?: number;
   pollIntervalMs?: number;
-  fetchReceipt: (id: string) => Promise<{ reserva?: { id: string }; qr?: { payload: string } | null } | null>;
-  fetchHistory: (userName: string, limit: number) => Promise<Array<{ id: string; status: string; code: string }>>;
+  fetchReceipt: (id: string) => Promise<{
+    reserva?: { id: string; estado?: string };
+    ticket?: { id?: string; estado?: string } | null;
+    qr?: { payload: string } | null;
+  } | null>;
+  fetchHistory: (userName: string, limit: number) => Promise<Array<{
+    id: string;
+    status: string;
+    code: string;
+    ticketIssued?: boolean;
+  }>>;
 }
 
 /**
@@ -32,10 +41,15 @@ export async function pollPaymentConfirmation({
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const receipt = await fetchReceipt(reservationId);
-      if (receipt?.reserva?.id) {
+      if (
+        receipt?.reserva?.id === reservationId &&
+        receipt.reserva.estado === "CONFIRMADA" &&
+        receipt.ticket &&
+        receipt.qr?.payload
+      ) {
         return {
           confirmed: true,
-          bookingCode: receipt.qr?.payload ? receipt.qr.payload.slice(0, 16) : null,
+          bookingCode: receipt.qr.payload.slice(0, 16),
         };
       }
     } catch {
@@ -44,7 +58,9 @@ export async function pollPaymentConfirmation({
 
     try {
       const history = await fetchHistory(userName, 5);
-      const match = history.find((h) => h.id === reservationId && h.status === 'Confirmada');
+      const match = history.find(
+        (h) => h.id === reservationId && h.status === "Confirmada" && h.ticketIssued,
+      );
       if (match) {
         return {
           confirmed: true,
