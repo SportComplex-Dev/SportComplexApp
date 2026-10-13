@@ -5,6 +5,7 @@ import {
   listarTorneos,
   obtenerInscripcionesUsuarioParaTorneos,
 } from "@sportcomplex/db";
+import { signTicket, buildTicketQrPayload } from "@sportcomplex/core";
 
 /**
  * GET /api/tournaments
@@ -65,26 +66,71 @@ export async function GET(request: Request) {
       [key: string]: unknown;
     }
 
-    let inscripcionesUsuario: Set<string> = new Set();
+    interface MiInscripcionItem {
+      id: string;
+      estado: string;
+      nombrePareja: string | null;
+      ticketCodigoUuid: string | null;
+      ticketEstado?: string;
+      /** INT-01: payload QR firmado SC1:<uuid>:<hmac> — solo para inscripciones CONFIRMADAS con ticket emitido */
+      ticketQrPayload: string | null;
+    }
+
+    const inscripcionesMap = new Map<string, MiInscripcionItem>();
     if (authResult && authResult.authorized) {
       const torneoIds = (torneos as TorneoItem[]).map((t: TorneoItem) => t.id);
       const misInscripciones = await obtenerInscripcionesUsuarioParaTorneos(
         authResult.actor.id,
         torneoIds,
       );
-      inscripcionesUsuario = new Set(misInscripciones.map((i: { torneoId: string }) => i.torneoId));
+      const qrSecret = process.env.QR_HMAC_SECRET;
+      for (const ins of misInscripciones as Array<{
+        id: string;
+        torneoId: string;
+        estado: string;
+        nombrePareja?: string | null;
+        ticketCodigoUuid?: string | null;
+        ticketEstado?: string;
+      }>) {
+        // INT-01: Generar payload firmado SC1 solo para inscripciones CONFIRMADAS con ticket emitido.
+        // Usamos las bibliotecas de @sportcomplex/core que ya maneja este contrato en todo el monorepo.
+        let ticketQrPayload: string | null = null;
+        if (
+          ins.estado === "CONFIRMADA" &&
+          ins.ticketCodigoUuid &&
+          qrSecret
+        ) {
+          try {
+            const signature = signTicket(ins.ticketCodigoUuid, qrSecret);
+            ticketQrPayload = buildTicketQrPayload(ins.ticketCodigoUuid, signature);
+          } catch {
+            // Si falla la firma (UUID mal formado), no exponer payload
+            ticketQrPayload = null;
+          }
+        }
+        inscripcionesMap.set(ins.torneoId, {
+          id: ins.id,
+          estado: ins.estado,
+          nombrePareja: ins.nombrePareja ?? null,
+          ticketCodigoUuid: ins.ticketCodigoUuid ?? null,
+          ticketEstado: ins.ticketEstado,
+          ticketQrPayload,
+        });
+      }
     }
 
     const resultado = (torneos as TorneoItem[]).map((t: TorneoItem) => {
       const cuposDisponibles = Math.max(0, t.cuposTotales - t.cuposOcupados);
       const inscripcionesAbiertas =
         t.estado === "INSCRIPCIONES_ABIERTAS" && cuposDisponibles > 0;
+      const miInscripcion = inscripcionesMap.get(t.id) ?? null;
 
       return {
         ...t,
         cuposDisponibles,
         inscripcionesAbiertas,
-        yaInscrito: inscripcionesUsuario.has(t.id),
+        yaInscrito: Boolean(miInscripcion),
+        miInscripcion,
       };
     });
 

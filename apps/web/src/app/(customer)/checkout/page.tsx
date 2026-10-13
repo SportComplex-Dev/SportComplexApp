@@ -66,7 +66,10 @@ function parseSlotInterval(dateStr: string, timeStr: string): { startTime: strin
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const queryReservationId = searchParams.get('reservationId') || searchParams.get('reservaId')
+  const queryReservationId =
+    searchParams.get('reservationId') ||
+    searchParams.get('reservaId') ||
+    searchParams.get('bookingId')
 
   const { session, notify } = useApp()
   const [catalog] = useCatalog()
