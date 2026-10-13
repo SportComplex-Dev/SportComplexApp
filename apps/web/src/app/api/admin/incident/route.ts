@@ -16,7 +16,8 @@ interface IncidentSession {
   user?: { id?: string | null } | null;
 }
 
-interface IncidentAccount {
+export interface IncidentAccount {
+  id?: string;
   estado: string;
   deletedAt: Date | null;
   rol: { nombre: string } | null;
@@ -24,7 +25,7 @@ interface IncidentAccount {
 
 export interface IncidentDependencies {
   authenticate: () => Promise<IncidentSession | null>;
-  findAccount: (userId: string) => Promise<IncidentAccount | null>;
+  findAccount: (identifier: string) => Promise<IncidentAccount | null>;
   disableService: typeof disableServiceForContingency;
   previewContingency: typeof getContingencyPreview;
   sendWebhook: typeof sendContingencyWebhook;
@@ -33,10 +34,16 @@ export interface IncidentDependencies {
 
 const defaultDependencies: IncidentDependencies = {
   authenticate: auth,
-  findAccount: (userId) =>
-    prisma.usuario.findUnique({
-      where: { id: userId },
+  findAccount: (identifier) =>
+    prisma.usuario.findFirst({
+      where: {
+        OR: [
+          { id: identifier.includes("@") ? undefined : identifier },
+          { correo: identifier.toLowerCase() },
+        ],
+      },
       select: {
+        id: true,
         estado: true,
         deletedAt: true,
         rol: { select: { nombre: true } },
@@ -58,12 +65,17 @@ export async function handleIncidentPreviewRequest(
       db: {
         usuario: {
           findUnique: async (args) => {
-            const id = "id" in args.where ? args.where.id : undefined;
-            if (!id) return null;
-            const user = await dependencies.findAccount(id);
+            const identifier =
+              "id" in args.where
+                ? args.where.id
+                : "correo" in args.where
+                  ? args.where.correo
+                  : undefined;
+            if (!identifier) return null;
+            const user = await dependencies.findAccount(identifier);
             if (!user) return null;
             return {
-              id,
+              id: user.id ?? identifier,
               estado: user.estado,
               deletedAt: user.deletedAt,
               rol: user.rol,
@@ -110,12 +122,17 @@ export async function handleIncidentRequest(
       db: {
         usuario: {
           findUnique: async (args) => {
-            const id = "id" in args.where ? args.where.id : undefined;
-            if (!id) return null;
-            const user = await dependencies.findAccount(id);
+            const identifier =
+              "id" in args.where
+                ? args.where.id
+                : "correo" in args.where
+                  ? args.where.correo
+                  : undefined;
+            if (!identifier) return null;
+            const user = await dependencies.findAccount(identifier);
             if (!user) return null;
             return {
-              id,
+              id: user.id ?? identifier,
               estado: user.estado,
               deletedAt: user.deletedAt,
               rol: user.rol,
