@@ -35,6 +35,9 @@ export function createSupabaseRestClient(apiKey?: string): SupabaseClient {
 }
 
 export function createSupabaseAdminClient(): SupabaseClient {
+  const injected = (globalThis as unknown as { __scSupabaseAdminClient?: SupabaseClient }).__scSupabaseAdminClient;
+  if (injected) return injected;
+
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !serviceRoleKey) {
