@@ -317,7 +317,7 @@ export default function TicketsPage() {
                   const precioNum = Number(tournament.precioInscripcion ?? 0)
 
                   const handleOpenTournamentQR = () => {
-                    const fakeBooking: Booking = {
+                    const fakeBooking: PortalTicket = {
                       id: tournament.id,
                       code: ticketCode,
                       service: `Torneo: ${tournament.titulo}`,
@@ -337,7 +337,7 @@ export default function TicketsPage() {
                   }
 
                   const handlePrintTournamentTicket = () => {
-                    const fakeBooking: Booking = {
+                    const fakeBooking: PortalTicket = {
                       id: tournament.id,
                       code: ticketCode,
                       service: `Torneo: ${tournament.titulo}`,
