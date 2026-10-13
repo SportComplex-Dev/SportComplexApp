@@ -1,0 +1,239 @@
+{
+  "name": "TSK-AU-04 - Flujo de fallo de cobro de membresía (invoice.payment_failed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "billing/failed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        112
+      ],
+      "id": "c7e6ec36-b31f-4ab6-b915-122d0eddcf1b",
+      "name": "Webhook: Payment Failed",
+      "webhookId": "billing-payment-failed"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-email-exists",
+              "leftValue": "={{ $json.body.body.customerEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-event-type",
+              "leftValue": "={{ $json.body.event || 'invoice.payment_failed' }}",
+              "rightValue": "invoice.payment_failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        112
+      ],
+      "id": "359bd689-58fa-4e46-8289-bf5f19a78711",
+      "name": "Validar Payload & Correo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-customer-name",
+              "name": "customerName",
+              "value": "={{ $json.body.customerName || 'Estimado/a cliente' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-customer-email",
+              "name": "customerEmail",
+              "value": "={{ $json.body.body.customerEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-plan-name",
+              "name": "planName",
+              "value": "={{ $json.body.planName || 'Plan de Membresía' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-portal-url",
+              "name": "billingPortalUrl",
+              "value": "={{ $json.body.billingPortalUrl || 'https://tu-dominio.com/perfil/membresia' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-next-retry",
+              "name": "nextAttemptDate",
+              "value": "={{ $json.body.nextAttemptDate || 'próximamente' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-membership-id",
+              "name": "membershipId",
+              "value": "={{ $json.body.membershipId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        0
+      ],
+      "id": "a6a3e6e0-4f09-458d-8678-70ed21be9138",
+      "name": "Formatear Datos de Notificación"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Notificación de fallo de cobro enviada correctamente\",\n  \"membershipId\": \"{{ $json.membershipId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "0ea5a9e0-5590-4ec8-a6e7-a9398963f1d8",
+      "name": "Respuesta 200 OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Payload inválido o falta correo del destinatario\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        224
+      ],
+      "id": "2a95ef32-dfe6-40f9-bcd3-b2ab4951cc7f",
+      "name": "Respuesta 400 Bad Request"
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "Akros Latam <no-reply@akros.lat>",
+        "to": "={{ $json.customerEmail }}",
+        "subject": " Problema al procesar el pago de tu membresía",
+        "html": "=<div style=\"font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;\">\n  <h2 style=\"color: #d32f2f;\">Atención con tu renovación de membresía</h2>\n  <p>Hola <strong>{{ $json.customerName }}</strong>,</p>\n  <p>Tuvimos un problema al intentar procesar el pago correspondiente a tu suscripción en <strong>Akros</strong>.</p>\n  <p>Para evitar la desactivación de tu membresía y seguir disfrutando de los beneficios, por favor actualiza tu método de pago haciendo clic en el siguiente enlace:</p>\n  <div style=\"text-align: center; margin: 30px 0;\">\n    <a href=\"{{ $json.billingPortalUrl }}\" style=\"background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;\">Actualizar Método de Pago</a>\n  </div>\n  <p>Si ya realizaste esta acción, puedes ignorar este mensaje.</p>\n  <p>Saludos,<br>El equipo de Akros</p>\n</div>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        704,
+        0
+      ],
+      "id": "60a67e54-8f62-4a07-a180-f36c2ada2337",
+      "name": "Send a new email",
+      "webhookId": "b91d7ba4-e51f-4b82-9606-9af023ab29ce",
+      "credentials": {
+        "resendApi": {
+          "id": "XmmDZQvEj1MO36Uq",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook: Payment Failed": {
+      "main": [
+        [
+          {
+            "node": "Validar Payload & Correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Payload & Correo": {
+      "main": [
+        [
+          {
+            "node": "Formatear Datos de Notificación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta 400 Bad Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Datos de Notificación": {
+      "main": [
+        [
+          {
+            "node": "Send a new email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a new email": {
+      "main": [
+        [
+          {
+            "node": "Respuesta 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "58a9d175-8829-40f5-bf0c-cca3ae205446",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "8qB3lrXkhqwwGeqN",
+  "tags": []
+}

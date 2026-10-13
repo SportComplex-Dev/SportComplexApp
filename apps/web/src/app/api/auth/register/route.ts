@@ -4,9 +4,17 @@ import {
   hashSecret,
   generateVerificationCode,
   TOKEN_TTL_MS,
-  sendVerificationCodeEmail,
-} from "@sportcomplex/core";
+} from "@sportcomplex/core/src/security/token";
+import { sendVerificationCodeEmail } from "@sportcomplex/core";
 import { prisma, createToken } from "@sportcomplex/db";
+import {
+  createSupabaseAuthUser,
+  deleteSupabaseAuthUser,
+  findSupabaseUserByEmail,
+  isSupabaseAdminConfigured,
+} from "@/lib/supabase/admin";
+
+const DUPLICATE_EMAIL_HINT = /already been registered|already been taken|user_already_exists|email_exists/i;
 
 export async function POST(request: Request) {
   try {
@@ -18,8 +26,9 @@ export async function POST(request: Request) {
     }
 
     const { email, password, nombre } = parsed.data;
+    const correo = email.toLowerCase().trim();
 
-    const existing = await prisma.usuario.findUnique({ where: { correo: email } });
+    const existing = await prisma.usuario.findUnique({ where: { correo } });
     if (existing) {
       return fail("EMAIL_EXISTS", "El correo ya está registrado", 409);
     }
@@ -29,17 +38,49 @@ export async function POST(request: Request) {
       return fail("CONFIG_ERROR", "Rol CLIENTE no configurado", 500);
     }
 
+    // 1. Crear la identidad en Supabase Auth con email confirmado por Admin API (D4=b).
+    let supabaseUserId: string | null = null;
+    if (isSupabaseAdminConfigured()) {
+      const { data, error } = await createSupabaseAuthUser({ email: correo, password, nombre });
+
+      if (error) {
+        const duplicate = DUPLICATE_EMAIL_HINT.test(error.message ?? "");
+        // Huérfano Auth (intento previo falló la inserción en `usuario`): se recupera
+        // creando la fila; el flujo de 6 dígitos sigue siendo la puerta de activación.
+        const orphan = duplicate ? await findSupabaseUserByEmail(correo) : null;
+        if (duplicate && orphan?.data?.user) {
+          supabaseUserId = orphan.data.user.id;
+        } else {
+          return fail("EMAIL_EXISTS", "El correo ya está registrado", 409);
+        }
+      } else {
+        supabaseUserId = data?.user?.id ?? null;
+      }
+    }
+
     const passwordHash = await hashSecret(password);
 
-    const usuario = await prisma.usuario.create({
-      data: {
-        correo: email,
-        passwordHash,
-        nombre,
-        rolId: clienteRole.id,
-        estado: "PENDIENTE",
-      },
-    });
+    const usuario = await prisma.usuario
+      .create({
+        data: {
+          correo,
+          passwordHash,
+          nombre,
+          rolId: clienteRole.id,
+          estado: "PENDIENTE",
+        },
+      })
+      .catch(async (error: unknown) => {
+        // Rollback best-effort de la identidad Auth si falla la fila DB (sin huérfanos).
+        if (supabaseUserId) {
+          try {
+            await deleteSupabaseAuthUser(supabaseUserId);
+          } catch {
+            // el error original de DB es el que debe propagarse
+          }
+        }
+        throw error;
+      });
 
     const code = generateVerificationCode();
     const tokenHash = await hashSecret(code);
@@ -48,7 +89,7 @@ export async function POST(request: Request) {
     await createToken(usuario.id, tokenHash, expiraEn);
 
     // El código en claro nunca se persiste; se envía al webhook de correo (TSK-AU-01).
-    await sendVerificationCodeEmail({ usuarioId: usuario.id, to: email, nombre, code, expiraEn });
+    await sendVerificationCodeEmail({ usuarioId: usuario.id, to: correo, nombre, code, expiraEn });
 
     return ok({
       usuarioId: usuario.id,
