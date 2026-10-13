@@ -1165,6 +1165,13 @@ export function createMockPrisma() {
         return picked;
       },
       async create({ data, select }: any) {
+        const rolesMap: Record<number, string> = {
+          1: "ADMIN",
+          2: "VENDEDOR",
+          3: "LECTOR",
+          4: "CLIENTE",
+        };
+        const resolvedRolNombre = data.rolNombre || rolesMap[data.rolId] || "CLIENTE";
         const u: MockUsuario = {
           id: data.id || `user-${randomUUID()}`,
           nombre: data.nombre,
@@ -1172,7 +1179,7 @@ export function createMockPrisma() {
           estado: data.estado || "ACTIVO",
           deletedAt: null,
           rolId: data.rolId || 1,
-          rolNombre: data.rolNombre || "CLIENTE",
+          rolNombre: resolvedRolNombre,
           creadoEn: new Date(),
         };
         usuarios.push(u);
@@ -1181,7 +1188,7 @@ export function createMockPrisma() {
         for (const key of Object.keys(select)) {
           if (!select[key]) continue;
           if (key === "rol") {
-            picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? "CLIENTE" };
+            picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? resolvedRolNombre };
           } else {
             picked[key] = (u as any)[key];
           }

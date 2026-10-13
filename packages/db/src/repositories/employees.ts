@@ -139,7 +139,7 @@ export async function createEmployee(
   if (!ALL_EMPLOYEE_ROLES.includes(targetRolNombre as (typeof ALL_EMPLOYEE_ROLES)[number])) {
     throw new EmployeeError(
       `El rol "${data.rolNombre}" no es un rol de empleado válido.`,
-      "INVALID_EMPLOYEE_ROLE",
+      "ROLE_NOT_FOUND",
       400,
     );
   }

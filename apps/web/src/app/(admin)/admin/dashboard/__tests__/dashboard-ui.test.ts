@@ -25,7 +25,6 @@ test('TSK-FE-23 / NEW-01: Fallback neutro cuando no hay categorías deportivas l
 })
 
 test('TSK-FE-23 / UI-01: Generación y estructuración de contenido CSV de informe gerencial', () => {
-  const period = 'daily'
   const summary = {
     totalRevenue: 5200000,
     totalAttendance: 142,

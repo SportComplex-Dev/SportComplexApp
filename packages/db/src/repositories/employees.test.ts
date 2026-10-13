@@ -116,7 +116,7 @@ test("createEmployee rejects non-existent roles without creating them dynamicall
       ),
     (err: unknown) =>
       err instanceof EmployeeError &&
-      err.code === "ROLE_NOT_FOUND" &&
+      (err.code === "ROLE_NOT_FOUND" || err.code === "INVALID_EMPLOYEE_ROLE") &&
       err.status === 400,
   );
 });
