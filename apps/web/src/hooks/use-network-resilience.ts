@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export const SCANNER_TICKET_CACHE_KEY = "scanner_ticket_cache_v1";
+export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas (ms)
 
 /**
  * Información de consulta permitida para almacenamiento en caché local.
@@ -236,8 +237,45 @@ export function getCachedTicketHelper(
       storage ??
       (typeof window !== "undefined" ? window.localStorage : undefined);
     const cache = readCacheFromStorage(targetStorage);
-    const entry = cache[key];
-    return sanitizeTicketConsultationData(entry);
+    const rawEntry = cache[key];
+    if (!rawEntry || typeof rawEntry !== "object") return null;
+
+    // Política de caducidad estricta (TSK-FE-24):
+    // Invalida si cachedAt falta o no es string en el registro de almacenamiento
+    if (typeof rawEntry.cachedAt !== "string") {
+      delete cache[key];
+      writeCacheToStorage(cache, targetStorage);
+      return null;
+    }
+
+    const sanitized = sanitizeTicketConsultationData(rawEntry);
+    if (!sanitized) return null;
+
+    const cachedTime = new Date(sanitized.cachedAt!).getTime();
+    if (Number.isNaN(cachedTime)) {
+      delete cache[key];
+      writeCacheToStorage(cache, targetStorage);
+      return null;
+    }
+
+    const age = Date.now() - cachedTime;
+    if (age < 0 || age > CACHE_TTL_MS) {
+      delete cache[key];
+      writeCacheToStorage(cache, targetStorage);
+      return null;
+    }
+
+    // Invalida si la fecha programada del boleto ya expiró respecto a la fecha actual
+    if (sanitized.fecha) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (sanitized.fecha.slice(0, 10) < todayStr) {
+        delete cache[key];
+        writeCacheToStorage(cache, targetStorage);
+        return null;
+      }
+    }
+
+    return sanitized;
   } catch {
     return null;
   }
@@ -252,7 +290,11 @@ export function setCachedTicketHelper(
   const key = ticketCode.trim();
   if (!key) return;
 
-  const sanitized = sanitizeTicketConsultationData(data);
+  const withTimestamp: TicketConsultationData = {
+    ...data,
+    cachedAt: data.cachedAt || new Date().toISOString(),
+  };
+  const sanitized = sanitizeTicketConsultationData(withTimestamp);
   if (!sanitized) return;
 
   try {

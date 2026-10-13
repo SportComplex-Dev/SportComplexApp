@@ -17,6 +17,7 @@ import {
   writeCacheToStorage,
   HttpError,
   SCANNER_TICKET_CACHE_KEY,
+  CACHE_TTL_MS,
   type TicketConsultationData,
 } from "@/hooks/use-network-resilience";
 import { ConsultationResultCard } from "@/components/scanner/consultation-result-card";
@@ -685,3 +686,140 @@ test("Gherkin Escenario F: Reconexión actualiza indicador", () => {
   handleOnline();
   assert.equal(onlineState, true);
 });
+
+// ============================================================================
+// Code Review PR Verifications: Bloqueante 4xx, TTL 24h y Streaming retry
+// ============================================================================
+test("TSK-FE-24 (Bloqueante): Error HTTP 400 no realiza fallback a caché aunque exista entrada previa", async () => {
+  const storage = createMockStorage();
+  const ticketId = "ticket-test-400";
+  setCachedTicketHelper(
+    ticketId,
+    {
+      ticketId,
+      titularNombre: "Juan Pérez",
+      servicioNombre: "Cancha Tenis",
+      fecha: new Date().toISOString().slice(0, 10),
+      horaInicio: "10:00",
+      horaFin: "11:00",
+    },
+    storage,
+  );
+
+  // Verificar que el ticket sí existe en caché inicialmente
+  const initialCache = getCachedTicketHelper(ticketId, storage);
+  assert.notEqual(initialCache, null);
+
+  // Simular respuesta HTTP 400 (Firma inválida / Boleto cancelado)
+  const http400Error = new HttpError("Firma HMAC inválida o manipulada", 400);
+
+  // Verificar que NO es clasificado como fallo transitorio de red
+  assert.equal(isTransientNetworkError(http400Error), false);
+
+  // Simular la lógica de fallo en consultarTicket con cliente en línea
+  const originalOnLine = Object.getOwnPropertyDescriptor(globalThis.navigator, "onLine");
+  try {
+    Object.defineProperty(globalThis.navigator, "onLine", {
+      value: true,
+      configurable: true,
+    });
+
+    const isOnline = true;
+    const isNetworkFailure =
+      !isOnline ||
+      (typeof navigator !== "undefined" && !navigator.onLine) ||
+      isTransientNetworkError(http400Error);
+
+    assert.equal(isNetworkFailure, false, "HTTP 400 no debe clasificarse como falla de red");
+
+    const cached = isNetworkFailure ? getCachedTicketHelper(ticketId, storage) : null;
+    assert.equal(cached, null, "No debe realizar fallback a caché ante HTTP 400");
+  } finally {
+    if (originalOnLine) {
+      Object.defineProperty(globalThis.navigator, "onLine", originalOnLine);
+    } else {
+      delete (globalThis.navigator as Record<string, unknown>).onLine;
+    }
+  }
+});
+
+test("TSK-FE-24 (Observación 1): Política de TTL de 24 horas y fecha expirada en caché", () => {
+  const storage = createMockStorage();
+
+  // 1. Ticket con más de 24 horas de antigüedad en caché expira
+  const oldDate = new Date(Date.now() - (CACHE_TTL_MS + 60000)).toISOString();
+  setCachedTicketHelper(
+    "ticket-expired-ttl",
+    {
+      ticketId: "ticket-expired-ttl",
+      titularNombre: "Carlos Ruiz",
+      servicioNombre: "Pádel",
+      fecha: new Date().toISOString().slice(0, 10),
+      horaInicio: "12:00",
+      horaFin: "13:00",
+      cachedAt: oldDate,
+    },
+    storage,
+  );
+
+  const expiredEntry = getCachedTicketHelper("ticket-expired-ttl", storage);
+  assert.equal(expiredEntry, null, "Ticket con >24h de caché debe ser invalidado y retornar null");
+
+  // 2. Ticket con fecha programada en el pasado expira
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  setCachedTicketHelper(
+    "ticket-past-date",
+    {
+      ticketId: "ticket-past-date",
+      titularNombre: "María López",
+      servicioNombre: "Gimnasio",
+      fecha: yesterday,
+      horaInicio: "09:00",
+      horaFin: "10:00",
+      cachedAt: new Date().toISOString(),
+    },
+    storage,
+  );
+
+  const pastDateEntry = getCachedTicketHelper("ticket-past-date", storage);
+  assert.equal(pastDateEntry, null, "Ticket con fecha pasada debe ser invalidado y retornar null");
+
+  // 3. Ticket válido dentro de 24h y fecha vigente no expira
+  const validTicketId = "ticket-valid-ttl";
+  setCachedTicketHelper(
+    validTicketId,
+    {
+      ticketId: validTicketId,
+      titularNombre: "Andrea Gómez",
+      servicioNombre: "Piscina",
+      fecha: new Date().toISOString().slice(0, 10),
+      horaInicio: "16:00",
+      horaFin: "17:00",
+      cachedAt: new Date().toISOString(),
+    },
+    storage,
+  );
+
+  const validEntry = getCachedTicketHelper(validTicketId, storage);
+  assert.notEqual(validEntry, null, "Ticket vigente dentro de las 24h debe ser retornado");
+  assert.equal(validEntry?.ticketId, validTicketId);
+});
+
+test("TSK-FE-24 (Observación 2): executeWithRetry encapsula fetch y parseo json tolerando microcortes", async () => {
+  let attempt = 0;
+  const mockDelay = async () => {};
+
+  const simulateStreamMicrocut = async () => {
+    attempt += 1;
+    if (attempt === 1) {
+      // Simula fallo en lectura del cuerpo de respuesta (stream broken)
+      throw new TypeError("network error during body stream");
+    }
+    return { success: true, data: { ticket: { id: "stream-recovered" } } };
+  };
+
+  const result = await executeWithRetry(simulateStreamMicrocut, 3, mockDelay);
+  assert.equal(attempt, 2);
+  assert.equal(result.data.ticket.id, "stream-recovered");
+});
+

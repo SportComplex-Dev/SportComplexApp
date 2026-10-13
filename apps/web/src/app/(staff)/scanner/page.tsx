@@ -47,6 +47,7 @@ import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
 import { useOptionalApp } from "@/components/app-provider";
 import {
   HttpError,
+  isTransientNetworkError,
   useNetworkResilience,
 } from "@/hooks/use-network-resilience";
 
@@ -163,7 +164,7 @@ export default function ScannerPage() {
       detenerCamaraConsulta();
 
       try {
-        const response = await executeWithRetry(async () => {
+        const json = await executeWithRetry(async () => {
           const res = await fetch(
             `/api/tickets/verify/${encodeURIComponent(cleanId)}`,
             {
@@ -183,10 +184,8 @@ export default function ScannerPage() {
             );
           }
 
-          return res;
+          return await res.json();
         });
-
-        const json = await response.json();
 
         if (!json.success || !json.data) {
           const errorMsg =
@@ -211,8 +210,12 @@ export default function ScannerPage() {
 
         setTicketData(json.data);
       } catch (err: unknown) {
-        // Ante una falla real de conectividad, recuperar el último dato válido disponible para ese ticket
-        const cached = getCachedTicket(cleanId);
+        const isNetworkFailure =
+          !isOnline ||
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          isTransientNetworkError(err);
+
+        const cached = isNetworkFailure ? getCachedTicket(cleanId) : null;
         if (cached) {
           setTicketData({
             access: "GRANTED",
@@ -244,7 +247,7 @@ export default function ScannerPage() {
             setConsultationError(
               err instanceof Error
                 ? err.message
-                : "Error de conexión al consultar el servicio de accesos.",
+                : "Código no válido o no se pudo verificar la autenticidad del boleto.",
             );
           }
         }
