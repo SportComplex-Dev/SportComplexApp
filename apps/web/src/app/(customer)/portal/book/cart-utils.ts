@@ -34,7 +34,11 @@ export const SERVICE_NUMERIC_ID_MAP: Record<string, number> = {
 };
 
 export function getNumericServiceId(serviceId: string): number {
-  return SERVICE_NUMERIC_ID_MAP[serviceId] ?? 1;
+  const numericId = SERVICE_NUMERIC_ID_MAP[serviceId];
+  if (!numericId) {
+    throw new Error(`Servicio desconocido o sin identificador numérico configurado: ${serviceId}`);
+  }
+  return numericId;
 }
 
 export function formatMoney(amount: number): string {
@@ -63,7 +67,7 @@ export function getBogotaTodayISO(now: Date = new Date()): string {
 
 /**
  * Genera dinámicamente las franjas horarias del complejo entre 06:00 y 22:00 (turnos continuos de 60 min).
- * Aplica la regla RN-11 deshabilitando horas transcurridas si la fecha seleccionada es hoy en Bogotá.
+ * Aplica la regla RN-11 deshabilitando horas transcurridas si la fecha seleccionada es hoy en Bogotá o una fecha anterior.
  */
 export function generateDynamicTimeSlots(
   dateStr: string,
@@ -86,14 +90,15 @@ export function generateDynamicTimeSlots(
   for (let h = startHour; h < endHour; h++) {
     const startTime = `${pad(h)}:00`;
     const endTime = `${pad(h + 1)}:00`;
-    const isPast = dateStr === todayBogota && h <= currentBogotaHour;
+    const isDatePast = dateStr < todayBogota;
+    const isPast = isDatePast || (dateStr === todayBogota && h <= currentBogotaHour);
 
     slots.push({
       startTime,
       endTime,
       label: `${startTime} – ${endTime}`,
       isAvailable: !isPast,
-      disabledReason: isPast ? 'Horario concluido' : undefined,
+      disabledReason: isPast ? (isDatePast ? 'Fecha concluida' : 'Horario concluido') : undefined,
     });
   }
 
@@ -198,4 +203,33 @@ export function buildSingleLockPayload(item: CartItem, defaultDate: string) {
     cantidadCupos: 1,
   };
 }
+
+export interface CheckoutRedirection {
+  type: 'external' | 'internal';
+  url: string;
+}
+
+/**
+ * Resuelve la URL de destino tras el bloqueo exitoso de reservas.
+ * Si Stripe genera una URL absoluta externa (http/https), se marca como externa para redirección de navegador completo.
+ * De lo contrario, se procesa como ruta interna de la aplicación (/checkout).
+ */
+export function resolveCheckoutRedirection(
+  checkoutUrl?: string | null,
+  bookingIds: string[] = [],
+): CheckoutRedirection {
+  if (checkoutUrl && (checkoutUrl.startsWith('http://') || checkoutUrl.startsWith('https://'))) {
+    return { type: 'external', url: checkoutUrl };
+  }
+
+  const query =
+    bookingIds.length > 0
+      ? `?bookingIds=${bookingIds.join(',')}&bookingId=${bookingIds[0]}`
+      : '';
+  return {
+    type: 'internal',
+    url: checkoutUrl || `/checkout${query}`,
+  };
+}
+
 

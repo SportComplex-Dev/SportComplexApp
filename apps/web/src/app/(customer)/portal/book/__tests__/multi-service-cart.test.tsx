@@ -12,6 +12,7 @@ import {
   buildLockCartPayload,
   generateDynamicTimeSlots,
   getNumericServiceId,
+  resolveCheckoutRedirection,
   type CartItem,
 } from '../cart-utils';
 import { Cart } from '../components/cart';
@@ -232,11 +233,11 @@ test('TSK-FE-12 Test 3: Envía correctamente el payload multi-ítem a POST /api/
 
   const reservas = data.data.reservas;
   const bookingIds = reservas.map((r: { id: string }) => r.id);
-  const targetUrl =
-    data.data.checkout.url ||
-    `/checkout?bookingIds=${bookingIds.join(',')}&bookingId=${bookingIds[0]}`;
 
-  mockRouter.push(targetUrl);
+  // 2.1 Validación de redirección interna (/checkout)
+  const internalRedirection = resolveCheckoutRedirection(data.data.checkout.url, bookingIds);
+  assert.equal(internalRedirection.type, 'internal');
+  mockRouter.push(internalRedirection.url);
 
   assert.ok(
     redirectedUrl.startsWith('/checkout'),
@@ -245,6 +246,23 @@ test('TSK-FE-12 Test 3: Envía correctamente el payload multi-ítem a POST /api/
   assert.ok(
     redirectedUrl.includes('reserva-uuid-1') && redirectedUrl.includes('reserva-uuid-2'),
     'La URL de checkout debe incluir los IDs de las reservas bloqueadas',
+  );
+
+  // 2.2 Validación de redirección externa hacia Stripe Checkout (evitando falso positivo de router.push)
+  const stripeExternalUrl = 'https://checkout.stripe.com/c/pay/cs_test_mock_123';
+  const externalRedirection = resolveCheckoutRedirection(stripeExternalUrl, bookingIds);
+  assert.equal(
+    externalRedirection.type,
+    'external',
+    'Las URLs que inician con https://checkout.stripe.com deben resolverse como externas',
+  );
+  assert.equal(externalRedirection.url, stripeExternalUrl);
+
+  // 2.3 Validación defensiva de getNumericServiceId para servicios no catalogados
+  assert.throws(
+    () => getNumericServiceId('servicio-desconocido-no-existente'),
+    /Servicio desconocido o sin identificador numérico configurado/,
+    'Debe rechazar identificadores no mapeados',
   );
 });
 
@@ -350,5 +368,12 @@ test('TSK-FE-12 Test 4: Maneja el error cuando una de las franjas retorna SLOT_N
 
   assert.ok(selectorHtml.includes('Paso 1 · Fecha y horario dinámico'));
   assert.ok(selectorHtml.includes('17:00 – 18:00'));
+
+  // Caso 4.4: Fechas pasadas deben tener todas sus franjas deshabilitadas
+  const pastSlots = generateDynamicTimeSlots('2020-01-01');
+  assert.ok(
+    pastSlots.every((s) => !s.isAvailable && s.disabledReason === 'Fecha concluida'),
+    'Todas las franjas de una fecha en el pasado deben estar deshabilitadas',
+  );
 });
 

@@ -13,6 +13,7 @@ import {
   generateDynamicTimeSlots,
   getBogotaDateAfter,
   getNumericServiceId,
+  resolveCheckoutRedirection,
   validateCanAddToCart,
   type CartItem,
   type DynamicTimeSlot,
@@ -186,23 +187,16 @@ export default function BookPage() {
         return;
       }
 
-      // Respuesta exitosa (201 Created): Redirigir a checkout con los IDs de las reservas o URL de Stripe
+      // Respuesta exitosa (201 Created): Redirigir a pasarela externa (Stripe) o vista interna de checkout
       const reservas = data?.data?.reservas || (data?.data?.reserva ? [data.data.reserva] : []);
       const bookingIds = reservas.map((r: { id: string }) => r.id).filter(Boolean);
       const checkoutUrl = data?.data?.checkout?.url;
 
-      if (
-        checkoutUrl &&
-        (checkoutUrl.startsWith('http://') || checkoutUrl.startsWith('https://')) &&
-        !checkoutUrl.includes('/checkout')
-      ) {
-        window.location.href = checkoutUrl;
+      const redirection = resolveCheckoutRedirection(checkoutUrl, bookingIds);
+      if (redirection.type === 'external') {
+        window.location.href = redirection.url;
       } else {
-        const query =
-          bookingIds.length > 0
-            ? `?bookingIds=${bookingIds.join(',')}&bookingId=${bookingIds[0]}`
-            : '';
-        router.push(checkoutUrl || `/checkout${query}`);
+        router.push(redirection.url);
       }
     } catch (err) {
       setCheckoutError(
