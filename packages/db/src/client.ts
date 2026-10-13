@@ -1,6 +1,22 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
+
+if (!process.env.DIRECT_URL && !process.env.DATABASE_URL) {
+  try {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    if (typeof process.loadEnvFile === "function") {
+      try {
+        process.loadEnvFile(path.resolve(__dirname, "../../../apps/web/.env.local"));
+      } catch {}
+      try {
+        process.loadEnvFile(path.resolve(__dirname, "../../../apps/web/.env"));
+      } catch {}
+    }
+  } catch {}
+}
 
 const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 

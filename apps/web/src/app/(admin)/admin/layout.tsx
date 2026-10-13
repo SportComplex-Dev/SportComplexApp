@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Activity,
   ArrowRight,
+  AlertTriangle,
   BadgeCheck,
   CalendarDays,
   ChevronDown,
@@ -34,6 +35,7 @@ const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Torneos', icon: Trophy, href: '/admin/tournaments' },
   { name: 'Empleados', icon: Users, href: '/admin/employees' },
   { name: 'Reservas', icon: CalendarDays, href: '/admin/bookings' },
+  { name: 'Contingencias', icon: AlertTriangle, href: '/admin/incident' },
   { name: 'Membresías', icon: BadgeCheck, href: '/admin/memberships' },
   { name: 'Configuración', icon: Activity, href: '/admin/settings' },
 ]

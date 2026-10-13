@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  handleIncidentPreviewRequest,
   handleIncidentRequest,
   type IncidentDependencies,
 } from "../route";
@@ -36,6 +37,36 @@ function dependencies(
         motivo: "Daño en sistema de filtrado",
         usuarios: [],
       },
+    }),
+    previewContingency: async (serviceId: number) => ({
+      servicio: { id: serviceId, nombre: "Piscina", estado: "ACTIVO" as const },
+      totalReservas: 2,
+      totalCupos: 4,
+      totalClientesAfectados: 2,
+      reservasAfectadas: [
+        {
+          reservaId: "res-1",
+          usuarioId: "u-1",
+          nombre: "Juan Perez",
+          correo: "juan@example.com",
+          fecha: new Date("2026-10-12"),
+          horaInicio: new Date("1970-01-01T10:00:00Z"),
+          horaFin: new Date("1970-01-01T11:00:00Z"),
+          cantidadCupos: 2,
+          estado: "CONFIRMADA" as const,
+        },
+        {
+          reservaId: "res-2",
+          usuarioId: "u-2",
+          nombre: "Maria Gomez",
+          correo: "maria@example.com",
+          fecha: new Date("2026-10-12"),
+          horaInicio: new Date("1970-01-01T11:00:00Z"),
+          horaFin: new Date("1970-01-01T12:00:00Z"),
+          cantidadCupos: 2,
+          estado: "PENDIENTE_PAGO" as const,
+        },
+      ],
     }),
     sendWebhook: async () => ({
       sent: false,
@@ -148,4 +179,27 @@ test("POST /api/admin/incident sigue exitoso si falla registrar el despacho ya e
   assert.equal(response.status, 200);
   assert.deepEqual(body.data.webhook, { sent: true });
   assert.equal(body.data.webhookEnviadoRegistrado, false);
+});
+
+test("GET /api/admin/incident devuelve el resumen previo de reservas afectadas", async () => {
+  const getReq = new Request("http://localhost/api/admin/incident?serviceId=1");
+  const response = await handleIncidentPreviewRequest(getReq, dependencies());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(body.data.totalReservas, 2);
+  assert.equal(body.data.totalCupos, 4);
+  assert.equal(body.data.totalClientesAfectados, 2);
+  assert.equal(body.data.reservasAfectadas.length, 2);
+});
+
+test("GET /api/admin/incident valida parámetro serviceId", async () => {
+  const reqNoParam = new Request("http://localhost/api/admin/incident");
+  const resNoParam = await handleIncidentPreviewRequest(reqNoParam, dependencies());
+  assert.equal(resNoParam.status, 400);
+
+  const reqInvalid = new Request("http://localhost/api/admin/incident?serviceId=abc");
+  const resInvalid = await handleIncidentPreviewRequest(reqInvalid, dependencies());
+  assert.equal(resInvalid.status, 400);
 });
