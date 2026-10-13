@@ -1,7 +1,10 @@
 import { fail, ok } from "@/lib/api-response";
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { tournamentQuerySchema } from "@sportcomplex/validation";
-import { listarTorneos, prisma } from "@sportcomplex/db";
+import {
+  listarTorneos,
+  obtenerInscripcionesUsuarioParaTorneos,
+} from "@sportcomplex/db";
 
 /**
  * GET /api/tournaments
@@ -30,6 +33,15 @@ export async function GET(request: Request) {
       );
     }
 
+    const ESTADOS_CATALOGO_PUBLICO = ["INSCRIPCIONES_ABIERTAS", "EN_CURSO", "FINALIZADO"];
+    if (parsed.data.estado && !ESTADOS_CATALOGO_PUBLICO.includes(parsed.data.estado)) {
+      return fail(
+        "INVALID_FILTER",
+        "Estado de torneo no disponible para consulta pública.",
+        400,
+      );
+    }
+
     // Por defecto en el catálogo público, si no se especifica estado o soloActivos,
     // filtramos solo torneos activos (INSCRIPCIONES_ABIERTAS o EN_CURSO)
     const filtros = {
@@ -53,27 +65,51 @@ export async function GET(request: Request) {
       [key: string]: unknown;
     }
 
-    let inscripcionesUsuario: Set<string> = new Set();
+    interface MiInscripcionItem {
+      id: string;
+      estado: string;
+      nombrePareja: string | null;
+      ticketCodigoUuid: string | null;
+      ticketEstado?: string;
+    }
+
+    const inscripcionesMap = new Map<string, MiInscripcionItem>();
     if (authResult && authResult.authorized) {
-      const misInscripciones = await prisma.inscripcionTorneo.findMany({
-        where: {
-          usuarioId: authResult.actor.id,
-          torneoId: { in: (torneos as TorneoItem[]).map((t: TorneoItem) => t.id) },
-        },
-      });
-      inscripcionesUsuario = new Set(misInscripciones.map((i: { torneoId: string }) => i.torneoId));
+      const torneoIds = (torneos as TorneoItem[]).map((t: TorneoItem) => t.id);
+      const misInscripciones = await obtenerInscripcionesUsuarioParaTorneos(
+        authResult.actor.id,
+        torneoIds,
+      );
+      for (const ins of misInscripciones as Array<{
+        id: string;
+        torneoId: string;
+        estado: string;
+        nombrePareja?: string | null;
+        ticketCodigoUuid?: string | null;
+        ticketEstado?: string;
+      }>) {
+        inscripcionesMap.set(ins.torneoId, {
+          id: ins.id,
+          estado: ins.estado,
+          nombrePareja: ins.nombrePareja ?? null,
+          ticketCodigoUuid: ins.ticketCodigoUuid ?? null,
+          ticketEstado: ins.ticketEstado,
+        });
+      }
     }
 
     const resultado = (torneos as TorneoItem[]).map((t: TorneoItem) => {
       const cuposDisponibles = Math.max(0, t.cuposTotales - t.cuposOcupados);
       const inscripcionesAbiertas =
         t.estado === "INSCRIPCIONES_ABIERTAS" && cuposDisponibles > 0;
+      const miInscripcion = inscripcionesMap.get(t.id) ?? null;
 
       return {
         ...t,
         cuposDisponibles,
         inscripcionesAbiertas,
-        yaInscrito: inscripcionesUsuario.has(t.id),
+        yaInscrito: Boolean(miInscripcion),
+        miInscripcion,
       };
     });
 

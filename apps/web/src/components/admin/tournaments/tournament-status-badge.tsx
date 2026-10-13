@@ -26,13 +26,13 @@ export const tournamentConfig: Record<
     label: "Inscripciones Abiertas",
     bg: "bg-emerald-500/10 dark:bg-emerald-400/10 border-emerald-500/20",
     text: "text-emerald-700 dark:text-emerald-400",
-    dot: "bg-emerald-500 animate-pulse",
+    dot: "bg-emerald-500 motion-safe:animate-pulse motion-reduce:animate-none",
   },
   EN_CURSO: {
     label: "En Curso",
     bg: "bg-blue-500/10 dark:bg-blue-400/10 border-blue-500/20",
     text: "text-blue-700 dark:text-blue-400",
-    dot: "bg-blue-500 animate-pulse",
+    dot: "bg-blue-500 motion-safe:animate-pulse motion-reduce:animate-none",
   },
   FINALIZADO: {
     label: "Finalizado",

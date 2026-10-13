@@ -111,6 +111,11 @@ export default function LoginPage() {
       const result = await res.json().catch(() => null)
 
       if (!res.ok || !result?.success) {
+        if (result?.error?.code === 'ACCOUNT_PENDING') {
+          router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
+          router.refresh()
+          return
+        }
         setError(result?.error?.message || 'Correo o contraseña incorrectos.')
         return
       }

@@ -4,96 +4,193 @@ import {
   tournamentConfig,
   inscripcionConfig,
 } from '@/components/admin/tournaments/tournament-status-badge'
-import type { TournamentFormData, BloqueoFormItem } from '@/components/admin/tournaments/tournament-form-modal'
+import {
+  toDatetimeLocal,
+  parseDatetimeLocalToUtcIso,
+  mapTournamentApiError,
+} from '@/components/admin/tournaments/tournament-form-modal'
+import {
+  calculateTournamentKPIs,
+  type TorneoAdminItem,
+} from '@/app/(admin)/admin/tournaments/page'
+import { createTournamentSchema } from '@sportcomplex/validation'
 
-// TSK-FE-25 (SCRUM-168): Suite de pruebas unitarias para el Panel de Torneos Admin
+// TSK-FE-25 (SCRUM-168): Suite de pruebas unitarias robusta para Panel de Torneos Admin
 
-test('TSK-FE-25: Configuración semántica y visual de estados de torneo', () => {
-  // Verificar que todos los estados del ciclo de vida tienen etiqueta y clase de estilo
+test('TSK-FE-25: Configuración semántica y visual de estados de torneo (FSM & Badges con A11Y-02)', () => {
   assert.equal(tournamentConfig.BORRADOR.label, 'Borrador')
   assert.equal(tournamentConfig.INSCRIPCIONES_ABIERTAS.label, 'Inscripciones Abiertas')
   assert.equal(tournamentConfig.EN_CURSO.label, 'En Curso')
   assert.equal(tournamentConfig.FINALIZADO.label, 'Finalizado')
   assert.equal(tournamentConfig.CANCELADO.label, 'Cancelado')
 
-  // Verificar dots de estado
-  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /bg-emerald/)
-  assert.match(tournamentConfig.EN_CURSO.dot, /bg-blue/)
+  // A11Y-02: Verificar soporte de motion-safe y motion-reduce
+  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /motion-safe:animate-pulse/)
+  assert.match(tournamentConfig.INSCRIPCIONES_ABIERTAS.dot, /motion-reduce:animate-none/)
+  assert.match(tournamentConfig.EN_CURSO.dot, /motion-safe:animate-pulse/)
   assert.match(tournamentConfig.CANCELADO.dot, /bg-rose/)
-})
 
-test('TSK-FE-25: Configuración de estados de inscripción de jugadores', () => {
   assert.equal(inscripcionConfig.CONFIRMADA.label, 'Confirmada')
   assert.equal(inscripcionConfig.PENDIENTE_PAGO.label, 'Pendiente Pago')
   assert.equal(inscripcionConfig.CANCELADA.label, 'Cancelada')
 })
 
-test('TSK-FE-25: Cálculos de ocupación y recaudación estimada de torneo', () => {
-  const torneo = {
-    cuposTotales: 32,
-    cuposOcupados: 24,
-    precioInscripcion: 50000,
-  }
+test('TSK-FE-25 / SEC-01: Prevención de desfase horario cliente-servidor (Timezone America/Bogota UTC-5)', () => {
+  // Timestamp UTC a las 14:30 UTC -> En Bogotá (UTC-5) debe ser exactamente las 09:30
+  const utcDate = '2026-11-15T14:30:00.000Z'
+  const localFormatted = toDatetimeLocal(utcDate)
+  assert.equal(localFormatted, '2026-11-15T09:30')
 
-  const cuposDisponibles = Math.max(0, torneo.cuposTotales - torneo.cuposOcupados)
-  const pctOcupacion = Math.round((torneo.cuposOcupados / torneo.cuposTotales) * 100)
-  const recaudacionEstimada = torneo.cuposOcupados * torneo.precioInscripcion
+  // Timestamp nocturno: 2026-11-16T01:00:00.000Z -> En Bogotá es el día anterior 2026-11-15T20:00
+  const utcMidnight = '2026-11-16T01:00:00.000Z'
+  const localMidnight = toDatetimeLocal(utcMidnight)
+  assert.equal(localMidnight, '2026-11-15T20:00')
 
-  assert.equal(cuposDisponibles, 8)
-  assert.equal(pctOcupacion, 75)
-  assert.equal(recaudacionEstimada, 1200000)
+  // Conversión inversa de string local a ISO UTC garantizando offset -05:00
+  const inputDatetime = '2026-11-15T09:30'
+  const isoUtc = parseDatetimeLocalToUtcIso(inputDatetime)
+  assert.equal(isoUtc, '2026-11-15T14:30:00.000Z')
 })
 
-test('TSK-FE-25: Lógica de validación del formulario de creación y bloqueo preventivo (ARC-01)', () => {
-  const formDataValido: TournamentFormData = {
-    titulo: 'Torneo Abierto de Pádel Apertura 2026',
-    descripcion: 'Torneo oficial para categoría 2da y 3ra',
+test('TSK-FE-25 / VAL-01: Validación de esquema createTournamentSchema de @sportcomplex/validation con payload válido', () => {
+  const validPayload = {
+    titulo: 'Torneo Apertura de Tenis 2026',
+    descripcion: 'Torneo abierto en superficie rápida',
     categoriaId: 1,
-    nivel: 'Segunda Categoría (Intermedio Alto)',
-    fechaInicio: '2026-11-01T08:00',
-    fechaFin: '2026-11-02T20:00',
+    nivel: 'Segunda Categoría',
+    fechaInicio: '2026-11-20T13:00:00.000Z',
+    fechaFin: '2026-11-22T23:00:00.000Z',
     cuposTotales: 16,
-    precioInscripcion: 60000,
-    estado: 'BORRADOR',
+    precioInscripcion: 50000,
+    estado: 'BORRADOR' as const,
     bloqueos: [
       {
-        servicioId: 10,
-        horaInicio: '2026-11-01T08:00',
-        horaFin: '2026-11-01T14:00',
-      },
-      {
-        servicioId: 11,
-        horaInicio: '2026-11-01T08:00',
-        horaFin: '2026-11-01T14:00',
+        servicioId: 2,
+        horaInicio: '2026-11-20T13:00:00.000Z',
+        horaFin: '2026-11-20T19:00:00.000Z',
       },
     ],
   }
 
-  // Validación de título
-  assert.ok(formDataValido.titulo.trim().length >= 3)
-
-  // Validación de coherencia de fechas
-  const inicio = new Date(formDataValido.fechaInicio)
-  const fin = new Date(formDataValido.fechaFin)
-  assert.ok(fin > inicio, 'La fecha de fin debe ser posterior a la de inicio')
-
-  // Validación de bloqueos preventivos
-  assert.equal(formDataValido.bloqueos.length, 2)
-  formDataValido.bloqueos.forEach((b: BloqueoFormItem) => {
-    assert.ok(b.servicioId > 0)
-    assert.ok(new Date(b.horaFin) > new Date(b.horaInicio))
-  })
+  const result = createTournamentSchema.safeParse(validPayload)
+  assert.equal(result.success, true)
 })
 
-test('TSK-FE-25: Manejo y detección de conflicto 409 COURT_SLOT_CONFLICT', () => {
-  const errorResponse = {
-    success: false,
-    error: {
-      code: 'COURT_SLOT_CONFLICT',
-      message: 'La pista seleccionada presenta conflicto con una reserva previa en el horario especificado.',
-    },
+test('TSK-FE-25 / VAL-01: Rechazo estricto con fieldErrors para datos inválidos según reglas de negocio', () => {
+  // Caso 1: Título menor a 3 caracteres
+  const invalidTitle = {
+    titulo: 'AB',
+    categoriaId: 1,
+    nivel: 'Intermedio',
+    fechaInicio: '2026-11-20T13:00:00.000Z',
+    fechaFin: '2026-11-22T23:00:00.000Z',
+    cuposTotales: 16,
+  }
+  const resultTitle = createTournamentSchema.safeParse(invalidTitle)
+  assert.equal(resultTitle.success, false)
+  if (!resultTitle.success) {
+    const errors = resultTitle.error.flatten().fieldErrors
+    assert.ok(errors.titulo)
   }
 
-  assert.equal(errorResponse.error.code, 'COURT_SLOT_CONFLICT')
-  assert.match(errorResponse.error.message, /conflicto con una reserva previa/)
+  // Caso 2: Cupos menores a 2
+  const invalidCupos = {
+    titulo: 'Torneo Pádel Master',
+    categoriaId: 1,
+    nivel: 'Intermedio',
+    fechaInicio: '2026-11-20T13:00:00.000Z',
+    fechaFin: '2026-11-22T23:00:00.000Z',
+    cuposTotales: 1,
+  }
+  const resultCupos = createTournamentSchema.safeParse(invalidCupos)
+  assert.equal(resultCupos.success, false)
+  if (!resultCupos.success) {
+    const errors = resultCupos.error.flatten().fieldErrors
+    assert.ok(errors.cuposTotales)
+  }
+
+  // Caso 3: Bloqueo con horaFin anterior a horaInicio
+  const invalidBloqueo = {
+    titulo: 'Torneo Pádel Master',
+    categoriaId: 1,
+    nivel: 'Intermedio',
+    fechaInicio: '2026-11-20T13:00:00.000Z',
+    fechaFin: '2026-11-22T23:00:00.000Z',
+    cuposTotales: 16,
+    bloqueos: [
+      {
+        servicioId: 2,
+        horaInicio: '2026-11-20T19:00:00.000Z',
+        horaFin: '2026-11-20T13:00:00.000Z', // Invertida
+      },
+    ],
+  }
+  const resultBloqueo = createTournamentSchema.safeParse(invalidBloqueo)
+  assert.equal(resultBloqueo.success, false)
+})
+
+test('TSK-FE-25 / TEST-01: Mapeo funcional de códigos de error de la API con mapTournamentApiError (no tautológico)', () => {
+  // Evaluación directa de la función pura exportada por tournament-form-modal
+  const conflictMsg = mapTournamentApiError('COURT_SLOT_CONFLICT')
+  assert.match(conflictMsg, /Conflicto de disponibilidad/)
+  assert.match(conflictMsg, /reservas activas/)
+
+  const registeredMsg = mapTournamentApiError('ALREADY_REGISTERED')
+  assert.match(registeredMsg, /Ya te encuentras formalmente inscrito/)
+
+  const customFallbackMsg = mapTournamentApiError('OTHER_CODE', 'Error específico del servidor')
+  assert.equal(customFallbackMsg, 'Error específico del servidor')
+
+  const defaultMsg = mapTournamentApiError(undefined)
+  assert.equal(defaultMsg, 'Error al guardar el torneo en el servidor.')
+})
+
+test('TSK-FE-25 / SCAL-01: Cálculo agregado y reactivo de KPIs con calculateTournamentKPIs', () => {
+  const sampleTournaments: TorneoAdminItem[] = [
+    {
+      id: 'torneo-1',
+      titulo: 'Torneo Pádel Oro',
+      descripcion: null,
+      categoriaId: 1,
+      nivel: 'Segunda',
+      fechaInicio: '2026-11-01T08:00:00Z',
+      fechaFin: '2026-11-02T18:00:00Z',
+      cuposTotales: 16,
+      cuposOcupados: 12,
+      precioInscripcion: 50000,
+      estado: 'INSCRIPCIONES_ABIERTAS',
+    },
+    {
+      id: 'torneo-2',
+      titulo: 'Copa Tenis Interclubes',
+      descripcion: null,
+      categoriaId: 2,
+      nivel: 'Primera',
+      fechaInicio: '2026-11-05T08:00:00Z',
+      fechaFin: '2026-11-06T18:00:00Z',
+      cuposTotales: 32,
+      cuposOcupados: 20,
+      precioInscripcion: 80000,
+      estado: 'EN_CURSO',
+    },
+    {
+      id: 'torneo-3',
+      titulo: 'Torneo Squash Borrador',
+      descripcion: null,
+      categoriaId: 3,
+      nivel: 'Tercera',
+      fechaInicio: '2026-11-10T08:00:00Z',
+      fechaFin: '2026-11-11T18:00:00Z',
+      cuposTotales: 8,
+      cuposOcupados: 0,
+      precioInscripcion: 0,
+      estado: 'BORRADOR',
+    },
+  ]
+
+  const kpis = calculateTournamentKPIs(sampleTournaments)
+  assert.equal(kpis.total, 3)
+  assert.equal(kpis.abiertas, 1)
+  assert.equal(kpis.enCurso, 1)
+  assert.equal(kpis.inscripciones, 32)
 })

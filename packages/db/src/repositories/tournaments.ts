@@ -208,6 +208,51 @@ export async function aplicarBloqueosDisponibilidad(
       }
     }
 
+    // ARC-02: Si la fecha está fuera de la ventana de 15 días o aún no tiene filas de disponibilidad generadas,
+    // aprovisionar las franjas horarias correspondientes con bloqueadaMantenimiento: true
+    if (disponibilidades.length === 0 && db.servicio?.findUnique) {
+      const servicio = await db.servicio.findUnique({
+        where: { id: b.servicioId },
+        include: { franjasHorarias: true },
+      });
+
+      if (servicio && Array.isArray(servicio.franjasHorarias) && servicio.franjasHorarias.length > 0) {
+        // diaSemana ISO: 1 (Lunes) a 7 (Domingo)
+        const diaSemana = targetDate.getUTCDay() === 0 ? 7 : targetDate.getUTCDay();
+        const franjasDelDia = servicio.franjasHorarias.filter(
+          (f: { diaSemana: number }) => f.diaSemana === diaSemana,
+        );
+        const cuposTotales = servicio.modalidad === "EXCLUSIVA" ? 1 : servicio.capacidadMaxima;
+
+        for (const franja of franjasDelDia) {
+          const fStart = secondsFromDbTime(new Date(franja.horaInicio));
+          const fEnd = secondsFromDbTime(new Date(franja.horaFin));
+          const solapa = fStart < endSec && fEnd > startSec;
+
+          if (db.disponibilidad.upsert) {
+            await db.disponibilidad.upsert({
+              where: {
+                servicioId_franjaId_fecha: {
+                  servicioId: servicio.id,
+                  franjaId: franja.id,
+                  fecha: targetDate,
+                },
+              },
+              update: solapa ? { bloqueadaMantenimiento: true } : {},
+              create: {
+                servicioId: servicio.id,
+                franjaId: franja.id,
+                fecha: targetDate,
+                cuposTotales,
+                cuposOcupados: 0,
+                bloqueadaMantenimiento: solapa,
+              },
+            });
+          }
+        }
+      }
+    }
+
     if (matchingIds.length > 0) {
       if (db.disponibilidad.updateMany) {
         await db.disponibilidad.updateMany({
@@ -264,17 +309,30 @@ export async function liberarBloqueosTorneo(
     }
 
     if (matchingIds.length > 0) {
-      if (db.disponibilidad.updateMany) {
-        await db.disponibilidad.updateMany({
-          where: { id: { in: matchingIds } },
-          data: { bloqueadaMantenimiento: false },
-        });
-      } else {
-        for (const id of matchingIds) {
-          await db.disponibilidad.update({
-            where: { id },
+      // ARC-03: No reactivar franjas si el servicio posee una inhabilitación activa en la fecha
+      const tieneInhabilitacion = db.inhabilitacionServicio?.findFirst
+        ? await db.inhabilitacionServicio.findFirst({
+            where: {
+              servicioId: b.servicioId,
+              fechaInicio: { lte: targetDate },
+              fechaFin: { gte: targetDate },
+            },
+          })
+        : null;
+
+      if (!tieneInhabilitacion) {
+        if (db.disponibilidad.updateMany) {
+          await db.disponibilidad.updateMany({
+            where: { id: { in: matchingIds } },
             data: { bloqueadaMantenimiento: false },
           });
+        } else {
+          for (const id of matchingIds) {
+            await db.disponibilidad.update({
+              where: { id },
+              data: { bloqueadaMantenimiento: false },
+            });
+          }
         }
       }
     }
@@ -436,7 +494,36 @@ export async function obtenerTorneoPorId(
 }
 
 /**
- * Actualiza el estado de un torneo.
+ * Matriz de transiciones de estado legales para un torneo (ARC-04).
+ */
+export const TRANSICIONES_ESTADO_TORNEO: Record<EstadoTorneoValor, readonly EstadoTorneoValor[]> = {
+  BORRADOR: ["INSCRIPCIONES_ABIERTAS", "CANCELADO"],
+  INSCRIPCIONES_ABIERTAS: ["EN_CURSO", "CANCELADO"],
+  EN_CURSO: ["FINALIZADO", "CANCELADO"],
+  FINALIZADO: [],
+  CANCELADO: [],
+};
+
+/**
+ * Valida si la transición de estado es válida según el ciclo de vida del torneo (ARC-04).
+ */
+export function validarTransicionEstadoTorneo(
+  estadoActual: EstadoTorneoValor,
+  nuevoEstado: EstadoTorneoValor,
+): void {
+  if (estadoActual === nuevoEstado) return;
+  const permitidos = TRANSICIONES_ESTADO_TORNEO[estadoActual] ?? [];
+  if (!permitidos.includes(nuevoEstado)) {
+    throw new TournamentError(
+      `No se permite la transición de estado de ${estadoActual} a ${nuevoEstado}.`,
+      "INVALID_STATE_TRANSITION",
+      400,
+    );
+  }
+}
+
+/**
+ * Actualiza el estado de un torneo de forma transaccional (ARC-01b) y validando FSM (ARC-04).
  */
 export async function actualizarEstadoTorneo(
   id: string,
@@ -444,23 +531,30 @@ export async function actualizarEstadoTorneo(
   options: TournamentDbOptions = {},
 ) {
   const db = options.db ?? prisma;
-  const torneo = await db.torneo.findUnique({ where: { id } });
-  if (!torneo) {
-    throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
-  }
 
-  if (nuevoEstado === "CANCELADO") {
-    await liberarBloqueosTorneo(id, options);
-  }
+  const runOperation = async (tx: any) => {
+    const torneo = await tx.torneo.findUnique({ where: { id } });
+    if (!torneo) {
+      throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
+    }
 
-  return db.torneo.update({
-    where: { id },
-    data: { estado: nuevoEstado },
-    include: {
-      categoria: true,
-      bloqueos: { include: { servicio: true } },
-    },
-  });
+    validarTransicionEstadoTorneo(torneo.estado as EstadoTorneoValor, nuevoEstado);
+
+    if (nuevoEstado === "CANCELADO") {
+      await liberarBloqueosTorneo(id, { db: tx });
+    }
+
+    return tx.torneo.update({
+      where: { id },
+      data: { estado: nuevoEstado },
+      include: {
+        categoria: true,
+        bloqueos: { include: { servicio: true } },
+      },
+    });
+  };
+
+  return db.$transaction ? db.$transaction(runOperation) : runOperation(db);
 }
 
 /**
@@ -525,6 +619,7 @@ export async function actualizarTorneo(
       updateData.precioInscripcion = normalizePrecio(input.precioInscripcion);
     }
     if (input.estado !== undefined) {
+      validarTransicionEstadoTorneo(torneo.estado as EstadoTorneoValor, input.estado);
       updateData.estado = input.estado;
       if (input.estado === "CANCELADO") {
         await liberarBloqueosTorneo(id, { db: tx });
@@ -679,6 +774,27 @@ export async function inscribirUsuarioTorneo(
           409,
         );
       }
+      if (inscripcionExistente.estado === "PENDIENTE_PAGO" && !input.confirmado) {
+        return inscripcionExistente;
+      }
+    }
+
+    // HIGH-04: Si se suministra un pagoId, validar atómicamente dentro de la transacción
+    // que no haya sido utilizado ya en otra inscripción a cualquier torneo
+    if (input.pagoId) {
+      const pagoEnUso = await tx.inscripcionTorneo.findFirst({
+        where: {
+          pagoId: input.pagoId,
+          ...(inscripcionExistente ? { id: { not: inscripcionExistente.id } } : {}),
+        },
+      });
+      if (pagoEnUso) {
+        throw new TournamentError(
+          "El comprobante de pago ya ha sido utilizado en otra inscripción.",
+          "PAYMENT_ALREADY_USED",
+          409,
+        );
+      }
     }
 
     const estadoInicial: EstadoInscripcionTorneoValor = input.confirmado
@@ -687,29 +803,70 @@ export async function inscribirUsuarioTorneo(
         ? "CONFIRMADA"
         : "PENDIENTE_PAGO";
 
-    const inscripcion = await tx.inscripcionTorneo.create({
-      data: {
-        torneoId: input.torneoId,
-        usuarioId: input.usuarioId,
-        nombrePareja: input.nombrePareja?.trim() ?? null,
-        pagoId: input.pagoId ?? null,
-        estado: estadoInicial,
-        ticketEstado: "EMITIDO",
-      },
-      include: {
-        torneo: true,
-        usuario: { select: { id: true, nombre: true, correo: true } },
-      },
-    });
-
     if (estadoInicial === "CONFIRMADA") {
-      await tx.torneo.update({
-        where: { id: input.torneoId },
-        data: { cuposOcupados: { increment: 1 } },
+      const updateResult = await tx.torneo.updateMany({
+        where: {
+          id: input.torneoId,
+          cuposOcupados: { lt: torneo.cuposTotales },
+        },
+        data: {
+          cuposOcupados: { increment: 1 },
+        },
+      });
+
+      if (updateResult.count === 0) {
+        throw new TournamentError(
+          "No hay cupos disponibles para este torneo.",
+          "CAPACITY_EXCEEDED",
+          409,
+        );
+      }
+    }
+
+    if (inscripcionExistente) {
+      return tx.inscripcionTorneo.update({
+        where: { id: inscripcionExistente.id },
+        data: {
+          nombrePareja: input.nombrePareja?.trim() ?? inscripcionExistente.nombrePareja,
+          pagoId: input.pagoId ?? inscripcionExistente.pagoId,
+          estado: estadoInicial,
+          ticketEstado: estadoInicial === "CONFIRMADA" ? "EMITIDO" : inscripcionExistente.ticketEstado,
+        },
+        include: {
+          torneo: true,
+          usuario: { select: { id: true, nombre: true, correo: true } },
+        },
       });
     }
 
-    return inscripcion;
+    try {
+      return await tx.inscripcionTorneo.create({
+        data: {
+          torneoId: input.torneoId,
+          usuarioId: input.usuarioId,
+          nombrePareja: input.nombrePareja?.trim() ?? null,
+          pagoId: input.pagoId ?? null,
+          estado: estadoInicial,
+          ticketEstado: "EMITIDO",
+        },
+        include: {
+          torneo: true,
+          usuario: { select: { id: true, nombre: true, correo: true } },
+        },
+      });
+    } catch (err: any) {
+      if (err instanceof TournamentError) {
+        throw err;
+      }
+      if (err?.code === "P2002" || err?.message?.includes("Unique constraint")) {
+        throw new TournamentError(
+          "El usuario ya se encuentra inscrito en este torneo.",
+          "ALREADY_REGISTERED",
+          409,
+        );
+      }
+      throw err;
+    }
   });
 }
 
@@ -778,3 +935,114 @@ export async function canjearTicketTorneo(
     });
   });
 }
+
+/**
+ * Valida que un pago exista en la base de datos, esté APROBADO, pertenezca al usuario,
+ * cubra el monto requerido del torneo y no haya sido utilizado en otra inscripción a un torneo distinto.
+ */
+export async function verificarPagoParaTorneo(
+  identificador: string,
+  usuarioId: string,
+  montoRequerido: number,
+  torneoId?: string,
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      identificador,
+    );
+
+  let pago = null;
+  if (isUuid) {
+    pago = await db.pago.findUnique({
+      where: { id: identificador },
+    });
+  } else {
+    pago = await db.pago.findUnique({
+      where: { stripePaymentIntentId: identificador },
+    });
+  }
+
+  if (!pago) return null;
+  if (pago.usuarioId !== usuarioId) return null;
+  if (pago.estado !== "APROBADO") return null;
+  if (pago.tipo !== "TORNEO") return null;
+  if (Number(pago.monto) < montoRequerido) return null;
+
+  // Verificar si ya fue utilizado en otra inscripción a un torneo diferente
+  const inscripcionConPago = await db.inscripcionTorneo.findFirst({
+    where: { pagoId: pago.id },
+  });
+  if (inscripcionConPago) {
+    if (torneoId && inscripcionConPago.torneoId !== torneoId) {
+      return null;
+    }
+    if (inscripcionConPago.usuarioId !== usuarioId) {
+      return null;
+    }
+  }
+
+  return pago;
+}
+
+/**
+ * Obtiene las inscripciones activas (CONFIRMADA o PENDIENTE_PAGO) de un usuario para una lista de torneos.
+ */
+export async function obtenerInscripcionesUsuarioParaTorneos(
+  usuarioId: string,
+  torneoIds: string[],
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  return db.inscripcionTorneo.findMany({
+    where: {
+      usuarioId,
+      torneoId: { in: torneoIds },
+      estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
+    },
+  });
+}
+
+/**
+ * Obtiene la inscripción de un usuario a un torneo específico.
+ */
+export async function obtenerInscripcionUsuario(
+  torneoId: string,
+  usuarioId: string,
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  return db.inscripcionTorneo.findUnique({
+    where: {
+      torneoId_usuarioId: { torneoId, usuarioId },
+    },
+    include: {
+      usuario: { select: { id: true, nombre: true, correo: true } },
+    },
+  });
+}
+
+/**
+ * Obtiene el detalle público de un torneo sin exponer la lista de inscripciones ni PII de terceros.
+ */
+export async function obtenerDetallePublicoTorneo(
+  id: string,
+  options: TournamentDbOptions = {},
+) {
+  const db = options.db ?? prisma;
+  const torneo = await db.torneo.findUnique({
+    where: { id },
+    include: {
+      categoria: true,
+      bloqueos: { include: { servicio: true } },
+    },
+  });
+
+  if (!torneo) {
+    throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
+  }
+
+  return torneo;
+}
+
