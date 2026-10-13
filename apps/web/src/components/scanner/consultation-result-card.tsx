@@ -34,12 +34,14 @@ export interface TicketInfo {
 export interface ConsultationResultCardProps {
   ticket: TicketInfo;
   modo: "CONSULTA" | "TURNO";
+  isCached?: boolean;
   onReset: () => void;
 }
 
 export function ConsultationResultCard({
   ticket,
   modo,
+  isCached = false,
   onReset,
 }: ConsultationResultCardProps) {
   return (
@@ -53,13 +55,24 @@ export function ConsultationResultCard({
           <CheckCircle2 className="size-5 text-[#c9ef75]" />
           <h2 className="font-semibold text-sm">Información del Boleto</h2>
         </div>
-        <Badge
-          data-testid="ticket-status-badge"
-          variant={ticket.estado === "EMITIDO" ? "success" : "warning"}
-          className="font-mono text-xs"
-        >
-          {ticket.estado}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isCached ? (
+            <Badge
+              data-testid="cached-status-badge"
+              variant="outline"
+              className="border-amber-400 bg-amber-400/20 text-amber-200 font-semibold text-xs"
+            >
+              [Datos locales en caché - Sin conexión]
+            </Badge>
+          ) : null}
+          <Badge
+            data-testid="ticket-status-badge"
+            variant={ticket.estado === "EMITIDO" ? "success" : "warning"}
+            className="font-mono text-xs"
+          >
+            {ticket.estado}
+          </Badge>
+        </div>
       </div>
 
       <CardContent className="p-5 space-y-4">
@@ -121,6 +134,23 @@ export function ConsultationResultCard({
             </p>
           </div>
         </div>
+
+        {/* Banner de datos en caché cuando no hay conexión */}
+        {isCached ? (
+          <div
+            data-testid="cached-warning-banner"
+            role="status"
+            className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 space-y-1"
+          >
+            <div className="flex items-center gap-2 font-semibold text-xs text-amber-700 dark:text-amber-300">
+              <RefreshCw className="size-4 shrink-0" />
+              <span>[Datos locales en caché - Sin conexión]</span>
+            </div>
+            <p className="text-xs leading-relaxed">
+              Atención: Esta información fue recuperada de la memoria caché local del dispositivo. Los datos pueden estar desactualizados y no representan una validación actual del backend. No autorizan acceso ni canje transaccional.
+            </p>
+          </div>
+        ) : null}
 
         {/* Garantía y Criterio de Aceptación Clave */}
         <div
