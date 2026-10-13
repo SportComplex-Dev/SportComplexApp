@@ -173,11 +173,22 @@ transacciones con `ROLLBACK` (sin datos residuales):
 
 ---
 
-## Portal de membresías con descuento en reservas (PR #71)
+## Portal de membresías con descuento en reservas (PR #71, HU-20 / RF-16)
 
-El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) muestra planes con periodicidad `SEMANAL | MENSUAL | ANUAL` y la membresía activa del usuario (`VIGENTE | VENCIDA | CANCELADA`).
+> Estado: vigente
 
-- **Descuento del 30 %**: cada plan confiere `descuentoPct` que se aplica automáticamente al alquilar pistas/canchas. El desglose (`apps/web/src/components/portal/membership-utils.ts`, `PlanDisplayBreakdown`) transparenta precio original, monto de descuento y precio final antes del cobro en Stripe.
-- **Cobro transparente**: el monto que ve el usuario es el que se cobra; sin cargos ocultos.
-- **Beneficios por periodicidad** (`BENEFICIOS_POR_PERIODICIDAD`): acceso a gimnasio/piscina/zona húmeda según plan, pase de invitado mensual, QR digital para torniquetes, reserva preferente 48 h.
-- Tests: `membership-utils.test.ts` (144+ casos de cálculo y formato).
+### Contexto
+El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el socio ve planes, su membresía activa y se suscribe. El 30 % de descuento en reservas es el beneficio central que hay que transparentar antes del cobro.
+
+### Cómo funciona
+- **Planes**: `PlanMembresiaDTO` con periodicidad `SEMANAL | MENSUAL | ANUAL`, precio y `descuentoPct` (`apps/web/src/components/portal/membership-utils.ts`). La membresía activa del usuario es `VIGENTE | VENCIDA | CANCELADA`.
+- **Desglose** (`calcularDesglosePlan`): respeta la tarifa autoritativa de la DB/Stripe y muestra precio original, monto de descuento y precio final. El plan `MENSUAL` se marca `popular`; el `ANUAL` muestra ahorro ("hasta 2 meses vs mensualidad").
+- **Suscripción**: `iniciarSuscripcionStripe(planId)` hace `POST /api/memberships/subscribe` y redirige al Checkout de Stripe (`successUrl`/`cancelUrl` de vuelta al portal con `?success=true&plan_id=`). Respuestas de error tipadas (`UNAUTHORIZED`, `SUBSCRIBE_ERROR`, `NETWORK_ERROR`).
+- **Beneficios por periodicidad** (`BENEFICIOS_POR_PERIODICIDAD`): acceso a gimnasio/piscina/zona húmeda según plan, pases de invitado, QR para torniquetes, reserva preferente (48 h–15 días según plan).
+
+### Decisiones y restricciones
+- El precio mostrado es el que se cobra: `precioConDescuento` sale del mismo desglose que alimenta Stripe. Nada se recalcula en el cliente al pagar.
+- `descuentoPct` cae a `30` por defecto si la DB trae nulo: el beneficio nunca desaparece por dato faltante.
+
+### Testing
+`apps/web/src/components/portal/__tests__/membership-utils.test.ts` (cálculo de desglose, formato, flujos de suscripción y errores).

@@ -747,9 +747,23 @@ La suite automatizada se ubica en:
 
 ## Pantalla de inhabilitación por contingencia (PR #72, RF-19)
 
-El admin puede inhabilitar servicios por contingencia desde `apps/web/src/app/(admin)/admin/incident/page.tsx`, con API en `apps/web/src/app/api/admin/incident/route.ts` y persistencia en `packages/db/src/repositories/contingencies.ts`.
+> Estado: vigente
 
-- **Motivo obligatorio**: 3–255 caracteres (`isIncidentReasonValid` en `incident-utils.ts`).
-- **Fechas/horas en UTC**: `formatIncidentDate`/`formatIncidentHour` fuerzan `timeZone: 'UTC'` para evitar off-by-one en `America/Bogota` (las columnas son `@db.Date`/`@db.Time` de Postgres).
-- La inhabilitación alimenta el flujo de notificación por contingencia (ver `docs/automation/workflows.md` y webhook `N8N_CONTINGENCY_WEBHOOK_URL`).
-- Tests: `incident-ui.test.ts` + `route.test.ts`.
+### Contexto
+Cuando un servicio queda fuera de operación (mantenimiento imprevisto, fuerza mayor), el admin lo inhabilita desde `apps/web/src/app/(admin)/admin/incident/page.tsx`. La acción cancela reservas activas y dispara el aviso a los afectados vía n8n.
+
+### Cómo funciona
+1. **Preview antes de actuar** (`getContingencyPreview` en `packages/db/src/repositories/contingencies.ts`): muestra reservas `PENDIENTE_PAGO`/`CONFIRMADA` afectadas, total de cupos y clientes únicos. Nada se modifica.
+2. **Inhabilitación transaccional** (`disableServiceForContingency`): en una sola transacción con `FOR UPDATE` sobre `servicio` + `disponibilidad` (evita doble inhabilitación concurrente):
+   - Crea `inhabilitacionServicio` (servicio, admin, motivo, inicio).
+   - Marca el servicio `INHABILITADO` (reintento → `409 ALREADY_INACTIVE`; inexistente → `404 NOT_FOUND` vía `ContingencyError`).
+   - Cancela reservas activas a `CANCELADA_ADMINISTRATIVA` vinculadas a la inhabilitación, y devuelve `cuposOcupados` a disponibilidad.
+   - Devuelve `webhookPayload` (servicio, motivo, usuarios afectados) para el flujo de notificación (`N8N_CONTINGENCY_WEBHOOK_URL`; ver `docs/automation/workflows.md`). `markContingencyWebhookSent` registra el envío.
+3. **UI**: motivo obligatorio de 3–255 caracteres (`isIncidentReasonValid`); fechas/horas formateadas en UTC (`formatIncidentDate`/`formatIncidentHour` en `incident-utils.ts`) para evitar off-by-one con columnas `@db.Date`/`@db.Time` en `America/Bogota`.
+
+### Decisiones y restricciones
+- Todo o nada: si falla cualquier paso, la transacción revierte (nunca quedan reservas canceladas sin servicio inhabilitado ni viceversa).
+- Solo `PENDIENTE_PAGO` y `CONFIRMADA` se cancelan; el resto de estados no se toca.
+
+### Testing
+`apps/web/src/app/(admin)/admin/incident/__tests__/incident-ui.test.ts` + `route.test.ts` (validación de motivo, preview, inhabilitación y errores 404/409).
