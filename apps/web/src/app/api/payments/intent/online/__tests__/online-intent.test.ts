@@ -274,6 +274,41 @@ test("POST /api/payments/intent/online: 502/500 si Stripe falla al crear el Paym
   assert.equal(data.error.code, "SERVER_ERROR");
 });
 
+test("POST /api/payments/intent/online: 502 PAYMENT_PROVIDER_ERROR si Stripe lanza StripeError", async () => {
+  const stripeApiErrorReservationId = "66666666-7777-4888-8999-000011112222";
+  mock._state.reservas.push({
+    id: stripeApiErrorReservationId,
+    disponibilidadId: 1n,
+    titularId,
+    estado: "PENDIENTE_PAGO",
+    canal: "ONLINE",
+    total: 45000,
+    cantidadCupos: 1,
+    expiraEn: new Date(Date.now() + 15 * 60_000),
+    pagoId: null,
+  });
+
+  const mockStripe = {
+    paymentIntents: {
+      create: async () => {
+        throw new Stripe.errors.StripeAPIError({
+          message: "Stripe API network outage",
+          type: "api_error",
+        });
+      },
+    },
+  };
+
+  setSession(titularId);
+  const res = await onlineRoute.POST(createRequest({ reservationId: stripeApiErrorReservationId }), {
+    stripeClient: mockStripe as unknown as Stripe,
+  });
+
+  assert.equal(res.status, 502);
+  const data = await res.json();
+  assert.equal(data.error.code, "PAYMENT_PROVIDER_ERROR");
+});
+
 test("POST /api/payments/intent/online: 409 y cancela PaymentIntent si falla la asociación con la reserva", async () => {
   const raceReservationId = "77777777-7777-4777-8777-777777777777";
   const resObj = {
