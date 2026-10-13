@@ -27,6 +27,10 @@ export function useApp() {
   return context
 }
 
+export function useOptionalApp() {
+  return useContext(AppContext)
+}
+
 function InnerAppProvider({ children }: { children: ReactNode }) {
   const ready = useHydrated()
   const [storedSession, setStoredSession] = useStoredSession()

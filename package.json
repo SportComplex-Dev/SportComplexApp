@@ -2,7 +2,6 @@
   "name": "sportcomplex-monorepo",
   "version": "0.1.0",
   "private": true,
-  "pnpm": { "onlyBuiltDependencies": [ "prisma", "@prisma/engines" ] },
   "description": "Plataforma de Gestión de Reservas, Venta y Control de Acceso Deportivo (SportComplex) — Monorepo Turborepo + pnpm",
   "packageManager": "pnpm@12.6.0",
   "engines": {
@@ -13,9 +12,9 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "pnpm db:generate && pnpm --filter @sportcomplex/validation --filter @sportcomplex/ui --filter @sportcomplex/db --filter @sportcomplex/core --filter web run typecheck",
     "test": "turbo run test",
-    "db:generate": "turbo run db:generate",
+    "db:generate": "pnpm --filter @sportcomplex/db exec prisma generate --schema prisma/schema.prisma",
     "db:migrate": "turbo run db:migrate",
     "smoke:be24": "node --experimental-strip-types scripts/smoke-be24.mts",
     "clean": "turbo run clean && rm -rf node_modules"
