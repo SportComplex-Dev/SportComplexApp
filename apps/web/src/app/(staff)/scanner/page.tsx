@@ -19,6 +19,7 @@ export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
   const serviceIdRef = useRef("");
+  const restartRef = useRef(false);
   const [serviceId, setServiceId] = useState("");
   const [result, setResult] = useState<TicketValidationResponse | null>(null);
   const [error, setError] = useState("");
@@ -33,7 +34,9 @@ export default function ScannerPage() {
       setError("");
 
       try {
-        await scanner.stop();
+        if (scanner.isScanning) {
+          await scanner.stop();
+        }
         const { ticketId, signature } = parseTicketQr(decodedText);
         const selectedServiceId = Number(serviceIdRef.current);
         if (!Number.isInteger(selectedServiceId) || selectedServiceId < 1) {
@@ -115,27 +118,34 @@ export default function ScannerPage() {
 
   const continueScanning = useCallback(async () => {
     const scanner = scannerRef.current;
-    if (!scanner) return;
+    if (!scanner || restartRef.current) return;
 
     setError("");
     setCameraError("");
+    restartRef.current = true;
     try {
-      await scanner.start(
-        { facingMode: "environment" },
-        CAMERA_CONFIG,
-        (decodedText) => void processDecodedText(decodedText, scanner),
-        () => undefined,
-      );
+      if (!scanner.isScanning) {
+        await scanner.start(
+          { facingMode: "environment" },
+          CAMERA_CONFIG,
+          (decodedText) => void processDecodedText(decodedText, scanner),
+          () => undefined,
+        );
+      }
       setResult(null);
       setCameraReady(true);
       processingRef.current = false;
       setCameraError("");
     } catch (startError) {
+      processingRef.current = false;
+      setCameraReady(false);
       setCameraError(
         startError instanceof Error
           ? `No se pudo reactivar la cámara: ${startError.message}`
           : "No se pudo reactivar la cámara.",
       );
+    } finally {
+      restartRef.current = false;
     }
   }, [processDecodedText]);
 
@@ -143,23 +153,6 @@ export default function ScannerPage() {
     setServiceId(value);
     serviceIdRef.current = value;
   };
-
-  if (result?.status === "EXPIRED" && result.expiredDetails) {
-    return (
-      <main>
-        <ExpiredSlotScreen
-          cameraError={cameraError}
-          expiredDetails={result.expiredDetails}
-          message={result.message}
-          onContinue={() => void continueScanning()}
-          reservationId={result.reservationId ?? ""}
-          targetCourtName={result.targetCourtName ?? "Servicio"}
-          ticketId={result.ticketId ?? ""}
-          userName={result.userName ?? "Cliente"}
-        />
-      </main>
-    );
-  }
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 py-8 text-slate-900 dark:bg-[#111815] dark:text-white sm:px-6">
@@ -194,7 +187,7 @@ export default function ScannerPage() {
         </p>
       )}
 
-      {result && (
+      {result && result.status !== "EXPIRED" && (
         <section
           aria-live="assertive"
           className={`mt-5 rounded-2xl border p-5 ${
@@ -216,6 +209,19 @@ export default function ScannerPage() {
           </button>
         </section>
       )}
+
+      {result?.status === "EXPIRED" && result.expiredDetails ? (
+        <ExpiredSlotScreen
+          cameraError={cameraError}
+          expiredDetails={result.expiredDetails}
+          message={result.message}
+          onContinue={() => void continueScanning()}
+          reservationId={result.reservationId ?? ""}
+          targetCourtName={result.targetCourtName ?? "Servicio"}
+          ticketId={result.ticketId ?? ""}
+          userName={result.userName ?? "Cliente"}
+        />
+      ) : null}
     </main>
   );
 }

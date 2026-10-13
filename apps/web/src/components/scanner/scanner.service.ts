@@ -1,4 +1,8 @@
-import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
+import {
+  ACCESS_WINDOW_EXPIRED_MESSAGE,
+  parseTicketQrPayload,
+  TIMEZONE,
+} from "@sportcomplex/core";
 
 export interface ExpiredSlotDetails {
   slotStart: string;
@@ -49,6 +53,11 @@ export class ScannerServiceError extends Error {
 }
 
 export function parseTicketQr(value: string): { ticketId: string; signature: string } {
+  const parsedPayload = parseTicketQrPayload(value);
+  if (parsedPayload) {
+    return parsedPayload;
+  }
+
   const separator = value.lastIndexOf(".");
   if (separator < 1 || separator === value.length - 1) {
     throw new ScannerServiceError("El código QR no contiene un ticket y una firma válidos.");

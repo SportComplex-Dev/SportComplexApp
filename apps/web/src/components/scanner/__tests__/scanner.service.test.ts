@@ -7,6 +7,9 @@ import {
 } from "../scanner.service";
 import { ACCESS_WINDOW_EXPIRED_MESSAGE } from "@sportcomplex/core";
 
+const ticketId = "123e4567-e89b-42d3-a456-426614174000";
+const signature = "a".repeat(64);
+
 test("parseTicketQr separa el identificador y la firma", () => {
   assert.deepEqual(parseTicketQr("ticket-uuid.hmac-signature"), {
     ticketId: "ticket-uuid",
@@ -14,8 +17,20 @@ test("parseTicketQr separa el identificador y la firma", () => {
   });
 });
 
+test("parseTicketQr acepta el payload QR canónico", () => {
+  assert.deepEqual(parseTicketQr(`SC1:${ticketId}:${signature}`), {
+    ticketId,
+    signature,
+  });
+});
+
 test("parseTicketQr rechaza un QR sin firma", () => {
-  assert.throws(() => parseTicketQr("ticket-uuid"), ScannerServiceError);
+  assert.throws(
+    () => parseTicketQr("ticket-uuid"),
+    (error: unknown) =>
+      error instanceof ScannerServiceError &&
+      error.message === "El código QR no contiene un ticket y una firma válidos.",
+  );
 });
 
 test("validateTicket normaliza WINDOW_EXPIRED al contrato de la pantalla", async () => {

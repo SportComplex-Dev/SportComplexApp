@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Clock3, Ticket } from "lucide-react";
 import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
@@ -21,7 +22,7 @@ function formatTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-    timeZone: "America/Bogota",
+    timeZone: TIMEZONE,
   }).format(new Date(value));
 }
 
@@ -38,12 +39,23 @@ export default function ExpiredSlotScreen({
   const isBeforeWindow = expiredDetails.windowPosition === "BEFORE";
   const distance = expiredDetails.minutesFromBoundary;
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onContinue();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onContinue]);
+
   return (
     <section
-      aria-label={message ?? ACCESS_WINDOW_EXPIRED_MESSAGE}
+      aria-labelledby="expired-slot-title"
       aria-modal="true"
       className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-md dark:bg-[#111815] sm:p-6"
-      role="dialog"
+      role="alertdialog"
     >
       <div className="my-auto w-full max-w-3xl rounded-3xl border border-rose-200 bg-white p-5 text-slate-900 shadow-2xl dark:border-rose-500/30 dark:bg-[#1a2420] dark:text-white sm:p-8">
         <header className="text-center">
@@ -54,7 +66,7 @@ export default function ExpiredSlotScreen({
             <Ticket aria-hidden="true" size={14} />
             [ESTADO: DENEGADO_HORARIO / BOLETO EMITIDO]
           </p>
-          <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
+          <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl" id="expired-slot-title">
             {message ?? ACCESS_WINDOW_EXPIRED_MESSAGE}
           </h1>
           <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
@@ -114,6 +126,7 @@ export default function ExpiredSlotScreen({
             </p>
           )}
           <button
+            autoFocus
             className="min-h-14 w-full rounded-xl bg-rose-700 px-5 py-4 text-base font-bold text-white transition hover:bg-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700 dark:bg-rose-800 dark:hover:bg-rose-700"
             onClick={onContinue}
             type="button"
