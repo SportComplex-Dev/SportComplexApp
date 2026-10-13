@@ -176,7 +176,9 @@ test("POST /api/payments/intent/online: 200 con reserva válida usa monto real y
   };
 
   setSession(titularId);
-  const res = await onlineRoute.POST(createRequest({ reservationId }), { stripeClient: mockStripe as any });
+  const res = await onlineRoute.POST(createRequest({ reservationId }), {
+    stripeClient: mockStripe as unknown as Stripe,
+  });
   assert.equal(res.status, 200);
   const data = await res.json();
 

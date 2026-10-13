@@ -42,7 +42,7 @@ function parseSlotInterval(dateStr: string, timeStr: string): { startTime: strin
       return { hour: h, minute: isNaN(m) ? 0 : m }
     }
 
-    let start = parseTo24(parts[0])
+    const start = parseTo24(parts[0])
     let end = parts[1] ? parseTo24(parts[1]) : { hour: (start.hour + 1) % 24, minute: start.minute }
 
     if (end.hour < start.hour || (end.hour === start.hour && end.minute <= start.minute)) {
