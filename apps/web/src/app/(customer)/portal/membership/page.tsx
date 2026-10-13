@@ -1,10 +1,9 @@
 'use client'
 
-import React, { useEffect, useState, useTransition } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft,
   ArrowRight,
   Calendar,
   Check,
@@ -12,17 +11,15 @@ import {
   Clock,
   CreditCard,
   Crown,
-  HelpCircle,
   Info,
   Loader2,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Ticket,
   Zap,
 } from 'lucide-react'
-import { formatDate, formatMoney } from '@sportcomplex/core'
+import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { useApp } from '@/components/app-provider'
 import {
@@ -34,7 +31,7 @@ import {
 } from '@/components/portal/membership-utils'
 
 export default function MembershipPortalPage() {
-  const { session, notify } = useApp()
+  const { notify } = useApp()
   const searchParams = useSearchParams()
 
   const [loading, setLoading] = useState(true)

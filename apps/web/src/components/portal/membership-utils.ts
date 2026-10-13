@@ -76,7 +76,7 @@ export const BENEFICIOS_POR_PERIODICIDAD: Record<string, string[]> = {
  */
 export function calcularDesglosePlan(
   plan: PlanMembresiaDTO,
-  esSocioVigente = false,
+  _esSocioVigente = false,
 ): PlanDisplayBreakdown {
   const rawPrecio =
     typeof plan.precio === "number" ? plan.precio : parseFloat(String(plan.precio)) || 0;
