@@ -26,3 +26,6 @@ SCRUM-*.xml
 
 .agents
 AGENTS.md
+
+# Reportes locales de revisión
+CODE_REVIEW_*.md

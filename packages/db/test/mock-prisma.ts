@@ -92,6 +92,8 @@ export interface MockUsuario {
   deletedAt?: Date | null;
   rolId?: number;
   rolNombre?: string;
+  creadoEn?: Date;
+  passwordHash?: string;
 }
 
 export interface MockTicketQr {
@@ -693,6 +695,10 @@ export function createMockPrisma() {
         }
         return picked;
       },
+      async findFirst({ where, include, select }: any = {}) {
+        const results = await (this as any).findMany({ where, include, select, take: 1 });
+        return results[0] ?? null;
+      },
       async findMany({ where, orderBy, take, include, select }: any = {}) {
         let list = reservas.filter((reservation) => {
           if (
@@ -734,9 +740,14 @@ export function createMockPrisma() {
               return false;
             }
           }
+          if (typeof where?.canal === "string" && reservation.canal !== where.canal) return false;
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
+          ) return false;
+          if (
+            where?.expiraEn?.gt &&
+            (!reservation.expiraEn || reservation.expiraEn <= where.expiraEn.gt)
           ) return false;
           if (where?.OR) {
             const createdAt = reservation.creadoEn;
@@ -807,6 +818,8 @@ export function createMockPrisma() {
               res[key] = tickets.find((t) => t.reservaId === reservation.id);
             } else if (key === "titular") {
               res[key] = usuarios.find((u) => u.id === reservation.titularId);
+            } else if (key === "pago") {
+              res[key] = reservation.pagoId ? pagos.find((p) => p.id === reservation.pagoId) : null;
             }
           }
           return res;
@@ -934,11 +947,26 @@ export function createMockPrisma() {
         return item;
       },
       async update({ where, data }: any) {
-        const pago = pagos.find((p) => p.id === where.id);
+        const pago = pagos.find((p) => p.id === where.id || (where.stripePaymentIntentId && p.stripePaymentIntentId === where.stripePaymentIntentId));
         if (!pago) throw new Error("Not found");
         if (data.estado !== undefined) pago.estado = data.estado;
         if (data.monto !== undefined) pago.monto = data.monto;
         return pago;
+      },
+      async upsert({ where, create, update }: any) {
+        const existing = pagos.find((p) => {
+          if (where.id !== undefined && p.id === where.id) return true;
+          if (where.stripePaymentIntentId !== undefined && p.stripePaymentIntentId === where.stripePaymentIntentId) return true;
+          return false;
+        });
+        if (existing) {
+          if (update) {
+            if (update.estado !== undefined) existing.estado = update.estado;
+            if (update.monto !== undefined) existing.monto = update.monto;
+          }
+          return existing;
+        }
+        return (this as any).create({ data: create });
       },
     },
     membresia: {
@@ -1089,7 +1117,7 @@ export function createMockPrisma() {
     },
 
     usuario: {
-      async findFirst({ where, select }: any) {
+      async findFirst({ where, select }: any = {}) {
         if (!where) return usuarios[0] ?? null;
         const usuario = usuarios.find((u) => {
           if (where.id !== undefined && u.id !== where.id) return false;
@@ -1103,12 +1131,44 @@ export function createMockPrisma() {
         for (const key of Object.keys(select)) {
           if (!select[key]) continue;
           if (key === "rol") {
-            picked.rol = { nombre: usuario.rolNombre };
+            picked.rol = { id: usuario.rolId ?? 1, nombre: usuario.rolNombre };
           } else {
             picked[key] = (usuario as any)[key];
           }
         }
         return picked;
+      },
+      async findMany({ where, select, orderBy, take, skip }: any = {}) {
+        let list = [...usuarios];
+        if (where?.rol?.nombre?.in) {
+          const allowedRoles = where.rol.nombre.in;
+          list = list.filter((u) => allowedRoles.includes(u.rolNombre));
+        }
+        if (where?.estado) {
+          list = list.filter((u) => u.estado === where.estado);
+        }
+        if (orderBy?.creadoEn === "desc") {
+          list.sort((a, b) => ((b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0)));
+        }
+        if (skip !== undefined) {
+          list = list.slice(skip);
+        }
+        if (take !== undefined) {
+          list = list.slice(0, take);
+        }
+        if (!select) return list;
+        return list.map((u) => {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(select)) {
+            if (!select[key]) continue;
+            if (key === "rol") {
+              picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? "VENDEDOR" };
+            } else {
+              picked[key] = (u as any)[key];
+            }
+          }
+          return picked;
+        });
       },
       async findUnique({ where, select }: any) {
         const usuario = where.id !== undefined
@@ -1123,24 +1183,43 @@ export function createMockPrisma() {
         for (const key of Object.keys(select)) {
           if (!select[key]) continue;
           if (key === "rol") {
-            picked.rol = { nombre: usuario.rolNombre };
+            picked.rol = { id: usuario.rolId ?? 1, nombre: usuario.rolNombre };
           } else {
             picked[key] = (usuario as any)[key];
           }
         }
         return picked;
       },
-      async create({ data }: any) {
+      async create({ data, select }: any) {
+        const rolesMap: Record<number, string> = {
+          1: "ADMIN",
+          2: "VENDEDOR",
+          3: "LECTOR",
+          4: "CLIENTE",
+        };
+        const resolvedRolNombre = data.rolNombre || rolesMap[data.rolId] || "CLIENTE";
         const u: MockUsuario = {
           id: data.id || `user-${randomUUID()}`,
           nombre: data.nombre,
           correo: data.correo,
           estado: data.estado || "ACTIVO",
-          rolNombre: "CLIENTE",
+          deletedAt: null,
           rolId: data.rolId || 1,
+          rolNombre: resolvedRolNombre,
+          creadoEn: new Date(),
         };
         usuarios.push(u);
-        return u;
+        if (!select) return u;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (!select[key]) continue;
+          if (key === "rol") {
+            picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? resolvedRolNombre };
+          } else {
+            picked[key] = (u as any)[key];
+          }
+        }
+        return picked;
       },
       async updateMany({ where, data }: any) {
         let count = 0;
@@ -1159,8 +1238,38 @@ export function createMockPrisma() {
       },
     },
     rol: {
-      async findFirst() {
-        return { id: 1, nombre: "CLIENTE" };
+      async findFirst({ where, select }: any = {}) {
+        const roles = [
+          { id: 1, nombre: "ADMIN" },
+          { id: 2, nombre: "VENDEDOR" },
+          { id: 3, nombre: "LECTOR" },
+          { id: 4, nombre: "CLIENTE" },
+        ];
+        let found: { id: number; nombre: string } | null = null;
+        if (where?.nombre) {
+          found = roles.find((r) => r.nombre === where.nombre) ?? null;
+        } else if (where?.OR) {
+          const names = where.OR.map((o: any) => o.nombre);
+          found = roles.find((r) => names.includes(r.nombre)) ?? null;
+        } else {
+          found = roles[0];
+        }
+        if (!found) return null;
+        if (!select) return found;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (found as any)[key];
+        }
+        return picked;
+      },
+      async create({ data, select }: any) {
+        const created = { id: 5, nombre: data.nombre };
+        if (!select) return created;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (created as any)[key];
+        }
+        return picked;
       },
     },
     ticketQr: {
