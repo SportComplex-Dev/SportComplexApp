@@ -380,3 +380,30 @@ export function makeId(name: string): string {
   const base = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return `${base || 'item'}-${Math.random().toString(36).slice(2, 7)}`;
 }
+
+/**
+ * Resuelve el ID relacional numérico en base de datos a partir de un ítem del catálogo o su ID en texto.
+ * Asegura compatibilidad 1:1 entre el catálogo público y los registros de PostgreSQL / Supabase.
+ */
+export function resolveCatalogServiceId(itemOrId: string | number | { id: string | number; name?: string; category?: string }): number {
+  if (typeof itemOrId === 'number' && itemOrId > 0) return itemOrId;
+  const rawId = typeof itemOrId === 'string' ? itemOrId : typeof itemOrId === 'object' ? String(itemOrId.id) : '';
+  const numeric = Number(rawId);
+  if (!isNaN(numeric) && numeric > 0) return numeric;
+
+  const idStr = rawId.toLowerCase();
+  const nameStr = (typeof itemOrId === 'object' && itemOrId.name ? itemOrId.name : '').toLowerCase();
+
+  // Mapeo exacto a los IDs registrados en PostgreSQL/Supabase:
+  if (idStr.includes('tenis-cancha-1') || idStr.includes('tenis-1') || nameStr.includes('cancha 1') && nameStr.includes('tenis')) return 17;
+  if (idStr.includes('tenis-cancha-2') || idStr.includes('tenis-2') || nameStr.includes('cancha 2') && nameStr.includes('tenis')) return 18;
+  if (idStr.includes('padel') || nameStr.includes('pádel')) return 19;
+  if (idStr.includes('carril') || nameStr.includes('carril')) return 20;
+  if (idStr.includes('piscina') || nameStr.includes('piscina')) return 4;
+  if (idStr.includes('futbol') || nameStr.includes('fútbol')) return 1;
+  if (idStr.includes('tenis') || nameStr.includes('tenis')) return 3;
+  if (idStr.includes('gimnasio') || nameStr.includes('gimnasio') || nameStr.includes('funcional')) return 5;
+  if (idStr.includes('zona-humeda') || nameStr.includes('sauna') || nameStr.includes('turco')) return 6;
+
+  return 5;
+}

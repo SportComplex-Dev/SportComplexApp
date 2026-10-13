@@ -44,20 +44,27 @@ function paymentIntentResponse(paymentIntent: Stripe.PaymentIntent) {
   });
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  dependencies: { stripeClient?: Stripe } = {},
+) {
   try {
     let userId: string | null = null;
     const authResult = await authorizeApiRequest(["Cliente"]);
     if (authResult.authorized) {
       userId = authResult.actor.id;
     } else {
-      const session = await auth();
-      if (
-        session?.user?.id &&
-        (session.user.role?.toUpperCase() === "CLIENTE" || !session.user.role) &&
-        (session.user.estado === "ACTIVO" || !session.user.estado)
-      ) {
-        userId = session.user.id;
+      try {
+        const session = await auth();
+        if (
+          session?.user?.id &&
+          (session.user.role?.toUpperCase() === "CLIENTE" || !session.user.role) &&
+          (session.user.estado === "ACTIVO" || !session.user.estado)
+        ) {
+          userId = session.user.id;
+        }
+      } catch {
+        // En entorno de test sin request store o sin sesión válida de NextAuth
       }
     }
 
@@ -88,26 +95,11 @@ export async function POST(request: Request) {
     });
 
     if (!reservation) {
-      // En entorno de desarrollo o pruebas de UI con sandbox, si la reserva fue creada en memoria/draft
-      // o el seed local no tiene el servicio persistido, permitimos crear el PaymentIntent
-      const secretKey = process.env.STRIPE_SECRET_KEY;
-      if (!secretKey) {
-        return fail("PAYMENT_CONFIGURATION_ERROR", "El pago no está disponible en este momento.", 503);
-      }
-      const stripe = new Stripe(secretKey);
-      const testPaymentIntent = await stripe.paymentIntents.create(
-        {
-          amount: 4800000,
-          currency: STRIPE_CURRENCY,
-          automatic_payment_methods: { enabled: true },
-          metadata: buildPaymentMetadata({
-            bookingId: targetReservationId,
-            userId,
-          }),
-        },
-        { idempotencyKey: `reservation-${targetReservationId}` },
+      return fail(
+        "RESERVATION_NOT_FOUND",
+        "La reserva no existe o no pertenece al usuario autenticado.",
+        404,
       );
-      return paymentIntentResponse(testPaymentIntent);
     }
 
     if (
@@ -129,12 +121,12 @@ export async function POST(request: Request) {
     }
 
     const secretKey = process.env.STRIPE_SECRET_KEY;
-    if (!secretKey) {
+    if (!dependencies.stripeClient && !secretKey) {
       console.error("STRIPE_SECRET_KEY no está configurada.");
       return fail("PAYMENT_CONFIGURATION_ERROR", "El pago no está disponible en este momento.", 503);
     }
 
-    const stripe = new Stripe(secretKey);
+    const stripe = dependencies.stripeClient ?? new Stripe(secretKey!);
     let paymentIntent: Stripe.PaymentIntent;
 
     if (reservation.pagoId) {

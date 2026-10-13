@@ -1,11 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, Clock3,
-  Lock, ShieldCheck,
+  Lock, ShieldCheck, AlertCircle, Loader2,
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
@@ -20,6 +20,47 @@ import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
 import { PaymentMethodSelector } from '@/components/payment-method-selector'
+import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
+import { resolveCatalogServiceId } from '@sportcomplex/core'
+
+function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
+  try {
+    const raw = timeStr.toLowerCase().replace(/—/g, '-').trim()
+    const parts = raw.split('-')
+
+    const parseTo24 = (t: string): { hour: number; minute: number } => {
+      const isPm = t.includes('p') || t.includes('pm')
+      const isAm = t.includes('a') || t.includes('am')
+      const digits = t.replace(/[^0-9:]/g, '').trim()
+      const [hStr, mStr] = digits.split(':')
+      let h = parseInt(hStr, 10)
+      const m = mStr ? parseInt(mStr, 10) : 0
+      if (isNaN(h)) h = 8
+
+      if (isPm && h < 12) h += 12
+      if (isAm && h === 12) h = 0
+      return { hour: h, minute: isNaN(m) ? 0 : m }
+    }
+
+    let start = parseTo24(parts[0])
+    let end = parts[1] ? parseTo24(parts[1]) : { hour: (start.hour + 1) % 24, minute: start.minute }
+
+    if (end.hour < start.hour || (end.hour === start.hour && end.minute <= start.minute)) {
+      end = { hour: Math.min(23, start.hour + 1), minute: start.minute }
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startIso = `${dateStr}T${pad(start.hour)}:${pad(start.minute)}:00.000-05:00`
+    const endIso = `${dateStr}T${pad(end.hour)}:${pad(end.minute)}:00.000-05:00`
+
+    return {
+      startTime: new Date(startIso).toISOString(),
+      endTime: new Date(endIso).toISOString(),
+    }
+  } catch {
+    return null
+  }
+}
 
 function CheckoutContent() {
   const router = useRouter()
@@ -34,6 +75,8 @@ function CheckoutContent() {
 
   const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
+  const [holdError, setHoldError] = useState<string | null>(null)
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
 
   // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
   const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
@@ -85,27 +128,39 @@ function CheckoutContent() {
   const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
 
+  const creatingRef = useRef(false)
+
   // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
   useEffect(() => {
-    if (reservationId) return
+    if (reservationId || holdError || creatingRef.current) return
     const currentDraft = activeDraft
     const currentItem = item
     if (!currentDraft || !currentItem) return
 
     let cancelled = false
     async function createHold() {
-      if (!currentDraft || !currentItem) return
+      if (!currentDraft || !currentItem || creatingRef.current) return
+      creatingRef.current = true
       setIsCreatingReservation(true)
+      setHoldError(null)
+
+      const interval = parseSlotInterval(currentDraft.date, currentDraft.time)
+      if (!interval) {
+        setHoldError('El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.')
+        setIsCreatingReservation(false)
+        creatingRef.current = false
+        return
+      }
 
       try {
-        // Intentar registrar la reserva en la DB mediante /api/bookings
+        // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            serviceId: Number(currentItem.id) || 1,
-            startTime: `${currentDraft.date}T${currentDraft.time.replace(/[^0-9:]/g, '').padStart(5, '0')}:00.000Z`,
-            endTime: `${currentDraft.date}T${currentDraft.time.replace(/[^0-9:]/g, '').padStart(5, '0')}:00.000Z`,
+            serviceId: resolveCatalogServiceId(currentItem),
+            startTime: interval.startTime,
+            endTime: interval.endTime,
             cantidadCupos: currentDraft.attendees,
           }),
         })
@@ -116,15 +171,16 @@ function CheckoutContent() {
         if (res.ok && data?.data?.id) {
           setReservationId(data.data.id)
         } else {
-          // Si el backend no tiene ese servicio numérico o responde error, usamos un UUID de fallback
-          // para permitir el flujo seguro de Stripe
-          const fallbackUuid = crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}`
-          setReservationId(fallbackUuid)
+          const errMsg = data?.error?.message || 'No se pudo reservar el cupo temporal en el horario seleccionado. Puede que ya no haya disponibilidad o la franja no sea válida.'
+          setHoldError(errMsg)
+          setReservationId(null)
+          creatingRef.current = false
         }
       } catch {
         if (!cancelled) {
-          const fallbackUuid = crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}`
-          setReservationId(fallbackUuid)
+          setHoldError('Error de conexión al intentar bloquear la disponibilidad. Por favor vuelve a seleccionar el horario.')
+          setReservationId(null)
+          creatingRef.current = false
         }
       } finally {
         if (!cancelled) {
@@ -137,7 +193,7 @@ function CheckoutContent() {
     return () => {
       cancelled = true
     }
-  }, [activeDraft, item, reservationId])
+  }, [activeDraft, item, reservationId, holdError])
 
   const handleExpire = useCallback(() => {
     setIsExpired(true)
@@ -146,6 +202,8 @@ function CheckoutContent() {
 
   const handleRetry = useCallback(() => {
     setDraft(null)
+    setHoldError(null)
+    setReservationId(null)
     if (item) {
       router.push(`/services/${item.category}/${item.id}`)
     } else {
@@ -176,11 +234,50 @@ function CheckoutContent() {
   const remainingSeconds = calculateRemainingSeconds(activeDraft?.expiresAt, Date.now())
   const paymentBlocked = isExpired || isPaymentBlocked(remainingSeconds)
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
+    setIsConfirmingPayment(true)
+    const targetId = reservationId
+
+    let confirmedBackendBooking = false
+    let finalBookingCode: string | null = null
+
+    // Polling del backend para validar que el webhook confirmó la reserva
+    const maxAttempts = 12
+    const pollInterval = 1500
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (targetId) {
+        try {
+          const receipt = await fetchReceiptData(targetId)
+          if (receipt?.reserva?.id) {
+            confirmedBackendBooking = true
+            finalBookingCode = receipt.qr?.payload ? receipt.qr.payload.slice(0, 16) : null
+            break
+          }
+        } catch {
+          // continuar con polling
+        }
+      }
+
+      try {
+        const history = await fetchCustomerBookingHistory(session?.name ?? 'Cliente', 5)
+        const match = history.find((h) => h.id === targetId && h.status === 'Confirmada')
+        if (match) {
+          confirmedBackendBooking = true
+          finalBookingCode = match.code
+          break
+        }
+      } catch {
+        // continuar reintentos
+      }
+
+      await new Promise((r) => setTimeout(r, pollInterval))
+    }
+
     const [, month, day] = activeDraft.date.split('-')
-    const bookingCode = `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`
+    const bookingCode = finalBookingCode || `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`
     const newBooking: Booking = {
-      id: reservationId || `b${Date.now()}`,
+      id: targetId || `b${Date.now()}`,
       code: bookingCode,
       client: session?.name ?? 'Cliente',
       category: item.category,
@@ -190,7 +287,7 @@ function CheckoutContent() {
       time: activeDraft.time,
       attendees: activeDraft.attendees,
       amount: total,
-      status: 'Confirmada',
+      status: confirmedBackendBooking ? 'Confirmada' : 'Pendiente',
       paymentMethod: 'card',
       paymentStatus: 'Aprobada',
       transactionRef: `STRIPE-${Date.now()}`,
@@ -199,7 +296,13 @@ function CheckoutContent() {
     setBookings([newBooking, ...bookings])
     setLastCode(newBooking.code)
     setDraft(null)
-    notify('¡Pago procesado con éxito y reserva confirmada!', 'success')
+    setIsConfirmingPayment(false)
+
+    if (confirmedBackendBooking) {
+      notify('¡Pago confirmado por el servidor y comprobante emitido!', 'success')
+    } else {
+      notify('Pago recibido. Tu reserva se está sincronizando con el club.', 'info')
+    }
     router.push('/confirmation')
   }
 
@@ -239,7 +342,28 @@ function CheckoutContent() {
             Transacciones 100% cashless y cifradas de extremo a extremo mediante pasarela segura Stripe.
           </p>
 
-          {isCreatingReservation ? (
+          {isConfirmingPayment ? (
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-8 text-center text-sm">
+              <Loader2 className="mx-auto size-8 animate-spin text-emerald-600 mb-3" />
+              <p className="font-bold text-ink text-base">Pago en proceso</p>
+              <p className="mt-1 text-xs text-subtle max-w-sm mx-auto">
+                Estamos validando la confirmación de tu pago con el servidor y emitiendo tu tiquete oficial…
+              </p>
+            </div>
+          ) : holdError ? (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-center">
+              <AlertCircle className="mx-auto size-7 text-destructive mb-2" />
+              <p className="font-bold text-destructive text-base">No se pudo reservar el horario</p>
+              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">{holdError}</p>
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
+              >
+                Volver a seleccionar horario <ArrowRight size={14} />
+              </button>
+            </div>
+          ) : isCreatingReservation ? (
             <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-6 text-center text-sm">
               <p className="font-semibold text-ink">Iniciando sesión segura de pago…</p>
               <p className="mt-1 text-xs text-subtle">
