@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -30,7 +30,7 @@ import {
   type PlanMembresiaDTO,
 } from '@/components/portal/membership-utils'
 
-export default function MembershipPortalPage() {
+function MembershipPortalPage() {
   const { notify } = useApp()
   const searchParams = useSearchParams()
 
@@ -441,5 +441,13 @@ export default function MembershipPortalPage() {
         </div>
       )}
     </>
+  )
+}
+
+export default function MembershipPortalPagePage() {
+  return (
+    <Suspense fallback={null}>
+      <MembershipPortalPage />
+    </Suspense>
   )
 }
