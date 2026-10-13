@@ -92,6 +92,8 @@ export interface MockUsuario {
   deletedAt?: Date | null;
   rolId?: number;
   rolNombre?: string;
+  creadoEn?: Date;
+  passwordHash?: string;
 }
 
 export interface MockTicketQr {
@@ -486,15 +488,37 @@ export function createMockPrisma() {
       },
     },
     franjaHoraria: {
+      async findFirst({ where }: any) {
+        if (!where) return franjas[0] ?? null;
+        return franjas.find((f) => {
+          if (where.servicioId !== undefined && f.servicioId !== where.servicioId) return false;
+          return true;
+        }) ?? null;
+      },
+      async create({ data }: any) {
+        const item: MockFranja = {
+          id: franjaIdSeq++,
+          servicioId: data.servicioId,
+          diaSemana: data.diaSemana,
+          horaInicio: data.horaInicio,
+          horaFin: data.horaFin,
+        };
+        franjas.push(item);
+        return item;
+      },
       async deleteMany({ where }: any) {
         const initial = franjas.length;
-        const remaining = franjas.filter((f) => f.servicioId !== where.servicioId);
+        const remaining = franjas.filter((f) => {
+          if (where?.servicioId !== undefined && f.servicioId === where.servicioId) return false;
+          return true;
+        });
         franjas.length = 0;
         franjas.push(...remaining);
         return { count: initial - remaining.length };
       },
       async createMany({ data }: any) {
-        for (const f of data) {
+        const items = Array.isArray(data) ? data : [data];
+        for (const f of items) {
           franjas.push({
             id: franjaIdSeq++,
             servicioId: f.servicioId,
@@ -503,7 +527,7 @@ export function createMockPrisma() {
             horaFin: f.horaFin,
           });
         }
-        return { count: data.length };
+        return { count: items.length };
       },
     },
     disponibilidad: {
@@ -534,15 +558,20 @@ export function createMockPrisma() {
                   if (reservation.disponibilidadId !== d.id) return false;
                   if (
                     relationWhere?.estado !== undefined &&
+                    typeof relationWhere.estado === "string" &&
                     reservation.estado !== relationWhere.estado
+                  ) return false;
+                  if (
+                    relationWhere?.estado !== undefined &&
+                    Array.isArray(relationWhere.estado?.in) &&
+                    !relationWhere.estado.in.includes(reservation.estado)
                   ) return false;
                   const expiresAt = relationWhere?.expiraEn?.lte;
                   if (expiresAt && (!reservation.expiraEn || reservation.expiraEn > expiresAt)) {
                     return false;
                   }
                   return true;
-                })
-                .map(({ cantidadCupos }) => ({ cantidadCupos }));
+                });
             }
             return result;
           });
@@ -559,6 +588,9 @@ export function createMockPrisma() {
       async update({ where, data }: any) {
         const disp = disponibilidades.find((d) => d.id === where.id);
         if (!disp) throw new Error("Not found");
+        if (data.bloqueadaMantenimiento !== undefined) {
+          disp.bloqueadaMantenimiento = data.bloqueadaMantenimiento;
+        }
         if (data.cuposOcupados?.increment !== undefined) {
           disp.cuposOcupados += data.cuposOcupados.increment;
         }
@@ -571,12 +603,37 @@ export function createMockPrisma() {
         }
         return disp;
       },
-      async findFirst({ where }: any) {
-        return disponibilidades.find(
-          (d) =>
-            d.servicioId === where.servicioId &&
-            d.cuposOcupados > where.cuposOcupados.gt,
-        ) ?? null;
+      async findFirst({ where, include }: any) {
+        if (!where) return disponibilidades[0] ?? null;
+        const d = disponibilidades.find((disp) => {
+          if (where.id !== undefined && disp.id !== where.id) return false;
+          if (where.servicioId !== undefined && disp.servicioId !== where.servicioId) return false;
+          if (where.cuposOcupados?.gt !== undefined && disp.cuposOcupados <= where.cuposOcupados.gt) return false;
+          return true;
+        }) ?? null;
+        if (!d) return null;
+        if (include?.franja) {
+          const franja = franjas.find((f) => f.id === d.franjaId);
+          return { ...d, franja };
+        }
+        return d;
+      },
+      async create({ data, include }: any) {
+        const item: MockDisponibilidad = {
+          id: dispIdSeq++,
+          servicioId: data.servicioId,
+          franjaId: data.franjaId,
+          fecha: data.fecha,
+          cuposTotales: data.cuposTotales,
+          cuposOcupados: data.cuposOcupados ?? 0,
+          bloqueadaMantenimiento: data.bloqueadaMantenimiento ?? false,
+        };
+        disponibilidades.push(item);
+        if (include?.franja) {
+          const franja = franjas.find((f) => f.id === item.franjaId);
+          return { ...item, franja };
+        }
+        return item;
       },
       async upsert({ where, create, update }: any) {
         const { servicioId, franjaId, fecha } = where.servicioId_franjaId_fecha;
@@ -606,10 +663,10 @@ export function createMockPrisma() {
       async updateMany({ where, data }: any) {
         let count = 0;
         for (const disponibilidad of disponibilidades) {
-          if (disponibilidad.servicioId === where.servicioId) {
-            Object.assign(disponibilidad, data);
-            count++;
-          }
+          if (where.servicioId !== undefined && disponibilidad.servicioId !== where.servicioId) continue;
+          if (where.id?.in !== undefined && !where.id.in.includes(disponibilidad.id)) continue;
+          Object.assign(disponibilidad, data);
+          count++;
         }
         return { count };
       },
@@ -621,6 +678,7 @@ export function createMockPrisma() {
         return { count: initial - remaining.length };
       },
     },
+
     reserva: {
       async findUnique({ where, select }: any) {
         if (where.id === undefined) return null;
@@ -636,6 +694,10 @@ export function createMockPrisma() {
           if (key in full) picked[key] = (full as any)[key];
         }
         return picked;
+      },
+      async findFirst({ where, include, select }: any = {}) {
+        const results = await (this as any).findMany({ where, include, select, take: 1 });
+        return results[0] ?? null;
       },
       async findMany({ where, orderBy, take, include, select }: any = {}) {
         let list = reservas.filter((reservation) => {
@@ -678,9 +740,14 @@ export function createMockPrisma() {
               return false;
             }
           }
+          if (typeof where?.canal === "string" && reservation.canal !== where.canal) return false;
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
+          ) return false;
+          if (
+            where?.expiraEn?.gt &&
+            (!reservation.expiraEn || reservation.expiraEn <= where.expiraEn.gt)
           ) return false;
           if (where?.OR) {
             const createdAt = reservation.creadoEn;
@@ -751,6 +818,8 @@ export function createMockPrisma() {
               res[key] = tickets.find((t) => t.reservaId === reservation.id);
             } else if (key === "titular") {
               res[key] = usuarios.find((u) => u.id === reservation.titularId);
+            } else if (key === "pago") {
+              res[key] = reservation.pagoId ? pagos.find((p) => p.id === reservation.pagoId) : null;
             }
           }
           return res;
@@ -806,6 +875,13 @@ export function createMockPrisma() {
         }
         return reservation;
       },
+      async update({ where, data }: any) {
+        const r = reservas.find((res) => res.id === where.id);
+        if (!r) throw new Error("Not found");
+        if (data.pagoId !== undefined) r.pagoId = data.pagoId;
+        if (data.estado !== undefined) r.estado = data.estado;
+        return r;
+      },
       async count({ where }: any) {
         let list = [...reservas];
         if (where?.disponibilidad?.servicioId) {
@@ -830,6 +906,21 @@ export function createMockPrisma() {
           );
         }
         return null;
+      },
+      async findFirst({ where }: any = {}) {
+        return (
+          pagos.find((p) => {
+            if (where?.id !== undefined && p.id !== where.id) return false;
+            if (
+              where?.stripePaymentIntentId !== undefined &&
+              p.stripePaymentIntentId !== where.stripePaymentIntentId
+            )
+              return false;
+            if (where?.usuarioId !== undefined && p.usuarioId !== where.usuarioId) return false;
+            if (where?.estado !== undefined && p.estado !== where.estado) return false;
+            return true;
+          }) ?? null
+        );
       },
       async create({ data }: any) {
         // Respeta el UNIQUE "pago_stripe_payment_intent_id_key" (TSK-BD-06).
@@ -856,11 +947,26 @@ export function createMockPrisma() {
         return item;
       },
       async update({ where, data }: any) {
-        const pago = pagos.find((p) => p.id === where.id);
+        const pago = pagos.find((p) => p.id === where.id || (where.stripePaymentIntentId && p.stripePaymentIntentId === where.stripePaymentIntentId));
         if (!pago) throw new Error("Not found");
         if (data.estado !== undefined) pago.estado = data.estado;
         if (data.monto !== undefined) pago.monto = data.monto;
         return pago;
+      },
+      async upsert({ where, create, update }: any) {
+        const existing = pagos.find((p) => {
+          if (where.id !== undefined && p.id === where.id) return true;
+          if (where.stripePaymentIntentId !== undefined && p.stripePaymentIntentId === where.stripePaymentIntentId) return true;
+          return false;
+        });
+        if (existing) {
+          if (update) {
+            if (update.estado !== undefined) existing.estado = update.estado;
+            if (update.monto !== undefined) existing.monto = update.monto;
+          }
+          return existing;
+        }
+        return (this as any).create({ data: create });
       },
     },
     membresia: {
@@ -1011,6 +1117,59 @@ export function createMockPrisma() {
     },
 
     usuario: {
+      async findFirst({ where, select }: any = {}) {
+        if (!where) return usuarios[0] ?? null;
+        const usuario = usuarios.find((u) => {
+          if (where.id !== undefined && u.id !== where.id) return false;
+          if (where.correo !== undefined && u.correo !== where.correo) return false;
+          return true;
+        }) ?? null;
+        if (!usuario) return null;
+        if (!select) return usuario;
+
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (!select[key]) continue;
+          if (key === "rol") {
+            picked.rol = { id: usuario.rolId ?? 1, nombre: usuario.rolNombre };
+          } else {
+            picked[key] = (usuario as any)[key];
+          }
+        }
+        return picked;
+      },
+      async findMany({ where, select, orderBy, take, skip }: any = {}) {
+        let list = [...usuarios];
+        if (where?.rol?.nombre?.in) {
+          const allowedRoles = where.rol.nombre.in;
+          list = list.filter((u) => allowedRoles.includes(u.rolNombre));
+        }
+        if (where?.estado) {
+          list = list.filter((u) => u.estado === where.estado);
+        }
+        if (orderBy?.creadoEn === "desc") {
+          list.sort((a, b) => ((b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0)));
+        }
+        if (skip !== undefined) {
+          list = list.slice(skip);
+        }
+        if (take !== undefined) {
+          list = list.slice(0, take);
+        }
+        if (!select) return list;
+        return list.map((u) => {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(select)) {
+            if (!select[key]) continue;
+            if (key === "rol") {
+              picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? "VENDEDOR" };
+            } else {
+              picked[key] = (u as any)[key];
+            }
+          }
+          return picked;
+        });
+      },
       async findUnique({ where, select }: any) {
         const usuario = where.id !== undefined
           ? usuarios.find((u) => u.id === where.id)
@@ -1024,9 +1183,40 @@ export function createMockPrisma() {
         for (const key of Object.keys(select)) {
           if (!select[key]) continue;
           if (key === "rol") {
-            picked.rol = { nombre: usuario.rolNombre };
+            picked.rol = { id: usuario.rolId ?? 1, nombre: usuario.rolNombre };
           } else {
             picked[key] = (usuario as any)[key];
+          }
+        }
+        return picked;
+      },
+      async create({ data, select }: any) {
+        const rolesMap: Record<number, string> = {
+          1: "ADMIN",
+          2: "VENDEDOR",
+          3: "LECTOR",
+          4: "CLIENTE",
+        };
+        const resolvedRolNombre = data.rolNombre || rolesMap[data.rolId] || "CLIENTE";
+        const u: MockUsuario = {
+          id: data.id || `user-${randomUUID()}`,
+          nombre: data.nombre,
+          correo: data.correo,
+          estado: data.estado || "ACTIVO",
+          deletedAt: null,
+          rolId: data.rolId || 1,
+          rolNombre: resolvedRolNombre,
+          creadoEn: new Date(),
+        };
+        usuarios.push(u);
+        if (!select) return u;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          if (!select[key]) continue;
+          if (key === "rol") {
+            picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? resolvedRolNombre };
+          } else {
+            picked[key] = (u as any)[key];
           }
         }
         return picked;
@@ -1045,6 +1235,41 @@ export function createMockPrisma() {
           count++;
         }
         return { count };
+      },
+    },
+    rol: {
+      async findFirst({ where, select }: any = {}) {
+        const roles = [
+          { id: 1, nombre: "ADMIN" },
+          { id: 2, nombre: "VENDEDOR" },
+          { id: 3, nombre: "LECTOR" },
+          { id: 4, nombre: "CLIENTE" },
+        ];
+        let found: { id: number; nombre: string } | null = null;
+        if (where?.nombre) {
+          found = roles.find((r) => r.nombre === where.nombre) ?? null;
+        } else if (where?.OR) {
+          const names = where.OR.map((o: any) => o.nombre);
+          found = roles.find((r) => names.includes(r.nombre)) ?? null;
+        } else {
+          found = roles[0];
+        }
+        if (!found) return null;
+        if (!select) return found;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (found as any)[key];
+        }
+        return picked;
+      },
+      async create({ data, select }: any) {
+        const created = { id: 5, nombre: data.nombre };
+        if (!select) return created;
+        const picked: Record<string, unknown> = {};
+        for (const key of Object.keys(select)) {
+          picked[key] = (created as any)[key];
+        }
+        return picked;
       },
     },
     ticketQr: {
@@ -1167,6 +1392,19 @@ export function createMockPrisma() {
       },
     },
     inhabilitacionServicio: {
+      async findFirst({ where }: any = {}) {
+        return (
+          inhabilitaciones.find((item: any) => {
+            if (where?.servicioId !== undefined && item.servicioId !== where.servicioId) return false;
+            if (where?.fechaInicio?.lte !== undefined && new Date(item.fechaInicio) > new Date(where.fechaInicio.lte)) return false;
+            if (where?.fechaFin?.gte !== undefined) {
+              if (!item.fechaFin) return true;
+              if (new Date(item.fechaFin) < new Date(where.fechaFin.gte)) return false;
+            }
+            return true;
+          }) ?? null
+        );
+      },
       async create({ data }: any) {
         const entry = { id: inhabilitaciones.length + 1, ...data };
         inhabilitaciones.push(entry);
@@ -1182,7 +1420,7 @@ export function createMockPrisma() {
     torneo: {
       async create({ data, include }: any) {
         const item: any = {
-          id: data.id ?? `torneo-${torneos.length + 1}`,
+          id: data.id ?? randomUUID(),
           adminId: data.adminId,
           categoriaId: data.categoriaId,
           titulo: data.titulo,
@@ -1254,7 +1492,7 @@ export function createMockPrisma() {
         }
         return res;
       },
-      async findMany({ where, include }: any = {}) {
+      async findMany({ where, include, skip, take }: any = {}) {
         let list = [...torneos];
         if (where?.estado) {
           if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
@@ -1266,6 +1504,12 @@ export function createMockPrisma() {
         if (where?.categoriaId) {
           list = list.filter((t) => t.categoriaId === where.categoriaId);
         }
+        if (where?.titulo?.contains) {
+          const s = where.titulo.contains.toLowerCase();
+          list = list.filter((t) => t.titulo.toLowerCase().includes(s));
+        }
+        if (typeof skip === "number") list = list.slice(skip);
+        if (typeof take === "number") list = list.slice(0, take);
         return list.map((item) => {
           const res: any = { ...item };
           if (include?.categoria) {
@@ -1287,9 +1531,17 @@ export function createMockPrisma() {
           return res;
         });
       },
-      async update({ where, data }: any) {
+      async update({ where, data, include }: any) {
         const item = torneos.find((t) => t.id === where.id);
         if (!item) throw new Error("Torneo no encontrado");
+        if (data.titulo !== undefined) item.titulo = data.titulo;
+        if (data.descripcion !== undefined) item.descripcion = data.descripcion;
+        if (data.categoriaId !== undefined) item.categoriaId = data.categoriaId;
+        if (data.nivel !== undefined) item.nivel = data.nivel;
+        if (data.fechaInicio !== undefined) item.fechaInicio = new Date(data.fechaInicio);
+        if (data.fechaFin !== undefined) item.fechaFin = new Date(data.fechaFin);
+        if (data.cuposTotales !== undefined) item.cuposTotales = data.cuposTotales;
+        if (data.precioInscripcion !== undefined) item.precioInscripcion = data.precioInscripcion;
         if (data.estado !== undefined) item.estado = data.estado;
         if (data.cuposOcupados?.increment !== undefined) {
           item.cuposOcupados = (item.cuposOcupados ?? 0) + data.cuposOcupados.increment;
@@ -1297,7 +1549,48 @@ export function createMockPrisma() {
           item.cuposOcupados = data.cuposOcupados;
         }
         item.actualizadoEn = new Date();
-        return { ...item };
+        const res: any = { ...item };
+        if (include?.categoria) {
+          res.categoria = categorias.find((c) => c.id === item.categoriaId) ?? null;
+        }
+        if (include?.bloqueos) {
+          res.bloqueos = bloqueosTorneo
+            .filter((b) => b.torneoId === item.id)
+            .map((b) => ({
+              ...b,
+              servicio: servicios.find((s) => s.id === b.servicioId) ?? null,
+            }));
+        }
+        return res;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const t of torneos) {
+          if (where?.id !== undefined && t.id !== where.id) continue;
+          if (
+            where?.cuposOcupados?.lt !== undefined &&
+            (t.cuposOcupados ?? 0) >= where.cuposOcupados.lt
+          ) {
+            continue;
+          }
+          if (data.cuposOcupados?.increment !== undefined) {
+            t.cuposOcupados = (t.cuposOcupados ?? 0) + data.cuposOcupados.increment;
+          } else if (data.cuposOcupados !== undefined) {
+            t.cuposOcupados = data.cuposOcupados;
+          }
+          if (data.estado !== undefined) {
+            t.estado = data.estado;
+          }
+          t.actualizadoEn = new Date();
+          count++;
+        }
+        return { count };
+      },
+      async delete({ where }: any) {
+        const idx = torneos.findIndex((t) => t.id === where.id);
+        if (idx === -1) throw new Error("Torneo no encontrado");
+        const [deleted] = torneos.splice(idx, 1);
+        return deleted;
       },
     },
     torneoBloqueo: {
@@ -1308,9 +1601,55 @@ export function createMockPrisma() {
           return true;
         });
       },
+      async create({ data }: any) {
+        const item = {
+          id: bloqueosTorneo.length + 1,
+          torneoId: data.torneoId,
+          servicioId: data.servicioId,
+          horaInicio: new Date(data.horaInicio),
+          horaFin: new Date(data.horaFin),
+        };
+        bloqueosTorneo.push(item);
+        return item;
+      },
+      async createMany({ data }: any) {
+        const items = Array.isArray(data) ? data : [data];
+        for (const d of items) {
+          bloqueosTorneo.push({
+            id: bloqueosTorneo.length + 1,
+            torneoId: d.torneoId,
+            servicioId: d.servicioId,
+            horaInicio: new Date(d.horaInicio),
+            horaFin: new Date(d.horaFin),
+          });
+        }
+        return { count: items.length };
+      },
+      async deleteMany({ where }: any = {}) {
+        let removed = 0;
+        for (let i = bloqueosTorneo.length - 1; i >= 0; i--) {
+          const b = bloqueosTorneo[i];
+          if (!where?.torneoId || b.torneoId === where.torneoId) {
+            bloqueosTorneo.splice(i, 1);
+            removed++;
+          }
+        }
+        return { count: removed };
+      },
     },
     inscripcionTorneo: {
       async create({ data, include }: any) {
+        if (
+          inscripcionesTorneo.some(
+            (i) => i.torneoId === data.torneoId && i.usuarioId === data.usuarioId,
+          )
+        ) {
+          const err = new Error(
+            "Unique constraint failed on the fields: (`torneo_id`,`usuario_id`)",
+          ) as Error & { code: string };
+          err.code = "P2002";
+          throw err;
+        }
         const item: any = {
           id: data.id ?? `inscripcion-${inscripcionesTorneo.length + 1}`,
           torneoId: data.torneoId,
@@ -1364,10 +1703,36 @@ export function createMockPrisma() {
         }
         return res;
       },
+      async findFirst({ where, include }: any = {}) {
+        const list = await this.findMany({ where });
+        if (!list || list.length === 0) return null;
+        return this.findUnique({ where: { id: list[0].id }, include });
+      },
       async findMany({ where }: any = {}) {
         return inscripcionesTorneo.filter((i) => {
-          if (where?.torneoId && i.torneoId !== where.torneoId) return false;
+          if (where?.id) {
+            if (typeof where.id === "object" && where.id.not !== undefined) {
+              if (i.id === where.id.not) return false;
+            } else if (i.id !== where.id) {
+              return false;
+            }
+          }
+          if (where?.torneoId) {
+            if (typeof where.torneoId === "object" && Array.isArray(where.torneoId.in)) {
+              if (!where.torneoId.in.includes(i.torneoId)) return false;
+            } else if (i.torneoId !== where.torneoId) {
+              return false;
+            }
+          }
           if (where?.usuarioId && i.usuarioId !== where.usuarioId) return false;
+          if (where?.pagoId && i.pagoId !== where.pagoId) return false;
+          if (where?.estado) {
+            if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
+              if (!where.estado.in.includes(i.estado)) return false;
+            } else if (i.estado !== where.estado) {
+              return false;
+            }
+          }
           return true;
         });
       },

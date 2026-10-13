@@ -1,69 +1,232 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, ArrowRight, Building2, CalendarDays, Check, Clock3,
-  CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles, Store,
+  ArrowLeft, ArrowRight, CalendarDays, Check, Clock3,
+  Lock, ShieldCheck, AlertCircle, Loader2,
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
-  type Booking, type PaymentMethod,
+  type Booking,
 } from '@sportcomplex/core'
-import { Badge, Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
+import { CheckoutTimer } from '@/components/booking/checkout-timer'
+import {
+  isPaymentBlocked,
+  calculateRemainingSeconds,
+} from '@/components/booking/checkout-timer-utils'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
+import { PaymentMethodSelector } from '@/components/payment-method-selector'
+import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
+import { resolveCatalogServiceId } from '@sportcomplex/core'
+import { pollPaymentConfirmation, resolvePaymentOutcome } from './checkout-flow'
 
-const pseBanks = [
-  'Bancolombia',
-  'Banco de Bogotá',
-  'Davivienda',
-  'Nequi',
-  'BBVA Colombia',
-  'Banco de Occidente',
-  'Scotiabank Colpatria',
-  'Banco Popular',
-  'Banco AV Villas',
-  'Lulo Bank',
-]
+function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
+  try {
+    const raw = timeStr.toLowerCase().replace(/—/g, '-').trim()
+    const parts = raw.split('-')
 
-export default function CheckoutPage() {
+    const parseTo24 = (t: string): { hour: number; minute: number } => {
+      const isPm = t.includes('p') || t.includes('pm')
+      const isAm = t.includes('a') || t.includes('am')
+      const digits = t.replace(/[^0-9:]/g, '').trim()
+      const [hStr, mStr] = digits.split(':')
+      let h = parseInt(hStr, 10)
+      const m = mStr ? parseInt(mStr, 10) : 0
+      if (isNaN(h)) h = 8
+
+      if (isPm && h < 12) h += 12
+      if (isAm && h === 12) h = 0
+      return { hour: h, minute: isNaN(m) ? 0 : m }
+    }
+
+    const start = parseTo24(parts[0])
+    let end = parts[1] ? parseTo24(parts[1]) : { hour: (start.hour + 1) % 24, minute: start.minute }
+
+    if (end.hour < start.hour || (end.hour === start.hour && end.minute <= start.minute)) {
+      end = { hour: Math.min(23, start.hour + 1), minute: start.minute }
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startIso = `${dateStr}T${pad(start.hour)}:${pad(start.minute)}:00.000-05:00`
+    const endIso = `${dateStr}T${pad(end.hour)}:${pad(end.minute)}:00.000-05:00`
+
+    return {
+      startTime: new Date(startIso).toISOString(),
+      endTime: new Date(endIso).toISOString(),
+    }
+  } catch {
+    return null
+  }
+}
+
+function CheckoutContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryReservationId =
+    searchParams.get('reservationId') ||
+    searchParams.get('reservaId') ||
+    searchParams.get('bookingId')
+
   const { session, notify } = useApp()
   const [catalog] = useCatalog()
   const [bookings, setBookings] = useBookings()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
-  // Payment states
-  const [method, setMethod] = useState<PaymentMethod>('card')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [processStep, setProcessStep] = useState(1)
+  const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false)
+  const [holdError, setHoldError] = useState<string | null>(null)
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
+  const [pendingConfirmation, setPendingConfirmation] = useState(false)
 
-  // Card form state
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardHolder, setCardHolder] = useState(session?.name ?? '')
-  const [cardExp, setCardExp] = useState('')
-  const [cardCvc, setCardCvc] = useState('')
-  const [installments, setInstallments] = useState('1')
+  // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
+  const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
+  const paramServiceId = searchParams.get('serviceId')
+  const paramServiceName = searchParams.get('service')
+  const paramDate = searchParams.get('date')
+  const paramTime = searchParams.get('time')
+  const paramAttendees = searchParams.get('attendees')
 
-  // PSE form state
-  const [pseBank, setPseBank] = useState(pseBanks[0])
-  const [psePersonType, setPsePersonType] = useState('natural')
-  const [pseDocType, setPseDocType] = useState('CC')
-  const [pseDocNumber, setPseDocNumber] = useState('')
-  const [pseEmail, setPseEmail] = useState(session?.email ?? '')
+  const paramItem = paramServiceId
+    ? catalog.find((entry) => String(entry.id) === String(paramServiceId))
+    : paramServiceName
+      ? catalog.find((entry) => entry.name.toLowerCase().includes(paramServiceName.toLowerCase()))
+      : sessionId ? catalog[0] : undefined
 
-  // Wompi / Nequi state
-  const [nequiPhone, setNequiPhone] = useState('')
+  useEffect(() => {
+    if (!draft && paramItem) {
+      setDraft({
+        itemId: paramItem.id,
+        date: paramDate || new Date().toISOString().split('T')[0],
+        time: paramTime || '08:00 a. m. - 09:00 a. m.',
+        attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+      })
+    }
+  }, [draft, paramItem, paramDate, paramTime, paramAttendees, setDraft])
 
-  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
+  const activeDraft = draft || (paramItem ? {
+    itemId: paramItem.id,
+    date: paramDate || new Date().toISOString().split('T')[0],
+    time: paramTime || '08:00 a. m. - 09:00 a. m.',
+    attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+  } : null)
+
+  // Timer & Cupo state (TSK-FE-09 / SCRUM-117)
+  const [isExpired, setIsExpired] = useState(false)
+
+  // Sincronizar o inicializar el TTL de 30 minutos (1800 seg) del cupo
+  useEffect(() => {
+    if (!activeDraft) return
+
+    if (!activeDraft.expiresAt) {
+      const expiresAt = Date.now() + 30 * 60 * 1000
+      setDraft({ ...activeDraft, expiresAt })
+    } else if (activeDraft.expiresAt <= Date.now()) {
+      setIsExpired(true)
+    }
+  }, [activeDraft, setDraft])
+
+  const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
 
-  if (!draft || !item || !category) {
+  const creatingRef = useRef(false)
+
+  // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
+  useEffect(() => {
+    if (reservationId || holdError || creatingRef.current) return
+    const currentDraft = activeDraft
+    const currentItem = item
+    if (!currentDraft || !currentItem) return
+
+    let cancelled = false
+    async function createHold() {
+      if (!currentDraft || !currentItem || creatingRef.current) return
+      creatingRef.current = true
+      setIsCreatingReservation(true)
+      setHoldError(null)
+
+      const interval = parseSlotInterval(currentDraft.date, currentDraft.time)
+      if (!interval) {
+        setHoldError('El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.')
+        setIsCreatingReservation(false)
+        creatingRef.current = false
+        return
+      }
+
+      try {
+        let serviceId: number
+        try {
+          serviceId = resolveCatalogServiceId(currentItem)
+        } catch {
+          setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
+          setIsCreatingReservation(false)
+          creatingRef.current = false
+          return
+        }
+
+        // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId,
+            startTime: interval.startTime,
+            endTime: interval.endTime,
+            cantidadCupos: currentDraft.attendees,
+          }),
+        })
+
+        const data = await res.json()
+        if (cancelled) return
+
+        if (res.ok && data?.data?.id) {
+          setReservationId(data.data.id)
+        } else {
+          const errMsg = data?.error?.message || 'No se pudo reservar el cupo temporal en el horario seleccionado. Puede que ya no haya disponibilidad o la franja no sea válida.'
+          setHoldError(errMsg)
+          setReservationId(null)
+          creatingRef.current = false
+        }
+      } catch {
+        if (!cancelled) {
+          setHoldError('Error de conexión al intentar bloquear la disponibilidad. Por favor vuelve a seleccionar el horario.')
+          setReservationId(null)
+          creatingRef.current = false
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCreatingReservation(false)
+        }
+      }
+    }
+
+    void createHold()
+    return () => {
+      cancelled = true
+    }
+  }, [activeDraft, item, reservationId, holdError])
+
+  const handleExpire = useCallback(() => {
+    setIsExpired(true)
+    notify('El tiempo de reserva de 30 minutos ha finalizado. El cupo ha sido liberado.', 'error')
+  }, [notify])
+
+  const handleRetry = useCallback(() => {
+    setDraft(null)
+    setHoldError(null)
+    setReservationId(null)
+    if (item) {
+      router.push(`/services/${item.category}/${item.id}`)
+    } else {
+      router.push('/services')
+    }
+  }, [item, router, setDraft])
+
+  if (!activeDraft || !item || !category) {
     return (
       <main className="section-shell payment-page">
         <div className="dashboard-empty">
@@ -80,121 +243,65 @@ export default function CheckoutPage() {
   }
 
   const isCourt = item.category === 'canchas'
-  const total = calculateBookingPrice(item, draft.attendees)
+  const total = calculateBookingPrice(item, activeDraft.attendees)
   const Icon = categoryIcons[category.icon]
 
-  // Formaters
-  const handleCardNumberChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 16)
-    const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ')
-    setCardNumber(formatted)
-  }
+  const remainingSeconds = calculateRemainingSeconds(activeDraft?.expiresAt, Date.now())
+  const paymentBlocked = isExpired || isPaymentBlocked(remainingSeconds)
 
-  const handleExpChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 4)
-    if (raw.length > 2) {
-      setCardExp(`${raw.slice(0, 2)}/${raw.slice(2)}`)
-    } else {
-      setCardExp(raw)
-    }
-  }
+  const handlePaymentSuccess = async () => {
+    setIsConfirmingPayment(true)
+    const targetId = reservationId
 
-  const fillTestCard = () => {
-    setCardNumber('4532 8912 3456 8821')
-    setCardHolder(session?.name || 'MARÍA CAMILA RESTREPO')
-    setCardExp('09/29')
-    setCardCvc('821')
-    notify('Tarjeta de prueba Visa precargada.', 'success')
-  }
+    const verification = await pollPaymentConfirmation({
+      reservationId: targetId,
+      userName: session?.name ?? 'Cliente',
+      fetchReceipt: fetchReceiptData,
+      fetchHistory: fetchCustomerBookingHistory,
+    })
 
-  const confirmPayment = async () => {
-    // Form validation based on method
-    if (method === 'card') {
-      if (!cardNumber.trim() || cardNumber.replace(/\s/g, '').length < 15) {
-        notify('Ingresa un número de tarjeta válido.', 'error')
-        return
-      }
-      if (!cardExp.trim() || cardExp.length < 5) {
-        notify('Ingresa la fecha de vencimiento (MM/AA).', 'error')
-        return
-      }
-      if (!cardCvc.trim() || cardCvc.length < 3) {
-        notify('Ingresa el código CVC de 3 dígitos.', 'error')
-        return
-      }
-    } else if (method === 'pse') {
-      if (!pseDocNumber.trim()) {
-        notify('Ingresa tu número de documento para PSE.', 'error')
-        return
-      }
-      if (!pseEmail.trim() || !pseEmail.includes('@')) {
-        notify('Ingresa el correo electrónico registrado en PSE.', 'error')
-        return
-      }
-    } else if (method === 'wompi') {
-      if (!nequiPhone.trim() || nequiPhone.replace(/\D/g, '').length < 10) {
-        notify('Ingresa un número de celular de 10 dígitos para Nequi.', 'error')
-        return
-      }
-    }
+    resolvePaymentOutcome({
+      verification,
+      onConfirmed: (officialCode) => {
+        const newBooking: Booking = {
+          id: targetId || `b${Date.now()}`,
+          code: officialCode,
+          client: session?.name ?? 'Cliente',
+          category: item.category,
+          service: item.name,
+          sede: item.sede,
+          date: activeDraft.date,
+          time: activeDraft.time,
+          attendees: activeDraft.attendees,
+          amount: total,
+          status: 'Confirmada',
+          paymentMethod: 'card',
+          paymentStatus: 'Aprobada',
+          transactionRef: `STRIPE-${Date.now()}`,
+        }
 
-    const clash = bookings.some(
-      (booking) =>
-        booking.service === item.name &&
-        booking.date === draft.date &&
-        booking.time === draft.time &&
-        booking.status !== 'Cancelada'
-    )
-    if (clash) {
-      notify('Ese horario acaba de ser reservado. Elige otro.', 'error')
-      router.push(`/services/${item.category}/${item.id}`)
-      return
-    }
-
-    setIsProcessing(true)
-    setProcessStep(1)
-
-    // Simulated financial authorization pipeline
-    setTimeout(() => {
-      setProcessStep(2)
-    }, 700)
-
-    setTimeout(() => {
-      setProcessStep(3)
-    }, 1400)
-
-    setTimeout(() => {
-      const [, month, day] = draft.date.split('-')
-      const txRef = `WMP-ALT-${Math.floor(100000 + Math.random() * 900000)}`
-      const booking: Booking = {
-        id: `b${Date.now()}`,
-        code: `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`,
-        client: session?.name ?? 'Cliente',
-        category: item.category,
-        service: item.name,
-        sede: item.sede,
-        date: draft.date,
-        time: draft.time,
-        attendees: draft.attendees,
-        amount: total,
-        status: 'Confirmada',
-        paymentMethod: method,
-        paymentStatus: 'Aprobada',
-        transactionRef: txRef,
-      }
-      setBookings([booking, ...bookings])
-      setLastCode(booking.code)
-      setDraft(null)
-      setIsProcessing(false)
-      notify('¡Pago aprobado y reserva confirmada!', 'success')
-      router.push('/confirmation')
-    }, 2100)
+        setBookings([newBooking, ...bookings])
+        setLastCode(newBooking.code)
+        setDraft(null)
+        setIsConfirmingPayment(false)
+        notify('¡Pago confirmado por el servidor y comprobante emitido!', 'success')
+        router.push('/confirmation')
+      },
+      onPending: () => {
+        // Si el sondeo vence sin confirmación del backend:
+        // Mantenemos el estado "pago recibido, confirmación pendiente"
+        // NO generamos código local ALT-* ni comprobante ficticio.
+        setIsConfirmingPayment(false)
+        setPendingConfirmation(true)
+        notify('Pago recibido. La confirmación oficial del servidor está en proceso. Podrás verla en tu portal.', 'info')
+      },
+    })
   }
 
   return (
     <main className="section-shell payment-page">
       <Link href={`/services/${item.category}/${item.id}`} className="back-link">
-        <ArrowLeft size={15} /> Volver a la reserva
+        <ArrowLeft size={15} /> Volver a la selección
       </Link>
 
       <div className="checkout-progress">
@@ -207,297 +314,96 @@ export default function CheckoutPage() {
         <span className="progress-step">3&nbsp; Confirmación</span>
       </div>
 
+      {/* Temporizador regresivo visible en todo momento (TSK-FE-09 / SCRUM-117) */}
+      <CheckoutTimer
+        expiresAt={activeDraft?.expiresAt}
+        initialSeconds={1800}
+        onExpire={handleExpire}
+        onRetry={handleRetry}
+        isExpired={paymentBlocked}
+        className="mb-8 max-w-[960px] mx-auto"
+      />
+
       <div className="payment-layout">
         <section className="payment-form">
           <div className="eyebrow">PASARELA DE PAGO SEGURA</div>
           <h1>
             Elige tu medio de <span>pago.</span>
           </h1>
-          <p>Transacciones cifradas de extremo a extremo mediante pasarela segura Wompi / Bancolombia.</p>
+          <p>
+            Transacciones 100% cashless y cifradas de extremo a extremo mediante pasarela segura Stripe.
+          </p>
 
-          {/* Selector de métodos de pago */}
-          <div className="payment-methods-tabs">
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'card' ? 'active' : ''}`}
-              onClick={() => setMethod('card')}
-            >
-              <CreditCard size={20} />
-              <span>Tarjeta</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'pse' ? 'active' : ''}`}
-              onClick={() => setMethod('pse')}
-            >
-              <Building2 size={20} />
-              <span>PSE / Banco</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'wompi' ? 'active' : ''}`}
-              onClick={() => setMethod('wompi')}
-            >
-              <QrCode size={20} />
-              <span>Nequi / QR</span>
-            </button>
-            <button
-              type="button"
-              className={`payment-tab-btn ${method === 'on_site' ? 'active' : ''}`}
-              onClick={() => setMethod('on_site')}
-            >
-              <Store size={20} />
-              <span>En Sede</span>
-            </button>
+          {pendingConfirmation ? (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-8 text-center text-sm">
+              <AlertCircle className="mx-auto size-8 text-amber-600 mb-3" />
+              <p className="font-bold text-ink text-base">Pago recibido · Confirmación pendiente</p>
+              <p className="mt-2 text-xs text-subtle max-w-md mx-auto">
+                Hemos recibido tu pago en la pasarela. La confirmación oficial y emisión del tiquete están siendo procesadas por el servidor.
+              </p>
+              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">
+                Puedes consultar el estado definitivo de tu reserva y descargar tu comprobante una vez emitido desde tu portal.
+              </p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <Link
+                  href="/portal"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition"
+                >
+                  Ir a Mi Portal <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/services"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-ink text-xs font-medium hover:bg-[var(--surface-soft)] transition"
+                >
+                  Ver más servicios
+                </Link>
+              </div>
+            </div>
+          ) : isConfirmingPayment ? (
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-8 text-center text-sm">
+              <Loader2 className="mx-auto size-8 animate-spin text-emerald-600 mb-3" />
+              <p className="font-bold text-ink text-base">Pago en proceso</p>
+              <p className="mt-1 text-xs text-subtle max-w-sm mx-auto">
+                Estamos validando la confirmación de tu pago con el servidor y emitiendo tu tiquete oficial…
+              </p>
+            </div>
+          ) : holdError ? (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-center">
+              <AlertCircle className="mx-auto size-7 text-destructive mb-2" />
+              <p className="font-bold text-destructive text-base">No se pudo reservar el horario</p>
+              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">{holdError}</p>
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
+              >
+                Volver a seleccionar horario <ArrowRight size={14} />
+              </button>
+            </div>
+          ) : isCreatingReservation ? (
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-6 text-center text-sm">
+              <p className="font-semibold text-ink">Iniciando sesión segura de pago…</p>
+              <p className="mt-1 text-xs text-subtle">
+                Estamos preparando el bloqueo temporal de tu horario en el sistema.
+              </p>
+            </div>
+          ) : (
+            <PaymentMethodSelector
+              reservationId={reservationId}
+              onPaymentSuccess={handlePaymentSuccess}
+            />
+          )}
+
+          <div className="mt-6 flex items-start gap-2 text-xs leading-5 text-subtle">
+            <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#527c47]" />
+            <p>
+              Tu pago se procesa con Stripe Elements. La reserva se confirma de forma atómica
+              y se genera el tiquete digital de acceso al club.
+            </p>
           </div>
 
-          {/* Formulario según método */}
-          {method === 'card' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Tarjeta de Crédito o Débito</span>
-                <div className="card-brands">
-                  <b>VISA</b>
-                  <b>MC</b>
-                  <b>AMEX</b>
-                </div>
-              </div>
-
-              {/* Visual Card Preview */}
-              <div className="card-visual-preview">
-                <div className="flex justify-between items-start">
-                  <div className="card-chip" />
-                  <span className="text-[12px] font-extrabold tracking-widest text-[#c9ef75]">ALTURA CLUB</span>
-                </div>
-                <div className="card-preview-number">
-                  {cardNumber || '•••• •••• •••• ••••'}
-                </div>
-                <div className="card-preview-footer">
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">TITULAR</small>
-                    <span className="card-preview-name">{cardHolder || 'NOMBRE DEL TITULAR'}</span>
-                  </div>
-                  <div>
-                    <small className="text-[9px] uppercase tracking-wider block opacity-75">VENCE</small>
-                    <span className="card-preview-exp">{cardExp || 'MM/AA'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end -mt-2 mb-2">
-                <button
-                  type="button"
-                  onClick={fillTestCard}
-                  className="text-[12px] font-semibold text-[#4b7652] dark:text-[#9ee285] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Sparkles size={13} /> Cargar datos de tarjeta de prueba
-                </button>
-              </div>
-
-              <label className="demo-field">
-                Número de tarjeta
-                <Input
-                  value={cardNumber}
-                  onChange={(e) => handleCardNumberChange(e.target.value)}
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                  required
-                />
-              </label>
-
-              <label className="demo-field">
-                Nombre del titular (como figura en el plástico)
-                <Input
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                  placeholder="JUAN PÉREZ"
-                  required
-                />
-              </label>
-
-              <div className="form-row">
-                <label className="demo-field">
-                  Vencimiento (MM/AA)
-                  <Input
-                    value={cardExp}
-                    onChange={(e) => handleExpChange(e.target.value)}
-                    placeholder="MM/AA"
-                    maxLength={5}
-                    required
-                  />
-                </label>
-                <label className="demo-field">
-                  Código de seguridad (CVC)
-                  <Input
-                    type="password"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="•••"
-                    maxLength={4}
-                    required
-                  />
-                </label>
-              </div>
-
-              <label className="demo-field">
-                Número de cuotas
-                <select
-                  value={installments}
-                  onChange={(e) => setInstallments(e.target.value)}
-                  className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                >
-                  <option value="1">1 cuota (sin intereses)</option>
-                  <option value="2">2 cuotas</option>
-                  <option value="3">3 cuotas</option>
-                  <option value="6">6 cuotas</option>
-                  <option value="12">12 cuotas</option>
-                </select>
-              </label>
-            </div>
-          )}
-
-          {method === 'pse' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Transferencia Bancaria en Línea (PSE)</span>
-                <Badge variant="success">PSE Colombia</Badge>
-              </div>
-              <p className="text-[12.5px] text-[var(--subtle)]">
-                Debes estar registrado en PSE para ser redirigido a la sucursal de tu entidad bancaria.
-              </p>
-
-              <label className="demo-field">
-                Entidad bancaria
-                <select
-                  value={pseBank}
-                  onChange={(e) => setPseBank(e.target.value)}
-                  className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                >
-                  {pseBanks.map((bank) => (
-                    <option key={bank} value={bank}>
-                      {bank}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="form-row">
-                <label className="demo-field">
-                  Tipo de persona
-                  <select
-                    value={psePersonType}
-                    onChange={(e) => setPsePersonType(e.target.value)}
-                    className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                  >
-                    <option value="natural">Persona Natural</option>
-                    <option value="juridica">Persona Jurídica</option>
-                  </select>
-                </label>
-                <label className="demo-field">
-                  Tipo de documento
-                  <select
-                    value={pseDocType}
-                    onChange={(e) => setPseDocType(e.target.value)}
-                    className="min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
-                  >
-                    <option value="CC">Cédula de Ciudadanía</option>
-                    <option value="CE">Cédula de Extranjería</option>
-                    <option value="NIT">NIT</option>
-                    <option value="PAS">Pasaporte</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="demo-field">
-                Número de documento
-                <Input
-                  value={pseDocNumber}
-                  onChange={(e) => setPseDocNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Ej. 1020304050"
-                  required
-                />
-              </label>
-
-              <label className="demo-field">
-                Correo electrónico registrado en PSE
-                <Input
-                  type="email"
-                  value={pseEmail}
-                  onChange={(e) => setPseEmail(e.target.value)}
-                  placeholder="usuario@correo.com"
-                  required
-                />
-              </label>
-            </div>
-          )}
-
-          {method === 'wompi' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Nequi / Bancolombia a la Mano</span>
-                <Badge variant="success">Instantáneo</Badge>
-              </div>
-              <p className="text-[12.5px] text-[var(--subtle)]">
-                Ingresa tu número de celular asociado a tu cuenta Nequi. Recibirás una notificación push para autorizar el cobro.
-              </p>
-
-              <label className="demo-field">
-                Número de celular Nequi (10 dígitos)
-                <Input
-                  type="tel"
-                  value={nequiPhone}
-                  onChange={(e) => setNequiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="300 123 4567"
-                  required
-                />
-              </label>
-
-              <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[12px] text-[var(--subtle)] flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#557b53] shrink-0" />
-                <span>Al confirmar, la solicitud de cobro aparecerá en la bandeja de entrada de tu App Nequi.</span>
-              </div>
-            </div>
-          )}
-
-          {method === 'on_site' && (
-            <div className="payment-method">
-              <div className="payment-method-heading">
-                <span>Pago Presencial en Taquilla</span>
-                <Badge variant="secondary">En Complejo</Badge>
-              </div>
-              <p className="text-[13px] text-[var(--subtle)]">
-                Tu reserva quedará registrada y garantizada en el sistema. Podrás pagar en la recepción de la sede con efectivo, tarjeta débito/crédito física o bono corporativo antes de ingresar.
-              </p>
-              <div className="p-3 rounded-lg border border-[#e3d7a8] bg-[#fdfbf2] dark:border-[#524422] dark:bg-[#2b2413] text-[12.5px] text-[#876e2d] dark:text-[#f2d87e]">
-                💡 <b>Importante:</b> Llega con 10 minutos de anticipación para realizar el pago en caja y reclamar tu pulsera de acceso.
-              </div>
-            </div>
-          )}
-
-          {/* Action button */}
-          <ActionButton
-            onClick={confirmPayment}
-            disabled={isProcessing}
-            className="w-full justify-center text-[14px]"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 size={17} className="animate-spin" /> Procesando pago...
-              </>
-            ) : (
-              <>
-                {method === 'on_site' ? 'Confirmar reserva en sede' : 'Pagar y confirmar reserva'} · {formatMoney(total)}{' '}
-                <ArrowRight size={16} />
-              </>
-            )}
-          </ActionButton>
-
-          <Link href="/dashboard" className="demo-payment-link">
-            Cancelar y volver a mi cuenta
-          </Link>
-
-          <div className="secure-foot">
-            <Lock size={14} /> Transacción cifrada con protocolo TLS 256-bit y certificación PCI-DSS
+          <div className="secure-foot mt-6">
+            <Lock size={14} /> Transacción cifrada con protocolo TLS 256-bit y certificación PCI-DSS Nivel 1
           </div>
         </section>
 
@@ -513,20 +419,26 @@ export default function CheckoutPage() {
               <b>{item.name}</b>
               <span>
                 Sede {item.sede}
-                {!isCourt && <> · {draft.attendees} {draft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
+                {!isCourt && <> · {activeDraft.attendees} {activeDraft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
               </span>
             </div>
           </div>
           <div className="order-item">
             <span>
-              <CalendarDays size={15} /> {formatDate(draft.date)}
+              <CalendarDays size={15} /> {formatDate(activeDraft.date)}
             </span>
             <span>
-              <Clock3 size={15} /> {draft.time} · 60 minutos
+              <Clock3 size={15} /> {activeDraft.time} · 60 minutos
             </span>
           </div>
+          <div className="order-item py-2 border-b border-[var(--line)] flex items-center justify-between text-[12px]">
+            <span>Estado de cupo</span>
+            <b className={paymentBlocked ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
+              {paymentBlocked ? 'Expirado' : 'Bloqueado (30 min)'}
+            </b>
+          </div>
           <div className="order-price">
-            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
+            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${activeDraft.attendees}`}</span>
             <b>{formatMoney(total)}</b>
           </div>
           <div className="order-total">
@@ -541,30 +453,23 @@ export default function CheckoutPage() {
           </div>
         </aside>
       </div>
-
-      {/* Modal simulador de procesamiento bancario */}
-      {isProcessing && (
-        <div className="modal-backdrop">
-          <div className="reservation-modal payment-processing-modal">
-            <div className="processing-spinner" />
-            <div className="eyebrow mb-1">PROCESANDO PAGO SEGURO</div>
-            <h2 className="text-[20px] font-bold">
-              {processStep === 1 && 'Conectando con la entidad financiera...'}
-              {processStep === 2 && 'Validando fondos y disponibilidad...'}
-              {processStep === 3 && '¡Transacción Aprobada!'}
-            </h2>
-            <p className="text-[13px] text-[var(--subtle)] mt-2">
-              Por favor, no cierres esta ventana mientras confirmamos tu reserva.
-            </p>
-            <div className="flex gap-2 mt-4">
-              <span className={`w-3 h-3 rounded-full ${processStep >= 1 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-              <span className={`w-3 h-3 rounded-full ${processStep >= 2 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-              <span className={`w-3 h-3 rounded-full ${processStep >= 3 ? 'bg-[#8cd766]' : 'bg-[var(--line)]'}`} />
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
 
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="section-shell payment-page">
+          <div className="dashboard-empty">
+            <b>Cargando pasarela de pago...</b>
+            <p>Por favor espera un momento.</p>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  )
+}

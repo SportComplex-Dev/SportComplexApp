@@ -1,3 +1,16 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../apps/web/.env.local"));
+  } catch {}
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../apps/web/.env"));
+  } catch {}
+}
+
 import { PeriodicidadPlan } from "@prisma/client";
 import { prisma } from "../src/client";
 
@@ -52,6 +65,45 @@ async function main() {
     }
   }
   console.log("Planes de membresía sembrados con éxito con descuento_pct = 30%");
+
+  // 3. Usuario Administrador de pruebas
+  const adminRole = await prisma.rol.findUnique({
+    where: { nombre: "ADMIN" },
+  });
+
+  if (adminRole) {
+    const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@sportcomplex.com";
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || "Admin123*";
+
+    // Hash Argon2id con parámetros estándar (compatible con verifySecret de @sportcomplex/core)
+    const { hash } = await import("@node-rs/argon2");
+    const passwordHash = await hash(adminPassword, {
+      algorithm: 2,
+      memoryCost: 19456,
+      timeCost: 2,
+      parallelism: 1,
+    });
+
+    await prisma.usuario.upsert({
+      where: { correo: adminEmail },
+      update: {
+        nombre: "Administrador SportComplex",
+        rolId: adminRole.id,
+        estado: "ACTIVO",
+        passwordHash,
+        deletedAt: null,
+      },
+      create: {
+        correo: adminEmail,
+        nombre: "Administrador SportComplex",
+        rolId: adminRole.id,
+        estado: "ACTIVO",
+        passwordHash,
+      },
+    });
+
+    console.log(`Usuario administrador creado/actualizado con éxito: ${adminEmail}`);
+  }
 
   console.log("Seed completado correctamente.");
 }

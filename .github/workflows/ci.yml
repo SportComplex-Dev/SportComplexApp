@@ -19,4 +19,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
+      - run: pnpm test
       - run: pnpm --filter web build
+      - name: Validar Docker Compose
+        run: docker compose -f docker/docker-compose.yml config --quiet

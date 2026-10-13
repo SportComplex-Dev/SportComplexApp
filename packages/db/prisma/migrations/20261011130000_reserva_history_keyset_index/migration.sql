@@ -4,7 +4,7 @@
 -- la clave de orden, forzando un sort. Se reemplaza por el compuesto, que cubre
 -- el prefijo de igualdad y el orden de la paginación.
 
-DROP INDEX "reserva_titular_id_estado_idx";
+DROP INDEX IF EXISTS "reserva_titular_id_estado_idx";
 
-CREATE INDEX "reserva_titular_id_estado_creado_en_id_idx"
+CREATE INDEX IF NOT EXISTS "reserva_titular_id_estado_creado_en_id_idx"
   ON "reserva"("titular_id", "estado", "creado_en", "id");

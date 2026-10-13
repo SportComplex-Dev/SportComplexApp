@@ -1,0 +1,239 @@
+{
+  "name": "Fallo de cobro de membresía (invoice.payment_failed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "billing/failed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        112
+      ],
+      "id": "c7e6ec36-b31f-4ab6-b915-122d0eddcf1b",
+      "name": "Webhook: Payment Failed",
+      "webhookId": "billing-payment-failed"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-email-exists",
+              "leftValue": "={{ $json.body.body.customerEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-event-type",
+              "leftValue": "={{ $json.body.event || 'invoice.payment_failed' }}",
+              "rightValue": "invoice.payment_failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        112
+      ],
+      "id": "359bd689-58fa-4e46-8289-bf5f19a78711",
+      "name": "Validar Payload & Correo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-customer-name",
+              "name": "customerName",
+              "value": "={{ $json.body.customerName || 'Estimado/a cliente' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-customer-email",
+              "name": "customerEmail",
+              "value": "={{ $json.body.body.customerEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-plan-name",
+              "name": "planName",
+              "value": "={{ $json.body.planName || 'Plan de Membresía' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-portal-url",
+              "name": "billingPortalUrl",
+              "value": "={{ $json.body.billingPortalUrl || 'https://tu-dominio.com/perfil/membresia' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-next-retry",
+              "name": "nextAttemptDate",
+              "value": "={{ $json.body.nextAttemptDate || 'próximamente' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-membership-id",
+              "name": "membershipId",
+              "value": "={{ $json.body.membershipId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        0
+      ],
+      "id": "a6a3e6e0-4f09-458d-8678-70ed21be9138",
+      "name": "Formatear Datos de Notificación"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Notificación de fallo de cobro enviada correctamente\",\n  \"membershipId\": \"{{ $json.membershipId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "0ea5a9e0-5590-4ec8-a6e7-a9398963f1d8",
+      "name": "Respuesta 200 OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Payload inválido o falta correo del destinatario\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        224
+      ],
+      "id": "2a95ef32-dfe6-40f9-bcd3-b2ab4951cc7f",
+      "name": "Respuesta 400 Bad Request"
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "Akros Latam <no-reply@akros.lat>",
+        "to": "={{ $json.customerEmail }}",
+        "subject": " Problema al procesar el pago de tu membresía",
+        "html": "=<div style=\"background-color:#0b0f0d;padding:24px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\">\n  <div style=\"max-width:540px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:32px;\">\n    <span style=\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\">Pago fallido</span>\n    <h1 style=\"font-size:20px;color:#ffffff;margin:0 0 12px 0;\">Atención con tu renovación de membresía</h1>\n    <p style=\"font-size:14px;color:#cbd5e1;margin:0 0 12px 0;\">Hola <strong style=\"color:#ffffff;\">{{ $json.customerName }}</strong>,</p>\n    <p style=\"font-size:14px;color:#94a3b8;line-height:1.6;margin:0 0 24px 0;\">Tuvimos un problema al procesar el pago de tu suscripción en <strong style=\"color:#c9ef75;\">AKROS</strong>. Para evitar la desactivación de tu membresía, actualiza tu método de pago:</p>\n    <div style=\"text-align:center;margin:24px 0;\">\n      <a href=\"{{ $json.billingPortalUrl }}\" style=\"display:inline-block;background:#c9ef75;color:#111815;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:9999px;\">Actualizar método de pago</a>\n    </div>\n    <p style=\"font-size:13px;color:#64748b;margin:24px 0 0 0;\">Si ya lo hiciste, puedes ignorar este mensaje.</p>\n    <p style=\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\">AKROS CLUB &middot; ATHLETIC &amp; WELLNESS CLUB</p>\n  </div>\n</div>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        704,
+        0
+      ],
+      "id": "60a67e54-8f62-4a07-a180-f36c2ada2337",
+      "name": "Send a new email",
+      "webhookId": "b91d7ba4-e51f-4b82-9606-9af023ab29ce",
+      "credentials": {
+        "resendApi": {
+          "id": "XmmDZQvEj1MO36Uq",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook: Payment Failed": {
+      "main": [
+        [
+          {
+            "node": "Validar Payload & Correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Payload & Correo": {
+      "main": [
+        [
+          {
+            "node": "Formatear Datos de Notificación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta 400 Bad Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Datos de Notificación": {
+      "main": [
+        [
+          {
+            "node": "Send a new email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a new email": {
+      "main": [
+        [
+          {
+            "node": "Respuesta 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "58a9d175-8829-40f5-bf0c-cca3ae205446",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "8qB3lrXkhqwwGeqN",
+  "tags": []
+}

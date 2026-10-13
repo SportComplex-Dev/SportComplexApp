@@ -37,6 +37,8 @@ export type Booking = {
   paymentMethod?: import('../services/pricing').PaymentMethod | string;
   paymentStatus?: 'Aprobada' | 'Pendiente' | 'Rechazada';
   transactionRef?: string;
+  qrPayload?: string;
+  qrDataUrl?: string;
 };
 
 export const roleHome: Record<Role, string> = {

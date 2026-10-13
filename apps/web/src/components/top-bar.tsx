@@ -20,6 +20,7 @@ export function TopBar() {
 
   const isCustomer = session && (session.role === 'Cliente' || session.role === 'customer')
   const isAdmin = session && (session.role === 'Administrador' || session.role === 'admin')
+  const isSeller = session && (session.role === 'Empleado_Vendedor' || session.role === 'vendedor')
 
   const navItems = session
     ? isCustomer
@@ -27,11 +28,19 @@ export function TopBar() {
           { label: 'Inicio', href: '/' },
           { label: 'Servicios', href: '/services' },
           { label: 'Mi Portal', href: '/portal' },
+          { label: 'Membresías', href: '/portal/membership' },
           { label: 'Tiquetes QR', href: '/portal/tickets' },
+        ]
+      : isSeller
+      ? [
+          { label: 'Taquilla POS', href: '/pos' },
+          { label: 'Servicios', href: '/services' },
+          { label: 'Mi Portal', href: '/portal' },
         ]
       : isAdmin
       ? [
           { label: 'Panel Admin', href: '/admin/dashboard' },
+          { label: 'Taquilla POS', href: '/pos' },
           { label: 'Catálogo', href: '/admin/catalog' },
           { label: 'Portal Cliente', href: '/portal' },
         ]
@@ -39,10 +48,12 @@ export function TopBar() {
           { label: 'Inicio', href: '/' },
           { label: 'Servicios', href: '/services' },
           { label: 'Mi Portal', href: '/portal' },
+          { label: 'Membresías', href: '/portal/membership' },
         ]
     : [
         { label: 'Inicio', href: '/' },
         { label: 'Servicios', href: '/services' },
+        { label: 'Membresías', href: '/portal/membership' },
         { label: 'Reglamentos', href: '/legal' },
       ]
 

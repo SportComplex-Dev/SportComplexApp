@@ -2,7 +2,6 @@
   "name": "sportcomplex-monorepo",
   "version": "0.1.0",
   "private": true,
-  "pnpm": { "onlyBuiltDependencies": [ "prisma", "@prisma/engines" ] },
   "description": "Plataforma de Gestión de Reservas, Venta y Control de Acceso Deportivo (SportComplex) — Monorepo Turborepo + pnpm",
   "packageManager": "pnpm@12.6.0",
   "engines": {
@@ -13,18 +12,26 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "pnpm db:generate && pnpm --filter @sportcomplex/validation --filter @sportcomplex/ui --filter @sportcomplex/db --filter @sportcomplex/core --filter web run typecheck",
     "test": "turbo run test",
-    "db:generate": "turbo run db:generate",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "db:generate": "pnpm --filter @sportcomplex/db exec prisma generate --schema prisma/schema.prisma",
     "db:migrate": "turbo run db:migrate",
     "smoke:be24": "node --experimental-strip-types scripts/smoke-be24.mts",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/jsdom": "^30.0.0",
+    "eslint": "10.11.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jsdom": "^30.1.2",
     "turbo": "2.11.4",
     "typescript": "5.7.3",
-    "eslint": "10.11.0",
-    "typescript-eslint": "8.71.0",
-    "eslint-plugin-react-hooks": "7.1.1"
+    "typescript-eslint": "8.71.0"
   }
 }

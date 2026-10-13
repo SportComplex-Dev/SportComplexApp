@@ -43,8 +43,9 @@ async function getArgon2() {
   if (typeof window !== "undefined") {
     throw new Error("Argon2 solo está disponible en el entorno de servidor.");
   }
-  const pkg = "@node-rs/argon2";
-  return import(/* webpackIgnore: true */ pkg);
+  // Import dinámico con specifier literal: Turbopack/Next lo externaliza
+  // (serverExternalPackages) y Node lo resuelve desde node_modules en runtime.
+  return import("@node-rs/argon2");
 }
 
 /**

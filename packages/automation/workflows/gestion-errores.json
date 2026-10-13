@@ -1,0 +1,92 @@
+{
+  "name": "Gestión de errores",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ff906bf1-7e99-4fd9-bc2e-2a2ff955544c",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $input.first()?.json ?? {};\nconst execution = e.execution ?? {};\nconst workflow = e.workflow ?? {};\nconst error = execution.error ?? {};\n\nreturn [{\n  json: {\n    asunto: '[ERROR] TSK-AU-02 - Sincronización de festivos Colombia',\n    workflow: workflow.name ?? 'Workflow desconocido',\n    ejecucionUrl: execution.url ?? '',\n    ultimoNodo: execution.lastNodeExecuted ?? 'No identificado',\n    mensaje: error.message ?? e.message ?? 'Error sin detalle disponible',\n    fecha: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "191dcc96-c009-4a16-9eec-cc0fee24188e",
+      "name": "Preparar detalle del error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "no-reply@akros.lat",
+        "to": "official@akros.lat",
+        "subject": "{{ $json.asunto }}",
+        "html": "=<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin:0;padding:24px;background-color:#0b0f0d;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\">\n  <div style=\"max-width:580px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:28px;\">\n    <span style=\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\">Alerta interna</span>\n    <h1 style=\"font-size:20px;color:#ffffff;margin:0 0 16px 0;\">Fallo en workflow: {{ $json.workflow }}</h1>\n    <div style=\"background:#0b0f0d;border:1px solid #1f2c25;border-radius:12px;padding:16px;margin-bottom:16px;\">\n      <p style=\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\">Último nodo ejecutado</p>\n      <p style=\"font-size:14px;color:#f1f5f9;margin:0 0 12px 0;\">{{ $json.ultimoNodo }}</p>\n      <p style=\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\">Mensaje</p>\n      <p style=\"font-size:14px;color:#f87171;margin:0;font-family:monospace;\">{{ $json.mensaje }}</p>\n    </div>\n    <p style=\"font-size:13px;color:#94a3b8;margin:0 0 16px 0;\">Fecha: {{ $json.fecha }}</p>\n    <a href=\"{{ $json.ejecucionUrl }}\" style=\"display:inline-block;background:#c9ef75;color:#111815;font-size:13px;font-weight:700;text-decoration:none;padding:10px 20px;border-radius:9999px;\">Ver ejecución en n8n</a>\n    <p style=\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\">AKROS CLUB &middot; AUTOMATION</p>\n  </div>\n</body>\n</html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "id": "933dacb0-aba7-4589-ac03-cc5efc9fbe5d",
+      "name": "Send a new email",
+      "webhookId": "f3330977-adf6-484f-9773-6f40c0edeca7",
+      "credentials": {
+        "resendApi": {
+          "id": "QoyCY6ZzewUYBXCt",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Preparar detalle del error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar detalle del error": {
+      "main": [
+        [
+          {
+            "node": "Send a new email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fa87c606-7672-4734-b4c0-c5c4aacf6a22",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0762f3182e783dd1c2b55f3cb7a9f0cecbedc700a9d77b0b92b196aea136c803"
+  },
+  "nodeGroups": [],
+  "id": "OPHaetTDF7cfGwk1",
+  "tags": []
+}
