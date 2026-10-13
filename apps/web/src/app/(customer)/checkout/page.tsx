@@ -22,6 +22,7 @@ import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
 import { PaymentMethodSelector } from '@/components/payment-method-selector'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
 import { resolveCatalogServiceId } from '@sportcomplex/core'
+import { pollPaymentConfirmation, resolvePaymentOutcome } from './checkout-flow'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
   try {
@@ -77,6 +78,7 @@ function CheckoutContent() {
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
   const [holdError, setHoldError] = useState<string | null>(null)
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
+  const [pendingConfirmation, setPendingConfirmation] = useState(false)
 
   // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
   const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
@@ -153,12 +155,22 @@ function CheckoutContent() {
       }
 
       try {
+        let serviceId: number
+        try {
+          serviceId = resolveCatalogServiceId(currentItem)
+        } catch {
+          setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
+          setIsCreatingReservation(false)
+          creatingRef.current = false
+          return
+        }
+
         // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            serviceId: resolveCatalogServiceId(currentItem),
+            serviceId,
             startTime: interval.startTime,
             endTime: interval.endTime,
             cantidadCupos: currentDraft.attendees,
@@ -238,72 +250,49 @@ function CheckoutContent() {
     setIsConfirmingPayment(true)
     const targetId = reservationId
 
-    let confirmedBackendBooking = false
-    let finalBookingCode: string | null = null
+    const verification = await pollPaymentConfirmation({
+      reservationId: targetId,
+      userName: session?.name ?? 'Cliente',
+      fetchReceipt: fetchReceiptData,
+      fetchHistory: fetchCustomerBookingHistory,
+    })
 
-    // Polling del backend para validar que el webhook confirmó la reserva
-    const maxAttempts = 12
-    const pollInterval = 1500
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (targetId) {
-        try {
-          const receipt = await fetchReceiptData(targetId)
-          if (receipt?.reserva?.id) {
-            confirmedBackendBooking = true
-            finalBookingCode = receipt.qr?.payload ? receipt.qr.payload.slice(0, 16) : null
-            break
-          }
-        } catch {
-          // continuar con polling
+    resolvePaymentOutcome({
+      verification,
+      onConfirmed: (officialCode) => {
+        const newBooking: Booking = {
+          id: targetId || `b${Date.now()}`,
+          code: officialCode,
+          client: session?.name ?? 'Cliente',
+          category: item.category,
+          service: item.name,
+          sede: item.sede,
+          date: activeDraft.date,
+          time: activeDraft.time,
+          attendees: activeDraft.attendees,
+          amount: total,
+          status: 'Confirmada',
+          paymentMethod: 'card',
+          paymentStatus: 'Aprobada',
+          transactionRef: `STRIPE-${Date.now()}`,
         }
-      }
 
-      try {
-        const history = await fetchCustomerBookingHistory(session?.name ?? 'Cliente', 5)
-        const match = history.find((h) => h.id === targetId && h.status === 'Confirmada')
-        if (match) {
-          confirmedBackendBooking = true
-          finalBookingCode = match.code
-          break
-        }
-      } catch {
-        // continuar reintentos
-      }
-
-      await new Promise((r) => setTimeout(r, pollInterval))
-    }
-
-    const [, month, day] = activeDraft.date.split('-')
-    const bookingCode = finalBookingCode || `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`
-    const newBooking: Booking = {
-      id: targetId || `b${Date.now()}`,
-      code: bookingCode,
-      client: session?.name ?? 'Cliente',
-      category: item.category,
-      service: item.name,
-      sede: item.sede,
-      date: activeDraft.date,
-      time: activeDraft.time,
-      attendees: activeDraft.attendees,
-      amount: total,
-      status: confirmedBackendBooking ? 'Confirmada' : 'Pendiente',
-      paymentMethod: 'card',
-      paymentStatus: 'Aprobada',
-      transactionRef: `STRIPE-${Date.now()}`,
-    }
-
-    setBookings([newBooking, ...bookings])
-    setLastCode(newBooking.code)
-    setDraft(null)
-    setIsConfirmingPayment(false)
-
-    if (confirmedBackendBooking) {
-      notify('¡Pago confirmado por el servidor y comprobante emitido!', 'success')
-    } else {
-      notify('Pago recibido. Tu reserva se está sincronizando con el club.', 'info')
-    }
-    router.push('/confirmation')
+        setBookings([newBooking, ...bookings])
+        setLastCode(newBooking.code)
+        setDraft(null)
+        setIsConfirmingPayment(false)
+        notify('¡Pago confirmado por el servidor y comprobante emitido!', 'success')
+        router.push('/confirmation')
+      },
+      onPending: () => {
+        // Si el sondeo vence sin confirmación del backend:
+        // Mantenemos el estado "pago recibido, confirmación pendiente"
+        // NO generamos código local ALT-* ni comprobante ficticio.
+        setIsConfirmingPayment(false)
+        setPendingConfirmation(true)
+        notify('Pago recibido. La confirmación oficial del servidor está en proceso. Podrás verla en tu portal.', 'info')
+      },
+    })
   }
 
   return (
@@ -342,7 +331,32 @@ function CheckoutContent() {
             Transacciones 100% cashless y cifradas de extremo a extremo mediante pasarela segura Stripe.
           </p>
 
-          {isConfirmingPayment ? (
+          {pendingConfirmation ? (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-8 text-center text-sm">
+              <AlertCircle className="mx-auto size-8 text-amber-600 mb-3" />
+              <p className="font-bold text-ink text-base">Pago recibido · Confirmación pendiente</p>
+              <p className="mt-2 text-xs text-subtle max-w-md mx-auto">
+                Hemos recibido tu pago en la pasarela. La confirmación oficial y emisión del tiquete están siendo procesadas por el servidor.
+              </p>
+              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">
+                Puedes consultar el estado definitivo de tu reserva y descargar tu comprobante una vez emitido desde tu portal.
+              </p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <Link
+                  href="/portal"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition"
+                >
+                  Ir a Mi Portal <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/services"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-ink text-xs font-medium hover:bg-[var(--surface-soft)] transition"
+                >
+                  Ver más servicios
+                </Link>
+              </div>
+            </div>
+          ) : isConfirmingPayment ? (
             <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-8 text-center text-sm">
               <Loader2 className="mx-auto size-8 animate-spin text-emerald-600 mb-3" />
               <p className="font-bold text-ink text-base">Pago en proceso</p>

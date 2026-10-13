@@ -28,3 +28,14 @@ test("resolveCatalogServiceId: tolera objetos de catálogo con name o id", () =>
   assert.equal(resolveCatalogServiceId({ id: "tenis-cancha-1", name: "Cancha de tenis · Cancha 1" }), 17);
   assert.equal(resolveCatalogServiceId({ id: "custom", name: "Gimnasio · Zona funcional" }), 5);
 });
+
+test("resolveCatalogServiceId: lanza error si el servicio no es reconocido", () => {
+  assert.throws(
+    () => resolveCatalogServiceId("servicio-inexistente-xyz"),
+    /Servicio de catálogo no reconocido/
+  );
+  assert.throws(
+    () => resolveCatalogServiceId({ id: "desconocido", name: "Servicio Fantasma" }),
+    /Servicio de catálogo no reconocido/
+  );
+});

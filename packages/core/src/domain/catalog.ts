@@ -405,5 +405,7 @@ export function resolveCatalogServiceId(itemOrId: string | number | { id: string
   if (idStr.includes('gimnasio') || nameStr.includes('gimnasio') || nameStr.includes('funcional')) return 5;
   if (idStr.includes('zona-humeda') || nameStr.includes('sauna') || nameStr.includes('turco')) return 6;
 
-  return 5;
+  throw new Error(
+    `Servicio de catálogo no reconocido o sin ID relacional verificable: ${typeof itemOrId === 'object' ? JSON.stringify(itemOrId) : String(itemOrId)}`
+  );
 }

@@ -193,3 +193,128 @@ test("POST /api/payments/intent/online: 200 con reserva válida usa monto real y
   assert.equal(payload.metadata?.bookingId, reservationId);
   assert.equal(payload.metadata?.userId, titularId);
 });
+
+test("POST /api/payments/intent/online: 409 PAYMENT_CANCELED si el PaymentIntent previo fue cancelado", async () => {
+  const canceledReservationId = "55555555-5555-4555-8555-555555555555";
+  const canceledPaymentId = "pago-cancelado-1";
+  const canceledStripePiId = "pi_online_canceled_1";
+
+  mock._state.pagos.push({
+    id: canceledPaymentId,
+    usuarioId: titularId,
+    tipo: "RESERVA",
+    stripePaymentIntentId: canceledStripePiId,
+    monto: 60000,
+    estado: "PENDIENTE",
+  });
+
+  mock._state.reservas.push({
+    id: canceledReservationId,
+    disponibilidadId: 1n,
+    titularId,
+    estado: "PENDIENTE_PAGO",
+    canal: "ONLINE",
+    total: 60000,
+    cantidadCupos: 1,
+    expiraEn: new Date(Date.now() + 15 * 60_000),
+    pagoId: canceledPaymentId,
+  });
+
+  const mockStripe = {
+    paymentIntents: {
+      retrieve: async (id: string) => {
+        assert.equal(id, canceledStripePiId);
+        return {
+          id,
+          status: "canceled",
+        };
+      },
+    },
+  };
+
+  setSession(titularId);
+  const res = await onlineRoute.POST(createRequest({ reservationId: canceledReservationId }), {
+    stripeClient: mockStripe as unknown as Stripe,
+  });
+
+  assert.equal(res.status, 409);
+  const data = await res.json();
+  assert.equal(data.error.code, "PAYMENT_CANCELED");
+});
+
+test("POST /api/payments/intent/online: 502/500 si Stripe falla al crear el PaymentIntent", async () => {
+  const stripeErrorReservationId = "66666666-6666-4666-8666-666666666666";
+  mock._state.reservas.push({
+    id: stripeErrorReservationId,
+    disponibilidadId: 1n,
+    titularId,
+    estado: "PENDIENTE_PAGO",
+    canal: "ONLINE",
+    total: 45000,
+    cantidadCupos: 1,
+    expiraEn: new Date(Date.now() + 15 * 60_000),
+    pagoId: null,
+  });
+
+  const mockStripe = {
+    paymentIntents: {
+      create: async () => {
+        throw new Error("Stripe connection timeout");
+      },
+    },
+  };
+
+  setSession(titularId);
+  const res = await onlineRoute.POST(createRequest({ reservationId: stripeErrorReservationId }), {
+    stripeClient: mockStripe as unknown as Stripe,
+  });
+
+  assert.equal(res.status, 500);
+  const data = await res.json();
+  assert.equal(data.error.code, "SERVER_ERROR");
+});
+
+test("POST /api/payments/intent/online: 409 y cancela PaymentIntent si falla la asociación con la reserva", async () => {
+  const raceReservationId = "77777777-7777-4777-8777-777777777777";
+  const resObj = {
+    id: raceReservationId,
+    disponibilidadId: 1n,
+    titularId,
+    estado: "PENDIENTE_PAGO",
+    canal: "ONLINE",
+    total: 35000,
+    cantidadCupos: 1,
+    expiraEn: new Date(Date.now() + 10 * 60_000),
+    pagoId: null,
+  };
+  mock._state.reservas.push(resObj);
+
+  let canceledPiId: string | null = null;
+  const mockStripe = {
+    paymentIntents: {
+      create: async () => {
+        // Simulamos condición de carrera: justo antes de la transacción, la reserva expira o cambia de estado
+        resObj.estado = "CANCELADA";
+        return {
+          id: "pi_race_test_999",
+          client_secret: "secret_race",
+          status: "requires_payment_method",
+        };
+      },
+      cancel: async (id: string) => {
+        canceledPiId = id;
+        return { id, status: "canceled" };
+      },
+    },
+  };
+
+  setSession(titularId);
+  const res = await onlineRoute.POST(createRequest({ reservationId: raceReservationId }), {
+    stripeClient: mockStripe as unknown as Stripe,
+  });
+
+  assert.equal(res.status, 409);
+  const data = await res.json();
+  assert.equal(data.error.code, "RESERVATION_NOT_PAYABLE");
+  assert.equal(canceledPiId, "pi_race_test_999");
+});
