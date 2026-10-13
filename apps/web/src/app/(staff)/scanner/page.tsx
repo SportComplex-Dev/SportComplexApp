@@ -1,225 +1,337 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { CheckCircle2, ShieldAlert, WifiOff } from "lucide-react";
+
+import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
+import { ScannerHeader } from "@/components/scanner/scanner-header";
+import { ShiftSelector } from "@/components/scanner/shift-selector";
+import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
 import ExpiredSlotScreen from "@/components/scanner/ExpiredSlotScreen";
 import {
-  parseTicketQr,
-  ScannerServiceError,
-  validateTicket,
-  type TicketValidationResponse,
+  type ScannerFlowState,
+  type ScannedTicket,
+  type ShiftOption,
+  type RedeemTicketResponse,
+  buildExpiredSlotDetails,
+  scannerService,
 } from "@/components/scanner/scanner.service";
-
-const CAMERA_CONFIG = {
-  fps: 10,
-  qrbox: { width: 250, height: 250 },
-};
+import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
+import { useApp } from "@/components/app-provider";
 
 export default function ScannerPage() {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const processingRef = useRef(false);
-  const serviceIdRef = useRef("");
-  const restartRef = useRef(false);
-  const [serviceId, setServiceId] = useState("");
-  const [result, setResult] = useState<TicketValidationResponse | null>(null);
-  const [error, setError] = useState("");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState("");
+  const [flowState, setFlowState] = useState<ScannerFlowState>("idle");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [shiftOptions, setShiftOptions] = useState<ShiftOption[]>([]);
+  const [isLoadingShifts, setIsLoadingShifts] = useState(true);
+  const [shiftLoadError, setShiftLoadError] = useState<string | null>(null);
+  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [activeShift, setActiveShift] = useState<ShiftOption | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [ticket, setTicket] = useState<ScannedTicket | null>(null);
+  const [modalMessage, setModalMessage] = useState("Se debe validar el QR para confirmar acceso.");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [cameraToast, setCameraToast] = useState<string | null>(null);
 
-  const processDecodedText = useCallback(
-    async (decodedText: string, scanner: Html5Qrcode) => {
-      if (processingRef.current || scannerRef.current !== scanner) return;
-      processingRef.current = true;
-      setCameraReady(false);
-      setError("");
-
-      try {
-        if (scanner.isScanning) {
-          await scanner.stop();
-        }
-        const { ticketId, signature } = parseTicketQr(decodedText);
-        const selectedServiceId = Number(serviceIdRef.current);
-        if (!Number.isInteger(selectedServiceId) || selectedServiceId < 1) {
-          throw new ScannerServiceError("Ingresa un ID de servicio válido antes de escanear.");
-        }
-        const validation = await validateTicket(
-          ticketId,
-          signature,
-          selectedServiceId,
-        );
-        setResult(validation);
-      } catch (scanError) {
-        setError(
-          scanError instanceof ScannerServiceError
-            ? scanError.message
-            : "No fue posible procesar el código escaneado.",
-        );
-        processingRef.current = false;
-        try {
-          await scanner.start(
-            { facingMode: "environment" },
-            CAMERA_CONFIG,
-            (nextDecodedText) => void processDecodedText(nextDecodedText, scanner),
-            () => undefined,
-          );
-          setCameraReady(true);
-        } catch (restartError) {
-          setCameraError(
-            restartError instanceof Error
-              ? `No se pudo reactivar la cámara: ${restartError.message}`
-              : "No se pudo reactivar la cámara.",
-          );
-        }
-      }
-    },
-    [],
-  );
+  const { activateAudio, playSuccess, playError } = useAudioFeedback(audioEnabled);
+  const { session } = useApp();
 
   useEffect(() => {
-    let mounted = true;
-    let scanner: Html5Qrcode | null = null;
+    let isCurrent = true;
 
-    async function startCamera() {
-      try {
-        const instance = new Html5Qrcode("scanner-camera");
-        scanner = instance;
-        scannerRef.current = instance;
-        await instance.start(
-          { facingMode: "environment" },
-          CAMERA_CONFIG,
-          (decodedText) => {
-            if (mounted) void processDecodedText(decodedText, instance);
-          },
-          () => undefined,
-        );
-        if (!mounted) {
-          await instance.stop();
-          return;
+    scannerService.getShiftOptions()
+      .then((options) => {
+        if (isCurrent) setShiftOptions(options);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setShiftLoadError(error instanceof Error ? error.message : "No se pudieron cargar los servicios de acceso.");
         }
-        setCameraReady(true);
-      } catch (startError) {
-        if (mounted) {
-          setCameraError(
-            startError instanceof Error
-              ? `No se pudo iniciar la cámara: ${startError.message}`
-              : "No se pudo iniciar la cámara.",
-          );
-        }
-      }
-    }
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingShifts(false);
+      });
 
-    void startCamera();
     return () => {
-      mounted = false;
-      if (scanner?.isScanning) void scanner.stop();
-      scannerRef.current = null;
+      isCurrent = false;
     };
-  }, [processDecodedText]);
+  }, []);
 
-  const continueScanning = useCallback(async () => {
-    const scanner = scannerRef.current;
-    if (!scanner || restartRef.current) return;
+  const setStateAndMessage = useCallback((nextState: ScannerFlowState, nextMessage: string) => {
+    setFlowState(nextState);
+    setModalMessage(nextMessage);
+  }, []);
 
-    setError("");
-    setCameraError("");
-    restartRef.current = true;
-    try {
-      if (!scanner.isScanning) {
-        await scanner.start(
-          { facingMode: "environment" },
-          CAMERA_CONFIG,
-          (decodedText) => void processDecodedText(decodedText, scanner),
-          () => undefined,
-        );
-      }
-      setResult(null);
-      setCameraReady(true);
-      processingRef.current = false;
-      setCameraError("");
-    } catch (startError) {
-      processingRef.current = false;
-      setCameraReady(false);
-      setCameraError(
-        startError instanceof Error
-          ? `No se pudo reactivar la cámara: ${startError.message}`
-          : "No se pudo reactivar la cámara.",
-      );
-    } finally {
-      restartRef.current = false;
+  const handleSelectShift = useCallback((shift: ShiftOption) => {
+    setSelectedShiftId(shift.id);
+    setActiveShift(shift);
+    setTicket(null);
+    setIsModalOpen(false);
+    setCameraToast(null);
+    setFlowState("configuring-shift");
+  }, []);
+
+  const handleOpenCamera = useCallback(() => {
+    if (!activeShift || !Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0) {
+      return;
     }
-  }, [processDecodedText]);
 
-  const handleServiceIdChange = (value: string) => {
-    setServiceId(value);
-    serviceIdRef.current = value;
-  };
+    setFlowState("starting-camera");
+    setCameraToast("Preparando la cámara del puesto seleccionado...");
+  }, [activeShift]);
+
+  const handleChangeShift = useCallback(() => {
+    setSelectedShiftId(null);
+    setActiveShift(null);
+    setTicket(null);
+    setIsModalOpen(false);
+    setFlowState("idle");
+    setCameraToast(null);
+    setModalMessage("Se debe validar el QR para confirmar acceso.");
+  }, []);
+
+  useEffect(() => {
+    if (!activeShift) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (flowState === "configuring-shift" || flowState === "starting-camera") {
+        setFlowState("starting-camera");
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [activeShift, flowState]);
+
+  const handleScan = useCallback((rawQr: string) => {
+    if (!activeShift || !Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0) return;
+
+    setIsModalOpen(true);
+    const parsed = scannerService.parseTicket(rawQr);
+    if (!parsed) {
+      setTicket(null);
+      setStateAndMessage("ticket-invalid", "El QR no contiene un ticket firmado válido (SC1, UUID y firma HMAC).");
+      if (audioEnabled) playError();
+      return;
+    }
+
+    setTicket(parsed);
+    setStateAndMessage("ticket-valid", "Confirma el canje para validar el acceso con el servidor.");
+  }, [activeShift, audioEnabled, playError, setStateAndMessage]);
+
+  const handleRedeem = useCallback(async () => {
+    if (
+      !ticket ||
+      !activeShift ||
+      !Number.isInteger(activeShift.postServiceId) ||
+      activeShift.postServiceId <= 0
+    ) return;
+
+    setFlowState("redeeming");
+    setIsRedeeming(true);
+    setModalMessage("Registrando acceso y confirmando el paso del cliente...");
+
+    try {
+      const result: RedeemTicketResponse = await scannerService.redeemTicket(
+        ticket,
+        activeShift.postServiceId,
+      );
+      setTicket({ ...ticket, result });
+      if (result.access === "DENIED") {
+        const message = result.code === "ALREADY_USED"
+          ? "Boleto ya utilizado anteriormente."
+          : result.code === "SERVICE_MISMATCH"
+            ? result.message ?? "El ticket pertenece a otro escenario deportivo."
+            : result.code === "WINDOW_EXPIRED"
+              ? result.message ?? "Franja horaria vencida o no disponible."
+              : result.message ?? "El acceso fue denegado.";
+        setStateAndMessage("access-denied", message);
+        if (audioEnabled) {
+          playError();
+        }
+        return;
+      }
+
+      setStateAndMessage("access-granted", result.message ?? "Acceso concedido y canje registrado.");
+      if (audioEnabled) {
+        playSuccess();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? `No se pudo registrar el canje: ${error.message}`
+        : "No se pudo registrar el canje por un error de conexión.";
+      setStateAndMessage("redeem-error", message);
+      if (audioEnabled) {
+        playError();
+      }
+    } finally {
+      setIsRedeeming(false);
+    }
+  }, [activeShift, audioEnabled, playError, playSuccess, setStateAndMessage, ticket]);
+
+  const handleCameraError = useCallback(
+    (message: string) => {
+      setCameraToast(message);
+      setFlowState("camera-error");
+      setStateAndMessage("camera-error", message);
+    },
+    [setStateAndMessage],
+  );
+
+  const handleScanNext = useCallback(() => {
+    setTicket(null);
+    setIsModalOpen(false);
+    setFlowState("scanning");
+    setModalMessage("Escaneando siguiente QR...");
+  }, []);
+
+  const canStartCamera = Boolean(
+    activeShift &&
+    Number.isInteger(activeShift.postServiceId) &&
+    activeShift.postServiceId > 0 &&
+    (flowState === "starting-camera" || flowState === "scanning"),
+  );
+
+  const isExpired = ticket?.result?.code === "WINDOW_EXPIRED" && Boolean(ticket.result.ticket);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 py-8 text-slate-900 dark:bg-[#111815] dark:text-white sm:px-6">
-      <h1 className="text-2xl font-extrabold">Control de acceso móvil</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        Escanea el QR para validar la reserva y su franja horaria.
-      </p>
-
-      <label className="mt-6 block text-sm font-semibold" htmlFor="scanner-service-id">
-        ID del servicio asignado
-      </label>
-      <input
-        className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-slate-900 outline-none focus:border-emerald-600 dark:border-white/20 dark:bg-[#1a2420] dark:text-white"
-        id="scanner-service-id"
-        min="1"
-        onChange={(event) => handleServiceIdChange(event.target.value)}
-        placeholder="Ej. 3"
-        type="number"
-        value={serviceId}
+    <main data-scanner-theme={theme} className="min-h-screen bg-brand-dark text-brand-text">
+      <ScannerHeader
+        activeShift={activeShift}
+        audioEnabled={audioEnabled}
+        theme={theme}
+        onToggleAudio={() => {
+          if (!audioEnabled) activateAudio();
+          setAudioEnabled((current) => !current);
+        }}
+        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        onChangeShift={handleChangeShift}
       />
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-black dark:border-white/10">
-        <div aria-label="Cámara para escanear códigos QR" id="scanner-camera" />
-      </div>
-      <p className="mt-3 text-sm text-slate-600 dark:text-slate-300" role="status">
-        {cameraError || (cameraReady ? "Cámara activa. Centra el código QR en el recuadro." : "Iniciando cámara…")}
-      </p>
+      {!activeShift ? (
+        <section className="px-4 pb-10 pt-8 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <ShiftSelector
+              options={shiftOptions}
+              selectedId={selectedShiftId}
+              isLoading={isLoadingShifts}
+              loadError={shiftLoadError}
+              onSelect={handleSelectShift}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-5 flex flex-col gap-3 rounded-[26px] border border-brand-border bg-brand-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent">Puesto confirmado</p>
+                <h2 className="mt-1 text-xl font-bold text-brand-text">{activeShift.label} · {activeShift.courtName}</h2>
+              </div>
 
-      {error && (
-        <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-800/50 dark:bg-rose-950/60 dark:text-rose-200" role="alert">
-          {error}
-        </p>
-      )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFacingMode((current) => (current === "environment" ? "user" : "environment"))}
+                  className="rounded-full border border-brand-border bg-brand-control px-3 py-2 text-xs font-semibold text-brand-text transition hover:border-brand-accent hover:text-brand-accent"
+                >
+                  Cambiar cámara
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenCamera}
+                  disabled={!Number.isInteger(activeShift.postServiceId) || activeShift.postServiceId <= 0}
+                  className="rounded-full bg-brand-accent px-4 py-2 text-xs font-bold text-brand-on-accent transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+                >
+                  {flowState === "scanning" ? "Cámara activa" : "Iniciar cámara"}
+                </button>
+              </div>
+            </div>
 
-      {result && result.status !== "EXPIRED" && (
-        <section
-          aria-live="assertive"
-          className={`mt-5 rounded-2xl border p-5 ${
-            result.isValid
-              ? "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-100"
-              : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-100"
-          }`}
-        >
-          <h2 className="font-bold">{result.message}</h2>
-          <p className="mt-2 text-sm">
-            {result.userName} · {result.targetCourtName}
-          </p>
-          <button
-            className="mt-4 min-h-12 w-full rounded-xl bg-slate-900 px-4 py-3 font-bold text-white dark:bg-white dark:text-slate-900"
-            onClick={() => void continueScanning()}
-            type="button"
-          >
-            Continuar escaneando
-          </button>
+            {cameraToast ? (
+              <div role="alert" className="mb-4 flex items-center gap-2 rounded-2xl border border-brand-danger-border bg-brand-danger-bg px-4 py-3 text-sm text-brand-danger-text">
+                <WifiOff className="h-4 w-4" />
+                {cameraToast}
+              </div>
+            ) : null}
+
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
+              <div>
+                <QrCameraViewport
+                  enabled={canStartCamera}
+                  facingMode={facingMode}
+                  onScan={handleScan}
+                  onCameraError={handleCameraError}
+                />
+              </div>
+
+              <motion.aside
+                initial={{ opacity: 0, x: 18 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="rounded-[28px] border border-brand-border bg-brand-surface p-5"
+              >
+                <div className="mb-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent">Estado del turno</p>
+                  <h3 className="mt-2 text-xl font-bold text-brand-text">{activeShift.courtName}</h3>
+                </div>
+
+                <div className="space-y-3 text-sm text-brand-muted">
+                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
+                    <span>ID del puesto/servicio</span>
+                    <span className="font-semibold text-brand-text">{activeShift.postServiceId}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl border border-brand-border bg-brand-control px-3 py-2">
+                    <span>Validación</span>
+                    <span className="font-semibold text-brand-accent">{flowState}</span>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-brand-accent/30 bg-brand-accent/10 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-brand-accent">
+                    {flowState === "scanning" ? <CheckCircle2 className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                    {flowState === "scanning" ? "Escaneando activo" : "Esperando QR"}
+                  </div>
+                  <p className="mt-2 text-sm text-brand-text">
+                    {flowState === "scanning"
+                      ? "Apunte al QR firmado del ticket para confirmar el canje."
+                      : "Seleccione un puesto/servicio válido para habilitar la lectura."}
+                  </p>
+                </div>
+              </motion.aside>
+            </div>
+          </div>
         </section>
       )}
 
-      {result?.status === "EXPIRED" && result.expiredDetails ? (
+      <TicketValidationModal
+        isOpen={isModalOpen && !isExpired}
+        state={flowState}
+        ticket={ticket}
+        message={modalMessage}
+        employeeName={session?.name ?? ""}
+        isRedeeming={isRedeeming}
+        onClose={handleScanNext}
+        onRedeem={handleRedeem}
+        onScanNext={handleScanNext}
+      />
+
+      {isExpired && ticket?.result?.ticket ? (
         <ExpiredSlotScreen
-          cameraError={cameraError}
-          expiredDetails={result.expiredDetails}
-          message={result.message}
-          onContinue={() => void continueScanning()}
-          reservationId={result.reservationId ?? ""}
-          targetCourtName={result.targetCourtName ?? "Servicio"}
-          ticketId={result.ticketId ?? ""}
-          userName={result.userName ?? "Cliente"}
+          cameraError=""
+          expiredDetails={buildExpiredSlotDetails(
+            ticket.result.ticket,
+            ticket.result.timestamp,
+          )}
+          message={ticket.result.message}
+          onContinue={handleScanNext}
+          reservationId={ticket.result.ticket.reservaId}
+          targetCourtName={ticket.result.ticket.servicioNombre}
+          ticketId={ticket.result.ticket.id ?? ticket.ticketId}
+          userName={ticket.result.ticket.titularNombre}
         />
       ) : null}
     </main>
