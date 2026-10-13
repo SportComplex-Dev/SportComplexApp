@@ -17,6 +17,7 @@ type TicketValidationModalProps = {
   message: string;
   employeeName: string;
   isRedeeming: boolean;
+  isOnline?: boolean;
   onClose: () => void;
   onRedeem: () => void;
   onScanNext: () => void;
@@ -67,6 +68,7 @@ export function TicketValidationModal({
   message,
   employeeName,
   isRedeeming,
+  isOnline = true,
   onClose,
   onRedeem,
   onScanNext,
@@ -209,14 +211,30 @@ export function TicketValidationModal({
                   <p className="mt-2 break-all text-sm font-medium text-brand-text">{ticket.ticketId}</p>
                   <p className="mt-2 text-sm text-brand-muted">{message}</p>
                 </div>
+                {!isOnline ? (
+                  <div
+                    role="alert"
+                    data-testid="offline-modal-alert"
+                    className="flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200"
+                  >
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>Sin conexión a internet. El canje de tickets está suspendido por seguridad.</span>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={onRedeem}
-                  disabled={isRedeeming}
+                  disabled={isRedeeming || !isOnline}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-accent px-4 py-3 text-sm font-bold text-brand-on-accent transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
                 >
-                  {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Dar Acceso
+                  {isRedeeming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : !isOnline ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {!isOnline ? "Canje suspendido (Sin conexión)" : "Dar Acceso"}
                 </button>
               </div>
             ) : (
