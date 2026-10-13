@@ -36,6 +36,7 @@ import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
 import { ScannerHeader } from "@/components/scanner/scanner-header";
 import { ShiftSelector } from "@/components/scanner/shift-selector";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
+import ZoneMismatchScreen from "@/components/scanner/ZoneMismatchScreen";
 import {
   type ScannerFlowState,
   type ScannedTicket,
@@ -90,6 +91,11 @@ export default function ScannerPage() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isRedeeming, setIsRedeeming] = useState<boolean>(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
+  // TSK-FE-16: alerta roja de discrepancia de zona (403 SERVICE_MISMATCH)
+  const [zoneMismatch, setZoneMismatch] = useState<{
+    message: string;
+    ticketId: string;
+  } | null>(null);
 
   const { activateAudio, playSuccess, playError } = useAudioFeedback(audioEnabled);
   const app = useOptionalApp();
@@ -360,6 +366,15 @@ export default function ScannerPage() {
       );
       setTicket({ ...ticket, result });
       if (result.access === "DENIED") {
+        // TSK-FE-16: discrepancia de zona -> pantalla roja bloqueante en vez del modal.
+        if (result.code === "SERVICE_MISMATCH") {
+          setZoneMismatch({
+            message:
+              result.message ?? "El ticket pertenece a otro escenario deportivo.",
+            ticketId: ticket.ticketId,
+          });
+          setIsModalOpen(false);
+        }
         const message =
           result.code === "ALREADY_USED"
             ? "Boleto ya utilizado anteriormente."
@@ -408,6 +423,7 @@ export default function ScannerPage() {
   const handleScanNextTurno = useCallback(() => {
     setTicket(null);
     setIsModalOpen(false);
+    setZoneMismatch(null);
     setFlowState("scanning");
     setModalMessage("Escaneando siguiente QR...");
   }, []);
@@ -892,8 +908,16 @@ export default function ScannerPage() {
               onClose={handleScanNextTurno}
               onRedeem={handleRedeem}
               onScanNext={handleScanNextTurno}
-              postServiceName={activeShift?.courtName}
             />
+
+            {zoneMismatch && activeShift ? (
+              <ZoneMismatchScreen
+                message={zoneMismatch.message}
+                ticketId={zoneMismatch.ticketId}
+                postServiceName={activeShift.courtName}
+                onContinue={handleScanNextTurno}
+              />
+            ) : null}
           </div>
         )}
       </div>
