@@ -36,6 +36,7 @@ import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
 import { ScannerHeader } from "@/components/scanner/scanner-header";
 import { ShiftSelector } from "@/components/scanner/shift-selector";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
+import ZoneMismatchScreen from "@/components/scanner/ZoneMismatchScreen";
 import {
   type ScannerFlowState,
   type ScannedTicket,
@@ -45,17 +46,26 @@ import {
 } from "@/components/scanner/scanner.service";
 import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
 import { useOptionalApp } from "@/components/app-provider";
+import {
+  HttpError,
+  isTransientNetworkError,
+  useNetworkResilience,
+} from "@/hooks/use-network-resilience";
 
 interface VerifyResponseData {
   access: "GRANTED" | "DENIED";
   modo: "CONSULTA" | "TURNO";
   resultado: string;
   canjeado: boolean;
+  isCached?: boolean;
   lecturaId?: string;
   ticket: TicketInfo;
 }
 
 export default function ScannerPage() {
+  const { isOnline, executeWithRetry, getCachedTicket, setCachedTicket } =
+    useNetworkResilience();
+
   // TSK-FE-15: Modo Consulta Informativo sin puesto asignado (activo por defecto)
   const [isConsultationMode, setIsConsultationMode] = useState<boolean>(true);
   const [ticketData, setTicketData] = useState<VerifyResponseData | null>(null);
@@ -90,6 +100,11 @@ export default function ScannerPage() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isRedeeming, setIsRedeeming] = useState<boolean>(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
+  // TSK-FE-16: alerta roja de discrepancia de zona (403 SERVICE_MISMATCH)
+  const [zoneMismatch, setZoneMismatch] = useState<{
+    message: string;
+    ticketId: string;
+  } | null>(null);
 
   const { activateAudio, playSuccess, playError } = useAudioFeedback(audioEnabled);
   const app = useOptionalApp();
@@ -146,25 +161,39 @@ export default function ScannerPage() {
 
   const consultarTicket = useCallback(
     async (ticketId: string, signature: string) => {
+      const cleanId = ticketId.trim();
+      const cleanSig = signature.trim();
+
       setConsultationLoading(true);
       setConsultationError(null);
 
       detenerCamaraConsulta();
 
       try {
-        const response = await fetch(
-          `/api/tickets/verify/${encodeURIComponent(ticketId.trim())}`,
-          {
-            method: "GET",
-            headers: {
-              "x-ticket-signature": signature.trim(),
+        const json = await executeWithRetry(async () => {
+          const res = await fetch(
+            `/api/tickets/verify/${encodeURIComponent(cleanId)}`,
+            {
+              method: "GET",
+              headers: {
+                "x-ticket-signature": cleanSig,
+              },
             },
-          },
-        );
+          );
 
-        const json = await response.json();
+          if (!res.ok) {
+            const errorPayload = await res.json().catch(() => null);
+            throw new HttpError(
+              errorPayload?.error?.message ||
+                "Código no válido o no se pudo verificar la autenticidad del boleto.",
+              res.status,
+            );
+          }
 
-        if (!response.ok || !json.success) {
+          return await res.json();
+        });
+
+        if (!json.success || !json.data) {
           const errorMsg =
             json?.error?.message ||
             "Código no válido o no se pudo verificar la autenticidad del boleto.";
@@ -173,15 +202,72 @@ export default function ScannerPage() {
           return;
         }
 
+        // Guardar únicamente tras consulta confirmada como exitosa y válida
+        const verifiedTicket = json.data.ticket;
+        setCachedTicket(cleanId, {
+          ticketId: verifiedTicket.id,
+          titularNombre: verifiedTicket.titularNombre,
+          servicioNombre: verifiedTicket.servicioNombre,
+          fecha: verifiedTicket.fecha,
+          horaInicio: verifiedTicket.horaInicio,
+          horaFin: verifiedTicket.horaFin,
+          cachedAt: new Date().toISOString(),
+        });
+
         setTicketData(json.data);
-      } catch {
-        setConsultationError("Error de conexión al consultar el servicio de accesos.");
-        setTicketData(null);
+      } catch (err: unknown) {
+        const isNetworkFailure =
+          !isOnline ||
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          isTransientNetworkError(err);
+
+        const cached = isNetworkFailure ? getCachedTicket(cleanId) : null;
+        if (cached) {
+          setTicketData({
+            access: "GRANTED",
+            modo: "CONSULTA",
+            resultado: "CONSULTA",
+            canjeado: false,
+            isCached: true,
+            ticket: {
+              id: cached.ticketId,
+              reservaId: "CONSULTA-LOCAL",
+              estado: "EMITIDO",
+              servicioId: 0,
+              servicioNombre: cached.servicioNombre,
+              fecha: cached.fecha,
+              horaInicio: cached.horaInicio,
+              horaFin: cached.horaFin,
+              titularId: "CACHED-USER",
+              titularNombre: cached.titularNombre,
+            },
+          });
+          setConsultationError(null);
+        } else {
+          setTicketData(null);
+          if (!isOnline || (typeof navigator !== "undefined" && !navigator.onLine)) {
+            setConsultationError(
+              "Sin conexión a internet. No hay datos en caché para este boleto.",
+            );
+          } else {
+            setConsultationError(
+              err instanceof Error
+                ? err.message
+                : "Código no válido o no se pudo verificar la autenticidad del boleto.",
+            );
+          }
+        }
       } finally {
         setConsultationLoading(false);
       }
     },
-    [detenerCamaraConsulta],
+    [
+      detenerCamaraConsulta,
+      executeWithRetry,
+      getCachedTicket,
+      isOnline,
+      setCachedTicket,
+    ],
   );
 
   const procesarTextoEscaneadoConsulta = useCallback(
@@ -349,6 +435,15 @@ export default function ScannerPage() {
     )
       return;
 
+    // Regla crítica TSK-FE-24: Bloqueo de canje cuando el dispositivo está offline
+    if (!isOnline || (typeof navigator !== "undefined" && !navigator.onLine)) {
+      setStateAndMessage(
+        "redeem-error",
+        "Sin conexión a internet. El canje de tickets está suspendido por seguridad.",
+      );
+      return;
+    }
+
     setFlowState("redeeming");
     setIsRedeeming(true);
     setModalMessage("Registrando acceso y confirmando el paso del cliente...");
@@ -360,6 +455,15 @@ export default function ScannerPage() {
       );
       setTicket({ ...ticket, result });
       if (result.access === "DENIED") {
+        // TSK-FE-16: discrepancia de zona -> pantalla roja bloqueante en vez del modal.
+        if (result.code === "SERVICE_MISMATCH") {
+          setZoneMismatch({
+            message:
+              result.message ?? "El ticket pertenece a otro escenario deportivo.",
+            ticketId: ticket.ticketId,
+          });
+          setIsModalOpen(false);
+        }
         const message =
           result.code === "ALREADY_USED"
             ? "Boleto ya utilizado anteriormente."
@@ -382,11 +486,11 @@ export default function ScannerPage() {
       if (audioEnabled) {
         playSuccess();
       }
-    } catch (error: unknown) {
+    } catch {
+      // Regla crítica TSK-FE-24: Resultado incierto ante fallos de red / excepciones
+      // Informar al operador sin afirmar fallo definitivo ni éxito, y sin reintentar automáticamente
       const message =
-        error instanceof Error
-          ? `No se pudo registrar el canje: ${error.message}`
-          : "No se pudo registrar el canje por un error de conexión.";
+        "Resultado de canje incierto debido a un error de comunicación. Verifique el estado del boleto mediante el Modo Consulta antes de intentar nuevamente.";
       setStateAndMessage("redeem-error", message);
       if (audioEnabled) {
         playError();
@@ -394,7 +498,15 @@ export default function ScannerPage() {
     } finally {
       setIsRedeeming(false);
     }
-  }, [activeShift, audioEnabled, playError, playSuccess, setStateAndMessage, ticket]);
+  }, [
+    activeShift,
+    audioEnabled,
+    isOnline,
+    playError,
+    playSuccess,
+    setStateAndMessage,
+    ticket,
+  ]);
 
   const handleCameraErrorTurno = useCallback(
     (message: string) => {
@@ -408,6 +520,7 @@ export default function ScannerPage() {
   const handleScanNextTurno = useCallback(() => {
     setTicket(null);
     setIsModalOpen(false);
+    setZoneMismatch(null);
     setFlowState("scanning");
     setModalMessage("Escaneando siguiente QR...");
   }, []);
@@ -475,13 +588,46 @@ export default function ScannerPage() {
               </h1>
             </div>
 
-            {/* Badge de rol / vista */}
-            <Badge variant="admin">Staff Portería</Badge>
+            {/* Indicador de conectividad y badge de rol */}
+            <div className="flex items-center gap-2">
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="network-status-indicator"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  isOnline
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                }`}
+              >
+                <span
+                  className={`size-2 rounded-full ${
+                    isOnline ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                />
+                {isOnline ? "En línea" : "Sin conexión"}
+              </span>
+              <Badge variant="admin">Staff Portería</Badge>
+            </div>
           </div>
           <p className="text-sm text-[var(--subtle)]">
             Consulta y verificación de boletos para el personal de acceso de AKROS Club.
           </p>
         </header>
+
+        {/* Banner visible cuando se pierde la conectividad (TSK-FE-24) */}
+        {!isOnline && (
+          <div
+            role="alert"
+            data-testid="offline-connectivity-banner"
+            className="flex items-center gap-3 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-200"
+          >
+            <WifiOff className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs sm:text-sm font-semibold">
+              Sin conexión a internet. El canje de tickets está suspendido por seguridad.
+            </p>
+          </div>
+        )}
 
         {/* Control del Modo Consulta (TSK-FE-15 / RF-13) */}
         <Card className="border-[var(--brand-border)] bg-[var(--surface)] shadow-xs">
@@ -557,6 +703,7 @@ export default function ScannerPage() {
               <ConsultationResultCard
                 ticket={ticketData.ticket}
                 modo={ticketData.modo}
+                isCached={Boolean(ticketData.isCached)}
                 onReset={handleResetConsulta}
               />
             )}
@@ -889,10 +1036,20 @@ export default function ScannerPage() {
               message={modalMessage}
               employeeName={session?.name ?? ""}
               isRedeeming={isRedeeming}
+              isOnline={isOnline}
               onClose={handleScanNextTurno}
               onRedeem={handleRedeem}
               onScanNext={handleScanNextTurno}
             />
+
+            {zoneMismatch && activeShift ? (
+              <ZoneMismatchScreen
+                message={zoneMismatch.message}
+                ticketId={zoneMismatch.ticketId}
+                postServiceName={activeShift.courtName}
+                onContinue={handleScanNextTurno}
+              />
+            ) : null}
           </div>
         )}
       </div>
