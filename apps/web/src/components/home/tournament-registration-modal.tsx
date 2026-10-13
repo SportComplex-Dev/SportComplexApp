@@ -32,6 +32,13 @@ export interface TournamentRegisterTarget {
   cuposOcupados: number
   precioInscripcion: number | string
   yaInscrito?: boolean
+  miInscripcion?: {
+    id: string
+    estado: string
+    nombrePareja?: string | null
+    ticketCodigoUuid?: string | null
+    ticketQrPayload?: string | null
+  } | null
 }
 
 interface TournamentRegistrationModalProps {
@@ -69,6 +76,7 @@ export function TournamentRegistrationModal({
   const isAuthenticated = Boolean(session?.email)
   const precio = Number(tournament.precioInscripcion ?? 0)
   const esGratuito = precio === 0
+  const existingPendingPayment = tournament.miInscripcion?.estado === 'PENDIENTE_PAGO'
   const cuposRestantes = tournament.cuposDisponibles ?? Math.max(0, tournament.cuposTotales - tournament.cuposOcupados)
   const cuposAgotados = cuposRestantes <= 0
 
@@ -198,14 +206,14 @@ export function TournamentRegistrationModal({
         </div>
 
         {/* BUS-01: Estado de inscripción con pago pendiente */}
-        {pendingPayment ? (
+        {pendingPayment || existingPendingPayment ? (
           <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3">
             <Clock size={36} className="mx-auto text-amber-600 dark:text-amber-400" />
             <h4 className="text-base font-bold text-amber-800 dark:text-amber-200">
-              ¡Inscripción registrada - Pago pendiente!
+              Inscripción pendiente de pago
             </h4>
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Tu pre-reserva fue registrada. Para activar tu cupo oficial y generar tu entrada digital con código QR firmado, debes abonar <b>${precio.toLocaleString('es-CO')} COP</b> en la recepción de la sede o desde tu portal.
+              Esta inscripción todavía no está confirmada y no tiene un QR de acceso válido. El portal no procesa pagos de torneos; contacta a recepción para conocer las opciones disponibles y activar tu cupo.
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
               <ActionButton
@@ -270,6 +278,24 @@ export function TournamentRegistrationModal({
             <AlertCircle size={16} />
             Este torneo ha completado su aforo máximo. No hay cupos disponibles.
           </div>
+        ) : !esGratuito ? (
+          <div
+            role="status"
+            className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3"
+          >
+            <CircleDollarSign size={36} className="mx-auto text-amber-600 dark:text-amber-400" />
+            <h4 className="text-base font-bold text-amber-800 dark:text-amber-200">
+              Inscripción con pago presencial
+            </h4>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              La inscripción cuesta <b>${precio.toLocaleString('es-CO')} COP</b>. Este portal todavía no
+              permite registrar ni cobrar torneos con costo, así que no creará una inscripción ni reservará un
+              cupo. Contacta a recepción para conocer las opciones disponibles.
+            </p>
+            <ActionButton secondary onClick={handleClose} className="w-full sm:w-auto">
+              Entendido
+            </ActionButton>
+          </div>
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
             {errorMessage && (
@@ -322,15 +348,6 @@ export function TournamentRegistrationModal({
                     Si el torneo se juega en modalidad por equipos o dobles, tu compañero quedará formalmente registrado con este pase.
                   </p>
                 </div>
-
-                {!esGratuito && (
-                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                    <CircleDollarSign size={16} className="text-amber-500 shrink-0" />
-                    <span>
-                      Al confirmar, tu inscripción quedará en estado <b>Pendiente de Pago</b>. Podrás cancelar en recepción del complejo para emitir tu QR de acceso.
-                    </span>
-                  </div>
-                )}
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <ActionButton secondary onClick={handleClose} disabled={submitting}>
