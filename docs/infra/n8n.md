@@ -25,12 +25,13 @@ El servicio n8n en `docker/docker-compose.yml` los monta de solo lectura:
 3. Crear la **cuenta Owner** (email + password del equipo). Queda persistida en `./data/n8n` (SQLite). Guardarla en el gestor de contraseñas.
 4. Importar los workflows existentes desde dentro del contenedor:
    ```bash
-   sudo docker exec -i sportcomplex-prod-n8n-1 \
+   cd ~/SportComplexApp/docker
+   sudo docker compose exec -i n8n \
      n8n import:workflow --separate --input=/opt/workflows/
    ```
 5. Activar todos los workflows importados:
    ```bash
-   sudo docker exec -i sportcomplex-prod-n8n-1 n8n activate:workflow --all
+   sudo docker compose exec -i n8n n8n activate:workflow --all
    ```
 6. **Crear credenciales a mano** (Settings → Credentials en la UI). Los JSON exportados no incluyen credenciales — solo referencias por nombre. Necesitamos: Resend API key, HMAC secrets usados por los webhooks (mismos valores que en `APPS_WEB_ENV`), Stripe creds si los flujos las tocan. Sin credenciales los flujos fallarán al ejecutar aunque estén activos.
 7. Prueba de humo: abrir el workflow de webhook de prueba, pulsar **Execute**, copiar la *Test URL* (`https://n8n.akros.lat/webhook-test/...`) y abrirla — debe responder 200.
@@ -41,10 +42,10 @@ El flujo es cero-SSH:
 
 1. Alguien exporta el workflow desde n8n (o lo crea a mano) y lo guarda en `packages/automation/workflows/nombre-nuevo.json`.
 2. PR → merge a `main`.
-3. El workflow `deploy.yml` solo: hace `git pull` en el VPS → monta el JSON en `/opt/workflows` → hace loop de import.
-4. El JSON nuevo aparece en la lista de workflows en la UI. **Importado ≠ activo**: el deploy no activa nada. Actívalo en la UI (toggle "Active") o:
+3. El workflow `deploy.yml` solo: hace `git pull` en el VPS → monta el JSON en `/opt/workflows` → hace loop de import y activa con `activate:workflow --all`.
+4. El JSON nuevo aparece en la lista de workflows en la UI y queda activo. Para reactivar manualmente si fuera necesario:
    ```bash
-   sudo docker exec -i sportcomplex-prod-n8n-1 n8n activate:workflow --all
+   sudo docker compose exec -i n8n n8n activate:workflow --all
    ```
 
 ### Actualizar un workflow existente

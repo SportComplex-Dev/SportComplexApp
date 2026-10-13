@@ -44,7 +44,7 @@
 
 **Quién debe leer**: Todo desarrollador del proyecto.
 
-### 5. **[packages/automation/IMPLEMENTATION_EXAMPLES.ts](../packages/automation/IMPLEMENTATION_EXAMPLES.ts)** - Código Listo para Copiar
+### 5. **[Guía de Implementación — Ejemplos](./implementation-guide.md#3-ejemplo-completo-endpoint-de-registro)** - Código Listo para Copiar
 - Ejemplos de endpoints reales
 - Handlers de registro, verificación, resend
 - Hook de React para UI
@@ -123,7 +123,7 @@
 
 ### "Necesito implementar envío de código YA"
 1. Leer: [IMPLEMENTATION_GUIDE.md](./implementation-guide.md) secciones 1-5
-2. Copiar: Código de [IMPLEMENTATION_EXAMPLES.ts](../packages/automation/IMPLEMENTATION_EXAMPLES.ts)
+2. Copiar: Código de [IMPLEMENTATION_GUIDE.md](./implementation-guide.md#3-ejemplo-completo-endpoint-de-registro)
 3. Adaptar: A tu endpoint específico
 4. Test: Usar ejemplos de testing
 
@@ -248,7 +248,7 @@ R: [IMPLEMENTATION_GUIDE.md](./implementation-guide.md) secciones 1-4
 R: [AUTOMATION.md](./overview.md) sección "Integración con Backend" + [N8N_WORKFLOWS.md](./workflows.md)
 
 **P: ¿Qué datos envío?**  
-R: [N8N_WORKFLOWS.md](./workflows.md) sección "Entrada Esperada" + [packages/automation/IMPLEMENTATION_EXAMPLES.ts](../packages/automation/IMPLEMENTATION_EXAMPLES.ts)
+R: [N8N_WORKFLOWS.md](./workflows.md) sección "Entrada Esperada" + [IMPLEMENTATION_GUIDE.md](./implementation-guide.md#3-ejemplo-completo-endpoint-de-registro)
 
 **P: ¿Cómo hago validación?**  
 R: [IMPLEMENTATION_GUIDE.md](./implementation-guide.md) sección 2, paso 4

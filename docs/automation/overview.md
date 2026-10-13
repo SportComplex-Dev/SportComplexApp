@@ -455,7 +455,7 @@ n8n → Executions (Tab)
 ## Referencias
 
 - [Documentación completa de workflows](./workflows.md)
-- [Schemas de validación](../packages/validation/src/automation.schema.ts)
+- [Schemas de validación](../../packages/validation/src/automation.schema.ts)
 - [n8n Official Docs](https://docs.n8n.io/)
 - [Resend Email API](https://resend.com/docs)
 

@@ -3,9 +3,10 @@ name: sportcomplex-prod
 services:
   migrate:
     image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
-    command: ["pnpm", "--filter", "@sportcomplex/db", "db:migrate:deploy"]
+    command: ["prisma", "migrate", "deploy", "--schema=packages/db/prisma/schema.prisma", "--config=packages/db/prisma.config.ts"]
     env_file:
-      - ../apps/web/.env
+      - path: ../apps/web/.env
+        required: false
     networks:
       - sportcomplex-net
     restart: "no"
@@ -16,7 +17,8 @@ services:
       migrate:
         condition: service_completed_successfully
     env_file:
-      - ../apps/web/.env
+      - path: ../apps/web/.env
+        required: false
     environment:
       TZ: America/Bogota
     expose:
@@ -47,6 +49,11 @@ services:
       - ../packages/automation/workflows:/opt/workflows:ro
     networks:
       - sportcomplex-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
 
   caddy:
     image: caddy:2-alpine
@@ -63,6 +70,11 @@ services:
       - sportcomplex-net
       - edge-shared
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
 
 networks:
   sportcomplex-net:

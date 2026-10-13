@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -81,12 +81,13 @@ jobs:
             # 5. Escribir el .env de producción desde el secret (gitignored; el reset no lo toca)
             mkdir -p ~/SportComplexApp/apps/web
             printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
-            chmod 600 /home/ubuntu/SportComplexApp/apps/web/.env
+            chmod 600 "$HOME/SportComplexApp/apps/web/.env"
 
             # 6. Migrar y levantar (downtime = recreación de contenedores)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)
             sudo docker compose up -d web caddy n8n
 
-            # 7. Importar workflows nuevos en n8n (los existentes los omite)
-            sudo docker exec -i sportcomplex-prod-n8n-1 sh -c \
+            # 7. Importar y activar workflows nuevos en n8n (los existentes los omite)
+            sudo docker compose exec -i n8n sh -c \
               'for f in /opt/workflows/*.json; do n8n import:workflow --input="$f" || true; done'
+            sudo docker compose exec -i n8n n8n activate:workflow --all || true

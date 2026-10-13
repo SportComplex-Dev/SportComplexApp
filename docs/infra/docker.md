@@ -20,7 +20,7 @@ VPS · docker compose up -d
 | `docker/Dockerfile.web` | Imagen de producción (standalone, usuario no-root `nodejs`, `EXPOSE 3000`) |
 | `docker/docker-compose.yml` | Prod: `migrate` → `web` + `n8n` + `caddy` (único con `ports 80/443`) |
 | `docker/Caddyfile` | Edge (ver `./caddy.md`) |
-| `docker-compose.dev.yml` | Local: solo `n8n` en `localhost:5678` |
+| `docker/docker-compose.dev.yml` | Local: solo `n8n` en `localhost:5678` |
 
 ## Reglas de convivencia en el VPS compartido
 

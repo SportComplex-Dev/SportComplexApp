@@ -4,7 +4,7 @@ Guía interna para **levantar la infraestructura en entorno local** (Development
 ## 1. Archivo Docker Compose para Desarrollo
 Levanta solo **n8n**. La app Next.js corre con `pnpm dev` y el storage va contra Supabase cloud.
 
-### `docker-compose.dev.yml`
+### `docker/docker-compose.dev.yml`
 ```yaml
 name: sportcomplex-dev
 
@@ -22,7 +22,7 @@ services:
       - WEBHOOK_URL=http://localhost:5678/
       - GENERIC_TIMEZONE=America/Bogota
     volumes:
-      - ./docker/dev_data/n8n:/home/node/.n8n
+      - ./dev_data/n8n:/home/node/.n8n
 ```
 
 ## 2. Preparación Local
@@ -34,7 +34,7 @@ sudo chown -R 1000:1000 ./docker/dev_data/n8n
 
 ## 3. Levantando el Entorno
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker/docker-compose.dev.yml up -d
 # App:
 pnpm dev
 ```

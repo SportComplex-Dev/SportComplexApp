@@ -1167,8 +1167,8 @@ migración inicial.
 Se reutilizan `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET`, ya descritas en
 `apps/web/.env.example`. La interfaz POS con Stripe Elements corresponde al
 frontend. La confirmación, el QR y la idempotencia del webhook se apoyan en
-[`TSK-BE-10`](TSK-BE-10-webhook-stripe-y-frontend.md) y
-[`TSK-BD-09`](TSK-BD-09-idempotencia-pagos-stripe.md).
+[`TSK-BE-10`](#tsk-be-10--webhook-de-stripe-firmado-e-idempotente--guía-de-integración-frontend) y
+[`TSK-BD-09`](#tsk-bd-09--idempotencia-de-pagos-con-stripe-hu-10--rf-09).
 # TSK-BE-19 — Endpoint de datos del comprobante
 
 `GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS`

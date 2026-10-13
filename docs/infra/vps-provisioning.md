@@ -105,29 +105,25 @@ name: sportcomplex-prod
 
 services:
   migrate:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.web
-    command: ["pnpm", "--filter", "@sportcomplex/db", "db:migrate:deploy"]
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
+    command: ["prisma", "migrate", "deploy", "--schema=packages/db/prisma/schema.prisma", "--config=packages/db/prisma.config.ts"]
     env_file:
-      - .env
+      - ../apps/web/.env
     networks:
-      - prod-net
+      - sportcomplex-net
     restart: "no"
 
   web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.web
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
     depends_on:
       migrate:
         condition: service_completed_successfully
     env_file:
-      - .env
+      - ../apps/web/.env
     expose:
       - "3000"
     networks:
-      - prod-net
+      - sportcomplex-net
     restart: unless-stopped
     deploy:
       resources:
@@ -142,24 +138,33 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./caddy_data:/data
-      - ./caddy_config:/config
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
-      - prod-net
+      - sportcomplex-net
       - edge-shared
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
 
 networks:
-  prod-net:
+  sportcomplex-net:
     driver: bridge
   edge-shared:
     external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
 ```
 
 Reglas de convivencia:
 - Nuestros servicios usan `expose`, nunca `ports` (salvo Caddy con `80/443`). Así los puertos internos (`3000`, `5678`) pueden repetirse en el otro equipo sin chocar.
-- `name:` y red `prod-net` son solo nuestros. El otro equipo usa su propio `name:` y su red.
-- Solo `caddy` y ambas apps tocan `edge-shared`. n8n y demás quedan en `prod-net`.
+- `name:` y red `sportcomplex-net` son solo nuestros. El otro equipo usa su propio `name:` y su red.
+- Solo `caddy` toca `edge-shared`. web, n8n y demás quedan en `sportcomplex-net`.
 
 El otro equipo, en `~/OtiumProyect` (configuración confirmada por ellos, sin proxy propio):
 ```yaml
@@ -200,7 +205,7 @@ services:
 
 Notas:
 - Sintaxis Caddy es `reverse_proxy`, no `proxy_pass` (eso es Nginx).
-- `localhost:3002` **no** funciona desde dentro del contenedor Caddy (`localhost` es el propio Caddy → `502`). Por eso se usa el nombre de servicio `jorge-web:3002` sobre la red `edge-shared`.
+- `localhost:3002` **no** funciona desde dentro del contenedor Caddy (`localhost` es el propio Caddy → `502`). Por eso se usa el nombre de servicio `jorge-web:3000` sobre la red `edge-shared`.
 - Recargar sin downtime tras editar: `docker compose up -d caddy && docker exec caddy caddy reload`.
 
 ---
