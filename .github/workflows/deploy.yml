@@ -89,11 +89,18 @@ jobs:
             printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
             chmod 600 "$HOME/SportComplexApp/apps/web/.env"
 
-            # 6. Migrar y levantar (downtime = recreación de contenedores)
+            # 6. Migrar y levantar web/caddy (n8n se levanta tras el import)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)
-            sudo docker compose up -d web caddy n8n
+            sudo docker compose up -d web caddy
 
-            # 7. Importar y activar workflows nuevos en n8n (los existentes los omite)
-            sudo docker compose exec -i n8n sh -c \
-              'for f in /opt/workflows/*.json; do n8n import:workflow --input="$f" || true; done'
-            sudo docker compose exec -i n8n n8n activate:workflow --all || true
+            # 7. Importar y publicar workflows con n8n DETENIDO mediante
+            #    contenedores one-off: evita el race SQLite ("table migrations
+            #    already exists") y el publish con servidor corriendo.
+            #    (activate:workflow no existe en n8n actual: se publica por --id.)
+            sudo docker compose run --rm n8n \
+              import:workflow --separate --input=/opt/workflows/
+            IDS=$(python3 -c "import sqlite3; c=sqlite3.connect('file:$HOME/SportComplexApp/docker/data/n8n/database.sqlite?mode=ro', uri=True, timeout=30); print(' '.join(r[0] for r in c.execute('select id from workflow_entity order by id')))")
+            for id in $IDS; do
+              sudo docker compose run --rm n8n publish:workflow --id="$id" || true
+            done
+            sudo docker compose up -d n8n
