@@ -1,11 +1,9 @@
-name: sportcomplex-net
+name: sportcomplex-prod
 
 services:
   migrate:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.web
-    command: ["pnpm", "--filter", "@sportcomplex/db", "db:migrate"]
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
+    command: ["pnpm", "--filter", "@sportcomplex/db", "db:migrate:deploy"]
     env_file:
       - ../apps/web/.env
     networks:
@@ -13,9 +11,7 @@ services:
     restart: "no"
 
   web:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.web
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -28,6 +24,29 @@ services:
     networks:
       - sportcomplex-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+    expose:
+      - "5678"
+    environment:
+      N8N_HOST: n8n.akros.lat
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      NODE_ENV: production
+      WEBHOOK_URL: https://n8n.akros.lat/
+      GENERIC_TIMEZONE: America/Bogota
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+      - ../packages/automation/workflows:/opt/workflows:ro
+    networks:
+      - sportcomplex-net
 
   caddy:
     image: caddy:2-alpine
@@ -42,11 +61,14 @@ services:
       - web
     networks:
       - sportcomplex-net
+      - edge-shared
     restart: unless-stopped
 
 networks:
   sportcomplex-net:
     driver: bridge
+  edge-shared:
+    external: true
 
 volumes:
   caddy_data:

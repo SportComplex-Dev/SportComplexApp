@@ -3,21 +3,68 @@ name: deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/sportcomplex-dev/sportcomplex-web
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.web
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sportcomplex-web:latest
-      # Despliegue VPS: ssh + docker compose pull + up -d (migrate init-container corre antes de web)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Sync .env + despliegue
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_TAG,APPS_WEB_ENV
+          env:
+            IMAGE_TAG: ${{ github.sha }}
+            APPS_WEB_ENV: ${{ secrets.APPS_WEB_ENV }}
+          script: |
+            set -e
+            # 1. Actualizar el repo en el VPS (Caddyfile, compose y workflows JSON)
+            git -C ~/SportComplexApp pull --ff-only
+
+            # 2. Escribir el .env de producción desde el secret
+            mkdir -p ~/SportComplexApp/apps/web
+            printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
+            chmod 600 ~/SportComplexApp/apps/web/.env
+
+            # 3. Pull + migrate + up
+            cd ~/SportComplexApp/docker
+            sudo docker compose pull
+            sudo docker compose up migrate        # prisma migrate deploy (sale solo)
+            sudo docker compose up -d web caddy n8n
+
+            # 4. Importar workflows nuevos/actualizados en n8n (idempotente por archivo nuevo;
+            #    los ya existentes se omiten sin tumbar el comando)
+            sudo docker exec -i sportcomplex-prod-n8n-1 sh -c \
+              'for f in /opt/workflows/*.json; do n8n import:workflow --input="$f" || true; done'
