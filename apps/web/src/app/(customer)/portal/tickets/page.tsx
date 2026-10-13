@@ -50,6 +50,7 @@ interface UserTournamentItem {
     estado: string
     nombrePareja?: string | null
     ticketCodigoUuid?: string | null
+    /** INT-01: payload QR firmado SC1 generado por el servidor */
     ticketQrPayload?: string | null
     ticket?: { id?: string; codigo?: string; codigoUuid?: string; qrPayload?: string }
   }
@@ -312,14 +313,21 @@ export default function TicketsPage() {
                   const ins = tournament.miInscripcion
                   const estadoIns = ins?.estado ?? 'CONFIRMADA'
                   const isConfirmed = estadoIns === 'CONFIRMADA'
-                  // INT-01: Usar identificador real del ticket firmado ticketCodigoUuid
-                  const ticketCode = ins?.ticketCodigoUuid || ins?.ticket?.codigo || ins?.ticket?.codigoUuid || (isConfirmed ? `TRN-${tournament.id.slice(0, 8)}` : 'PENDIENTE')
+                  // INT-01: Priorizar el payload QR firmado SC1 entregado por el servidor.
+                  // El escáner solo puede validar el formato SC1:<uuid>:<hmac>, NO el UUID crudo.
+                  const qrPayload = ins?.ticketQrPayload || ins?.ticket?.qrPayload || null
+                  // El código legible para el usuario sigue siendo el UUID (display), pero el QR usa el payload firmado
+                  const ticketCode = ins?.ticketCodigoUuid || ins?.ticket?.codigoUuid || (isConfirmed ? `TRN-${tournament.id.slice(0, 8)}` : 'PENDIENTE')
+                  // INT-01: El ID para recuperar el comprobante debe ser el ID de la inscripción, no del torneo
+                  const inscripcionId = ins?.id || tournament.id
                   const precioNum = Number(tournament.precioInscripcion ?? 0)
 
                   const handleOpenTournamentQR = () => {
                     const fakeBooking: PortalTicket = {
-                      id: tournament.id,
+                      id: inscripcionId,
                       code: ticketCode,
+                      // INT-01: El qrPayload firmado asegura que el escáner acepte el QR
+                      qrPayload: qrPayload ?? undefined,
                       service: `Torneo: ${tournament.titulo}`,
                       category: tournament.categoria?.nombre || 'Torneo',
                       sede: 'Sede Principal',
@@ -338,8 +346,11 @@ export default function TicketsPage() {
 
                   const handlePrintTournamentTicket = () => {
                     const fakeBooking: PortalTicket = {
-                      id: tournament.id,
+                      // INT-01: usar ID de la inscripción para que fetchReceiptData consulte el comprobante correcto
+                      id: inscripcionId,
                       code: ticketCode,
+                      // INT-01: el qrPayload firmado SC1 es el único aceptado por el escáner
+                      qrPayload: qrPayload ?? undefined,
                       service: `Torneo: ${tournament.titulo}`,
                       category: tournament.categoria?.nombre || 'Torneo',
                       sede: 'Sede Principal',

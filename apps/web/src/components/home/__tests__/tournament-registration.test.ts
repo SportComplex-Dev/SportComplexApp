@@ -74,8 +74,8 @@ test('TSK-FE-26: Mapeo de códigos de error de inscripción de torneos a mensaje
   assert.match(errorMap.REGISTRATION_CLOSED, /cerradas/)
 })
 
-test('TSK-FE-26 / INT-01: Verificación de contrato real de ticket y resolución de identificador UUID firmado', () => {
-  // Contrato real retornado por backend Prisma (InscripcionTorneo con ticketCodigoUuid)
+test('TSK-FE-26 / INT-01: Verificación de contrato real de ticket, QR firmado SC1 y recuperación de comprobante', () => {
+  // Contrato real retornado por backend Prisma (InscripcionTorneo con ticketCodigoUuid y ticketQrPayload firmado)
   const mockBackendResponse = {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     titulo: 'Torneo Máster de Tenis',
@@ -89,18 +89,34 @@ test('TSK-FE-26 / INT-01: Verificación de contrato real de ticket y resolución
       estado: 'CONFIRMADA',
       nombrePareja: 'Andrés Gómez',
       ticketCodigoUuid: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      ticketQrPayload: 'SC1:3fa85f64-5717-4562-b3fc-2c963f66afa6:a1b2c3d4e5f6',
+      ticketQrPayload: 'SC1:3fa85f64-5717-4562-b3fc-2c963f66afa6:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
     },
   }
 
-  // La función de resolución debe priorizar ticketCodigoUuid real sobre fallbacks
+  // Lógica del portal en tickets/page.tsx
   const ins = mockBackendResponse.miInscripcion
   const isConfirmed = ins.estado === 'CONFIRMADA'
-  const resolvedCode = ins.ticketCodigoUuid || (isConfirmed ? `TRN-${mockBackendResponse.id.slice(0, 8)}` : 'PENDIENTE')
+  const qrPayload = ins?.ticketQrPayload || null
+  const ticketCode = ins?.ticketCodigoUuid || (isConfirmed ? `TRN-${mockBackendResponse.id.slice(0, 8)}` : 'PENDIENTE')
+  const inscripcionId = ins?.id || mockBackendResponse.id
 
-  assert.equal(resolvedCode, '3fa85f64-5717-4562-b3fc-2c963f66afa6')
-  assert.match(resolvedCode, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  // 1. El código para display al usuario es el UUID
+  assert.equal(ticketCode, '3fa85f64-5717-4562-b3fc-2c963f66afa6')
+  assert.match(ticketCode, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
   assert.equal(isConfirmed, true)
+
+  // 2. El payload del QR debe ser el payload firmado SC1 recibido del servidor
+  assert.ok(qrPayload, 'El payload del QR debe existir')
+  assert.match(qrPayload, /^SC1:3fa85f64-5717-4562-b3fc-2c963f66afa6:[a-f0-9]{64}$/)
+
+  // 3. El modal y la impresión del ticket deben usar inscripcionId (no el tournament.id) para fetchReceiptData
+  const fakeTicketForPrint = {
+    id: inscripcionId,
+    code: ticketCode,
+    qrPayload: qrPayload ?? undefined,
+  }
+  assert.equal(fakeTicketForPrint.id, 'ins-55', 'Para imprimir/fetchReceiptData se debe consultar por el ID de la inscripción')
+  assert.equal(fakeTicketForPrint.qrPayload, qrPayload, 'El comprobante impreso debe recibir el payload firmado SC1 para el escáner')
 })
 
 test('TSK-FE-26 / BUS-01: Bloqueo de QR de acceso para inscripciones en estado PENDIENTE_PAGO', () => {

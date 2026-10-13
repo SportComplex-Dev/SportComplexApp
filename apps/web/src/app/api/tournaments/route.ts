@@ -5,6 +5,7 @@ import {
   listarTorneos,
   obtenerInscripcionesUsuarioParaTorneos,
 } from "@sportcomplex/db";
+import { signTicket, buildTicketQrPayload } from "@sportcomplex/core";
 
 /**
  * GET /api/tournaments
@@ -71,6 +72,8 @@ export async function GET(request: Request) {
       nombrePareja: string | null;
       ticketCodigoUuid: string | null;
       ticketEstado?: string;
+      /** INT-01: payload QR firmado SC1:<uuid>:<hmac> — solo para inscripciones CONFIRMADAS con ticket emitido */
+      ticketQrPayload: string | null;
     }
 
     const inscripcionesMap = new Map<string, MiInscripcionItem>();
@@ -80,6 +83,7 @@ export async function GET(request: Request) {
         authResult.actor.id,
         torneoIds,
       );
+      const qrSecret = process.env.QR_HMAC_SECRET;
       for (const ins of misInscripciones as Array<{
         id: string;
         torneoId: string;
@@ -88,12 +92,29 @@ export async function GET(request: Request) {
         ticketCodigoUuid?: string | null;
         ticketEstado?: string;
       }>) {
+        // INT-01: Generar payload firmado SC1 solo para inscripciones CONFIRMADAS con ticket emitido.
+        // Usamos las bibliotecas de @sportcomplex/core que ya maneja este contrato en todo el monorepo.
+        let ticketQrPayload: string | null = null;
+        if (
+          ins.estado === "CONFIRMADA" &&
+          ins.ticketCodigoUuid &&
+          qrSecret
+        ) {
+          try {
+            const signature = signTicket(ins.ticketCodigoUuid, qrSecret);
+            ticketQrPayload = buildTicketQrPayload(ins.ticketCodigoUuid, signature);
+          } catch {
+            // Si falla la firma (UUID mal formado), no exponer payload
+            ticketQrPayload = null;
+          }
+        }
         inscripcionesMap.set(ins.torneoId, {
           id: ins.id,
           estado: ins.estado,
           nombrePareja: ins.nombrePareja ?? null,
           ticketCodigoUuid: ins.ticketCodigoUuid ?? null,
           ticketEstado: ins.ticketEstado,
+          ticketQrPayload,
         });
       }
     }
