@@ -114,23 +114,120 @@ test("POST /api/admin/employees: registra nuevo empleado exitosamente con contra
   assert.equal(json.data.passwordHash, undefined);
 });
 
-test("POST /api/admin/employees: rechaza correo duplicado con 409", async () => {
+test("GET /api/admin/employees: admite paginación con limit y offset (PERF-01)", async () => {
   seedData();
-  const req = new Request("http://localhost/api/admin/employees", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      nombre: "Duplicado",
-      correo: "admin@sportcomplex.co",
-      rolNombre: "VENDEDOR",
-      password: "ClaveSegura2026*",
-    }),
-  });
-
-  const res = await route.POST(req);
-  assert.equal(res.status, 409);
+  const req = new Request("http://localhost/api/admin/employees?limit=2&offset=1");
+  const res = await route.GET(req);
+  assert.equal(res.status, 200);
 
   const json = await res.json();
-  assert.equal(json.success, false);
-  assert.equal(json.error.code, "EMAIL_ALREADY_EXISTS");
+  assert.equal(json.success, true);
+  assert.equal(json.data.length, 2);
+  assert.equal(json.data[0].correo, "vendedora@sportcomplex.co");
+});
+
+test("POST /api/admin/employees: rechaza y no crea empleado si Supabase Auth falla por correo duplicado (SEC-04)", async () => {
+  seedData();
+  const initialLength = db._state.usuarios.length;
+
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://mock.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "mock-service-role-key";
+
+  const mockAdminClient = {
+    auth: {
+      admin: {
+        createUser: async () => ({
+          data: null,
+          error: { message: "User already registered" },
+        }),
+        deleteUser: async () => ({ data: null, error: null }),
+      },
+    },
+  };
+  (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient = mockAdminClient;
+
+  try {
+    const req = new Request("http://localhost/api/admin/employees", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        nombre: "Empleado Conflicto Supabase",
+        correo: "conflicto.sb@sportcomplex.co",
+        rolNombre: "LECTOR",
+        password: "ClaveSegura2026*",
+      }),
+    });
+
+    const res = await route.POST(req);
+    assert.equal(res.status, 409);
+
+    const json = await res.json();
+    assert.equal(json.success, false);
+    assert.equal(json.error.code, "EMAIL_ALREADY_EXISTS");
+
+    // Verificar que la base de datos local no fue modificada
+    assert.equal(db._state.usuarios.length, initialLength);
+    assert.equal(
+      db._state.usuarios.some((u: { correo: string }) => u.correo === "conflicto.sb@sportcomplex.co"),
+      false,
+    );
+  } finally {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient;
+  }
+});
+
+test("POST /api/admin/employees: compensa (revierte) la identidad en Supabase si la creación en DB falla", async () => {
+  seedData();
+
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://mock.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "mock-service-role-key";
+
+  let userDeleted = false;
+  const mockAdminClient = {
+    auth: {
+      admin: {
+        createUser: async () => ({
+          data: { user: { id: "sb-user-rollback-id" } },
+          error: null,
+        }),
+        deleteUser: async (id: string) => {
+          if (id === "sb-user-rollback-id") userDeleted = true;
+          return { data: null, error: null };
+        },
+      },
+    },
+  };
+  (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient = mockAdminClient;
+
+  // Hacemos que la DB falle arrojando un error en create
+  const originalCreate = db.usuario.create;
+  db.usuario.create = async () => {
+    throw new Error("DB connection dropped");
+  };
+
+  try {
+    const req = new Request("http://localhost/api/admin/employees", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        nombre: "Empleado Falla DB",
+        correo: "falla.db@sportcomplex.co",
+        rolNombre: "VENDEDOR",
+        password: "ClaveSegura2026*",
+      }),
+    });
+
+    const res = await route.POST(req);
+    assert.equal(res.status, 500);
+
+    // Debe haberse ejecutado el rollback en Supabase Auth
+    assert.equal(userDeleted, true, "La identidad en Supabase debe ser eliminada tras el fallo en DB");
+  } finally {
+    db.usuario.create = originalCreate;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient;
+  }
 });

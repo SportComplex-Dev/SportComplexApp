@@ -80,8 +80,7 @@ export async function listEmployees(
       ? Math.max(0, (options.page - 1) * options.limit)
       : undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const users = await (db as any).usuario.findMany({
+  const users = await db.usuario.findMany({
     where: {
       rol: {
         nombre: { in: [...ALL_EMPLOYEE_ROLES] },
@@ -115,8 +114,7 @@ export async function createEmployee(
   const db = options.db ?? prisma;
   const normalizedEmail = data.correo.trim().toLowerCase();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const existing = await (db as any).usuario.findUnique({
+  const existing = await db.usuario.findUnique({
     where: { correo: normalizedEmail },
     select: { id: true },
   });
@@ -144,8 +142,7 @@ export async function createEmployee(
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rol = await (db as any).rol.findFirst({
+  const rol = await db.rol.findFirst({
     where: {
       OR: [
         { nombre: targetRolNombre },
@@ -217,8 +214,7 @@ export async function deactivateEmployee(
   }
 
   const db = options.db ?? prisma;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const employee = await (db as any).usuario.findUnique({
+  const employee = await db.usuario.findUnique({
     where: { id: employeeId },
     select: {
       id: true,
