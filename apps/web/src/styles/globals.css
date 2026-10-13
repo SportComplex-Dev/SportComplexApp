@@ -2,6 +2,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme inline {
+  --color-brand-dark: var(--scanner-bg);
+  --color-brand-surface: var(--scanner-surface);
+  --color-brand-surface-soft: var(--scanner-surface-soft);
+  --color-brand-text: var(--scanner-text);
+  --color-brand-muted: var(--scanner-muted);
+  --color-brand-border: var(--scanner-border);
+  --color-brand-control: var(--scanner-control);
+  --color-brand-emerald: var(--scanner-emerald);
+  --color-brand-accent: var(--scanner-accent);
+  --color-brand-accent-soft: var(--scanner-accent-soft);
+  --color-brand-on-accent: var(--scanner-on-accent);
+  --color-brand-danger-bg: var(--scanner-danger-bg);
+  --color-brand-danger-border: var(--scanner-danger-border);
+  --color-brand-danger-text: var(--scanner-danger-text);
+  --color-brand-danger-solid: var(--scanner-danger-solid);
+  --color-brand-on-danger: var(--scanner-on-danger);
+}
+
 :root {
   --tz-canonical: "America/Bogota";
   color-scheme: light;
@@ -3541,6 +3560,58 @@ button { cursor: pointer; }
   background: color-mix(in srgb, var(--surface) 90%, black);
 }
 
+[data-scanner-theme="dark"] {
+  color-scheme: dark;
+  --scanner-bg: #111815;
+  --scanner-surface: #17211b;
+  --scanner-surface-soft: #202b24;
+  --scanner-text: #f5f7f4;
+  --scanner-muted: #b5c0b7;
+  --scanner-border: rgb(255 255 255 / 12%);
+  --scanner-control: rgb(255 255 255 / 5%);
+  --scanner-emerald: #193324;
+  --scanner-accent: #c9ef75;
+  --scanner-accent-soft: #dcedb6;
+  --scanner-on-accent: #111815;
+  --scanner-danger-bg: rgb(239 68 68 / 12%);
+  --scanner-danger-border: rgb(248 113 113 / 38%);
+  --scanner-danger-text: #fecaca;
+  --scanner-danger-solid: #b91c1c;
+  --scanner-on-danger: #ffffff;
+}
+
+[data-scanner-theme="light"] {
+  color-scheme: light;
+  --scanner-bg: #f4f7f1;
+  --scanner-surface: #ffffff;
+  --scanner-surface-soft: #f0f4ed;
+  --scanner-text: #17211a;
+  --scanner-muted: #4b5d50;
+  --scanner-border: #d2ddd0;
+  --scanner-control: #f2f5f0;
+  --scanner-emerald: #e8f1df;
+  --scanner-accent: #496817;
+  --scanner-accent-soft: #354b12;
+  --scanner-on-accent: #ffffff;
+  --scanner-danger-bg: #fef2f2;
+  --scanner-danger-border: #fecaca;
+  --scanner-danger-text: #991b1b;
+  --scanner-danger-solid: #b91c1c;
+  --scanner-on-danger: #ffffff;
+}
+
+.scanner-reader #reader__scan_region {
+  background: #09120f !important;
+}
+
+.scanner-reader #reader__scan_region video {
+  object-fit: cover;
+}
+
+.scanner-reader #reader__dashboard {
+  color: var(--scanner-text);
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -5183,24 +5254,32 @@ button { cursor: pointer; }
 
 /* ==========================================================================
    Impresión de Comprobante / Voucher PDF (RF-12 & RNF-05)
+   Encapsulado bajo .printing-thermal-receipt para evitar fuga global (CSS-01)
    ========================================================================== */
 @media print {
-  body * {
+  body.printing-thermal-receipt {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  body.printing-thermal-receipt * {
     visibility: hidden;
   }
-  .printable-receipt,
-  .printable-receipt * {
+  body.printing-thermal-receipt .printable-receipt,
+  body.printing-thermal-receipt .printable-receipt * {
     visibility: visible;
   }
-  .printable-receipt {
+  body.printing-thermal-receipt .printable-receipt {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
+    width: 58mm !important;
+    max-width: 58mm !important;
+    margin: 0 auto;
+    padding: 3mm 2mm;
     background: #fff !important;
     color: #000 !important;
+    font-family: 'Courier New', Courier, monospace;
+    box-sizing: border-box;
   }
   .no-print {
     display: none !important;

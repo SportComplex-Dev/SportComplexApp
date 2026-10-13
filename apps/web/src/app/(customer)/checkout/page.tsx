@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -11,18 +11,15 @@ import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
   type Booking,
 } from '@sportcomplex/core'
+import { CheckoutTimer } from '@/components/booking/checkout-timer'
+import {
+  isPaymentBlocked,
+  calculateRemainingSeconds,
+} from '@/components/booking/checkout-timer-utils'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
 import { PaymentMethodSelector } from '@/components/payment-method-selector'
-
-export default function CheckoutPage() {
-  return (
-    <Suspense fallback={<main className="section-shell payment-page"><p className="p-8 text-center text-sm">Cargando pasarela de pago…</p></main>}>
-      <CheckoutContent />
-    </Suspense>
-  )
-}
 
 function CheckoutContent() {
   const router = useRouter()
@@ -38,13 +35,60 @@ function CheckoutContent() {
   const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
 
-  const item = draft ? catalog.find((entry) => entry.id === draft.itemId) : undefined
+  // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
+  const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
+  const paramServiceId = searchParams.get('serviceId')
+  const paramServiceName = searchParams.get('service')
+  const paramDate = searchParams.get('date')
+  const paramTime = searchParams.get('time')
+  const paramAttendees = searchParams.get('attendees')
+
+  const paramItem = paramServiceId
+    ? catalog.find((entry) => String(entry.id) === String(paramServiceId))
+    : paramServiceName
+      ? catalog.find((entry) => entry.name.toLowerCase().includes(paramServiceName.toLowerCase()))
+      : sessionId ? catalog[0] : undefined
+
+  useEffect(() => {
+    if (!draft && paramItem) {
+      setDraft({
+        itemId: paramItem.id,
+        date: paramDate || new Date().toISOString().split('T')[0],
+        time: paramTime || '08:00 a. m. - 09:00 a. m.',
+        attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+      })
+    }
+  }, [draft, paramItem, paramDate, paramTime, paramAttendees, setDraft])
+
+  const activeDraft = draft || (paramItem ? {
+    itemId: paramItem.id,
+    date: paramDate || new Date().toISOString().split('T')[0],
+    time: paramTime || '08:00 a. m. - 09:00 a. m.',
+    attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
+  } : null)
+
+  // Timer & Cupo state (TSK-FE-09 / SCRUM-117)
+  const [isExpired, setIsExpired] = useState(false)
+
+  // Sincronizar o inicializar el TTL de 30 minutos (1800 seg) del cupo
+  useEffect(() => {
+    if (!activeDraft) return
+
+    if (!activeDraft.expiresAt) {
+      const expiresAt = Date.now() + 30 * 60 * 1000
+      setDraft({ ...activeDraft, expiresAt })
+    } else if (activeDraft.expiresAt <= Date.now()) {
+      setIsExpired(true)
+    }
+  }, [activeDraft, setDraft])
+
+  const item = activeDraft ? catalog.find((entry) => entry.id === activeDraft.itemId) : undefined
   const category = item ? categoryBySlug(item.category) : undefined
 
   // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
   useEffect(() => {
     if (reservationId) return
-    const currentDraft = draft
+    const currentDraft = activeDraft
     const currentItem = item
     if (!currentDraft || !currentItem) return
 
@@ -93,9 +137,23 @@ function CheckoutContent() {
     return () => {
       cancelled = true
     }
-  }, [draft, item, reservationId])
+  }, [activeDraft, item, reservationId])
 
-  if (!draft || !item || !category) {
+  const handleExpire = useCallback(() => {
+    setIsExpired(true)
+    notify('El tiempo de reserva de 30 minutos ha finalizado. El cupo ha sido liberado.', 'error')
+  }, [notify])
+
+  const handleRetry = useCallback(() => {
+    setDraft(null)
+    if (item) {
+      router.push(`/services/${item.category}/${item.id}`)
+    } else {
+      router.push('/services')
+    }
+  }, [item, router, setDraft])
+
+  if (!activeDraft || !item || !category) {
     return (
       <main className="section-shell payment-page">
         <div className="dashboard-empty">
@@ -112,11 +170,14 @@ function CheckoutContent() {
   }
 
   const isCourt = item.category === 'canchas'
-  const total = calculateBookingPrice(item, draft.attendees)
+  const total = calculateBookingPrice(item, activeDraft.attendees)
   const Icon = categoryIcons[category.icon]
 
+  const remainingSeconds = calculateRemainingSeconds(activeDraft?.expiresAt, Date.now())
+  const paymentBlocked = isExpired || isPaymentBlocked(remainingSeconds)
+
   const handlePaymentSuccess = () => {
-    const [, month, day] = draft.date.split('-')
+    const [, month, day] = activeDraft.date.split('-')
     const bookingCode = `ALT-${day}${month}-${Math.floor(1000 + Math.random() * 9000)}`
     const newBooking: Booking = {
       id: reservationId || `b${Date.now()}`,
@@ -125,9 +186,9 @@ function CheckoutContent() {
       category: item.category,
       service: item.name,
       sede: item.sede,
-      date: draft.date,
-      time: draft.time,
-      attendees: draft.attendees,
+      date: activeDraft.date,
+      time: activeDraft.time,
+      attendees: activeDraft.attendees,
       amount: total,
       status: 'Confirmada',
       paymentMethod: 'card',
@@ -157,6 +218,16 @@ function CheckoutContent() {
         <i />
         <span className="progress-step">3&nbsp; Confirmación</span>
       </div>
+
+      {/* Temporizador regresivo visible en todo momento (TSK-FE-09 / SCRUM-117) */}
+      <CheckoutTimer
+        expiresAt={activeDraft?.expiresAt}
+        initialSeconds={1800}
+        onExpire={handleExpire}
+        onRetry={handleRetry}
+        isExpired={paymentBlocked}
+        className="mb-8 max-w-[960px] mx-auto"
+      />
 
       <div className="payment-layout">
         <section className="payment-form">
@@ -207,20 +278,26 @@ function CheckoutContent() {
               <b>{item.name}</b>
               <span>
                 Sede {item.sede}
-                {!isCourt && <> · {draft.attendees} {draft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
+                {!isCourt && <> · {activeDraft.attendees} {activeDraft.attendees === 1 ? 'asistente' : 'asistentes'}</>}
               </span>
             </div>
           </div>
           <div className="order-item">
             <span>
-              <CalendarDays size={15} /> {formatDate(draft.date)}
+              <CalendarDays size={15} /> {formatDate(activeDraft.date)}
             </span>
             <span>
-              <Clock3 size={15} /> {draft.time} · 60 minutos
+              <Clock3 size={15} /> {activeDraft.time} · 60 minutos
             </span>
           </div>
+          <div className="order-item py-2 border-b border-[var(--line)] flex items-center justify-between text-[12px]">
+            <span>Estado de cupo</span>
+            <b className={paymentBlocked ? 'text-red-500 font-bold' : 'text-[#4b7652] dark:text-[#9ee285] font-bold'}>
+              {paymentBlocked ? 'Expirado' : 'Bloqueado (30 min)'}
+            </b>
+          </div>
           <div className="order-price">
-            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${draft.attendees}`}</span>
+            <span>{isCourt ? 'Tarifa fija' : `${formatMoney(item.price)} × ${activeDraft.attendees}`}</span>
             <b>{formatMoney(total)}</b>
           </div>
           <div className="order-total">
@@ -236,5 +313,22 @@ function CheckoutContent() {
         </aside>
       </div>
     </main>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="section-shell payment-page">
+          <div className="dashboard-empty">
+            <b>Cargando pasarela de pago...</b>
+            <p>Por favor espera un momento.</p>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   )
 }

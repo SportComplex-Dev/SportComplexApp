@@ -115,7 +115,12 @@ export async function authorizeApiRequest(
       };
     }
 
-    const db: AuthorizationDatabase = dependencies.db ?? prisma;
+    const db: AuthorizationDatabase =
+      dependencies.db ??
+      (process.env.NODE_ENV === "test"
+        ? (globalThis as unknown as { __scPrisma?: AuthorizationDatabase }).__scPrisma
+        : undefined) ??
+      prisma;
     const account = (await db.usuario.findUnique({
       where: { id: userId },
       select: {

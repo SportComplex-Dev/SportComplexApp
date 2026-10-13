@@ -1,8 +1,9 @@
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { AccessError, procesarEscaneo } from "@/lib/access";
+import { accessResultResponse } from "@/lib/access-response";
 import { accessScanSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
-import { fail, ok } from "@/lib/api-response";
+import { fail } from "@/lib/api-response";
 
 // RF-13 / RF-14 / RF-15 — canje de ticket + auditoría (TSK-BD-10).
 // Firma HMAC → decideAccess → transacción única (UPDATE WHERE estado='EMITIDO'
@@ -50,7 +51,7 @@ export async function handleAccess(
       qrSecret,
       now: opts.now,
     });
-    return ok(resultado);
+    return accessResultResponse(resultado);
   } catch (error: unknown) {
     if (error instanceof AccessError || error instanceof TicketError) {
       return fail(error.code, error.message, error.status);

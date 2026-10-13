@@ -10,6 +10,14 @@ export const ACCESS_SERVICE_MISMATCH_MESSAGE =
 export const ACCESS_ALREADY_USED_MESSAGE =
   "Acceso denegado: Tiquete ya utilizado" as const;
 
+/** Compara IDs de servicio usando una única regla en el motor y el orquestador. */
+export function hasServiceMismatch(
+  ticketServiceId: string | number,
+  postServiceId: string | number | null,
+): boolean {
+  return postServiceId !== null && String(ticketServiceId) !== String(postServiceId);
+}
+
 export type AccessDecision =
   | { allowed: true; consume: boolean }
   | {
@@ -120,14 +128,14 @@ export function decideAccess(opts: {
   start: Date;
   end: Date;
   ticketStatus: "EMITIDO" | "USADO";
-  ticketServiceId: string;
-  postServiceId: string | null; // null = modo consulta
+  ticketServiceId: string | number;
+  postServiceId: string | number | null; // null = modo consulta
 }): AccessDecision {
   if (opts.postServiceId === null) {
     // Modo consulta: informativo, nunca consume (RN-05)
     return { allowed: true, consume: false };
   }
-  if (opts.ticketServiceId !== opts.postServiceId) {
+  if (hasServiceMismatch(opts.ticketServiceId, opts.postServiceId)) {
     return { allowed: false, code: "SERVICE_MISMATCH", message: ACCESS_SERVICE_MISMATCH_MESSAGE };
   }
   if (opts.ticketStatus !== "EMITIDO") {

@@ -27,9 +27,13 @@ const FUERA = new Date("2026-10-10T17:00:00.000Z");
 function seed({
   asignacion = true,
   estadoTicket = "EMITIDO",
+  serviceNames = ["Cancha 1", "Piscina Olímpica"],
+  stationServiceEstado = "ACTIVO",
 }: {
   asignacion?: boolean;
   estadoTicket?: "EMITIDO" | "USADO";
+  serviceNames?: [string, string];
+  stationServiceEstado?: string;
 } = {}) {
   for (const key of [
     "usuarios",
@@ -83,7 +87,7 @@ function seed({
     {
       id: 1,
       categoriaId: 1,
-      nombre: "Cancha 1",
+      nombre: serviceNames[0],
       capacidadMaxima: 10,
       tarifa: 75000,
       modalidad: "EXCLUSIVA",
@@ -93,12 +97,12 @@ function seed({
     {
       id: 2,
       categoriaId: 1,
-      nombre: "Piscina Olímpica",
+      nombre: serviceNames[1],
       capacidadMaxima: 30,
       tarifa: 25000,
       modalidad: "AFORO",
       tipoPiscina: "LIBRE",
-      estado: "ACTIVO",
+      estado: stationServiceEstado,
     },
   );
 
@@ -349,10 +353,10 @@ test("TSK-BE-14: payload sin postServiceId o con null se rechaza con 400 (modo t
   assert.equal(bodyBoolean.error.code, "VALIDATION_ERROR");
 });
 
-test("TSK-BE-14: discrepancia de servicio (SERVICE_MISMATCH) deniega acceso sin consumir el ticket", async () => {
-  seed();
+test("TSK-BE-16: discrepancia de servicio responde 403 con detalle sin consumir el ticket", async () => {
+  seed({ serviceNames: ["Piscina", "Canchas"] });
   const signature = signTicket(CODIGO, SECRET);
-  // Boleto es para Cancha 1 (id: 1), pero el empleado pasa postServiceId: 2 (Piscina)
+  // Boleto de Piscina escaneado en el puesto de Canchas.
   const req = createRedeemRequest({
     ticketId: CODIGO,
     signature,
@@ -365,16 +369,63 @@ test("TSK-BE-14: discrepancia de servicio (SERVICE_MISMATCH) deniega acceso sin 
   });
   const body = await res.json();
 
-  assert.equal(res.status, 200);
-  assert.equal(body.success, true);
-  assert.equal(body.data.access, "DENIED");
-  assert.equal(body.data.code, "SERVICE_MISMATCH");
-  assert.equal(body.data.resultado, "DENEGADO_SERVICIO");
-  assert.equal(body.data.canjeado, false);
+  assert.equal(res.status, 403);
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "SERVICE_MISMATCH");
+  assert.equal(
+    body.error.message,
+    "Acceso denegado: El tiquete pertenece a Piscina y se encuentra en Canchas",
+  );
 
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
   assert.equal(mock._state.lecturas.length, 1);
   assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_SERVICIO");
+});
+
+test("TSK-BE-16: un puesto inhabilitado conserva la denegación por discrepancia y su mensaje", async () => {
+  seed({
+    serviceNames: ["Piscina", "Canchas"],
+    stationServiceEstado: "INHABILITADO",
+  });
+  const req = createRedeemRequest({
+    ticketId: CODIGO,
+    signature: signTicket(CODIGO, SECRET),
+    postServiceId: 2,
+  });
+
+  const res = await handleAccessRedeem(req, {
+    authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"),
+    now: ADENTRO,
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 403);
+  assert.equal(
+    body.error.message,
+    "Acceso denegado: El tiquete pertenece a Piscina y se encuentra en Canchas",
+  );
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
+  assert.equal(mock._state.lecturas[0].resultado, "DENEGADO_SERVICIO");
+});
+
+test("TSK-BE-16: servicio del puesto inexistente responde 404 sin auditar ni alterar el tiquete", async () => {
+  seed();
+  const req = createRedeemRequest({
+    ticketId: CODIGO,
+    signature: signTicket(CODIGO, SECRET),
+    postServiceId: 999,
+  });
+
+  const res = await handleAccessRedeem(req, {
+    authenticate: authAs(EMPLEADO, "EMPLEADO_LECTOR"),
+    now: ADENTRO,
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 404);
+  assert.equal(body.error.code, "SERVICE_NOT_FOUND");
+  assert.equal(mock._state.lecturas.length, 0);
+  assert.equal(mock._state.tickets[0].estado, "EMITIDO");
 });
 
 test("TSK-BE-14: fuera de la franja horaria deniega acceso con WINDOW_EXPIRED (DENEGADO_HORARIO)", async () => {

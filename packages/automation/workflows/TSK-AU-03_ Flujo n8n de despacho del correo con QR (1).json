@@ -1,0 +1,133 @@
+{
+  "name": "TSK-AU-03: Flujo n8n de despacho del correo con QR",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reservas/despacho-qr",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d1cd1a0e-5add-4f5e-9552-946a61d2df21",
+      "name": "Webhook",
+      "webhookId": "48917dff-27f0-482d-87c9-2b1a512b1045"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n\n  // Extracción de variables con nombres alternativos de seguridad\n  const destinatario = body.correo || body.email || body.userEmail;\n  const nombre = body.nombre || body.userName || 'Deportista';\n  const ticketId = body.ticketId || body.reservaId || 'TKT-PENDING';\n  const cancha = body.cancha || body.courtName || 'Cancha Principal';\n  const sede = body.sede || body.venueName || 'AKROS Club';\n  const fecha = body.fecha || body.date || new Date().toISOString().split('T')[0];\n  const franjaHoraria = body.franjaHoraria || body.timeSlot || 'Por definir';\n  \n  // Generación de la imagen del QR y enlace a billetera del portal\n  const qrPayload = body.qrPayload || body.qrCode || ticketId;\n  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrPayload)}`;\n  const appBaseUrl = body.appUrl || 'https://akros.lat';\n  const walletUrl = `${appBaseUrl}/portal/wallet?ticket=${encodeURIComponent(ticketId)}`;\n\n  // Plantilla HTML con diseño oficial AKROS Club\n  const htmlTemplate = `\n  <!DOCTYPE html>\n  <html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <style>\n      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0d1210; margin: 0; padding: 24px; color: #ffffff; }\n      .card { max-width: 500px; margin: 0 auto; background: #111815; border: 1px solid #1a2420; border-radius: 16px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }\n      .badge { display: inline-block; background: rgba(201, 239, 117, 0.15); color: #c9ef75; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 12px; border-radius: 9999px; margin-bottom: 16px; }\n      h1 { font-size: 22px; margin: 0 0 8px 0; color: #ffffff; font-weight: 700; }\n      p.lead { color: #94a3b8; font-size: 14px; margin-top: 0; margin-bottom: 24px; }\n      .qr-container { background: #ffffff; border-radius: 12px; padding: 18px; text-align: center; display: inline-block; margin: 10px auto 24px auto; }\n      .qr-container img { display: block; margin: 0 auto; width: 220px; height: 220px; }\n      .details-box { background: #16201b; border: 1px solid #23322b; border-radius: 10px; padding: 16px; margin-bottom: 24px; text-align: left; }\n      .detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }\n      .detail-row:last-child { margin-bottom: 0; }\n      .detail-label { color: #64748b; }\n      .detail-value { color: #f1f5f9; font-weight: 600; font-family: ui-monospace, monospace; }\n      .btn-wallet { display: block; text-align: center; background: #c9ef75; color: #111815; font-weight: 700; font-size: 14px; text-decoration: none; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; }\n      .footer { font-size: 12px; color: #475569; text-align: center; line-height: 1.5; border-top: 1px solid #1a2420; padding-top: 20px; }\n    </style>\n  </head>\n  <body>\n    <div class=\"card\">\n      <div style=\"text-align: center;\">\n        <div class=\"badge\">Acceso Confirmado</div>\n        <h1>Tu Pase Deportivo</h1>\n        <p class=\"lead\">Hola ${nombre}, presenta este QR directamente en el lector de portería.</p>\n        <div class=\"qr-container\">\n          <img src=\"${qrImageUrl}\" alt=\"Boleto QR\" />\n        </div>\n      </div>\n      <div class=\"details-box\">\n        <div class=\"detail-row\"><span class=\"detail-label\">Instalación:</span><span class=\"detail-value\">${cancha}</span></div>\n        <div class=\"detail-row\"><span class=\"detail-label\">Sede:</span><span class=\"detail-value\">${sede}</span></div>\n        <div class=\"detail-row\"><span class=\"detail-label\">Fecha:</span><span class=\"detail-value\">${fecha}</span></div>\n        <div class=\"detail-row\"><span class=\"detail-label\">Franja:</span><span class=\"detail-value\">${franjaHoraria}</span></div>\n        <div class=\"detail-row\"><span class=\"detail-label\">ID Boleto:</span><span class=\"detail-value\">${ticketId}</span></div>\n      </div>\n      <a href=\"${walletUrl}\" target=\"_blank\" class=\"btn-wallet\">Abrir en Billetera Digital del Portal</a>\n      <div class=\"footer\">\n        Presenta este código al ingresar. Llegar con 10 min de anticipación.<br>\n        AKROS Club &copy; 2026. Todos los derechos reservados.\n      </div>\n    </div>\n  </body>\n  </html>\n  `;\n\n  return {\n    json: {\n      destinatario,\n      asunto: `Tu boleto de acceso para ${cancha} - AKROS Club`,\n      html: htmlTemplate,\n      ticketId,\n      dispatchedAt: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "6a0b63d8-3945-4c0b-9ed0-64d84c2fd7f9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    from: \"Akros <no-reply@akros.lat>\",\n    to: [$json.destinatario],\n    subject: $json.asunto,\n    html: $json.html\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "fedc3e34-6a00-4258-95d8-871955d26416",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Kh9OT3GVIJLhIvTY",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"mensaje\": \"Pase con QR despachado exitosamente\",\n  \"resendMessageId\": \"{{ $json.id }}\",\n  \"entregadoA\": \"{{ $('Code in JavaScript').item.json.destinatario }}\",\n  \"ticketId\": \"{{ $('Code in JavaScript').item.json.ticketId }}\",\n  \"despachadoAt\": \"{{ $('Code in JavaScript').item.json.dispatchedAt }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "9f833012-3e9f-4b7f-81be-c42fe21c4e0b",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c9c88de5-2182-47db-a769-e88861eff505",
+  "meta": {
+    "instanceId": "1a150f952554181ee1853a060d6f3774044880176b9d991156746d3090480194"
+  },
+  "nodeGroups": [],
+  "id": "rAA7D3R0JwdXu30M",
+  "tags": []
+}
