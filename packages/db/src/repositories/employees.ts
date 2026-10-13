@@ -1,5 +1,5 @@
 import { prisma } from "../client";
-import type { EstadoUsuario } from "@prisma/client";
+import type { EstadoUsuario, PrismaClient, Prisma } from "@prisma/client";
 
 export const ALL_EMPLOYEE_ROLES = [
   "ADMIN",
@@ -56,23 +56,39 @@ export interface CreateEmployeeInputData {
   passwordHash: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyDb = any;
+export type EmployeeDbClient = PrismaClient | Prisma.TransactionClient;
+
+export interface ListEmployeesOptions {
+  db?: EmployeeDbClient;
+  limit?: number;
+  offset?: number;
+  page?: number;
+}
 
 /**
- * Consulta y lista todos los empleados del sistema (ADMIN, VENDEDOR, LECTOR).
+ * Consulta y lista los empleados del sistema (ADMIN, VENDEDOR, LECTOR) con soporte de paginación (PERF-01).
  * Nunca expone password_hash (seguridad RF-18 / RNF-02).
  */
 export async function listEmployees(
-  options: { db?: AnyDb } = {},
+  options: ListEmployeesOptions = {},
 ): Promise<EmployeeItem[]> {
-  const db: AnyDb = options.db ?? prisma;
-  const users = await db.usuario.findMany({
+  const db = options.db ?? prisma;
+  const take = options.limit !== undefined ? Math.max(1, options.limit) : undefined;
+  const skip = options.offset !== undefined
+    ? Math.max(0, options.offset)
+    : options.page !== undefined && options.limit !== undefined
+      ? Math.max(0, (options.page - 1) * options.limit)
+      : undefined;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const users = await (db as any).usuario.findMany({
     where: {
       rol: {
         nombre: { in: [...ALL_EMPLOYEE_ROLES] },
       },
     },
+    ...(take !== undefined ? { take } : {}),
+    ...(skip !== undefined ? { skip } : {}),
     select: {
       id: true,
       nombre: true,
@@ -94,12 +110,13 @@ export async function listEmployees(
  */
 export async function createEmployee(
   data: CreateEmployeeInputData,
-  options: { db?: AnyDb } = {},
+  options: { db?: EmployeeDbClient } = {},
 ): Promise<EmployeeItem> {
-  const db: AnyDb = options.db ?? prisma;
+  const db = options.db ?? prisma;
   const normalizedEmail = data.correo.trim().toLowerCase();
 
-  const existing = await db.usuario.findUnique({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing = await (db as any).usuario.findUnique({
     where: { correo: normalizedEmail },
     select: { id: true },
   });
@@ -118,7 +135,17 @@ export async function createEmployee(
   if (targetRolNombre === "EMPLEADO_VENDEDOR") targetRolNombre = "VENDEDOR";
   if (targetRolNombre === "EMPLEADO_LECTOR") targetRolNombre = "LECTOR";
 
-  const rol = await db.rol.findFirst({
+  // NEW-02: Restringir a nivel de repositorio contra roles válidos de empleados
+  if (!ALL_EMPLOYEE_ROLES.includes(targetRolNombre as (typeof ALL_EMPLOYEE_ROLES)[number])) {
+    throw new EmployeeError(
+      `El rol "${data.rolNombre}" no es un rol de empleado válido.`,
+      "INVALID_EMPLOYEE_ROLE",
+      400,
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rol = await (db as any).rol.findFirst({
     where: {
       OR: [
         { nombre: targetRolNombre },
@@ -181,7 +208,7 @@ export async function createEmployee(
 export async function deactivateEmployee(
   employeeId: string,
   options: {
-    db?: AnyDb;
+    db?: EmployeeDbClient;
     now?: Date;
   } = {},
 ): Promise<EmployeeDeactivationResult> {
@@ -189,8 +216,9 @@ export async function deactivateEmployee(
     throw new EmployeeError("Falta el ID del empleado.", "INVALID_ID", 400);
   }
 
-  const db: AnyDb = options.db ?? prisma;
-  const employee = await db.usuario.findUnique({
+  const db = options.db ?? prisma;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const employee = await (db as any).usuario.findUnique({
     where: { id: employeeId },
     select: {
       id: true,

@@ -6,7 +6,11 @@ import {
   EmployeeError,
 } from "@sportcomplex/db";
 import { createEmployeeSchema } from "@sportcomplex/validation";
-import { hashSecret } from "@sportcomplex/core";
+import { hashSecret } from "@sportcomplex/core/src/security/token";
+import {
+  createSupabaseAdminClient,
+  isSupabaseAdminConfigured,
+} from "@/lib/supabase/admin";
 
 /**
  * GET /api/admin/employees
@@ -59,6 +63,21 @@ export async function POST(request: Request) {
       rolNombre,
       passwordHash,
     });
+
+    // SEC-04: Sincronizar credenciales con Supabase Auth si está configurado
+    if (isSupabaseAdminConfigured()) {
+      try {
+        const supabase = createSupabaseAdminClient();
+        await supabase.auth.admin.createUser({
+          email: correo.trim().toLowerCase(),
+          password,
+          email_confirm: true,
+          user_metadata: { role: rolNombre, name: nombre },
+        });
+      } catch (sbError) {
+        console.warn("Advertencia: No se pudo sincronizar el usuario en Supabase Auth:", sbError);
+      }
+    }
 
     return created(newEmployee);
   } catch (error: unknown) {

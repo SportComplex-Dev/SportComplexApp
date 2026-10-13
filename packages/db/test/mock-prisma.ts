@@ -1112,7 +1112,7 @@ export function createMockPrisma() {
         }
         return picked;
       },
-      async findMany({ where, select, orderBy }: any = {}) {
+      async findMany({ where, select, orderBy, take, skip }: any = {}) {
         let list = [...usuarios];
         if (where?.rol?.nombre?.in) {
           const allowedRoles = where.rol.nombre.in;
@@ -1123,6 +1123,12 @@ export function createMockPrisma() {
         }
         if (orderBy?.creadoEn === "desc") {
           list.sort((a, b) => ((b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0)));
+        }
+        if (skip !== undefined) {
+          list = list.slice(skip);
+        }
+        if (take !== undefined) {
+          list = list.slice(0, take);
         }
         if (!select) return list;
         return list.map((u) => {
