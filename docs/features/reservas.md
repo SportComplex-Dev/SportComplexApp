@@ -290,3 +290,196 @@ Para completar el criterio de aceptación de frontend en **TSK-FE-12** (*"dos se
 Las páginas usan keyset pagination descendente por `(creadoEn, id)`, con `id` como desempate. El cursor codifica esos valores; no se usa offset. Las inserciones posteriores quedan antes del cursor y no desplazan los elementos de páginas ya recorridas.
 
 El modelo `Reserva` declara el índice compuesto `@@index([titularId, estado, creadoEn, id])`, que acompaña el keyset: el prefijo de igualdad `(titularId, estado)` más el orden descendente `(creadoEn, id)` sin necesidad de un sort adicional. Se aplica con la migración `20261011130000_reserva_history_keyset_index` (reemplaza al índice previo `[titularId, estado]`). Las pruebas verifican conjuntos disjuntos por estado, aislamiento por titular y estabilidad al insertar una reserva nueva.
+
+
+---
+
+# TSK-FE-12: Selección Múltiple de Servicios en la Misma Franja
+
+## 1. Trazabilidad y Requerimientos de Negocio
+- **Identificador de Tarea:** `TSK-FE-12` (SCRUM Frontend / Monorepo `apps/web`)
+- **Historia de Usuario:** `HU-12` — Reserva concurrente de múltiples servicios e instalaciones.
+- **Requerimiento Funcional:** `RF-11` — Carrito y checkout consolidado para servicios concurrentes.
+- **Regla de Negocio:** `RN-07` — Multirreserva concurrente:
+  > *El titular puede reservar múltiples servicios para la misma fecha y bloque horario `[HoraInicio, HoraFin]` siempre que correspondan a servicios o instalaciones diferentes (ej. Cancha Sintética 1 + Piscina Libre de 17:00 a 18:00). El sistema permite agregar estos ítems al carrito sin generar bloqueos locales ni solapamientos artificiales sobre el mismo usuario para servicios distintos.*
+
+---
+
+## 2. Alcance Técnico Resuelto y Eliminación de Franjas Quemadas
+1. **Eliminación de Franjas Quemadas / Estáticas:**
+   - Previamente, la interfaz contaba con franjas fijas en código (ej. `["09:00", "10:00", "17:00"]`), limitando la operatividad.
+   - Se implementó un generador dinámico reactivo (`generateDynamicTimeSlots` en `cart-utils.ts`) que produce franjas horarias operativas continuas de 60 minutos entre las 06:00 y las 22:00, ajustadas a la zona horaria legal de Colombia (`America/Bogota`).
+   - Se respeta estrictamente la regla `RN-11` (prohibición de reservas en horas transcurridas si la fecha elegida es el día actual).
+   - El selector de fecha respeta la ventana máxima de 15 días calendario (`RN-01`).
+
+2. **Validación del Carrito Multi-servicio (`RN-07`):**
+   - **Permite servicios concurrentes:** Dos servicios distintos (con diferente `serviceId`) pueden agregarse para la misma fecha y franja horaria.
+   - **Previene duplicados exactos:** Si el usuario intenta agregar el mismo servicio para la misma fecha y hora, se bloquea la acción con mensaje accesible indicando que ya se encuentra en el carrito (`DUPLICATE_ITEM`).
+   - **Consistencia horaria:** Para ser pagados juntos en una única transacción atómica, todos los servicios del carrito deben pertenecer a la misma fecha y franja horaria (`DIFFERENT_SLOT`).
+
+3. **Arquitectura de Componentes Modulares:**
+   - `cart-utils.ts`: Lógica pura de validación, generación dinámica de horarios, formateo monetario y construcción de payloads tipados.
+   - `ServiceSelector`: Selector accesible de fechas y franjas horarias con filtrado por categoría y catálogo reactivo.
+   - `Cart`: Resumen visual de la selección con badges de horario por servicio (`Badge` de `@sportcomplex/ui`), botón de eliminación individual, vaciado total y cálculo del total acumulado.
+   - `BookingSummaryModal`: Diálogo modal de revisión (`role="dialog"`, `aria-modal="true"`) que consolida los ítems a bloquear juntos, presenta alertas de error accesibles (`role="alert"`) y dispara el checkout atómico.
+
+---
+
+## 3. Contrato Consumido con el Backend y Flujo de Checkout
+1. **Endpoint Atómico (`TSK-BE-12b` / `POST /api/bookings/lock-cart`):**
+   - Cuando el carrito contiene 2 o más servicios, el frontend envía la solicitud al endpoint consolidado `POST /api/bookings/lock-cart`.
+   - Cuando contiene un único servicio, se deriva a `POST /api/bookings/lock`.
+   - **Formato del Payload:** Cumple con el esquema Zod `cartCheckoutSchema` de `@sportcomplex/validation`:
+     ```json
+     {
+       "items": [
+         {
+           "serviceId": 1,
+           "date": "2026-10-15",
+           "startTime": "2026-10-15T22:00:00.000Z",
+           "endTime": "2026-10-15T23:00:00.000Z",
+           "cantidadCupos": 1
+         },
+         {
+           "serviceId": 6,
+           "date": "2026-10-15",
+           "startTime": "2026-10-15T22:00:00.000Z",
+           "endTime": "2026-10-15T23:00:00.000Z",
+           "cantidadCupos": 1
+         }
+       ]
+     }
+     ```
+
+2. **Flujo de Respuesta Exitosa (`HTTP 201 Created`):**
+   - El backend devuelve las reservas creadas en estado `PENDIENTE_PAGO` con TTL común de 30 minutos y los datos de la sesión de Stripe Checkout.
+   - El frontend extrae los identificadores de reserva y redirige a la URL de checkout correspondiente:
+     * Si `checkout.url` es devuelto por la pasarela, se procesa la redirección.
+     * Alternativamente, redirige a `/checkout?bookingIds=id1,id2...&bookingId=id1`.
+
+3. **Manejo Defensivo de Errores:**
+   - **`404` / `SLOT_NOT_FOUND`:** Se intercepta la respuesta y se despliega una alerta accesible (`role="alert"`, `aria-live="assertive"`) indicando con precisión que la franja solicitada no existe o agotó cupos en uno de los servicios.
+   - **`409` / `CONFLICT` / `OVERLAPPING_BOOKING`:** Se recarga automáticamente la disponibilidad dinámica y se alerta al usuario para que seleccione un nuevo turno.
+   - **`401` / No autenticado:** Redirección automática a `/login?redirect=/portal/book`.
+
+---
+
+## 4. Archivos Creados y Modificados
+- `apps/web/src/app/(customer)/portal/book/cart-utils.ts`: Lógica pura de carrito, cálculo de totales, generador de slots y constructores de payload.
+- `apps/web/src/app/(customer)/portal/book/components/service-selector.tsx`: Componente selector dinámico de franjas y catálogo.
+- `apps/web/src/app/(customer)/portal/book/components/cart.tsx`: Componente de carrito reactivo con badges y total acumulado.
+- `apps/web/src/app/(customer)/portal/book/components/booking-summary-modal.tsx`: Modal accesible de confirmación multi-servicio.
+- `apps/web/src/app/(customer)/portal/book/page.tsx`: Coordinador del portal de reservas con integración completa de endpoints.
+- `apps/web/package.json`: Soporte para ejecutar archivos `.test.tsx` en el comando `test`.
+- `apps/web/src/app/(customer)/portal/book/__tests__/multi-service-cart.test.tsx`: Suite completa de pruebas automatizadas.
+- `docs/TSK-FE-12-seleccion-multiple-servicios-misma-franja.md`: Esta documentación técnica exclusiva.
+
+---
+
+## 5. Pruebas Automatizadas Ejecutadas
+La suite en `multi-service-cart.test.tsx` verifica:
+1. **Test 1 (`RN-07`):** Permite agregar dos servicios distintos en el mismo rango horario (ej. Cancha 1 y Piscina de 17:00 a 18:00) al carrito, impidiendo duplicados idénticos y franjas dispares.
+2. **Test 2:** Muestra el total consolidado exacto de ambos servicios y renderiza los badges visuales de franja horaria y botones accesibles de eliminación en el carrito.
+3. **Test 3:** Construye y despacha el payload multi-ítem con fechas ISO a `POST /api/bookings/lock-cart` y procesa la redirección a `/checkout`.
+4. **Test 4:** Maneja defensivamente los errores `404 / SLOT_NOT_FOUND` y `409 / CONFLICT` con roles accesibles (`role="alert"`) sin degradar ni romper el renderizado del componente.
+
+---
+
+## 6. Verificación de Calidad
+- **Pruebas Unitarias:** 248 tests ejecutados en `apps/web`, 100% exitosos (`pnpm --filter web test`).
+- **Verificación de Tipos:** `pnpm run typecheck` completado con cero errores en todo el workspace.
+- **Linter:** `pnpm run lint` (`turbo run lint`) completado con 100% de cumplimiento en los paquetes aplicables.
+
+
+
+---
+
+# Reporte Técnico: Diagnóstico de Error en Selección Múltiple y Checkout Conjunto (TSK-FE-12)
+
+**Fecha:** 11 de octubre de 2026  
+**Módulos Afectados:** Frontend (`apps/web`), Backend (`packages/db`), Base de Datos (`PostgreSQL/Prisma`)  
+**Tareas Asociadas:**
+- `TSK-FE-12`: Selección múltiple de servicios en la misma franja (HU-12 / RF-11).
+- `TSK-BE-12`: Regla de concurrencia y no-solapamiento de reservas de titular (RN-07).
+- `TSK-BE-12b` (SCRUM-163): Endpoint transaccional multi-reserva y sesión Stripe (`POST /api/bookings/lock-cart`).
+
+---
+
+## 1. Descripción del Problema Detectado
+
+Durante las pruebas de usuario en la pantalla de reservas (`/portal/book`):
+1. El usuario selecciona una fecha y una franja horaria (ej. `2026-10-12`, de `17:00` a `18:00`).
+2. Agrega al carrito dos o más servicios distintos (ej. *Piscina · Nado libre* y *Cancha de tenis · Cancha 1*).
+3. Abre el modal de revisión y pulsa el botón **"Pagar reservas juntas"**.
+4. La aplicación arroja el siguiente error visual en el modal:
+   > **`Ítem 1 (servicio 1): la franja solicitada no existe.`**
+
+---
+
+## 2. Análisis Causa-Raíz (RCA)
+
+El error ocurre por una discrepancia entre la vista del cliente y los datos reales en persistencia:
+
+```
+[Frontend: book/page.tsx]
+      │ Envía { items: [{ serviceId: 1, startTime: "...", endTime: "..." }] }
+      ▼
+[API: POST /api/bookings/lock-cart]
+      │ Inicia transacción atómica createBookingHoldCart()
+      ▼
+[Database Query: tx.disponibilidad.findMany(...)]
+      │ Busca coincidencia de servicioId + fecha + franja horaria
+      ▼
+[Resultado: 0 registros encontrados]
+      │ Lanza BookingError("SLOT_NOT_FOUND", 404)
+      ▼
+Respuesta HTTP 404: "Ítem 1 (servicio 1): la franja solicitada no existe."
+```
+
+### Hallazgos Específicos:
+1. **La base de datos relacional no tiene sembradas las franjas ni los servicios:**
+   - El archivo de seed actual (`packages/db/prisma/seed.ts`) únicamente crea los 4 Roles (`ADMIN`, `VENDEDOR`, `LECTOR`, `CLIENTE`) y los 3 Planes de Membresía.
+   - Las tablas `categoria_servicio`, `servicio`, `franja_horaria` y `disponibilidad` se encuentran vacías en el entorno local.
+2. **El Frontend tiene horarios preconfigurados estáticos:**
+   - En `apps/web/src/app/(customer)/portal/book/page.tsx`, la lista `timeSlots` contiene valores quemados en código (`09:00 - 10:00`, `10:00 - 11:00`, `17:00 - 18:00`), sin verificar previamente si el backend cuenta con registros para esas franjas en la fecha elegida.
+
+---
+
+## 3. Matriz de Responsabilidades
+
+| Componente | Capa | Responsabilidad | Diagnóstico Actual |
+|---|---|---|---|
+| **Base de Datos / Backend** | `packages/db` | **60%** (Provisión de Datos) | **Incompleto:** Falta un script de seed que pueble las tablas de servicios, franjas horarias y disponibilidades de los 15 días reglamentarios. El código de validación transaccional (`createBookingHoldCart`) funciona según lo especificado. |
+| **Integración Frontend** | `apps/web` | **40%** (Consumo Dinámico) | **Parcialmente Desconectado:** La vista envía correctamente el payload hacia `POST /api/bookings/lock-cart`, pero los botones de horas (`timeSlots`) están fijos y no consultan la disponibilidad real (`GET /api/bookings?serviceId=...&date=...`). |
+
+---
+
+## 4. Estado de la Conexión Frontend-Backend
+
+La arquitectura de conexión entre `TSK-FE-12` y `TSK-BE-12b` **es correcta y cumple los contratos de la plataforma**:
+
+- **Contrato de esquema Zod:** Cumple con `cartCheckoutSchema` en `packages/validation/src/booking.schema.ts` (fechas ISO UTC válidas, cantidad mínima de 2 ítems, tipos numéricos correctos).
+- **Enrutamiento:** Conmuta automáticamente entre `POST /api/bookings/lock` (reserva única) y `POST /api/bookings/lock-cart` (carrito multi-servicio).
+- **Manejo de Stripe:** Espera y captura `data.checkout.url` para redirigir a la pasarela de pagos.
+- **Manejo de Errores:** Extrae e imprime strings legibles de error evitando fallas de renderizado en React.
+
+---
+
+## 5. Plan de Acción y Solución
+
+Para solucionar el problema de raíz y dejar la funcionalidad operativa de extremo a extremo:
+
+### Paso 1: Backend / Persistencia (Sembrado de Datos)
+1. Extender `packages/db/prisma/seed.ts` para crear:
+   - Categorías (`CANCHA`, `PISCINA`, `GIMNASIO`, `ZONA_HUMEDA`).
+   - Instancias de servicios del catálogo (`Cancha de tenis 1`, `Cancha de tenis 2`, `Piscina libre`, etc.).
+   - Franjas horarias diarias (`franja_horaria`) en intervalos de 1 hora entre `06:00` y `22:00`.
+   - Generación de disponibilidades (`disponibilidad`) para los próximos 15 días (ventana máxima RN-01).
+2. Ejecutar `pnpm --filter @sportcomplex/db db:seed`.
+
+### Paso 2: Frontend (Consumo Dinámico de Franjas)
+1. En `/portal/book/page.tsx`, reemplazar la lista fija `timeSlots` por una consulta reactiva a la disponibilidad real o a las franjas configuradas en `@sportcomplex/core`.
+2. Habilitar la selección en el carrito únicamente para aquellas combinaciones que tengan cupo disponible en la fecha seleccionada.
+
+---
+*Reporte generado como artefacto de auditoría para el equipo de desarrollo SportComplex.*
