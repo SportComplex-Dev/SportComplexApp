@@ -4,6 +4,7 @@ import { formatMoney, TIMEZONE, type Booking } from '@sportcomplex/core'
 export type PortalTicket = Booking & {
   accessWindowStart?: string
   accessWindowEnd?: string
+  ticketIssued?: boolean
 }
 
 export type AccessWindowStatus = 'UPCOMING' | 'OPEN' | 'EXPIRED'
@@ -192,10 +193,15 @@ export interface ReceiptApiResponse {
   }
   reserva?: {
     id: string
+    estado: string
     subtotal: string
     total: string
     descuentoPct?: string
   }
+  ticket?: {
+    id: string
+    estado: 'EMITIDO' | 'USADO'
+  } | null
   servicio?: {
     nombre: string
     fecha: string
@@ -275,6 +281,7 @@ export async function fetchCustomerBookingHistory(
 
         merged.push({
           id: item.id,
+          ticketIssued: Boolean(item.ticketQr?.codigoUuid),
           code: item.ticketQr?.codigoUuid
             ? `ALT-${item.ticketQr.codigoUuid.slice(0, 8).toUpperCase()}`
             : `ALT-${item.id.slice(0, 8).toUpperCase()}`,

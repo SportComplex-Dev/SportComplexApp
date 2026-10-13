@@ -695,6 +695,10 @@ export function createMockPrisma() {
         }
         return picked;
       },
+      async findFirst({ where, include, select }: any = {}) {
+        const results = await (this as any).findMany({ where, include, select, take: 1 });
+        return results[0] ?? null;
+      },
       async findMany({ where, orderBy, take, include, select }: any = {}) {
         let list = reservas.filter((reservation) => {
           if (
@@ -736,9 +740,14 @@ export function createMockPrisma() {
               return false;
             }
           }
+          if (typeof where?.canal === "string" && reservation.canal !== where.canal) return false;
           if (
             where?.expiraEn?.lte &&
             (!reservation.expiraEn || reservation.expiraEn > where.expiraEn.lte)
+          ) return false;
+          if (
+            where?.expiraEn?.gt &&
+            (!reservation.expiraEn || reservation.expiraEn <= where.expiraEn.gt)
           ) return false;
           if (where?.OR) {
             const createdAt = reservation.creadoEn;
@@ -809,6 +818,8 @@ export function createMockPrisma() {
               res[key] = tickets.find((t) => t.reservaId === reservation.id);
             } else if (key === "titular") {
               res[key] = usuarios.find((u) => u.id === reservation.titularId);
+            } else if (key === "pago") {
+              res[key] = reservation.pagoId ? pagos.find((p) => p.id === reservation.pagoId) : null;
             }
           }
           return res;
@@ -936,11 +947,26 @@ export function createMockPrisma() {
         return item;
       },
       async update({ where, data }: any) {
-        const pago = pagos.find((p) => p.id === where.id);
+        const pago = pagos.find((p) => p.id === where.id || (where.stripePaymentIntentId && p.stripePaymentIntentId === where.stripePaymentIntentId));
         if (!pago) throw new Error("Not found");
         if (data.estado !== undefined) pago.estado = data.estado;
         if (data.monto !== undefined) pago.monto = data.monto;
         return pago;
+      },
+      async upsert({ where, create, update }: any) {
+        const existing = pagos.find((p) => {
+          if (where.id !== undefined && p.id === where.id) return true;
+          if (where.stripePaymentIntentId !== undefined && p.stripePaymentIntentId === where.stripePaymentIntentId) return true;
+          return false;
+        });
+        if (existing) {
+          if (update) {
+            if (update.estado !== undefined) existing.estado = update.estado;
+            if (update.monto !== undefined) existing.monto = update.monto;
+          }
+          return existing;
+        }
+        return (this as any).create({ data: create });
       },
     },
     membresia: {
