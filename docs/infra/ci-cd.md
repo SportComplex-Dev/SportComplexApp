@@ -35,8 +35,16 @@ La imagen ya viene construida desde GitHub (`ghcr.io/sportcomplex-dev/sportcompl
 | `VPS_USER` | `ubuntu` | Usuario SSH del VPS |
 | `VPS_SSH_KEY` | `-----BEGIN ...` | Llave **privada** ed25519 dedicada a Actions |
 | `APPS_WEB_ENV` | *(archivo completo)* | Contenido íntegro del `.env` de `apps/web` en producción |
+| `GHCR_PAT` | `github_pat_...` | **Opcional.** PAT classic con `read:packages`, solo si el package GHCR queda privado. Si el package es público, déjalo sin crear |
 
 *(Ya no se necesitan `DOCKERHUB_*`: la imagen vive en GHCR con el `GITHUB_TOKEN` automático del workflow.)*
+
+## 3.2. Garantías del pipeline
+
+- **Serialización**: `concurrency: deploy-production` con `cancel-in-progress: false` — dos pushes a `main` no se pisan en el VPS.
+- **Mismo SHA en todo**: el job fija `IMAGE_TAG=<sha>` y hace `git reset --hard <sha>` en el VPS, garantizando que compose/Caddyfile/workflows correspondan exactamente a la imagen desplegada. El `.env` no se toca por el reset (es gitignored).
+- **Migración del stack viejo**: antes de levantar, se baja `docker compose -p sportcomplex-net down --remove-orphans` por si quedara el proyecto con nombre antiguo publicando `80/443`. Los volúmenes (`caddy_data`, `data/n8n`) son externos al nombre del proyecto y sobreviven.
+- **GHCR sin login si es público**: `docker login` solo corre si existe el secret `GHCR_PAT`. Con package público el `docker compose pull` es anónimo.
 
 Carga rápida con la CLI `gh` desde la raíz del repo:
 ```bash
