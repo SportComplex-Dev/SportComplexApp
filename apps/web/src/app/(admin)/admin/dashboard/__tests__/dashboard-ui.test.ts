@@ -47,7 +47,7 @@ test('TSK-FE-23 / UI-01: Generación y estructuración de contenido CSV de infor
   const csvContent = [
     `# Resumen Gerencial SportComplex`,
     `Ingresos Totales,${summary.totalRevenue}`,
-    `Asistencias Totales,${summary.attendance ?? summary.totalAttendance}`,
+    `Asistencias Totales,${summary.totalAttendance}`,
     `Cupos Vendidos,${summary.totalSpotsSold}`,
     `Usuarios Unicos,${summary.uniqueAttendees}`,
     '',
