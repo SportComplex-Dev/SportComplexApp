@@ -36,6 +36,8 @@ import {
 } from '@/components/portal/portal-utils'
 import { QRGraphicHD } from '@/components/portal/qr-modal'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
+import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
+import type { PortalTicket } from '@/components/portal/portal-utils'
 
 type TabType = 'activas' | 'historial' | 'canceladas'
 
@@ -49,9 +51,9 @@ export default function CustomerDashboardPage() {
 
   // Tabs de HU-13 / RF-12: Activas, Historial, Canceladas
   const [activeTab, setActiveTab] = useState<TabType>('activas')
-  const [selectedTicket, setSelectedTicket] = useState<Booking | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
   const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
-  const [dbBookings, setDbBookings] = useState<Booking[]>([])
+  const [dbBookings, setDbBookings] = useState<PortalTicket[]>([])
 
   // Cargar historial real desde el endpoint TSK-BE-13 (/api/bookings/history)
   useEffect(() => {
@@ -72,8 +74,8 @@ export default function CustomerDashboardPage() {
   }, [session])
 
   // Combinar reservas de base de datos con locales para persistencia en demo
-  const allBookings = useMemo(() => {
-    const combined = [...dbBookings]
+  const allBookings = useMemo<PortalTicket[]>(() => {
+    const combined: PortalTicket[] = [...dbBookings]
     const dbCodes = new Set(dbBookings.map((b) => b.code))
     localBookings.forEach((b) => {
       if (!dbCodes.has(b.code)) {
@@ -264,6 +266,15 @@ export default function CustomerDashboardPage() {
                           {booking.status}
                         </Badge>
                       </div>
+                      {booking.status === 'Confirmada' && (
+                        <AccessWindowIndicator
+                          compact
+                          date={booking.date}
+                          time={booking.time}
+                          accessWindowStart={booking.accessWindowStart}
+                          accessWindowEnd={booking.accessWindowEnd}
+                        />
+                      )}
                       <span className="text-xs text-[var(--subtle)] flex flex-wrap items-center gap-2 mt-1">
                         <span>
                           <strong className="text-[var(--ink)] font-semibold">{booking.code}</strong>
@@ -421,6 +432,13 @@ export default function CustomerDashboardPage() {
 
             {/* Código QR en Alta Definición */}
             <QRGraphicHD code={selectedTicket.code} />
+
+            <AccessWindowIndicator
+              date={selectedTicket.date}
+              time={selectedTicket.time}
+              accessWindowStart={selectedTicket.accessWindowStart}
+              accessWindowEnd={selectedTicket.accessWindowEnd}
+            />
 
             <div className="mt-2 mb-3">
               <b className="text-lg font-mono tracking-widest block text-[var(--ink)]">

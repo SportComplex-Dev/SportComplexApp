@@ -18,8 +18,14 @@ next-env.d.ts
 # Exportaciones XML de Jira (SCRUM-*.xml): se generan al leer la incidencia.
 SCRUM-*.xml
 
+# Credenciales locales generadas por scripts de migración (NO versionar)
+.auth-passwords.local.txt
+
 # Git Worktrees locales
 .worktrees/
 
 .agents
 AGENTS.md
+
+# Reportes locales de revisión
+CODE_REVIEW_*.md

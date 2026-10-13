@@ -181,8 +181,9 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
 | lector@example.com | LECTOR | PENDIENTE |
 
 **Importante:**
-- Todas autentican por **correo + contraseña** (`password_hash` con bcrypt, sin Google OAuth).
-- Las contraseñas en texto plano **no están en este repo** (solo existen los hashes). Si las necesitas, pídelas a quien creó las cuentas o resetea una con un hash nuevo.
+- La autenticación (correo + contraseña) se gestiona con **Supabase Auth** (`signInWithPassword`). Ver `docs/PLAN-AUTH-BACKEND.md`.
+- `password_hash` es un campo **legacy**: el verificador actual usa **Argon2id** (`packages/core/src/security/token.ts`), no bcrypt. Las filas con hash bcrypt nunca validaron contra ese verificador (por eso el login devolvía "Credenciales incorrectas").
+- Las contraseñas viven en **Supabase Auth**, no en este repo. Gestionar/restablecer en Dashboard → Authentication.
 - `vendedor@example.com` y `lector@example.com` están en estado **PENDIENTE**: no podrán iniciar sesión hasta activarse.
 - Para listarlas en cualquier momento:
   ```sql
