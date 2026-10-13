@@ -41,12 +41,9 @@ const defaultDependencies: IncidentDependencies = {
     if (!isEmail && !validUuid) return Promise.resolve(null);
 
     return prisma.usuario.findFirst({
-      where: {
-        OR: [
-          validUuid ? { id: identifier } : undefined,
-          isEmail ? { correo: identifier.toLowerCase() } : undefined,
-        ].filter(Boolean) as any,
-      },
+      where: validUuid
+        ? { id: identifier }
+        : { correo: identifier.toLowerCase() },
       select: {
         id: true,
         estado: true,
