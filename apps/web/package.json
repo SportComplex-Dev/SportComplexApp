@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/**/__tests__/**/*.test.ts"
+    "test": "tsx --test src/**/__tests__/**/*.test.ts src/**/__tests__/**/*.test.tsx"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
