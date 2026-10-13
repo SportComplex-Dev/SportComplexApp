@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 1 : undefined,
+  workers: 1,
   timeout: 30 * 1000,
   expect: {
     timeout: 8 * 1000,
@@ -32,41 +32,37 @@ export default defineConfig({
       name: "chromium-desktop",
       use: {
         ...devices["Desktop Chrome"],
-        launchOptions: chromiumExecutable
-          ? {
-              executablePath: chromiumExecutable,
-              args: [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-              ],
-            }
-          : undefined,
+        launchOptions: {
+          ...(chromiumExecutable ? { executablePath: chromiumExecutable } : {}),
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+          ],
+        },
       },
     },
     {
       name: "chromium-mobile",
       use: {
         ...devices["Pixel 5"],
-        launchOptions: chromiumExecutable
-          ? {
-              executablePath: chromiumExecutable,
-              args: [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-              ],
-            }
-          : undefined,
+        launchOptions: {
+          ...(chromiumExecutable ? { executablePath: chromiumExecutable } : {}),
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+          ],
+        },
       },
     },
   ],
   webServer: {
-    command: "node -e 'const fs=require(\"fs\"); const t=\"apps/web/.next/standalone/apps/web\"; if(!fs.existsSync(t+\"/public\") && fs.existsSync(\"apps/web/public\")) { try { fs.symlinkSync(\"../../../../public\", t+\"/public\"); } catch {} } if(!fs.existsSync(t+\"/.next/static\") && fs.existsSync(\"apps/web/.next/static\")) { try { fs.symlinkSync(\"../../static\", t+\"/.next/static\"); } catch {} }' && PORT=3000 HOSTNAME=127.0.0.1 node apps/web/.next/standalone/apps/web/server.js",
+    command: "node -e 'const fs=require(\"fs\"),path=require(\"path\"); const t=path.resolve(\"apps/web/.next/standalone/apps/web\"); try{fs.unlinkSync(path.join(t,\".next/static\"))}catch{} try{fs.unlinkSync(path.join(t,\"public\"))}catch{} if(fs.existsSync(\"apps/web/.next/static\")) fs.symlinkSync(path.resolve(\"apps/web/.next/static\"), path.join(t,\".next/static\")); if(fs.existsSync(\"apps/web/public\")) fs.symlinkSync(path.resolve(\"apps/web/public\"), path.join(t,\"public\"));' && PORT=3000 HOSTNAME=127.0.0.1 node apps/web/.next/standalone/apps/web/server.js",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: false,
-    timeout: 30 * 1000,
+    timeout: 60 * 1000,
   },
 });

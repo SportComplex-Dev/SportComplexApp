@@ -2,27 +2,37 @@
 
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { useOptionalApp } from '@/components/app-provider'
 
 export function useThemeToggle() {
-  const [dark, setDark] = useState(false)
+  const app = useOptionalApp()
+  const [localDark, setLocalDark] = useState(false)
 
   useEffect(() => {
+    if (app) return
     const root = document.documentElement
     const isDark = root.classList.contains('dark') || localStorage.getItem('akros_theme') === 'dark'
-    setDark(isDark)
+    setLocalDark(isDark)
     root.classList.toggle('dark', isDark)
     document.querySelector('.club-app')?.classList.toggle('dark', isDark)
-  }, [])
+  }, [app])
+
+  if (app) {
+    return {
+      dark: app.dark,
+      toggleTheme: () => app.setDark(!app.dark),
+    }
+  }
 
   const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
+    const next = !localDark
+    setLocalDark(next)
     document.documentElement.classList.toggle('dark', next)
     document.querySelector('.club-app')?.classList.toggle('dark', next)
     localStorage.setItem('akros_theme', next ? 'dark' : 'light')
   }
 
-  return { dark, toggleTheme }
+  return { dark: localDark, toggleTheme }
 }
 
 export function ThemeToggle({

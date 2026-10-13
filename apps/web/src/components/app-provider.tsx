@@ -35,7 +35,7 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
   const ready = useHydrated()
   const [storedSession, setStoredSession] = useStoredSession()
   const { data: authSession } = useSession()
-  const [dark, setDarkState] = usePersistentState<boolean>('altura:dark', false)
+  const [dark, setDarkState] = usePersistentState<boolean>('akros_theme_dark', false)
   const [toast, setToast] = useState<{ message: string; kind: ToastKind }>({ message: '', kind: 'info' })
   const timer = useRef<number | undefined>(undefined)
 
@@ -55,9 +55,11 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (ready && typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', Boolean(dark))
+      const isDark = Boolean(dark)
+      document.documentElement.classList.toggle('dark', isDark)
+      document.querySelector('.club-app')?.classList.toggle('dark', isDark)
       try {
-        localStorage.setItem('akros_theme', dark ? 'dark' : 'light')
+        localStorage.setItem('akros_theme', isDark ? 'dark' : 'light')
       } catch {}
     }
   }, [ready, dark])
@@ -67,6 +69,7 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
       setDarkState(value)
       if (typeof document !== 'undefined') {
         document.documentElement.classList.toggle('dark', value)
+        document.querySelector('.club-app')?.classList.toggle('dark', value)
         try {
           localStorage.setItem('akros_theme', value ? 'dark' : 'light')
         } catch {}

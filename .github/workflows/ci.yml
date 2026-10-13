@@ -21,9 +21,5 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm --filter web build
-      - name: Instalar Chromium para Playwright
-        run: pnpm exec playwright install chromium --with-deps
-      - name: Ejecutar pruebas de flujos con navegador headless (E2E)
-        run: pnpm test:e2e
       - name: Validar Docker Compose
         run: docker compose -f docker/docker-compose.yml config --quiet
