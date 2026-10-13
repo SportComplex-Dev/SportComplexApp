@@ -38,7 +38,7 @@ punto de entrada único del webhook de Stripe (`POST /api/payments`):
 - Reenviar el mismo webhook N veces deja **una sola** fila en `pago` y **una
   sola** reserva `CONFIRMADA`.
 
-Guía completa para backend y frontend: [`docs/TSK-BD-09-idempotencia-pagos-stripe.md`](../../docs/TSK-BD-09-idempotencia-pagos-stripe.md).
+Guía completa para backend y frontend: [`docs/features/pagos-pos.md`](../../docs/features/pagos-pos.md).
 
 ---
 
@@ -55,7 +55,7 @@ El repositorio `src/repositories/tickets.ts` exporta `getTicketForScan`,
   el boleto.
 
 Guía única de ambas tasks (backend, frontend y docketeo Jira):
-[`docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md`](../../docs/TSK-BD-09-10-pagos-y-canje-guia-equipo.md).
+[`docs/features/pagos-pos.md`](../../docs/features/pagos-pos.md).
 
 ---
 
@@ -181,7 +181,7 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
 | lector@example.com | LECTOR | PENDIENTE |
 
 **Importante:**
-- La autenticación (correo + contraseña) se gestiona con **Supabase Auth** (`signInWithPassword`). Ver `docs/PLAN-AUTH-BACKEND.md`.
+- La autenticación (correo + contraseña) se gestiona con **Supabase Auth** (`signInWithPassword`). Ver `docs/features/auth.md`.
 - `password_hash` es un campo **legacy**: el verificador actual usa **Argon2id** (`packages/core/src/security/token.ts`), no bcrypt. Las filas con hash bcrypt nunca validaron contra ese verificador (por eso el login devolvía "Credenciales incorrectas").
 - Las contraseñas viven en **Supabase Auth**, no en este repo. Gestionar/restablecer en Dashboard → Authentication.
 - `vendedor@example.com` y `lector@example.com` están en estado **PENDIENTE**: no podrán iniciar sesión hasta activarse.

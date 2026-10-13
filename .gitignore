@@ -29,3 +29,7 @@ AGENTS.md
 
 # Reportes locales de revisión
 CODE_REVIEW_*.md
+
+# Datos locales de contenedores Docker
+docker/data/
+docker/dev_data/
