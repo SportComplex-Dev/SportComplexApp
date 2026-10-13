@@ -738,7 +738,7 @@ test("TSK-FE-24 (Bloqueante): Error HTTP 400 no realiza fallback a caché aunque
     if (originalOnLine) {
       Object.defineProperty(globalThis.navigator, "onLine", originalOnLine);
     } else {
-      delete (globalThis.navigator as Record<string, unknown>).onLine;
+      Reflect.deleteProperty(globalThis.navigator, "onLine");
     }
   }
 });
