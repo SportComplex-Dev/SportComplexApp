@@ -1,5 +1,13 @@
 import QRCode from 'qrcode'
-import { formatMoney, type Booking } from '@sportcomplex/core'
+import { formatMoney, TIMEZONE, type Booking } from '@sportcomplex/core'
+
+export type PortalTicket = Booking & {
+  accessWindowStart?: string
+  accessWindowEnd?: string
+  ticketIssued?: boolean
+}
+
+export type AccessWindowStatus = 'UPCOMING' | 'OPEN' | 'EXPIRED'
 
 export interface ApiBookingHistoryItem {
   id: string
@@ -28,8 +36,73 @@ export function formatSlotTime(raw: string | undefined): string {
       const hour12 = h % 12 || 12
       return `${hour12}:${String(m).padStart(2, '0')} ${period}`
     }
+    return raw
   }
   return raw
+}
+
+function getWindowTimes(ticket: Pick<PortalTicket, 'date' | 'time' | 'accessWindowStart' | 'accessWindowEnd'>): {
+  start: string
+  end: string
+} | null {
+  const parseTime = (value: string | undefined): string | null => {
+    if (!value) return null
+    const match = value.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)?/i)
+    if (!match) return null
+
+    let hour = Number(match[1])
+    const minute = Number(match[2])
+    const second = Number(match[3] ?? 0)
+    const meridiem = match[4]?.replace(/\s/g, '').replace(/\./g, '').toLowerCase()
+    if (hour > 23 || minute > 59 || second > 59) return null
+    if (meridiem) {
+      if (hour < 1 || hour > 12) return null
+      hour = hour % 12 + (meridiem === 'pm' ? 12 : 0)
+    }
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
+  }
+
+  const timeMatches = [...ticket.time.matchAll(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)?/ig)]
+  const start = parseTime(ticket.accessWindowStart) ?? parseTime(timeMatches[0]?.[0])
+  const end = parseTime(ticket.accessWindowEnd) ?? parseTime(timeMatches[1]?.[0])
+  return start && end ? { start, end } : null
+}
+
+function localDateTimeKey(value: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(value)
+  const values = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]))
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}`
+}
+
+export function getAccessWindowStatus(
+  ticket: Pick<PortalTicket, 'date' | 'time' | 'accessWindowStart' | 'accessWindowEnd'>,
+  now = new Date(),
+): AccessWindowStatus | null {
+  const times = getWindowTimes(ticket)
+  if (!times || !/^\d{4}-\d{2}-\d{2}$/.test(ticket.date) || Number.isNaN(now.getTime())) return null
+
+  const start = `${ticket.date}T${times.start}`
+  const end = `${ticket.date}T${times.end}`
+  const current = localDateTimeKey(now)
+  if (current < start) return 'UPCOMING'
+  if (current <= end) return 'OPEN'
+  return 'EXPIRED'
+}
+
+export function getAccessWindowLabel(
+  ticket: Pick<PortalTicket, 'date' | 'time' | 'accessWindowStart' | 'accessWindowEnd'>,
+): string | null {
+  const times = getWindowTimes(ticket)
+  return times ? `${times.start.slice(0, 5)} - ${times.end.slice(0, 5)}` : null
 }
 
 /**
@@ -38,7 +111,7 @@ export function formatSlotTime(raw: string | undefined): string {
  * - Historial: Usadas o Expiradas
  * - Canceladas: Canceladas administrativamente o por usuario
  */
-export function clasificarReservas(reservas: Booking[]) {
+export function clasificarReservas<T extends Booking>(reservas: T[]) {
   const activas = reservas.filter(
     (b) => b.status === 'Confirmada' || b.status === 'CONFIRMADA' || b.status === 'Pendiente'
   )
@@ -120,10 +193,15 @@ export interface ReceiptApiResponse {
   }
   reserva?: {
     id: string
+    estado: string
     subtotal: string
     total: string
     descuentoPct?: string
   }
+  ticket?: {
+    id: string
+    estado: 'EMITIDO' | 'USADO'
+  } | null
   servicio?: {
     nombre: string
     fecha: string
@@ -172,7 +250,7 @@ export function sanitizeFilename(filename: string): string {
 export async function fetchCustomerBookingHistory(
   clientName = 'Cliente',
   limit = 20
-): Promise<Booking[]> {
+): Promise<PortalTicket[]> {
   const statuses = ['CONFIRMADA', 'EXPIRADA', 'CANCELADA_ADMINISTRATIVA']
   const requests = statuses.map((status) =>
     fetch(`/api/bookings/history?status=${status}&limit=${limit}`)
@@ -181,7 +259,7 @@ export async function fetchCustomerBookingHistory(
   )
 
   const results = await Promise.all(requests)
-  const merged: Booking[] = []
+  const merged: PortalTicket[] = []
 
   results.forEach((res) => {
     if (res?.success && Array.isArray(res.data?.items)) {
@@ -203,6 +281,7 @@ export async function fetchCustomerBookingHistory(
 
         merged.push({
           id: item.id,
+          ticketIssued: Boolean(item.ticketQr?.codigoUuid),
           code: item.ticketQr?.codigoUuid
             ? `ALT-${item.ticketQr.codigoUuid.slice(0, 8).toUpperCase()}`
             : `ALT-${item.id.slice(0, 8).toUpperCase()}`,
@@ -214,6 +293,12 @@ export async function fetchCustomerBookingHistory(
             ? String(item.disponibilidad.fecha).slice(0, 10)
             : '2026-10-09',
           time: item.disponibilidad?.franja ? `${inicio} — ${fin}` : '07:00 a. m.',
+          accessWindowStart: item.disponibilidad?.franja?.horaInicio
+            ? normalizeAccessTime(item.disponibilidad.franja.horaInicio)
+            : undefined,
+          accessWindowEnd: item.disponibilidad?.franja?.horaFin
+            ? normalizeAccessTime(item.disponibilidad.franja.horaFin)
+            : undefined,
           attendees: item.cantidadCupos ?? 1,
           amount: safeTotal,
           status: statusMap[item.estado] ?? 'Confirmada',
@@ -230,3 +315,7 @@ export async function fetchCustomerBookingHistory(
   return merged
 }
 
+function normalizeAccessTime(raw: string): string {
+  const value = raw.includes('T') ? raw.slice(11, 19) : raw
+  return value.length === 5 ? `${value}:00` : value.slice(0, 8)
+}

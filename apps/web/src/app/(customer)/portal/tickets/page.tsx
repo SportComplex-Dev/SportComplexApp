@@ -10,12 +10,12 @@ import {
   QrCode,
   ShieldCheck,
   Ticket,
+  Trophy,
   X,
 } from 'lucide-react'
 import {
   formatDate,
   formatMoney,
-  type Booking,
 } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { PageHeading } from '@/components/page-heading'
@@ -31,21 +31,44 @@ import {
 } from '@/components/portal/portal-utils'
 import { QRGraphicHD } from '@/components/portal/qr-modal'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
+import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
+import type { PortalTicket } from '@/components/portal/portal-utils'
 
-type TabType = 'activas' | 'historial' | 'canceladas'
+type TabType = 'activas' | 'historial' | 'canceladas' | 'torneos'
+
+interface UserTournamentItem {
+  id: string
+  titulo: string
+  descripcion?: string | null
+  nivel: string
+  categoria?: { id: number; nombre: string }
+  fechaInicio: string
+  fechaFin: string
+  precioInscripcion: number | string
+  miInscripcion?: {
+    id: string
+    estado: string
+    nombrePareja?: string | null
+    ticketCodigoUuid?: string | null
+    /** INT-01: payload QR firmado SC1 generado por el servidor */
+    ticketQrPayload?: string | null
+    ticket?: { id?: string; codigo?: string; codigoUuid?: string; qrPayload?: string }
+  }
+}
 
 export default function TicketsPage() {
   const { session, notify } = useApp()
   const [localBookings] = useBookings()
   const [, setLastCode] = useLastCode()
   const [activeTab, setActiveTab] = useState<TabType>('activas')
-  const [selectedTicket, setSelectedTicket] = useState<Booking | null>(null)
-  const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
+  const [printingTicket, setPrintingTicket] = useState<PortalTicket | null>(null)
   const [printingReceipt, setPrintingReceipt] = useState<ReceiptApiResponse | null>(null)
   const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [isPrinting, setIsPrinting] = useState<boolean>(false)
-  const [dbBookings, setDbBookings] = useState<Booking[]>([])
+  const [dbBookings, setDbBookings] = useState<PortalTicket[]>([])
+  const [userTournaments, setUserTournaments] = useState<UserTournamentItem[]>([])
 
   // Cargar historial real desde el endpoint TSK-BE-13
   useEffect(() => {
@@ -60,13 +83,27 @@ export default function TicketsPage() {
         // Fallback a almacenamiento local
       })
 
+    // PERF-01: Cargar torneos en los que el usuario se ha inscrito directamente sin cascada N+1
+    fetch('/api/tournaments')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!isMounted || !json.success || !Array.isArray(json.data)) return
+        const registered = json.data.filter((t: { yaInscrito?: boolean }) => t.yaInscrito)
+        if (isMounted) {
+          setUserTournaments(registered)
+        }
+      })
+      .catch((err) => {
+        console.error('Error cargando torneos del usuario:', err)
+      })
+
     return () => {
       isMounted = false
     }
   }, [session])
 
-  const allBookings = useMemo(() => {
-    const combined = [...dbBookings]
+  const allBookings = useMemo<PortalTicket[]>(() => {
+    const combined: PortalTicket[] = [...dbBookings]
     const dbCodes = new Set(dbBookings.map((b) => b.code))
     localBookings.forEach((b) => {
       if (!dbCodes.has(b.code)) {
@@ -87,10 +124,12 @@ export default function TicketsPage() {
         return historyBookings
       case 'canceladas':
         return cancelledBookings
+      case 'torneos':
+        return []
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
-  const handleOpenQrModal = useCallback(async (ticket: Booking) => {
+  const handleOpenQrModal = useCallback(async (ticket: PortalTicket) => {
     setSelectedTicket(ticket)
     if (!ticket.qrPayload && ticket.id) {
       try {
@@ -109,7 +148,7 @@ export default function TicketsPage() {
     }
   }, [])
 
-  const handlePrintTicket = useCallback(async (ticket: Booking) => {
+  const handlePrintTicket = useCallback(async (ticket: PortalTicket) => {
     try {
       setIsPrinting(true)
       const receipt = await fetchReceiptData(ticket.id).catch(() => null)
@@ -167,7 +206,7 @@ export default function TicketsPage() {
     }
   }, [notify])
 
-  const handleDownloadQr = useCallback(async (ticket: Booking) => {
+  const handleDownloadQr = useCallback(async (ticket: PortalTicket) => {
     if (downloadingId) return
     setDownloadingId(ticket.id)
     try {
@@ -240,6 +279,15 @@ export default function TicketsPage() {
                 Cancelados
                 <span className="portal-tab-badge">{cancelledBookings.length}</span>
               </button>
+              <button
+                type="button"
+                className={`portal-tab-btn ${activeTab === 'torneos' ? 'active' : ''}`}
+                onClick={() => setActiveTab('torneos')}
+              >
+                <Trophy size={13} className="text-amber-500 inline-block mr-1" />
+                Torneos
+                <span className="portal-tab-badge">{userTournaments.length}</span>
+              </button>
             </div>
 
             <Link href="/services" className="calendar-shortcut text-xs py-2.5 px-3.5 gap-2 w-full md:w-auto justify-center">
@@ -247,7 +295,151 @@ export default function TicketsPage() {
             </Link>
           </div>
 
-          {currentTabItems.length === 0 ? (
+          {activeTab === 'torneos' ? (
+            userTournaments.length === 0 ? (
+              <div className="demo-card text-center py-12">
+                <Trophy size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
+                <b className="block text-base">No tienes inscripciones a torneos activas</b>
+                <p className="text-sm text-[var(--subtle)] mt-1 mb-5">
+                  Inscríbete en nuestros torneos competitivos y eventos deportivos desde la página de inicio o el catálogo.
+                </p>
+                <Link href="/" className="action-button text-xs py-2 px-4">
+                  Ver Torneos Disponibles <ArrowRight size={14} />
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {userTournaments.map((tournament) => {
+                  const ins = tournament.miInscripcion
+                  const estadoIns = ins?.estado ?? 'CONFIRMADA'
+                  const isConfirmed = estadoIns === 'CONFIRMADA'
+                  // INT-01: Priorizar el payload QR firmado SC1 entregado por el servidor.
+                  // El escáner solo puede validar el formato SC1:<uuid>:<hmac>, NO el UUID crudo.
+                  const qrPayload = ins?.ticketQrPayload || ins?.ticket?.qrPayload || null
+                  // El código legible para el usuario sigue siendo el UUID (display), pero el QR usa el payload firmado
+                  const ticketCode = ins?.ticketCodigoUuid || ins?.ticket?.codigoUuid || (isConfirmed ? `TRN-${tournament.id.slice(0, 8)}` : 'PENDIENTE')
+                  // INT-01: El ID para recuperar el comprobante debe ser el ID de la inscripción, no del torneo
+                  const inscripcionId = ins?.id || tournament.id
+                  const precioNum = Number(tournament.precioInscripcion ?? 0)
+
+                  const handleOpenTournamentQR = () => {
+                    const fakeBooking: PortalTicket = {
+                      id: inscripcionId,
+                      code: ticketCode,
+                      // INT-01: El qrPayload firmado asegura que el escáner acepte el QR
+                      qrPayload: qrPayload ?? undefined,
+                      service: `Torneo: ${tournament.titulo}`,
+                      category: tournament.categoria?.nombre || 'Torneo',
+                      sede: 'Sede Principal',
+                      date: tournament.fechaInicio.split('T')[0],
+                      time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      attendees: ins?.nombrePareja ? 2 : 1,
+                      amount: precioNum,
+                      status: isConfirmed ? 'Confirmada' : 'Pendiente',
+                      client: session?.name || 'Socio',
+                    }
+                    setSelectedTicket(fakeBooking)
+                  }
+
+                  const handlePrintTournamentTicket = () => {
+                    const fakeBooking: PortalTicket = {
+                      // INT-01: usar ID de la inscripción para que fetchReceiptData consulte el comprobante correcto
+                      id: inscripcionId,
+                      code: ticketCode,
+                      // INT-01: el qrPayload firmado SC1 es el único aceptado por el escáner
+                      qrPayload: qrPayload ?? undefined,
+                      service: `Torneo: ${tournament.titulo}`,
+                      category: tournament.categoria?.nombre || 'Torneo',
+                      sede: 'Sede Principal',
+                      date: tournament.fechaInicio.split('T')[0],
+                      time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      attendees: ins?.nombrePareja ? 2 : 1,
+                      amount: precioNum,
+                      status: isConfirmed ? 'Confirmada' : 'Pendiente',
+                      client: session?.name || 'Socio',
+                    }
+                    handlePrintTicket(fakeBooking)
+                  }
+
+                  return (
+                    <div key={tournament.id} className="portal-ticket-item">
+                      <div className="portal-ticket-info">
+                        <div className="flex items-center gap-2.5">
+                          <b className="text-base tracking-tight">{tournament.titulo}</b>
+                          <Badge
+                            variant={isConfirmed ? 'success' : 'secondary'}
+                            className="text-[11px] px-2 py-0.5 shrink-0"
+                          >
+                            {isConfirmed ? 'Confirmada' : 'Pendiente Pago'}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-[var(--subtle)] flex flex-wrap items-center gap-2 mt-1">
+                          <span>
+                            <strong className="text-[var(--ink)] font-semibold">{ticketCode}</strong>
+                          </span>
+                          <span>·</span>
+                          <span>
+                            {new Date(tournament.fechaInicio).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          <span>·</span>
+                          <span>Nivel: {tournament.nivel}</span>
+                          {ins?.nombrePareja && (
+                            <>
+                              <span>·</span>
+                              <span>Pareja: <strong>{ins.nombrePareja}</strong></span>
+                            </>
+                          )}
+                          <span>·</span>
+                          <span>
+                            {precioNum === 0 ? 'Gratuito' : `${formatMoney(precioNum)} COP`}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* BUS-01: Condicionar QR de acceso y PDF estrictamente a inscripciones confirmadas */}
+                      <div className="portal-ticket-actions">
+                        {isConfirmed ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleOpenTournamentQR}
+                              className="action-button text-xs py-2 px-3.5 gap-2"
+                            >
+                              <QrCode size={15} /> Ver QR de Acceso
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handlePrintTournamentTicket}
+                              className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
+                              title="Descargar comprobante en PDF"
+                            >
+                              <Download size={14} /> PDF
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-amber-700 dark:text-amber-300 font-medium px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                              Pago pendiente en taquilla
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          ) : currentTabItems.length === 0 ? (
             <div className="demo-card text-center py-12">
               <Ticket size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
               <b className="block text-base">No hay pases registrados</b>
@@ -284,6 +476,15 @@ export default function TicketsPage() {
                           {booking.status}
                         </Badge>
                       </div>
+                      {booking.status === 'Confirmada' && (
+                        <AccessWindowIndicator
+                          compact
+                          date={booking.date}
+                          time={booking.time}
+                          accessWindowStart={booking.accessWindowStart}
+                          accessWindowEnd={booking.accessWindowEnd}
+                        />
+                      )}
                       <span className="text-xs text-[var(--subtle)] flex flex-wrap items-center gap-2 mt-1">
                         <span>
                           <strong className="text-[var(--ink)] font-semibold">{booking.code}</strong>
@@ -390,6 +591,13 @@ export default function TicketsPage() {
             <QRGraphicHD
               code={selectedTicket.qrPayload || selectedTicket.code}
               dataUrl={selectedTicket.qrDataUrl}
+            />
+
+            <AccessWindowIndicator
+              date={selectedTicket.date}
+              time={selectedTicket.time}
+              accessWindowStart={selectedTicket.accessWindowStart}
+              accessWindowEnd={selectedTicket.accessWindowEnd}
             />
 
             <div className="mt-2 mb-3">

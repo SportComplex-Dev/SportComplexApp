@@ -4,6 +4,8 @@ import { formatDate, type Booking } from "@sportcomplex/core";
 import {
   clasificarReservas,
   calcularDesgloseComprobante,
+  getAccessWindowLabel,
+  getAccessWindowStatus,
   obtenerProximaReserva,
   generarQRDataUrl,
   obtenerSaludoContextual,
@@ -110,6 +112,29 @@ test("TSK-FE-13 Componentes: Clasificación de reservas en 3 pestañas según RF
   assert.equal(canceladas.length, 2, "Canceladas debe contener cancelaciones de cliente y administrativas");
   assert.ok(canceladas.some((b) => b.id === "res-5" && b.status === "Cancelada"));
   assert.ok(canceladas.some((b) => b.id === "res-6" && b.status === "CANCELADA_ADMINISTRATIVA"));
+});
+
+test("TSK-FE-17: badge de franja respeta límites inclusivos en hora legal de Colombia", () => {
+  const ticket = {
+    date: "2026-10-12",
+    time: "10:00 - 11:00",
+    accessWindowStart: "10:00:00",
+    accessWindowEnd: "11:00:00",
+  };
+
+  assert.equal(getAccessWindowLabel(ticket), "10:00 - 11:00");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T14:59:59.000Z")), "UPCOMING");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T15:00:00.000Z")), "OPEN");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T15:30:00.000Z")), "OPEN");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T16:00:00.000Z")), "OPEN");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T16:00:01.000Z")), "EXPIRED");
+});
+
+test("TSK-FE-17: badge entiende horas presentadas en formato 12 horas", () => {
+  const ticket = { date: "2026-10-12", time: "10:00 a. m. — 11:00 a. m." };
+
+  assert.equal(getAccessWindowLabel(ticket), "10:00 - 11:00");
+  assert.equal(getAccessWindowStatus(ticket, new Date("2026-10-12T15:00:00.000Z")), "OPEN");
 });
 
 test("TSK-FE-13 Componentes: Banner 'Tu próxima reserva' filtra fechas pasadas y prioriza la más cercana", () => {
@@ -294,5 +319,4 @@ test("TSK-FE-11: Sanitización de nombres de archivo de descarga de tiquete (DOM
   assert.equal(sanitizeFilename("ticket-123.png"), "ticket-123_png");
   assert.equal(sanitizeFilename("VALID_CODE-123"), "VALID_CODE-123");
 });
-
 

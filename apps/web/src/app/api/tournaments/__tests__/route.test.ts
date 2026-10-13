@@ -566,3 +566,70 @@ test("API: POST /api/tournaments/[id]/register rechaza pago ya consumido en otra
   assert.ok(["PAYMENT_INVALID", "PAYMENT_ALREADY_USED"].includes(data.error.code));
 });
 
+test("API: GET /api/tournaments retorna miInscripcion con ticketCodigoUuid y ticketQrPayload firmado SC1 (INT-01)", async () => {
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-5" } };
+  const req = new Request("http://localhost:3000/api/tournaments");
+  const res = await listRoute.GET(req);
+  assert.equal(res.status, 200);
+
+  const body = await res.json();
+  assert.equal(body.success, true);
+
+  const abierto = body.data.find((t: any) => t.id === TORNEO_ABIERTO_ID);
+  assert.ok(abierto);
+  assert.equal(abierto.yaInscrito, true);
+  assert.ok(abierto.miInscripcion);
+  assert.equal(abierto.miInscripcion.ticketCodigoUuid, "aaaaaaa1-1111-4111-8111-111111111111");
+  assert.equal(abierto.miInscripcion.estado, "CONFIRMADA");
+
+  // INT-01: Validar que el servidor entrega ticketQrPayload firmado con el estándar SC1:<uuid>:<hmac>
+  assert.ok(abierto.miInscripcion.ticketQrPayload, "Debe incluir ticketQrPayload para inscripción confirmada");
+  assert.match(
+    abierto.miInscripcion.ticketQrPayload,
+    /^SC1:aaaaaaa1-1111-4111-8111-111111111111:[a-f0-9]{64}$/,
+    "El payload del QR debe cumplir el formato estandarizado SC1:<uuid>:<hmac-sha256>",
+  );
+
+  const parsed = parseTicketQrPayload(abierto.miInscripcion.ticketQrPayload);
+  assert.ok(parsed, "parseTicketQrPayload debe parsear exitosamente el payload");
+  assert.equal(parsed.ticketId, "aaaaaaa1-1111-4111-8111-111111111111");
+  assert.equal(
+    verifyTicketSignature(parsed.ticketId, parsed.signature, process.env.QR_HMAC_SECRET!),
+    true,
+    "La firma HMAC-SHA256 del ticketQrPayload debe ser criptográficamente válida con QR_HMAC_SECRET",
+  );
+});
+
+test("API: GET /api/tournaments no entrega ticketQrPayload firmado si la inscripción está en PENDIENTE_PAGO (BUS-01)", async () => {
+  mock._state.inscripcionesTorneo.push({
+    id: "inscripcion-pendiente-sin-qr",
+    torneoId: TORNEO_PAGO_ID,
+    usuarioId: "user-cliente-5",
+    nombrePareja: null,
+    pagoId: null,
+    estado: "PENDIENTE_PAGO",
+    ticketCodigoUuid: null,
+    ticketEstado: "PENDIENTE",
+    creadoEn: new Date(),
+  });
+
+  (globalThis as any).__scAuthSession = { user: { id: "user-cliente-5" } };
+  const req = new Request("http://localhost:3000/api/tournaments");
+  const res = await listRoute.GET(req);
+  assert.equal(res.status, 200);
+
+  const body = await res.json();
+  const torneoPago = body.data.find((t: any) => t.id === TORNEO_PAGO_ID);
+  assert.ok(torneoPago);
+  assert.equal(torneoPago.yaInscrito, true);
+  assert.ok(torneoPago.miInscripcion);
+  assert.equal(torneoPago.miInscripcion.estado, "PENDIENTE_PAGO");
+  assert.equal(
+    torneoPago.miInscripcion.ticketQrPayload,
+    null,
+    "Inscripción PENDIENTE_PAGO no debe recibir ticketQrPayload firmado",
+  );
+});
+
+
+
