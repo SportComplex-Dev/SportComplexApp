@@ -2,7 +2,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
-// @ts-expect-error react-dom/server types are omitted from dependencies
 import { renderToString } from "react-dom/server";
 
 // Asegurar React en globalThis para componentes JSX de paquetes externos
