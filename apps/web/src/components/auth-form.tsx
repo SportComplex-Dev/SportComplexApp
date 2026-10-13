@@ -12,8 +12,10 @@ import { TopBar } from '@/components/top-bar'
 import { ActionButton } from '@/components/action-button'
 import { GoogleMark } from '@/components/google-mark'
 import { useApp } from '@/components/app-provider'
+import { signIn } from 'next-auth/react'
 
 function getSafeNextPath() {
+  if (typeof window === 'undefined') return null
   const path = new URLSearchParams(window.location.search).get('next')
   return path && path.startsWith('/') && !path.startsWith('//') ? path : null
 }
@@ -59,7 +61,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         }
         role = result.data.user.role
         if (result.data.user) {
-          syncLogin(result.data.user.email, result.data.user.name)
+          syncLogin(result.data.user.email, result.data.user.name, result.data.user.role)
         }
       }
       // TODO(register): llamar al endpoint de registro cuando exista (hoy fe-00 solo valida y redirige)
@@ -106,7 +108,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
               {register ? 'Un paso más cerca de tu próxima aventura.' : 'Tu próximo momento de bienestar te espera.'}
             </p>
 
-            <button type="button" className="google-button" disabled>
+            <button
+              type="button"
+              className="google-button"
+              onClick={() => {
+                const destination = getSafeNextPath() ?? '/portal';
+                void signIn('google', { redirectTo: destination, callbackUrl: destination });
+              }}
+            >
               <GoogleMark /> Continuar con Google
             </button>
 

@@ -26,7 +26,19 @@ export const initialBookings: Booking[] = [
 
 export const useBookings = () => usePersistentState<Booking[]>('altura:bookings', initialBookings)
 
-export type Draft = { itemId: string; date: string; time: string; attendees: number }
+/**
+ * Información del borrador de reserva en progreso.
+ */
+export type Draft = {
+  itemId: string
+  date: string
+  time: string
+  attendees: number
+  /**
+   * Epoch timestamp en milisegundos (`Date.now()`) indicando el momento exacto en que expira la retención del cupo (TSK-FE-09).
+   */
+  expiresAt?: number
+}
 export const useDraft = () => usePersistentState<Draft | null>('altura:draft', null)
 
 /** Código del último tiquete generado, para mostrar la confirmación. */
@@ -45,7 +57,7 @@ export const sampleAccounts: Session[] = [
   { name: 'Laura Pérez', email: 'laura@altura.co', role: 'Cliente' },
 ]
 
-export const useStoredSession = () => usePersistentState<Session | null>('altura:session', sampleAccounts[0])
+export const useStoredSession = () => usePersistentState<Session | null>('altura:session', null)
 
 export const defaultSettings = { businessName: 'Altura Club', businessHours: '06:00 a. m. — 10:00 p. m.', bookingsOpen: true }
 export const useSettings = () => usePersistentState('altura:settings', defaultSettings)

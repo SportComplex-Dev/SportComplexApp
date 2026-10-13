@@ -8,6 +8,7 @@ const mock = createMockPrisma();
 const {
   BookingError,
   createBookingHold,
+  createBookingHoldCart,
   getBookableAvailability,
   getReadOnlyBookableAvailability,
 } = await import(
@@ -287,6 +288,203 @@ test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja compl
   );
 });
 
+test("SCRUM-163: createBookingHoldCart éxito con 2+ servicios distintos", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(15);
+  const userId = "00000000-0000-4000-8000-00000000cart1";
+
+  const res = await createBookingHoldCart({
+    items: [
+      {
+        serviceId: slot1.serviceId,
+        startTime: slot1.startsAt.toISOString(),
+        endTime: slot1.endsAt.toISOString(),
+        cantidadCupos: 2,
+      },
+      {
+        serviceId: slot2.serviceId,
+        startTime: slot2.startsAt.toISOString(),
+        endTime: slot2.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+    ],
+    userId,
+  });
+
+  assert.equal(res.bookings.length, 2);
+  assert.equal(res.total, 7500); // 2500*2 + 2500*1
+  assert.ok(res.expiresAt instanceof Date);
+
+  // Ambas reservas tienen el mismo TTL
+  assert.equal(res.bookings[0].expiraEn.getTime(), res.expiresAt.getTime());
+  assert.equal(res.bookings[1].expiraEn.getTime(), res.expiresAt.getTime());
+
+  // Cupos ocupados se incrementaron
+  const disp1 = mock._state.disponibilidades.find((d: any) => d.id === slot1.availabilityId);
+  const disp2 = mock._state.disponibilidades.find((d: any) => d.id === slot2.availabilityId);
+  assert.equal(disp1.cuposOcupados, 2);
+  assert.equal(disp2.cuposOcupados, 1);
+});
+
+test("SCRUM-163: fallo atómico en createBookingHoldCart si 1 ítem no tiene cupos → 0 holds creados", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(1);
+  // Llenar slot2
+  await createBookingHold(requestFor(slot2, 1, "00000000-0000-4000-8000-00000000fill"));
+
+  const initialReservasCount = mock._state.reservas.length;
+  const userId = "00000000-0000-4000-8000-00000000cart2";
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 2,
+          },
+          {
+            serviceId: slot2.serviceId,
+            startTime: slot2.startsAt.toISOString(),
+            endTime: slot2.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
+  );
+
+  // Atomicidad: cero holds adicionales y cupos de slot1 intactos (0 ocupados)
+  assert.equal(mock._state.reservas.length, initialReservasCount);
+  const disp1 = mock._state.disponibilidades.find((d: any) => d.id === slot1.availabilityId);
+  assert.equal(disp1.cuposOcupados, 0);
+});
+
+test("SCRUM-163: solapamiento intra-carrito (mismo servicio franjas solapadas) rechaza con TITULAR_RESERVATION_OVERLAP o DUPLICATE_SERVICE_IN_CART", async () => {
+  const slot1 = addAforoSlot(10);
+  const userId = "00000000-0000-4000-8000-00000000cart3";
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError &&
+      (error.code === "DUPLICATE_SERVICE_IN_CART" || error.code === "TITULAR_RESERVATION_OVERLAP"),
+  );
+});
+
+test("SCRUM-163: solapamiento con reserva existente activa del titular aborta carrito", async () => {
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(15);
+  const userId = "00000000-0000-4000-8000-00000000cart4";
+
+  // El usuario ya tiene una reserva activa en slot1
+  await createBookingHold(requestFor(slot1, 1, userId));
+
+  await assert.rejects(
+    () =>
+      createBookingHoldCart({
+        items: [
+          {
+            serviceId: slot1.serviceId,
+            startTime: slot1.startsAt.toISOString(),
+            endTime: slot1.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+          {
+            serviceId: slot2.serviceId,
+            startTime: slot2.startsAt.toISOString(),
+            endTime: slot2.endsAt.toISOString(),
+            cantidadCupos: 1,
+          },
+        ],
+        userId,
+      }),
+    (error: unknown) =>
+      error instanceof BookingError && error.code === "TITULAR_RESERVATION_OVERLAP",
+  );
+
+  // Slot 2 no fue reservado
+  const disp2 = mock._state.disponibilidades.find((d: any) => d.id === slot2.availabilityId);
+  assert.equal(disp2.cuposOcupados, 0);
+});
+
+test("SCRUM-163: concurrencia: dos carritos compitiendo por mismos cupos limitados → uno gana, otro CAPACITY_EXCEEDED", async () => {
+  const slotContended = addAforoSlot(2);
+  const slotOther1 = addAforoSlot(10);
+  const slotOther2 = addAforoSlot(10);
+
+  const userA = "00000000-0000-4000-8000-00000000cartA";
+  const userB = "00000000-0000-4000-8000-00000000cartB";
+
+  const results = await Promise.allSettled([
+    createBookingHoldCart({
+      items: [
+        {
+          serviceId: slotContended.serviceId,
+          startTime: slotContended.startsAt.toISOString(),
+          endTime: slotContended.endsAt.toISOString(),
+          cantidadCupos: 2,
+        },
+        {
+          serviceId: slotOther1.serviceId,
+          startTime: slotOther1.startsAt.toISOString(),
+          endTime: slotOther1.endsAt.toISOString(),
+          cantidadCupos: 1,
+        },
+      ],
+      userId: userA,
+    }),
+    createBookingHoldCart({
+      items: [
+        {
+          serviceId: slotContended.serviceId,
+          startTime: slotContended.startsAt.toISOString(),
+          endTime: slotContended.endsAt.toISOString(),
+          cantidadCupos: 2,
+        },
+        {
+          serviceId: slotOther2.serviceId,
+          startTime: slotOther2.startsAt.toISOString(),
+          endTime: slotOther2.endsAt.toISOString(),
+          cantidadCupos: 1,
+        },
+      ],
+      userId: userB,
+    }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r) => r.status === "rejected");
+
+  assert.equal(fulfilled.length, 1);
+  assert.equal(rejected.length, 1);
+  const dispContended = mock._state.disponibilidades.find(
+    (d: any) => d.id === slotContended.availabilityId,
+  );
+  assert.equal(dispContended.cuposOcupados, 2);
+});
+
 test("TSK-BE-23: read-only availability discounts only expired pending holds", async () => {
   const slot = addAforoSlot(10);
   const now = new Date();
@@ -393,3 +591,95 @@ test("TSK-BE-23: read-only availability clamps over-discount and reports mainten
   assert.equal(blockedResult[0].cuposOcupados, 3);
   assert.equal(blockedResult[0].cuposDisponibles, 0);
 });
+
+test("TSK-BE-20 / RN-08: createBookingHold aplica el 30% de descuento automático en ONLINE si el titular tiene membresía VIGENTE", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m1";
+  mock._state.membresias.push({
+    id: 101,
+    usuarioId: memberUserId,
+    planId: 2,
+    estado: "VIGENTE",
+  });
+
+  const slot = addAforoSlot(10);
+  const hold = await createBookingHold(requestFor(slot, 2, memberUserId));
+
+  // Tarifa = 2500, 2 cupos => subtotal = 5000
+  assert.equal(Number(hold.subtotal), 5000);
+  assert.equal(Number(hold.descuentoPct), 30);
+  // 5000 - 30% = 3500
+  assert.equal(Number(hold.total), 3500);
+  assert.equal(hold.membresiaId, 101);
+  assert.equal(hold.canal, "ONLINE");
+});
+
+test("TSK-BE-20 / RN-08 (Criterio Clave): createBookingHold aplica el 30% de descuento en canal TAQUILLA", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m2";
+  const vendedorId = "00000000-0000-4000-8000-0000000000v1";
+  mock._state.membresias.push({
+    id: 102,
+    usuarioId: memberUserId,
+    planId: 2,
+    estado: "VIGENTE",
+  });
+
+  const slot = addAforoSlot(10);
+  const hold = await createBookingHold({
+    ...requestFor(slot, 1, memberUserId),
+    canal: "TAQUILLA",
+    vendedorId,
+  });
+
+  // Tarifa = 2500 => subtotal = 2500
+  assert.equal(Number(hold.subtotal), 2500);
+  assert.equal(Number(hold.descuentoPct), 30);
+  // 2500 - 30% = 1750
+  assert.equal(Number(hold.total), 1750);
+  assert.equal(hold.membresiaId, 102);
+  assert.equal(hold.canal, "TAQUILLA");
+  assert.equal(hold.vendedorId, vendedorId);
+  // El descuento nunca supera el monto de la reserva
+  assert.ok(Number(hold.subtotal) - Number(hold.total) <= Number(hold.subtotal));
+});
+
+test("TSK-BE-20 / RN-08: createBookingHoldCart aplica el 30% a cada ítem del carrito para titular con membresía VIGENTE", async () => {
+  const memberUserId = "00000000-0000-4000-8000-0000000000m3";
+  mock._state.membresias.push({
+    id: 103,
+    usuarioId: memberUserId,
+    planId: 1,
+    estado: "VIGENTE",
+  });
+
+  const slot1 = addAforoSlot(10);
+  const slot2 = addAforoSlot(10);
+
+  const cart = await createBookingHoldCart({
+    items: [
+      {
+        serviceId: slot1.serviceId,
+        startTime: slot1.startsAt.toISOString(),
+        endTime: slot1.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+      {
+        serviceId: slot2.serviceId,
+        startTime: slot2.startsAt.toISOString(),
+        endTime: slot2.endsAt.toISOString(),
+        cantidadCupos: 1,
+      },
+    ],
+    userId: memberUserId,
+  });
+
+  assert.equal(cart.bookings.length, 2);
+  assert.equal(Number(cart.bookings[0].descuentoPct), 30);
+  assert.equal(Number(cart.bookings[0].total), 1750);
+  assert.equal(cart.bookings[0].membresiaId, 103);
+  assert.equal(Number(cart.bookings[1].descuentoPct), 30);
+  assert.equal(Number(cart.bookings[1].total), 1750);
+  assert.equal(cart.bookings[1].membresiaId, 103);
+  assert.equal(cart.total, 3500);
+});
+
+

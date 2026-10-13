@@ -20,6 +20,7 @@ export function TopBar() {
 
   const isCustomer = session && (session.role === 'Cliente' || session.role === 'customer')
   const isAdmin = session && (session.role === 'Administrador' || session.role === 'admin')
+  const isSeller = session && (session.role === 'Empleado_Vendedor' || session.role === 'vendedor')
 
   const navItems = session
     ? isCustomer
@@ -29,9 +30,16 @@ export function TopBar() {
           { label: 'Mi Portal', href: '/portal' },
           { label: 'Tiquetes QR', href: '/portal/tickets' },
         ]
+      : isSeller
+      ? [
+          { label: 'Taquilla POS', href: '/pos' },
+          { label: 'Servicios', href: '/services' },
+          { label: 'Mi Portal', href: '/portal' },
+        ]
       : isAdmin
       ? [
           { label: 'Panel Admin', href: '/admin/dashboard' },
+          { label: 'Taquilla POS', href: '/pos' },
           { label: 'Catálogo', href: '/admin/catalog' },
           { label: 'Portal Cliente', href: '/portal' },
         ]
@@ -68,13 +76,13 @@ export function TopBar() {
         <div className="flex items-center gap-4">
           <ThemeToggle dark={dark} onToggle={toggleTheme} />
           <span className="topbar-action-divider" aria-hidden="true" />
-          {ready && (session ? (
+          {ready && session ? (
             <UserMenu />
           ) : (
             <Link href="/login" className="action-button nav-access">
               Accede al club <ArrowRight size={15} />
             </Link>
-          ))}
+          )}
           <button
             type="button"
             aria-label={openMenu ? 'Cerrar menú' : 'Abrir menú'}

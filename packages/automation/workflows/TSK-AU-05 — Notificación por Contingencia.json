@@ -1,0 +1,236 @@
+{
+  "name": "TSK-AU-05 — Notificación por Contingencia",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contingencias/servicio",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "956935ea-cf12-498f-8610-8de4b090a3ea",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "a74fccad-b724-4b65-a24d-7d46f76a2b30"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst inputData = $input.first().json;\nconst headers = inputData.headers || {};\n\n// Secreto compartido para contingencia (definido para TSK-BE-22)\n// Mínimo 32 caracteres\nconst secret = \"akros_super_secret_contingency_key_32chars_min\";\n\n// Header enviado por TSK-BE-22: \"sha256=<hex>\"\nconst receivedSignature = headers['x-sportcomplex-signature'] || headers['X-SportComplex-Signature'] || '';\n\n// 1. Obtener el cuerpo crudo exacto.\n// Con la opción Raw Body, el Webhook guarda los bytes originales como binario en la propiedad 'data'.\nlet rawPayload = '';\nlet parsedPayload = null;\n\nlet rawFromBinary = null;\ntry {\n  if ($input.first().binary && $input.first().binary.data) {\n    const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\n    rawFromBinary = buf.toString('utf8');\n  }\n} catch (e) {\n  rawFromBinary = null;\n}\n\nif (rawFromBinary) {\n  rawPayload = rawFromBinary;\n  try {\n    parsedPayload = JSON.parse(rawFromBinary);\n  } catch (e) {\n    parsedPayload = inputData.body;\n  }\n} else if (inputData.rawBody) {\n  rawPayload = inputData.rawBody;\n  try {\n    parsedPayload = JSON.parse(inputData.rawBody);\n  } catch (e) {\n    parsedPayload = inputData.body;\n  }\n} else {\n  // Fallback si no viene rawBody\n  rawPayload = typeof inputData.body === 'string' ? inputData.body : JSON.stringify(inputData.body);\n  parsedPayload = typeof inputData.body === 'string' ? JSON.parse(inputData.body) : inputData.body;\n}\n\n// 2. Calcular HMAC-SHA256\nconst hmac = crypto.createHmac('sha256', secret);\nhmac.update(rawPayload);\nconst calculatedSignature = `sha256=${hmac.digest('hex')}`;\n\n// 3. Comparación segura\nlet isValid = false;\nconst receivedBuf = Buffer.from(String(receivedSignature));\nconst calculatedBuf = Buffer.from(calculatedSignature);\nif (receivedBuf.length === calculatedBuf.length) {\n  isValid = crypto.timingSafeEqual(receivedBuf, calculatedBuf);\n}\n\nreturn [\n  {\n    json: {\n      isValid,\n      payload: parsedPayload\n    }\n  }\n];"
+      },
+      "id": "791e54ef-67c0-4e60-bbcb-aac4b609934d",
+      "name": "Validar Firma HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "90d214d5-8ccb-4c19-b06f-646ecc0a3993",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4f3da33-8a6f-4bc0-a0ac-fbb7d37f218e",
+      "name": "¿Firma Válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \"mensaje\": \"Contingencia recibida en n8n, procesando notificaciones\" }",
+        "options": {}
+      },
+      "id": "57cd1a05-a406-49aa-8126-109d708ecac8",
+      "name": "Respond to Webhook (200)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MODO PRUEBA: Resend solo permite enviar a tu propio correo hasta verificar el dominio.\n// Cambia a false cuando akros.lat esté verificado en resend.com/domains.\nconst TEST_MODE = false;\nconst TEST_RECIPIENT = \"jebolivar33@gmail.com\";\nconst TEST_FROM = \"onboarding@resend.dev\";\nconst PROD_FROM = \"Akros Alertas <no-reply@akros.lat>\";\n\nconst rawPayload = $input.first().json.payload || {};\n\nconst motivo = rawPayload.motivo || \"Mantenimiento imprevisto o eventualidad de fuerza mayor\";\nconst servicioNombre = rawPayload.servicioNombre || `Servicio #${rawPayload.serviceId}`;\nconst afectados = (rawPayload.afectados || rawPayload.reservasAfectadas || [])\n  .filter(c => c && (c.emailUsuario || c.email));\n\n// Si no hay afectados en la lista, terminamos la ejecución\nif (!afectados.length) {\n  return [];\n}\n\nreturn afectados.map(cliente => {\n  const nombre = cliente.nombreUsuario || cliente.nombre || \"Usuario\";\n  const email = cliente.emailUsuario || cliente.email;\n  const codigoReserva = cliente.codigoReserva || cliente.reservaId || \"N/A\";\n  const fecha = cliente.fecha || \"Próximas horas\";\n  const horario = cliente.horario || cliente.hora || \"Horario programado\";\n\n  const html = `\n  <!DOCTYPE html>\n  <html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <style>\n      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0f0d; margin: 0; padding: 24px; color: #f1f5f9; }\n      .container { max-width: 580px; margin: 0 auto; background: #111815; border: 1px solid #1f2c25; border-radius: 14px; padding: 28px; }\n      .badge-alert { display: inline-block; background: rgba(239, 68, 68, 0.15); color: #f87171; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 5px 12px; border-radius: 9999px; margin-bottom: 12px; }\n      h1 { font-size: 20px; color: #ffffff; margin: 0 0 10px 0; }\n      p { font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 16px 0; }\n      .detail-box { background: #16221d; border: 1px solid #23342c; border-radius: 10px; padding: 16px; margin: 20px 0; }\n      .detail-item { font-size: 13px; color: #cbd5e1; margin-bottom: 8px; }\n      .detail-item strong { color: #ffffff; }\n      .notice-box { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; padding: 12px; border-radius: 4px; font-size: 12px; color: #fbbf24; margin: 20px 0; line-height: 1.5; }\n      .footer { font-size: 11px; color: #556b61; text-align: center; border-top: 1px solid #1f2c25; padding-top: 16px; margin-top: 24px; }\n    </style>\n  </head>\n  <body>\n    <div class=\"container\">\n      <div class=\"badge-alert\">Aviso de Contingencia</div>\n      <h1>Cancelación de Turno por Fuerza Mayor</h1>\n      <p>Hola <strong>${nombre}</strong>,</p>\n      <p>Te informamos que debido a una novedad operativa imprevista (<strong>${motivo}</strong>), el servicio <strong>${servicioNombre}</strong> ha sido inhabilitado temporalmente y tu reserva ha sido cancelada.</p>\n      \n      <div class=\"detail-box\">\n        <div class=\"detail-item\"><strong>Código de Reserva:</strong> ${codigoReserva}</div>\n        <div class=\"detail-item\"><strong>Fecha:</strong> ${fecha}</div>\n        <div class=\"detail-item\"><strong>Horario:</strong> ${horario}</div>\n        <div class=\"detail-item\"><strong>Estado:</strong> Cancelada Administrativamente</div>\n      </div>\n\n      <div class=\"notice-box\">\n        <strong>Política de Reembolso y Reprogramación:</strong><br>\n        Por políticas operativas, el sistema no realiza devoluciones bancarias automáticas. Tu pago se encuentra seguro y registrado a tu favor. Puedes solicitar la reprogramación de tu turno o coordinar tu saldo a favor directamente en la administración de AKROS Club.\n      </div>\n\n      <div class=\"footer\">\n        AKROS Club &bull; Notificación Oficial de Contingencia\n      </div>\n    </div>\n  </body>\n  </html>\n  `;\n\nreturn {\n    json: {\n      resendPayload: {\n        from: TEST_MODE ? TEST_FROM : PROD_FROM,\n        to: [TEST_MODE ? TEST_RECIPIENT : email],\n        subject: `${TEST_MODE ? '[PRUEBA para ' + email + '] ' : ''}⚠️ Aviso Importante: Cancelación por Contingencia - Reserva ${codigoReserva}`,\n        html: html\n      }\n    }\n  };\n});"
+      },
+      "id": "9c4532fd-dd00-4326-baae-bb02cf982dde",
+      "name": "Preparar Correos Individuales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": {{ JSON.stringify($json.resendPayload.from) }},\n  \"to\": {{ JSON.stringify($json.resendPayload.to) }},\n  \"subject\": {{ JSON.stringify($json.resendPayload.subject) }},\n  \"html\": {{ JSON.stringify($json.resendPayload.html) }}\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 600
+            }
+          }
+        }
+      },
+      "id": "d788daa6-34dc-4fdf-b114-4fb2e1e68df9",
+      "name": "Enviar Correo Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -96
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Kh9OT3GVIJLhIvTY",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": false, \"mensaje\": \"Firma HMAC inválida o no proporcionada\" }",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "91568651-13cf-44c5-9b1d-6f695c2693dc",
+      "name": "Respond to Webhook (401)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        96
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar Firma HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Firma HMAC": {
+      "main": [
+        [
+          {
+            "node": "¿Firma Válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Firma Válida?": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (200)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook (401)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook (200)": {
+      "main": [
+        [
+          {
+            "node": "Preparar Correos Individuales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Correos Individuales": {
+      "main": [
+        [
+          {
+            "node": "Enviar Correo Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "695aa8d0-1891-4edb-8b5a-c6f01de8bb4a",
+  "meta": {
+    "instanceId": "1a150f952554181ee1853a060d6f3774044880176b9d991156746d3090480194"
+  },
+  "nodeGroups": [],
+  "id": "KxwqJGygUpXL7LmC",
+  "tags": []
+}

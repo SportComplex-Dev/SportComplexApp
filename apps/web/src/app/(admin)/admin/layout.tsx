@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Sun,
   Ticket,
+  Trophy,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import { ToastMessage } from '@/components/toast-message'
 const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Resumen', icon: Home, href: '/admin' },
   { name: 'Catálogo', icon: Ticket, href: '/admin/catalog' },
+  { name: 'Torneos', icon: Trophy, href: '/admin/tournaments' },
   { name: 'Empleados', icon: Users, href: '/admin/employees' },
   { name: 'Reservas', icon: CalendarDays, href: '/admin/bookings' },
   { name: 'Contingencias', icon: AlertTriangle, href: '/admin/incident' },

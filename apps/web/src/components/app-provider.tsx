@@ -1,15 +1,17 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { SessionProvider, useSession, signOut } from 'next-auth/react'
 import { usePersistentState, useHydrated } from '@/lib/persistent-state'
 import { sampleAccounts, useStoredSession, type Session } from '@/lib/stores'
+import { normalizeRole } from '@/lib/session'
 import type { ToastKind } from '@/components/toast-message'
 
 type AppContextValue = {
   session: Session | null
   ready: boolean
-  login: (email: string, name?: string) => Session
-  logout: () => void
+  login: (email: string, name?: string, role?: string) => Session
+  logout: () => void | Promise<void>
   notify: (message: string, kind?: ToastKind) => void
   toast: { message: string; kind: ToastKind }
   closeToast: () => void
@@ -25,12 +27,31 @@ export function useApp() {
   return context
 }
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function useOptionalApp() {
+  return useContext(AppContext)
+}
+
+function InnerAppProvider({ children }: { children: ReactNode }) {
   const ready = useHydrated()
-  const [session, setSession] = useStoredSession()
+  const [storedSession, setStoredSession] = useStoredSession()
+  const { data: authSession } = useSession()
   const [dark, setDarkState] = usePersistentState<boolean>('altura:dark', false)
   const [toast, setToast] = useState<{ message: string; kind: ToastKind }>({ message: '', kind: 'info' })
   const timer = useRef<number | undefined>(undefined)
+
+  const session = useMemo<Session | null>(() => {
+    if (storedSession) return storedSession
+    if (authSession?.user) {
+      const userRole = (authSession.user as { role?: string }).role
+      const canonical = normalizeRole(userRole) ?? 'Cliente'
+      return {
+        name: authSession.user.name || 'Cliente',
+        email: authSession.user.email || '',
+        role: canonical,
+      }
+    }
+    return null
+  }, [storedSession, authSession])
 
   useEffect(() => {
     if (ready && typeof document !== 'undefined') {
@@ -67,30 +88,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const login = useCallback(
-    (email: string, name?: string) => {
+    (email: string, name?: string, role?: string) => {
       const normalized = email.trim().toLowerCase()
       const known = sampleAccounts.find((account) => account.email.toLowerCase() === normalized)
-      const next: Session = known ?? {
-        name: name?.trim() || 'Administrador',
+      const next: Session = {
+        name: name?.trim() || known?.name || 'Cliente',
         email: normalized,
-        role: 'Administrador',
+        role: role?.trim() || known?.role || 'Cliente',
       }
-      setSession(next)
+      setStoredSession(next)
       notify(`Bienvenido, ${next.name}`, 'success')
       return next
     },
-    [notify, setSession]
+    [notify, setStoredSession]
   )
 
-  const logout = useCallback(() => {
-    setSession(null)
-    notify('Has cerrado sesión.')
-  }, [notify, setSession])
+  const logout = useCallback(async () => {
+    setStoredSession(null)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      await signOut({ redirect: false })
+    } catch {
+      // Ignorar fallos de red al cerrar sesión
+    } finally {
+      notify('Has cerrado sesión.')
+      if (typeof window !== 'undefined') {
+        window.location.assign('/')
+      }
+    }
+  }, [notify, setStoredSession])
 
   return (
     <AppContext.Provider
       value={{
-        session: session ?? sampleAccounts[0],
+        session,
         ready,
         login,
         logout,
@@ -103,5 +134,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     >
       {children}
     </AppContext.Provider>
+  )
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <InnerAppProvider>{children}</InnerAppProvider>
+    </SessionProvider>
   )
 }
