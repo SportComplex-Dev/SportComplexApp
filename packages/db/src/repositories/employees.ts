@@ -101,7 +101,7 @@ export async function listEmployees(
     orderBy: { creadoEn: "desc" },
   });
 
-  return users as EmployeeItem[];
+  return users;
 }
 
 /**
@@ -181,7 +181,7 @@ export async function createEmployee(
       },
     });
 
-    return created as EmployeeItem;
+    return created;
   } catch (err: unknown) {
     if (
       typeof err === "object" &&
