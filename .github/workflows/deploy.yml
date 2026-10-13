@@ -42,46 +42,51 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    # Solo main; evita workflow_dispatch accidental desde una rama
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Sync .env + despliegue
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          DEPLOY_SHA: ${{ github.sha }}
+          APPS_WEB_ENV: ${{ secrets.APPS_WEB_ENV }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: IMAGE_TAG,APPS_WEB_ENV,DEPLOY_SHA,GHCR_PAT
-          env:
-            IMAGE_TAG: ${{ github.sha }}
-            DEPLOY_SHA: ${{ github.sha }}
-            APPS_WEB_ENV: ${{ secrets.APPS_WEB_ENV }}
-            GHCR_PAT: ${{ secrets.GHCR_PAT }}
           script: |
             set -e
-            # 1. Sincronizar el repo en el VPS al SHA exacto de este deploy
-            #    (evita mezclar compose/Caddyfile/workflows de un commit con la imagen de otro)
+
+            # 1. Sincronizar el repo del VPS al SHA exacto de este deploy
+            #    (compose, Caddyfile y workflows siempre del mismo commit que la imagen)
             git -C ~/SportComplexApp fetch origin --quiet
             git -C ~/SportComplexApp reset --hard "$DEPLOY_SHA"
 
-            # 2. Migración controlada del stack viejo por nombre de proyecto
-            #    (sportcomplex-net publicaba 80/443; si existe, va abajo antes de levantar el nuevo)
-            sudo docker compose -p sportcomplex-net down --remove-orphans 2>/dev/null || true
-
-            # 3. Login iniciar sesión en GHCR solo si el package es privado (GHCR_PAT opcional)
+            # 2. Login GHCR SOLO si el package es privado (GHCR_PAT es opcional)
             if [ -n "$GHCR_PAT" ]; then
               echo "$GHCR_PAT" | sudo docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
             fi
 
-            # 4. Escribir el .env de producción desde el secret
-            mkdir -p ~/SportComplexApp/apps/web
-            printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
-            chmod 600 ~/SportComplexApp/apps/web/.env
-
-            # 5. Pull + migrate + up (falla claro si GHCR niega el pull)
+            # 3. Pull ANTES de tocar lo que corre: si GHCR niega el pull, falla aquí
+            #    sin haber bajado el servicio actual.
             cd ~/SportComplexApp/docker
             sudo docker compose pull
+
+            # 4. Migración controlada del stack legado (una vez; si no existe, no-op)
+            sudo docker compose -p sportcomplex-net down --remove-orphans 2>/dev/null || true
+
+            # 5. Escribir el .env de producción desde el secret (gitignored; el reset no lo toca)
+            mkdir -p ~/SportComplexApp/apps/web
+            printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
+            chmod 600 /home/ubuntu/SportComplexApp/apps/web/.env
+
+            # 6. Migrar y levantar (downtime = recreación de contenedores)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)
             sudo docker compose up -d web caddy n8n
 
-            # 6. Importar workflows nuevos/actualizados en n8n
+            # 7. Importar workflows nuevos en n8n (los existentes los omite)
             sudo docker exec -i sportcomplex-prod-n8n-1 sh -c \
               'for f in /opt/workflows/*.json; do n8n import:workflow --input="$f" || true; done'
