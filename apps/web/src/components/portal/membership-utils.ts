@@ -28,9 +28,12 @@ export interface PlanDisplayBreakdown {
   nombre: string;
   periodicidad: "SEMANAL" | "MENSUAL" | "ANUAL";
   periodicidadLabel: string;
+  precio: number;
+  precioFormateado: string;
+  porcentajeDescuento: number; // Porcentaje de descuento (30%) que el plan confiere en reservas
+  // Campos de compatibilidad monetaria con la tarifa oficial
   precioOriginal: number;
   precioOriginalFormateado: string;
-  porcentajeDescuento: number;
   montoDescuento: number;
   montoDescuentoFormateado: string;
   precioConDescuento: number;
@@ -52,7 +55,7 @@ export const BENEFICIOS_POR_PERIODICIDAD: Record<string, string[]> = {
     "Reserva preferente con hasta 48 horas de anticipación",
   ],
   MENSUAL: [
-    "30 % de descuento automático en alquiler de pistas y turnos",
+    "30 % de descuento automático en alquiler de pistas y canchas",
     "Acceso ilimitado a Gimnasio, Piscina y Zona Húmeda",
     "1 pase de invitado de cortesía cada mes",
     "Toalla deportiva limpia en cada visita",
@@ -60,7 +63,7 @@ export const BENEFICIOS_POR_PERIODICIDAD: Record<string, string[]> = {
     "10 % de descuento en cafetería & bar del club",
   ],
   ANUAL: [
-    "30 % de descuento garantizado todo el año en cualquier servicio",
+    "30 % de descuento garantizado todo el año en cualquier reserva",
     "Acceso total VIP: Gimnasio, Piscina, Sauna, Turco & Jacuzzi",
     "Casillero privado con cerradura digital asignado",
     "3 pases de invitado de cortesía al mes",
@@ -71,47 +74,23 @@ export const BENEFICIOS_POR_PERIODICIDAD: Record<string, string[]> = {
 };
 
 /**
- * Calcula el desglose financiero transparente para un plan mostrando el precio
- * original, el descuento del 30% y el precio neto antes de confirmar el cobro.
+ * Presenta la información financiera transparente del plan respetando
+ * la tarifa autoritativa de la base de datos (y Stripe) y destacando el 30%
+ * de descuento que el usuario recibe en sus reservas deportivas (HU-20 / RF-16).
  */
 export function calcularDesglosePlan(
   plan: PlanMembresiaDTO,
   _esSocioVigente = false,
 ): PlanDisplayBreakdown {
-  const rawPrecio =
+  const precioNumerico =
     typeof plan.precio === "number" ? plan.precio : parseFloat(String(plan.precio)) || 0;
   const pct =
     typeof plan.descuentoPct === "number"
       ? plan.descuentoPct
       : parseFloat(String(plan.descuentoPct)) || 30;
 
-  // Si en la base de datos la periodicidad no coincide con el nombre, inferirla inteligentemente
-  let periodicidadKey: "SEMANAL" | "MENSUAL" | "ANUAL" = plan.periodicidad;
-  const lowerNombre = (plan.nombre || "").toLowerCase();
-  if (lowerNombre.includes("anual") || lowerNombre.includes("año")) {
-    periodicidadKey = "ANUAL";
-  } else if (lowerNombre.includes("mensual") || lowerNombre.includes("mes")) {
-    periodicidadKey = "MENSUAL";
-  } else if (lowerNombre.includes("semanal") || lowerNombre.includes("semana")) {
-    periodicidadKey = "SEMANAL";
-  }
-
-  // Si en la BD se guardaron precios simbólicos de prueba de Stripe (<= 5.000 COP),
-  // mostramos las tarifas comerciales colombianas estándar del complejo
-  let precioOriginal = rawPrecio;
-  if (rawPrecio <= 5000) {
-    if (periodicidadKey === "SEMANAL") {
-      precioOriginal = 50000;
-    } else if (periodicidadKey === "MENSUAL") {
-      precioOriginal = 180000;
-    } else if (periodicidadKey === "ANUAL") {
-      precioOriginal = 1800000;
-    }
-  }
-
-  // Calculamos el valor del 30%
-  const montoDescuento = Math.round((precioOriginal * pct) / 100);
-  const precioConDescuento = Math.max(0, precioOriginal - montoDescuento);
+  // Respetar la periodicidad oficial del Enum de base de datos
+  const periodicidadKey: "SEMANAL" | "MENSUAL" | "ANUAL" = plan.periodicidad;
 
   const periodicidadLabels: Record<string, string> = {
     SEMANAL: "Semana",
@@ -132,18 +111,23 @@ export function calcularDesglosePlan(
     ahorroAnualLabel = "Ahorras hasta 2 meses comparado con mensualidad recurrente";
   }
 
+  const precioFormateado = formatMoney(precioNumerico);
+
   return {
     id: plan.id,
     nombre: plan.nombre,
     periodicidad: periodicidadKey,
     periodicidadLabel,
-    precioOriginal,
-    precioOriginalFormateado: formatMoney(precioOriginal),
+    precio: precioNumerico,
+    precioFormateado,
     porcentajeDescuento: pct,
-    montoDescuento,
-    montoDescuentoFormateado: formatMoney(montoDescuento),
-    precioConDescuento,
-    precioConDescuentoFormateado: formatMoney(precioConDescuento),
+    // Valores consistentes con el cobro de Stripe
+    precioOriginal: precioNumerico,
+    precioOriginalFormateado: precioFormateado,
+    montoDescuento: 0,
+    montoDescuentoFormateado: formatMoney(0),
+    precioConDescuento: precioNumerico,
+    precioConDescuentoFormateado: precioFormateado,
     ahorroAnualLabel,
     beneficios,
     popular,
@@ -161,6 +145,7 @@ export async function iniciarSuscripcionStripe(planId: number): Promise<{
   errorMessage?: string;
 }> {
   try {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const res = await fetch("/api/memberships/subscribe", {
       method: "POST",
       headers: {
@@ -168,17 +153,26 @@ export async function iniciarSuscripcionStripe(planId: number): Promise<{
       },
       body: JSON.stringify({
         planId,
-        successUrl: `${window.location.origin}/portal/membership?success=true&plan_id=${planId}`,
-        cancelUrl: `${window.location.origin}/portal/membership?cancelled=true`,
+        successUrl: origin ? `${origin}/portal/membership?success=true&plan_id=${planId}` : undefined,
+        cancelUrl: origin ? `${origin}/portal/membership?cancelled=true` : undefined,
       }),
     });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
+    const data = await res.json().catch(() => null);
+
+    if (res.status === 401 || data?.error?.code === "UNAUTHORIZED") {
       return {
         success: false,
-        errorCode: data.error?.code || "SUBSCRIBE_ERROR",
-        errorMessage: data.error?.message || "No se pudo iniciar el proceso de suscripción.",
+        errorCode: "UNAUTHORIZED",
+        errorMessage: "Debes iniciar sesión para suscribirte a una membresía.",
+      };
+    }
+
+    if (!res.ok || !data?.success) {
+      return {
+        success: false,
+        errorCode: data?.error?.code || "SUBSCRIBE_ERROR",
+        errorMessage: data?.error?.message || "No se pudo iniciar el proceso de suscripción.",
       };
     }
 

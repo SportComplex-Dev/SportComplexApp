@@ -140,7 +140,7 @@ export default function CustomerDashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link href="/portal/membership" className="calendar-shortcut border-[#c9ef75]/40 text-[#557b53] dark:text-[#c9ef75]">
-              <Sparkles size={16} className="text-[#c9ef75]" /> Membresías · 30% OFF
+              <Sparkles size={16} className="text-[#c9ef75]" /> Membresías · 30% OFF en Reservas
             </Link>
             <Link href="/services" className="calendar-shortcut">
               <CalendarDays size={17} /> Reservar un espacio

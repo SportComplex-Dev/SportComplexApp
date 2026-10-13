@@ -30,7 +30,7 @@ import {
   type PlanMembresiaDTO,
 } from '@/components/portal/membership-utils'
 
-function MembershipPortalPage() {
+function MembershipPortalContent() {
   const { notify } = useApp()
   const searchParams = useSearchParams()
 
@@ -76,14 +76,35 @@ function MembershipPortalPage() {
     fetchMembershipData()
   }, [])
 
-  // Notificar al usuario tras retornar de Stripe Checkout
+  // Notificar al usuario tras retornar de Stripe Checkout y sincronizar estado si el webhook tarda
   useEffect(() => {
     if (isSuccessUrl) {
       notify('¡Suscripción procesada con éxito! Bienvenido al club exclusivo con 30% de descuento.', 'success')
+      // Sondeo reactivo suave para sincronizar la membresía una vez que el webhook de Stripe impacte la BD
+      const timer1 = setTimeout(() => {
+        fetchMembershipData()
+      }, 1500)
+      const timer2 = setTimeout(() => {
+        fetchMembershipData()
+      }, 3500)
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+      }
     } else if (isCancelledUrl) {
       notify('Proceso de pago en Stripe cancelado. Puedes retomar la suscripción cuando desees.', 'info')
     }
   }, [isSuccessUrl, isCancelledUrl, notify])
+
+  // Soporte de accesibilidad para cerrar modal con tecla Escape
+  useEffect(() => {
+    if (!selectedPlanForModal) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedPlanForModal(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedPlanForModal])
 
   // Iniciar el flujo de checkout recurrente en Stripe
   const handleSubscribe = async (plan: PlanDisplayBreakdown) => {
@@ -100,7 +121,10 @@ function MembershipPortalPage() {
       window.location.href = result.url
     } else {
       setSubscribingPlanId(null)
-      if (result.errorCode === 'DUPLICATE_ACTIVE_MEMBERSHIP') {
+      if (result.errorCode === 'UNAUTHORIZED') {
+        notify('Inicia sesión para suscribirte a una membresía.', 'info')
+        window.location.href = `/login?redirect=${encodeURIComponent('/portal/membership')}`
+      } else if (result.errorCode === 'DUPLICATE_ACTIVE_MEMBERSHIP') {
         notify('Ya cuentas con una membresía activa vigente.', 'error')
         fetchMembershipData()
       } else if (result.errorCode === 'STRIPE_PRICE_NOT_CONFIGURED') {
@@ -128,7 +152,7 @@ function MembershipPortalPage() {
             </h1>
             <p className="text-[var(--subtle)] text-sm max-w-2xl leading-relaxed">
               Disfruta de la mejor experiencia deportiva con tarifas preferenciales en todas tus reservas
-              de canchas, pistas y acceso total al complejo deportivo. Precios transparentes y sin sorpresas antes de pagar.
+              de canchas, pistas y acceso total al complejo deportivo. Tarifas transparentes sin cargos ocultos.
             </p>
           </div>
         </div>
@@ -209,9 +233,8 @@ function MembershipPortalPage() {
           </section>
         )}
 
-        {/* Transparencia total de precios con desglose del 30% antes de pagar */}
-        <section aria-label="Planes disponibles y desglose transparente">
-
+        {/* Planes disponibles y beneficios */}
+        <section aria-label="Planes disponibles y beneficios">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 size={32} className="animate-spin text-[#c9ef75]" />
@@ -258,7 +281,7 @@ function MembershipPortalPage() {
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="membership-kicker">PLAN {plan.periodicidad}</span>
                         <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#c9ef75] text-[#091b13]">
-                          AHORRA 30%
+                          30% DTO. EN RESERVAS
                         </span>
                       </div>
                       <h3 className="text-lg font-black text-[var(--ink)] tracking-tight">{plan.nombre}</h3>
@@ -266,19 +289,15 @@ function MembershipPortalPage() {
                       <div className="my-4 p-4 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)]">
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-2xl font-black text-[var(--ink)] tracking-tight">
-                            {plan.precioConDescuentoFormateado}
+                            {plan.precioFormateado}
                           </span>
                           <span className="text-[11px] text-[var(--subtle)]">/ {plan.periodicidadLabel.toLowerCase()}</span>
                         </div>
                         <div className="mt-2 pt-2 border-t border-[var(--line)] flex items-center justify-between text-[11px]">
-                          <span className="text-[var(--subtle)]">Tarifa regular:</span>
-                          <span className="line-through text-[var(--ink-muted)] font-semibold">
-                            {plan.precioOriginalFormateado}
+                          <span className="text-[var(--subtle)]">Beneficio exclusivo:</span>
+                          <span className="text-[#557b53] dark:text-[#c9ef75] font-bold">
+                            30% OFF en canchas y piscinas
                           </span>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-[#557b53] dark:text-[#c9ef75]">
-                          <span>Descuento (30 %):</span>
-                          <span>- {plan.montoDescuentoFormateado}</span>
                         </div>
                         {plan.ahorroAnualLabel && (
                           <div className="mt-2 pt-2 text-[10.5px] text-[#1b5e20] dark:text-[#c9ef75] font-semibold border-t border-[var(--line)] flex items-center gap-1.5">
@@ -360,7 +379,7 @@ function MembershipPortalPage() {
         </section>
       </main>
 
-      {/* Modal de Confirmación Previo a Stripe Checkout (Criterio Clave: Ver precio con y sin descuento antes de confirmar) */}
+      {/* Modal de Confirmación Previo a Stripe Checkout */}
       {selectedPlanForModal && (
         <div
           className="qr-modal-overlay"
@@ -386,24 +405,21 @@ function MembershipPortalPage() {
                 </Badge>
               </div>
 
-              <div className="flex justify-between items-center text-xs text-[var(--subtle)]">
-                <span>Precio de lista sin descuento:</span>
-                <span className="line-through">{selectedPlanForModal.precioOriginalFormateado}</span>
-              </div>
-
               <div className="flex justify-between items-center text-xs text-[#557b53] dark:text-[#c9ef75] font-semibold">
-                <span>Descuento aplicado (30 %):</span>
-                <span>- {selectedPlanForModal.montoDescuentoFormateado}</span>
+                <span>Beneficio permanente:</span>
+                <span>30 % de descuento en reservas deportivas</span>
               </div>
 
               <div className="border-t border-[var(--line)] pt-2.5 flex justify-between items-baseline">
                 <div>
-                  <span className="text-xs font-bold text-[var(--ink)] block">Total a debitar:</span>
-                  <small className="text-[10px] text-[var(--subtle)]">IVA 19% incluido</small>
+                  <span className="text-xs font-bold text-[var(--ink)] block">Tarifa de suscripción:</span>
+                  <small className="text-[10px] text-[var(--subtle)]">
+                    Cobro periódico por {selectedPlanForModal.periodicidadLabel.toLowerCase()} · IVA 19% incluido
+                  </small>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-[#557b53] dark:text-[#c9ef75]">
-                    {selectedPlanForModal.precioConDescuentoFormateado}
+                  <span className="text-2xl font-black text-[var(--ink)]">
+                    {selectedPlanForModal.precioFormateado}
                   </span>
                 </div>
               </div>
@@ -412,8 +428,8 @@ function MembershipPortalPage() {
             <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--line)] text-[11px] text-[var(--subtle)] mb-5 flex items-start gap-2">
               <Info size={15} className="text-[#c9ef75] shrink-0 mt-0.5" />
               <span>
-                Al continuar serás transferido a la pasarela de pago segura para completar el registro de tu
-                tarjeta. El monto a debitar es exactamente el indicado en este resumen.
+                Al continuar serás transferido a Stripe Checkout para registrar tu método de pago con total seguridad.
+                La tarifa de renovación periódica es de {selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}.
               </span>
             </div>
 
@@ -444,10 +460,10 @@ function MembershipPortalPage() {
   )
 }
 
-export default function MembershipPortalPagePage() {
+export default function MembershipPortalPage() {
   return (
     <Suspense fallback={null}>
-      <MembershipPortalPage />
+      <MembershipPortalContent />
     </Suspense>
   )
 }
