@@ -1,0 +1,17 @@
+{
+  "extends": "../../packages/config/typescript/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@sportcomplex/validation": ["../../packages/validation/src/index.ts"],
+      "@sportcomplex/validation/*": ["../../packages/validation/src/*"],
+      "@sportcomplex/db": ["../../packages/db/src/index.ts"],
+      "@sportcomplex/db/*": ["../../packages/db/src/*"],
+      "@sportcomplex/core": ["../../packages/core/src/index.ts"],
+      "@sportcomplex/core/*": ["../../packages/core/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

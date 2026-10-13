@@ -1,0 +1,66 @@
+name: ci-headless
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "Ruta de spec específica a probar (opcional, ej: e2e/06-visual-validations.spec.ts)"
+        required: false
+        default: ""
+
+concurrency:
+  group: ci-headless-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless-e2e:
+    name: Pruebas Headless E2E y Visuales
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22.14.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Configurar pnpm 12.6.0
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Compilar aplicación web (Next.js standalone)
+        run: pnpm --filter web build
+
+      - name: Instalar Chromium y dependencias del sistema
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Ejecutar pruebas con navegador headless
+        env:
+          CI: "true"
+        run: |
+          if [ -n "${{ inputs.spec }}" ]; then
+            echo "Ejecutando spec seleccionada: ${{ inputs.spec }}"
+            pnpm exec playwright test "${{ inputs.spec }}"
+          else
+            echo "Ejecutando suite completa E2E y Validaciones Visuales"
+            pnpm test:e2e
+          fi
+
+      - name: Subir reporte de Playwright y capturas visuales
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-headless-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

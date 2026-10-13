@@ -1,0 +1,31 @@
+{
+  "name": "@sportcomplex/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "date-fns": "4.1.0",
+    "date-fns-tz": "3.2.0",
+    "ky": "1.7.5",
+    "stripe": "22.6.2",
+    "zod": "4.6.5",
+    "@sportcomplex/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "typescript": "5.7.3",
+    "@sportcomplex/config": "workspace:*",
+    "tsx": "^4.23.15"
+  }
+}

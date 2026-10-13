@@ -1,0 +1,21 @@
+# ARCHITECTURE §7.3 — Caddy edge SSL auto (Let's Encrypt)
+# VPS compartido: este Caddy es el único proxy en 80/443 para todos los proyectos.
+{
+  email official@akros.lat
+}
+
+# App principal (SportComplex)
+akros.lat, www.akros.lat {
+  reverse_proxy web:3000
+}
+
+# n8n (workflows internos)
+n8n.akros.lat {
+  reverse_proxy n8n:5678
+}
+
+# Otro equipo (su DNS lo gestionan ellos; requiere red edge-shared)
+# OJO: puerto del CONTENEDOR (3000), no el publicado en el host (3002:3000)
+otium.coderhivex.com {
+  reverse_proxy jorge-web:3000
+}

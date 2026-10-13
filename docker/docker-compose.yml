@@ -1,0 +1,87 @@
+name: sportcomplex-prod
+
+services:
+  migrate:
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
+    command: ["prisma", "migrate", "deploy", "--schema=packages/db/prisma/schema.prisma", "--config=packages/db/prisma.config.ts"]
+    env_file:
+      - path: ../apps/web/.env
+        required: false
+    networks:
+      - sportcomplex-net
+    restart: "no"
+
+  web:
+    image: ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - path: ../apps/web/.env
+        required: false
+    environment:
+      TZ: America/Bogota
+    expose:
+      - "3000"
+    networks:
+      - sportcomplex-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+    expose:
+      - "5678"
+    environment:
+      N8N_HOST: n8n.akros.lat
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      NODE_ENV: production
+      WEBHOOK_URL: https://n8n.akros.lat/
+      GENERIC_TIMEZONE: America/Bogota
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+      - ../packages/automation/workflows:/opt/workflows:ro
+    networks:
+      - sportcomplex-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - sportcomplex-net
+      - edge-shared
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+networks:
+  sportcomplex-net:
+    driver: bridge
+  edge-shared:
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
