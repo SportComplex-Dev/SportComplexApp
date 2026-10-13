@@ -92,26 +92,42 @@ test("POST /api/admin/employees: valida campos requeridos y formato de correo", 
 
 test("POST /api/admin/employees: registra nuevo empleado exitosamente con contraseña hasheada", async () => {
   seedData();
-  const req = new Request("http://localhost/api/admin/employees", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      nombre: "Nuevo Empleado Taquilla",
-      correo: "nuevo.empleado@sportcomplex.co",
-      rolNombre: "VENDEDOR",
-      password: "ClaveSegura2026*",
-    }),
-  });
+  const mockAdminClient = {
+    auth: {
+      admin: {
+        createUser: async () => ({
+          data: { user: { id: "00000000-0000-4000-8000-000000000099" } },
+          error: null,
+        }),
+        deleteUser: async () => ({ data: null, error: null }),
+      },
+    },
+  };
+  (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient = mockAdminClient;
+  try {
+    const req = new Request("http://localhost/api/admin/employees", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        nombre: "Nuevo Empleado Taquilla",
+        correo: "nuevo.empleado@sportcomplex.co",
+        rolNombre: "VENDEDOR",
+        password: "ClaveSegura2026*",
+      }),
+    });
 
-  const res = await route.POST(req);
-  assert.equal(res.status, 201);
+    const res = await route.POST(req);
+    assert.equal(res.status, 201);
 
-  const json = await res.json();
-  assert.equal(json.success, true);
-  assert.equal(json.data.nombre, "Nuevo Empleado Taquilla");
-  assert.equal(json.data.correo, "nuevo.empleado@sportcomplex.co");
-  assert.equal(json.data.estado, "ACTIVO");
-  assert.equal(json.data.passwordHash, undefined);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.nombre, "Nuevo Empleado Taquilla");
+    assert.equal(json.data.correo, "nuevo.empleado@sportcomplex.co");
+    assert.equal(json.data.estado, "ACTIVO");
+    assert.equal(json.data.passwordHash, undefined);
+  } finally {
+    delete (globalThis as unknown as { __scSupabaseAdminClient?: unknown }).__scSupabaseAdminClient;
+  }
 });
 
 test("GET /api/admin/employees: admite paginación con limit y offset (PERF-01)", async () => {

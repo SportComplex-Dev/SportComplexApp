@@ -18,7 +18,7 @@ if (!process.env.DIRECT_URL && !process.env.DATABASE_URL) {
   } catch {}
 }
 
-const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pool = new pg.Pool({ connectionString, family: 4 } as any);
