@@ -1,5 +1,6 @@
 'use client';
 
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ArrowRight, ShoppingBag, Trash2 } from 'lucide-react';
 import { Badge, Button } from '@sportcomplex/ui';
 import {
@@ -23,6 +24,7 @@ export function Cart({
   onReviewSelection,
   feedbackMessage,
 }: CartProps) {
+  const shouldReduceMotion = useReducedMotion();
   const total = calculateCartTotal(cart);
   const activeSlot = cart[0];
 
@@ -78,42 +80,51 @@ export function Cart({
                 </div>
               )}
 
-              {/* Lista de Servicios */}
+              {/* Lista de Servicios con Transición Suave */}
               <ul className="divide-y divide-[#edf0eb] dark:divide-[#2b3730]">
-                {cart.map((item) => (
-                  <li
-                    key={item.serviceId}
-                    className="flex items-start justify-between gap-2 py-2.5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-xs font-bold text-[#203329] dark:text-[#e1e9e2]">
-                        {item.serviceName}
-                      </p>
-                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          {item.serviceCategory}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {item.startTime} – {item.endTime}
-                        </Badge>
+                <AnimatePresence initial={false}>
+                  {cart.map((item) => (
+                    <motion.li
+                      key={item.serviceId}
+                      layout={!shouldReduceMotion}
+                      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -6 }}
+                      animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, height: 'auto', y: 0 }}
+                      exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -6 }}
+                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                      className="flex items-start justify-between gap-2 py-2.5 overflow-hidden"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-1 text-xs font-bold text-[#203329] dark:text-[#e1e9e2]">
+                          {item.serviceName}
+                        </p>
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {item.serviceCategory}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {item.startTime} – {item.endTime}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-xs font-bold text-[#244533] dark:text-[#dce8dd]">
-                        {formatMoney(item.price)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveService(item.serviceId)}
-                        aria-label={`Quitar ${item.serviceName} del carrito`}
-                        className="rounded-md p-1.5 text-[#9a6962] transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-[#3a2927]"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs font-bold text-[#244533] dark:text-[#dce8dd]">
+                          {formatMoney(item.price)}
+                        </span>
+                        <motion.button
+                          type="button"
+                          whileHover={shouldReduceMotion ? undefined : { scale: 1.15 }}
+                          whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                          onClick={() => onRemoveService(item.serviceId)}
+                          aria-label={`Quitar ${item.serviceName} del carrito`}
+                          className="rounded-md p-1.5 text-[#9a6962] transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-[#3a2927]"
+                        >
+                          <Trash2 size={14} />
+                        </motion.button>
+                      </div>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
 
               {/* Total y Acción */}

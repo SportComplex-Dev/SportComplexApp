@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import { Badge, Card, CardContent, CardHeader, CardTitle, Input } from '@sportcomplex/ui'
 import { serviceCategories, formatMoney, type CatalogItem } from '@sportcomplex/core'
 import { categoryIcons } from '@/components/category-icons'
@@ -62,9 +63,11 @@ export function PosCatalogSelector({
               const Icon = categoryIcons[cat.icon]
               const isSelected = selectedCategory === cat.slug
               return (
-                <button
+                <motion.button
                   key={cat.slug}
                   type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   id={`pos-cat-${cat.slug}`}
                   aria-pressed={isSelected}
                   onClick={() => {
@@ -79,50 +82,61 @@ export function PosCatalogSelector({
                 >
                   <Icon size={16} />
                   <span className="truncate w-full text-center text-[11px]">{cat.name.split(' ')[0]}</span>
-                </button>
+                </motion.button>
               )
             })}
           </div>
         </div>
 
-        {/* Servicios de la categoría */}
+        {/* Servicios de la categoría con Transición */}
         <div>
           <span id="label-service-space" className="text-xs font-semibold uppercase tracking-wider text-[var(--subtle)] mb-2 block">
             Servicio / Espacio
           </span>
           <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-1" role="group" aria-labelledby="label-service-space">
-            {filteredServices.length === 0 ? (
-              <p className="text-xs text-[var(--subtle)] p-3 text-center">No hay servicios disponibles en esta categoría.</p>
-            ) : (
-              filteredServices.map((item) => {
-                const isSelected = (selectedServiceId ? selectedServiceId === item.id : currentService?.id === item.id)
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    id={`pos-service-${item.id}`}
-                    aria-pressed={isSelected}
-                    onClick={() => onSelectServiceId(item.id)}
-                    className={`p-3 rounded-lg text-left flex items-center justify-between transition-all border ${
-                      isSelected
-                        ? 'bg-[#c9ef75]/15 border-[#123e30] dark:border-[#c9ef75]'
-                        : 'bg-[var(--surface-soft)] border-transparent hover:border-[var(--line)]'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-semibold text-xs text-[var(--ink)]">{item.name}</div>
-                      <div className="text-[11px] text-[var(--subtle)] flex items-center gap-2 mt-0.5">
-                        <span>{item.sede}</span> · <span>Cap: {item.capacity}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-xs text-[#123e30] dark:text-[#c9ef75]">{formatMoney(item.price)}</span>
-                      <div className="text-[10px] text-[var(--subtle)]">por turno</div>
-                    </div>
-                  </button>
-                )
-              })
-            )}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedCategory}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: [0.25, 1, 0.5, 1] }}
+                className="flex flex-col gap-2"
+              >
+                {filteredServices.length === 0 ? (
+                  <p className="text-xs text-[var(--subtle)] p-3 text-center">No hay servicios disponibles en esta categoría.</p>
+                ) : (
+                  filteredServices.map((item) => {
+                    const isSelected = (selectedServiceId ? selectedServiceId === item.id : currentService?.id === item.id)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        id={`pos-service-${item.id}`}
+                        aria-pressed={isSelected}
+                        onClick={() => onSelectServiceId(item.id)}
+                        className={`p-3 rounded-lg text-left flex items-center justify-between transition-all border ${
+                          isSelected
+                            ? 'bg-[#c9ef75]/15 border-[#123e30] dark:border-[#c9ef75]'
+                            : 'bg-[var(--surface-soft)] border-transparent hover:border-[var(--line)]'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-semibold text-xs text-[var(--ink)]">{item.name}</div>
+                          <div className="text-[11px] text-[var(--subtle)] flex items-center gap-2 mt-0.5">
+                            <span>{item.sede}</span> · <span>Cap: {item.capacity}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-xs text-[#123e30] dark:text-[#c9ef75]">{formatMoney(item.price)}</span>
+                          <div className="text-[10px] text-[var(--subtle)]">por turno</div>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
 

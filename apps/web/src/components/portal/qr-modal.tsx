@@ -132,13 +132,13 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
 
   return (
     <div
-      className="qr-modal-overlay"
+      className="qr-modal-overlay animate-in fade-in-0 duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="qr-modal-title"
       onClick={onClose}
     >
-      <div className="qr-modal-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="qr-modal-dialog animate-in fade-in-0 zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <button
           className="qr-modal-close"
           onClick={onClose}

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Calendar, Clock, MapPin, Trophy, Users, CheckCircle2 } from 'lucide-react'
 import {
   TournamentRegistrationModal,
@@ -100,6 +101,7 @@ function getCategoryTone(categoryName: string = ''): 'lime' | 'blue' | 'orange' 
 
 export function ClubEvents() {
   const { notify } = useApp()
+  const shouldReduceMotion = useReducedMotion()
   const [events, setEvents] = useState<ClubEventView[]>(STATIC_EVENTS)
   const [selectedTournament, setSelectedTournament] = useState<TournamentRegisterTarget | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -211,7 +213,11 @@ export function ClubEvents() {
         {events.map((event) => {
           const isAlmostFull = event.spotsLeft <= 3
           return (
-            <article key={event.id} className="event-card">
+            <motion.article
+              key={event.id}
+              whileHover={shouldReduceMotion ? undefined : { y: -6, transition: { type: 'spring', stiffness: 320, damping: 20 } }}
+              className="event-card transition-colors"
+            >
               <div className="event-card-header">
                 <span className={`event-category-tag tag-${event.tone}`}>
                   {event.category} · {event.tag}
@@ -246,25 +252,29 @@ export function ClubEvents() {
                     <CheckCircle2 size={13} /> Inscrito
                   </span>
                 ) : event.isDynamic ? (
-                  <button
+                  <motion.button
                     type="button"
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
                     onClick={() => handleOpenRegister(event)}
                     className="event-register-btn cursor-pointer inline-flex items-center gap-1.5"
                   >
                     Inscribirme <ArrowRight size={14} />
-                  </button>
+                  </motion.button>
                 ) : (
-                  <button
+                  <motion.button
                     type="button"
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
                     onClick={() => handleOpenRegister(event)}
                     className="event-register-btn cursor-pointer inline-flex items-center gap-1.5 opacity-90"
                     title="Taller especial gestionado directamente en sede"
                   >
                     Consultar en Sede <ArrowRight size={14} />
-                  </button>
+                  </motion.button>
                 )}
               </div>
-            </article>
+            </motion.article>
           )
         })}
       </div>

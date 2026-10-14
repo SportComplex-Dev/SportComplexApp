@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -58,6 +59,7 @@ interface UserTournamentItem {
 
 export default function TicketsPage() {
   const { session, notify } = useApp()
+  const shouldReduceMotion = useReducedMotion()
   const [localBookings] = useBookings()
   const [, setLastCode] = useLastCode()
   const [activeTab, setActiveTab] = useState<TabType>('activas')
@@ -254,40 +256,92 @@ export default function TicketsPage() {
 
         <section className="mt-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div className="portal-tabs-nav">
-              <button
+            <div className="portal-tabs-nav" role="tablist" aria-label="Filtro de tiquetes">
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'activas' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'activas'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'activas' ? 'active' : ''}`}
                 onClick={() => setActiveTab('activas')}
               >
-                Pases Activos
-                <span className="portal-tab-badge">{activeBookings.length}</span>
-              </button>
-              <button
+                {activeTab === 'activas' && (
+                  <motion.span
+                    layoutId="activeTicketsTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Pases Activos
+                  <span className="portal-tab-badge">{activeBookings.length}</span>
+                </span>
+              </motion.button>
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'historial'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'historial' ? 'active' : ''}`}
                 onClick={() => setActiveTab('historial')}
               >
-                Historial
-                <span className="portal-tab-badge">{historyBookings.length}</span>
-              </button>
-              <button
+                {activeTab === 'historial' && (
+                  <motion.span
+                    layoutId="activeTicketsTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Historial
+                  <span className="portal-tab-badge">{historyBookings.length}</span>
+                </span>
+              </motion.button>
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'canceladas' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'canceladas'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'canceladas' ? 'active' : ''}`}
                 onClick={() => setActiveTab('canceladas')}
               >
-                Cancelados
-                <span className="portal-tab-badge">{cancelledBookings.length}</span>
-              </button>
-              <button
+                {activeTab === 'canceladas' && (
+                  <motion.span
+                    layoutId="activeTicketsTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Cancelados
+                  <span className="portal-tab-badge">{cancelledBookings.length}</span>
+                </span>
+              </motion.button>
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'torneos' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'torneos'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'torneos' ? 'active' : ''}`}
                 onClick={() => setActiveTab('torneos')}
               >
-                <Trophy size={13} className="text-amber-500 inline-block mr-1" />
-                Torneos
-                <span className="portal-tab-badge">{userTournaments.length}</span>
-              </button>
+                {activeTab === 'torneos' && (
+                  <motion.span
+                    layoutId="activeTicketsTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  <Trophy size={13} className="text-amber-500 inline-block mr-0.5" />
+                  Torneos
+                  <span className="portal-tab-badge">{userTournaments.length}</span>
+                </span>
+              </motion.button>
             </div>
 
             <Link href="/services" className="calendar-shortcut text-xs py-2.5 px-3.5 gap-2 w-full md:w-auto justify-center">
@@ -295,7 +349,15 @@ export default function TicketsPage() {
             </Link>
           </div>
 
-          {activeTab === 'torneos' ? (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+            >
+              {activeTab === 'torneos' ? (
             userTournaments.length === 0 ? (
               <div className="demo-card text-center py-12">
                 <Trophy size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
@@ -558,7 +620,9 @@ export default function TicketsPage() {
               })}
             </div>
           )}
-        </section>
+          </motion.div>
+        </AnimatePresence>
+      </section>
       </main>
 
       {/* Modal QR de Alta Definición */}

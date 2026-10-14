@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, ChevronDown, HelpCircle, MessageSquare } from 'lucide-react'
 
 interface FaqItem {
@@ -57,6 +58,7 @@ const FAQS: FaqItem[] = [
 ]
 
 export function FaqSection() {
+  const shouldReduceMotion = useReducedMotion()
   const [openIds, setOpenIds] = useState<string[]>(['anticipacion-reservas'])
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas')
 
@@ -87,23 +89,25 @@ export function FaqSection() {
         </p>
       </div>
 
-      {/* Filtro por categorías */}
+      {/* Filtro por categorías con microinteracción táctil */}
       <div className="faq-category-pills" role="tablist" aria-label="Categorías de preguntas">
         {categories.map((cat) => (
-          <button
+          <motion.button
             key={cat}
             type="button"
             role="tab"
             aria-selected={selectedCategory === cat}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
             className={`faq-pill-btn ${selectedCategory === cat ? 'faq-pill-active' : ''}`}
             onClick={() => setSelectedCategory(cat)}
           >
             {cat}
-          </button>
+          </motion.button>
         ))}
       </div>
 
-      {/* Lista Acordeón de FAQs */}
+      {/* Lista Acordeón de FAQs con apertura/cierre fluido */}
       <div className="faq-accordion-wrap">
         {filteredFaqs.map((faq) => {
           const isOpen = openIds.includes(faq.id)
@@ -128,15 +132,23 @@ export function FaqSection() {
                   />
                 </span>
               </button>
-              {isOpen && (
-                <div
-                  id={`faq-answer-${faq.id}`}
-                  role="region"
-                  className="faq-answer-content"
-                >
-                  <p>{faq.answer}</p>
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    id={`faq-answer-${faq.id}`}
+                    role="region"
+                    initial={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                    animate={shouldReduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+                    exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="faq-answer-content">
+                      <p>{faq.answer}</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )
         })}

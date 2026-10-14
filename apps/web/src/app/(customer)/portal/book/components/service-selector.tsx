@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check, Clock3, Plus } from 'lucide-react';
 import {
   categoryBySlug,
@@ -41,6 +42,7 @@ export function ServiceSelector({
   onAddService,
   disabledDateChange = false,
 }: ServiceSelectorProps) {
+  const shouldReduceMotion = useReducedMotion();
   const availableCatalog = useMemo(
     () => initialCatalog.filter((s) => s.status === 'Disponible'),
     [],
@@ -83,12 +85,14 @@ export function ServiceSelector({
             const isBlocked = !slot.isAvailable || (disabledDateChange && !isActive);
 
             return (
-              <button
+              <motion.button
                 key={slot.startTime}
                 type="button"
                 aria-pressed={isActive}
                 disabled={isBlocked}
                 onClick={() => onSelectSlot(slot)}
+                whileHover={isBlocked || shouldReduceMotion ? undefined : { scale: 1.03 }}
+                whileTap={isBlocked || shouldReduceMotion ? undefined : { scale: 0.96 }}
                 title={slot.disabledReason || `${slot.label} (${slot.isAvailable ? 'Disponible' : 'No disponible'})`}
                 className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${
                   isActive
@@ -101,7 +105,7 @@ export function ServiceSelector({
                 <Clock3 size={15} />
                 <span>{slot.label}</span>
                 {isActive && <Check size={15} />}
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -120,85 +124,115 @@ export function ServiceSelector({
         </span>
       </div>
 
-      {/* Tabs de Filtro */}
+      {/* Tabs de Filtro con layoutId deslizante */}
       <div
         className="sticky top-[72px] z-10 -mx-1 mb-3 flex gap-2 overflow-x-auto bg-[#f7f8f5]/95 px-1 py-2 backdrop-blur dark:bg-[#111815]/95"
         aria-label="Filtrar por categoría"
       >
-        <button
+        <motion.button
           type="button"
+          whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
+          whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
           aria-pressed={selectedCategory === 'todos'}
           onClick={() => onCategoryChange('todos')}
-          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+          className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
             selectedCategory === 'todos'
-              ? 'bg-[#183e30] text-white dark:bg-[#c9ef75] dark:text-[#19352a]'
+              ? 'text-white dark:text-[#19352a]'
               : 'border border-[#e0e6df] bg-white text-[#526058] hover:bg-[#f1f4ee] dark:border-[#39483e] dark:bg-[#19231d] dark:text-[#c2cec4] dark:hover:bg-[#26342b]'
           }`}
         >
-          Todos
-        </button>
+          {selectedCategory === 'todos' && (
+            <motion.span
+              layoutId="activeCategoryFilter"
+              className="absolute inset-0 rounded-full bg-[#183e30] dark:bg-[#c9ef75] -z-0"
+              transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10">Todos</span>
+        </motion.button>
         {serviceCategories.map((category) => (
-          <button
+          <motion.button
             key={category.slug}
             type="button"
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
             aria-pressed={selectedCategory === category.slug}
             onClick={() => onCategoryChange(category.slug)}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+            className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
               selectedCategory === category.slug
-                ? 'bg-[#183e30] text-white dark:bg-[#c9ef75] dark:text-[#19352a]'
+                ? 'text-white dark:text-[#19352a]'
                 : 'border border-[#e0e6df] bg-white text-[#526058] hover:bg-[#f1f4ee] dark:border-[#39483e] dark:bg-[#19231d] dark:text-[#c2cec4] dark:hover:bg-[#26342b]'
             }`}
           >
-            {category.name}
-          </button>
+            {selectedCategory === category.slug && (
+              <motion.span
+                layoutId="activeCategoryFilter"
+                className="absolute inset-0 rounded-full bg-[#183e30] dark:bg-[#c9ef75] -z-0"
+                transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">{category.name}</span>
+          </motion.button>
         ))}
       </div>
 
-      {/* Grid de Servicios */}
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {visibleServices.map((service, index) => {
-          const inCart = cartServiceIds.includes(service.id);
-          const color = ['#eaf2d9', '#e4f1f3', '#faeee1', '#eeeafa'][index % 4];
-          const isAddDisabled = !selectedSlot || inCart;
+      {/* Grid de Servicios con Transición Fluida */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={selectedCategory}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+          className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {visibleServices.map((service, index) => {
+            const inCart = cartServiceIds.includes(service.id);
+            const color = ['#eaf2d9', '#e4f1f3', '#faeee1', '#eeeafa'][index % 4];
+            const isAddDisabled = !selectedSlot || inCart;
 
-          return (
-            <article
-              key={service.id}
-              title={service.description}
-              className={`flex items-center gap-3 rounded-xl border bg-white p-2.5 shadow-sm transition hover:shadow-md dark:bg-[#19231d] ${
-                inCart ? 'border-[#7ca657]' : 'border-[#e5e9e2] dark:border-[#2b3730]'
-              }`}
-            >
-              <span
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-base font-bold text-[#244b37]"
-                style={{ backgroundColor: color }}
+            return (
+              <motion.article
+                key={service.id}
+                title={service.description}
+                whileHover={shouldReduceMotion ? undefined : { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } }}
+                className={`flex items-center gap-3 rounded-xl border bg-white p-2.5 shadow-sm transition hover:shadow-md dark:bg-[#19231d] ${
+                  inCart ? 'border-[#7ca657]' : 'border-[#e5e9e2] dark:border-[#2b3730]'
+                }`}
               >
-                {service.name.slice(0, 1).toUpperCase()}
-              </span>
-              <div className="min-w-0 flex-1">
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 uppercase tracking-[0.08em]">
-                  {categoryBySlug(service.category)?.name ?? 'Servicio'}
-                </Badge>
-                <h3 className="truncate text-sm font-bold text-[#18291f] dark:text-[#edf3ee]">
-                  {service.name}
-                </h3>
-                <span className="text-xs font-bold text-[#183c2e] dark:text-[#dce8dd]">
-                  {formatMoney(service.price)}
+                <span
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-base font-bold text-[#244b37]"
+                  style={{ backgroundColor: color }}
+                >
+                  {service.name.slice(0, 1).toUpperCase()}
                 </span>
-              </div>
-              <button
-                type="button"
-                disabled={isAddDisabled}
-                onClick={() => onAddService(service)}
-                aria-label={inCart ? `${service.name} ya está en el carrito` : `Agregar ${service.name} al carrito`}
-                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#edf5e2] px-2.5 py-2 text-xs font-bold text-[#31563a] transition hover:bg-[#e1efce] disabled:cursor-not-allowed disabled:bg-[#f1f3ef] disabled:text-[#9aa49c] dark:bg-[#2b3b2a] dark:text-[#d8efb3] dark:hover:bg-[#354a32] dark:disabled:bg-[#252d27] dark:disabled:text-[#758078]"
-              >
-                {inCart ? <Check size={14} /> : <Plus size={14} />}
-              </button>
-            </article>
-          );
-        })}
-      </div>
+                <div className="min-w-0 flex-1">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 uppercase tracking-[0.08em]">
+                    {categoryBySlug(service.category)?.name ?? 'Servicio'}
+                  </Badge>
+                  <h3 className="truncate text-sm font-bold text-[#18291f] dark:text-[#edf3ee]">
+                    {service.name}
+                  </h3>
+                  <span className="text-xs font-bold text-[#183c2e] dark:text-[#dce8dd]">
+                    {formatMoney(service.price)}
+                  </span>
+                </div>
+                <motion.button
+                  type="button"
+                  disabled={isAddDisabled}
+                  whileHover={isAddDisabled || shouldReduceMotion ? undefined : { scale: 1.06 }}
+                  whileTap={isAddDisabled || shouldReduceMotion ? undefined : { scale: 0.94 }}
+                  onClick={() => onAddService(service)}
+                  aria-label={inCart ? `${service.name} ya está en el carrito` : `Agregar ${service.name} al carrito`}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#edf5e2] px-2.5 py-2 text-xs font-bold text-[#31563a] transition hover:bg-[#e1efce] disabled:cursor-not-allowed disabled:bg-[#f1f3ef] disabled:text-[#9aa49c] dark:bg-[#2b3b2a] dark:text-[#d8efb3] dark:hover:bg-[#354a32] dark:disabled:bg-[#252d27] dark:disabled:text-[#758078]"
+                >
+                  {inCart ? <Check size={14} /> : <Plus size={14} />}
+                </motion.button>
+              </motion.article>
+            );
+          })}
+        </motion.div>
+      </AnimatePresence>
     </section>
   );
 }
