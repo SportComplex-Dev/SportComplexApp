@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { HERO_SLIDES } from '../hero-carousel'
+import { HERO_SLIDES, SLIDE_DURATION_MS } from '../hero-carousel'
 
 test('HeroCarousel: Configuración de exactamente 5 imágenes para el carrusel', () => {
   assert.equal(HERO_SLIDES.length, 5, 'El carrusel debe contener exactamente 5 imágenes')
@@ -50,7 +50,11 @@ test('HeroCarousel: Lógica de rotación circular de diapositivas (Siguiente y A
   assert.equal(cur, 0, 'Tras 5 avances debe volver a la slide 0')
 })
 
-test('HeroCarousel: Soporte de pausa y navegación directa por índice', () => {
+test('HeroCarousel: Duración de transición de 4000ms para rotación fluida', () => {
+  assert.equal(SLIDE_DURATION_MS, 4000, 'La duración del slide debe ser exactamente 4000ms')
+})
+
+test('HeroCarousel: Validación de límites de índice para navegación directa', () => {
   const isValidIndex = (index: number) => index >= 0 && index < HERO_SLIDES.length
 
   assert.equal(isValidIndex(0), true)

@@ -56,10 +56,12 @@ export const HERO_SLIDES: HeroSlide[] = [
   },
 ]
 
-const SLIDE_DURATION_MS = 4000
+export const SLIDE_DURATION_MS = 4000
 
 export function HeroCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
@@ -75,18 +77,37 @@ export function HeroCarousel() {
     setCurrentIndex(index)
   }, [])
 
-  // Autoplay continuo de 4 segundos sin interrupción
+  // Autoplay reactivo: se reinicia cada vez que cambia currentIndex o se sale de pausa
+  // Respeta prefers-reduced-motion y pausa en hover/foco
   useEffect(() => {
+    if (isPaused) return
+
+    if (typeof window !== 'undefined') {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (prefersReducedMotion) return
+    }
+
     const timer = setInterval(() => {
       goToNext()
     }, SLIDE_DURATION_MS)
 
     return () => clearInterval(timer)
-  }, [goToNext])
+  }, [currentIndex, isPaused, goToNext])
 
   // Controles con teclado (Flechas Izquierda / Derecha)
+  // Ignora eventos si el foco está en un input, textarea o contenido editable
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+
+      if (isInput) return
+
       if (event.key === 'ArrowLeft') {
         goToPrev()
       } else if (event.key === 'ArrowRight') {
@@ -98,38 +119,69 @@ export function HeroCarousel() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goToNext, goToPrev])
 
-  // Gestos táctiles en dispositivos móviles (Swipe)
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.targetTouches[0]?.clientX ?? null
-  }
+  // Gestos táctiles y accesibilidad (hover / foco) vinculados al contenedor padre (.hero-wrap)
+  useEffect(() => {
+    const parent = containerRef.current?.parentElement
+    if (!parent) return
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndXRef.current = e.targetTouches[0]?.clientX ?? null
-  }
-
-  const handleTouchEnd = () => {
-    if (touchStartXRef.current === null || touchEndXRef.current === null) return
-    const distance = touchStartXRef.current - touchEndXRef.current
-    const minSwipeDistance = 50
-
-    if (distance > minSwipeDistance) {
-      goToNext()
-    } else if (distance < -minSwipeDistance) {
-      goToPrev()
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartXRef.current = e.targetTouches[0]?.clientX ?? null
     }
 
-    touchStartXRef.current = null
-    touchEndXRef.current = null
-  }
+    const handleTouchMove = (e: TouchEvent) => {
+      touchEndXRef.current = e.targetTouches[0]?.clientX ?? null
+    }
+
+    const handleTouchEnd = () => {
+      if (touchStartXRef.current === null || touchEndXRef.current === null) return
+      const distance = touchStartXRef.current - touchEndXRef.current
+      const minSwipeDistance = 50
+
+      if (distance > minSwipeDistance) {
+        goToNext()
+      } else if (distance < -minSwipeDistance) {
+        goToPrev()
+      }
+
+      touchStartXRef.current = null
+      touchEndXRef.current = null
+    }
+
+    const handleMouseEnter = () => setIsPaused(true)
+    const handleMouseLeave = () => setIsPaused(false)
+    const handleFocusIn = () => setIsPaused(true)
+    const handleFocusOut = (e: FocusEvent) => {
+      if (!parent.contains(e.relatedTarget as Node | null)) {
+        setIsPaused(false)
+      }
+    }
+
+    parent.addEventListener('touchstart', handleTouchStart, { passive: true })
+    parent.addEventListener('touchmove', handleTouchMove, { passive: true })
+    parent.addEventListener('touchend', handleTouchEnd)
+    parent.addEventListener('mouseenter', handleMouseEnter)
+    parent.addEventListener('mouseleave', handleMouseLeave)
+    parent.addEventListener('focusin', handleFocusIn)
+    parent.addEventListener('focusout', handleFocusOut)
+
+    return () => {
+      parent.removeEventListener('touchstart', handleTouchStart)
+      parent.removeEventListener('touchmove', handleTouchMove)
+      parent.removeEventListener('touchend', handleTouchEnd)
+      parent.removeEventListener('mouseenter', handleMouseEnter)
+      parent.removeEventListener('mouseleave', handleMouseLeave)
+      parent.removeEventListener('focusin', handleFocusIn)
+      parent.removeEventListener('focusout', handleFocusOut)
+    }
+  }, [goToNext, goToPrev])
 
   const activeSlide = HERO_SLIDES[currentIndex] || HERO_SLIDES[0]!
 
   return (
     <div
+      ref={containerRef}
       className="absolute inset-0 overflow-hidden select-none"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      role="region"
       aria-roledescription="carousel"
       aria-label="Carrusel de instalaciones del complejo deportivo AKROS"
     >
@@ -159,7 +211,7 @@ export function HeroCarousel() {
 
       {/* Superposición de Gradientes Cinematográficos para Máximo Contraste */}
       <div
-        className="absolute inset-0 z-1 pointer-events-none"
+        className="absolute inset-0 z-[1] pointer-events-none"
         style={{
           background:
             'linear-gradient(90deg, rgba(8, 29, 21, 0.92) 0%, rgba(8, 29, 21, 0.78) 36%, rgba(8, 29, 21, 0.28) 58%, rgba(8, 29, 21, 0.05) 80%, transparent 100%), linear-gradient(0deg, rgba(10, 29, 22, 0.35) 0%, transparent 28%)',
@@ -225,6 +277,7 @@ export function HeroCarousel() {
                   className="absolute left-0 top-0 bottom-0 rounded-full bg-[var(--brand-accent,#c9ef75)]"
                   style={{
                     animation: `hero-pill-fill ${SLIDE_DURATION_MS}ms linear forwards`,
+                    animationPlayState: isPaused ? 'paused' : 'running',
                   }}
                 />
               )}
