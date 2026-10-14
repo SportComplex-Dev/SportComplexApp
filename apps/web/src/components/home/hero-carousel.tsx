@@ -235,14 +235,14 @@ export function HeroCarousel() {
               aria-selected={isActive}
               aria-label={`Ir a foto ${index + 1}: ${slide.title}`}
               onClick={() => goToSlide(index)}
-              className={`group relative h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] ${
+              className={`group relative h-2 rounded-full overflow-hidden transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] ${
                 isActive ? 'w-8 bg-white/30' : 'w-2 bg-white/30 hover:bg-white/50'
               }`}
             >
               {isActive && (
                 <span
                   key={`progress-${currentIndex}-${isPaused}`}
-                  className="absolute inset-0 rounded-full bg-[var(--brand-accent,#c9ef75)]"
+                  className="absolute left-0 top-0 bottom-0 rounded-full bg-[var(--brand-accent,#c9ef75)]"
                   style={{
                     animation: isPaused
                       ? 'none'
