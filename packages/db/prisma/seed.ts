@@ -11,7 +11,7 @@ if (typeof process.loadEnvFile === "function") {
   } catch {}
 }
 
-import { PeriodicidadPlan, EstadoTorneo } from "@prisma/client";
+import { PeriodicidadPlan, EstadoTorneo, TipoCategoriaServicio } from "@prisma/client";
 import { prisma } from "../src/client";
 
 async function main() {
@@ -107,7 +107,34 @@ async function main() {
 
     console.log(`Usuario administrador creado/actualizado con éxito: ${adminEmail}`);
 
-    // 4. Torneos Oficiales en INSCRIPCIONES_ABIERTAS
+    // 4. Categorías de Servicio para Torneos (CUOTA-001)
+    let catCanchas = await prisma.categoriaServicio.findFirst({
+      where: { nombre: { contains: "Canchas", mode: "insensitive" } },
+    });
+    if (!catCanchas) {
+      catCanchas = await prisma.categoriaServicio.create({
+        data: {
+          nombre: "Canchas",
+          tipo: TipoCategoriaServicio.CANCHA,
+        },
+      });
+      console.log(`Categoría Canchas creada: ${catCanchas.id}`);
+    }
+
+    let catPiscinas = await prisma.categoriaServicio.findFirst({
+      where: { nombre: { contains: "Piscinas", mode: "insensitive" } },
+    });
+    if (!catPiscinas) {
+      catPiscinas = await prisma.categoriaServicio.create({
+        data: {
+          nombre: "Piscinas",
+          tipo: TipoCategoriaServicio.PISCINA,
+        },
+      });
+      console.log(`Categoría Piscinas creada: ${catPiscinas.id}`);
+    }
+
+    // 5. Torneos Oficiales en INSCRIPCIONES_ABIERTAS
     const torneoPadel = await prisma.torneo.findFirst({
       where: { titulo: "Torneo Relámpago Nocturno de Pádel" },
     });
@@ -116,11 +143,8 @@ async function main() {
       const padelService = await prisma.servicio.findFirst({
         where: { nombre: { contains: "Pádel", mode: "insensitive" } },
       });
-      const catCanchas = await prisma.categoriaServicio.findFirst({
-        where: { nombre: { contains: "Canchas", mode: "insensitive" } },
-      });
 
-      const catId = catCanchas?.id ?? 1;
+      const catId = catCanchas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 7);
       startDate.setHours(19, 0, 0, 0);
@@ -166,11 +190,8 @@ async function main() {
       const tenisService = await prisma.servicio.findFirst({
         where: { nombre: { contains: "Tenis", mode: "insensitive" } },
       });
-      const catCanchas = await prisma.categoriaServicio.findFirst({
-        where: { nombre: { contains: "Canchas", mode: "insensitive" } },
-      });
 
-      const catId = catCanchas?.id ?? 1;
+      const catId = catCanchas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 10);
       startDate.setHours(8, 0, 0, 0);
@@ -216,11 +237,8 @@ async function main() {
       const piscinaService = await prisma.servicio.findFirst({
         where: { nombre: { contains: "Piscina", mode: "insensitive" } },
       });
-      const catPiscina = await prisma.categoriaServicio.findFirst({
-        where: { nombre: { contains: "Piscinas", mode: "insensitive" } },
-      });
 
-      const catId = catPiscina?.id ?? 2;
+      const catId = catPiscinas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 14);
       startDate.setHours(9, 0, 0, 0);

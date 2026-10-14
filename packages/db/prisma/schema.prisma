@@ -130,6 +130,7 @@ model Usuario {
   correo       String        @unique @db.VarChar(150)
   passwordHash String?       @map("password_hash") @db.VarChar(255)
   googleSub    String?       @unique @map("google_sub") @db.VarChar(100)
+  clienteStripeId String?    @unique @map("stripe_customer_id") @db.VarChar(100)
   estado       EstadoUsuario @default(PENDIENTE)
   deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
   creadoEn     DateTime      @default(now()) @map("creado_en") @db.Timestamptz
@@ -426,6 +427,7 @@ model Torneo {
   cuposOcupados     Int          @default(0) @map("cupos_ocupados")
   precioInscripcion Decimal      @default(0.00) @map("precio_inscripcion") @db.Decimal(12, 2)
   estado            EstadoTorneo @default(BORRADOR)
+  eliminadoEn       DateTime?    @map("deleted_at") @db.Timestamptz
   creadoEn          DateTime     @default(now()) @map("creado_en") @db.Timestamptz
   actualizadoEn     DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz
 
@@ -436,6 +438,7 @@ model Torneo {
   inscripciones InscripcionTorneo[]
 
   @@index([fechaInicio, estado])
+  @@index([eliminadoEn])
   @@map("torneo")
 }
 
@@ -467,6 +470,7 @@ model InscripcionTorneo {
   ticketUsadoEn    DateTime?               @map("ticket_usado_en") @db.Timestamptz
   ticketUsadoPor   String?                 @map("ticket_usado_por") @db.Uuid
   creadoEn         DateTime                @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn    DateTime                @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
 
   torneo   Torneo   @relation(fields: [torneoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)

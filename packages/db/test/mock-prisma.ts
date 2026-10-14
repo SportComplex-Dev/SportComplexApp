@@ -1434,6 +1434,7 @@ export function createMockPrisma() {
           estado: data.estado ?? "BORRADOR",
           creadoEn: new Date(),
           actualizadoEn: new Date(),
+          eliminadoEn: data.eliminadoEn ?? null,
         };
         torneos.push(item);
 
@@ -1494,6 +1495,11 @@ export function createMockPrisma() {
       },
       async findMany({ where, include, skip, take }: any = {}) {
         let list = [...torneos];
+        if (where?.eliminadoEn === null) {
+          list = list.filter((t) => t.eliminadoEn === null || t.eliminadoEn === undefined);
+        } else if (where?.eliminadoEn !== undefined) {
+          list = list.filter((t) => t.eliminadoEn !== null && t.eliminadoEn !== undefined);
+        }
         if (where?.estado) {
           if (typeof where.estado === "object" && Array.isArray(where.estado.in)) {
             list = list.filter((t) => where.estado.in.includes(t.estado));
@@ -1543,6 +1549,7 @@ export function createMockPrisma() {
         if (data.cuposTotales !== undefined) item.cuposTotales = data.cuposTotales;
         if (data.precioInscripcion !== undefined) item.precioInscripcion = data.precioInscripcion;
         if (data.estado !== undefined) item.estado = data.estado;
+        if (data.eliminadoEn !== undefined) item.eliminadoEn = data.eliminadoEn;
         if (data.cuposOcupados?.increment !== undefined) {
           item.cuposOcupados = (item.cuposOcupados ?? 0) + data.cuposOcupados.increment;
         } else if (data.cuposOcupados !== undefined) {

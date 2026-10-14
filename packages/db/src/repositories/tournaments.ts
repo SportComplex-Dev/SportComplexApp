@@ -430,7 +430,9 @@ export async function listarTorneos(
   options: TournamentDbOptions = {},
 ) {
   const db = options.db ?? prisma;
-  const where: any = {};
+  const where: any = {
+    eliminadoEn: null,
+  };
 
   if (filtros.estado) {
     where.estado = filtros.estado;
@@ -486,7 +488,7 @@ export async function obtenerTorneoPorId(
     },
   });
 
-  if (!torneo) {
+  if (!torneo || torneo.eliminadoEn !== null) {
     throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
   }
 
@@ -696,7 +698,7 @@ export async function eliminarTorneo(
       },
     });
 
-    if (!torneo) {
+    if (!torneo || torneo.eliminadoEn !== null) {
       throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
     }
 
@@ -708,7 +710,7 @@ export async function eliminarTorneo(
     if (tieneInscripciones || torneo.estado !== "BORRADOR") {
       return tx.torneo.update({
         where: { id },
-        data: { estado: "CANCELADO" },
+        data: { estado: "CANCELADO", eliminadoEn: new Date() },
         include: {
           categoria: true,
           bloqueos: { include: { servicio: true } },
@@ -720,7 +722,10 @@ export async function eliminarTorneo(
       await tx.torneoBloqueo.deleteMany({ where: { torneoId: id } });
     }
 
-    return tx.torneo.delete({ where: { id } });
+    return tx.torneo.update({
+      where: { id },
+      data: { estado: "CANCELADO", eliminadoEn: new Date() },
+    });
   };
 
   return db.$transaction ? db.$transaction(runOperation) : runOperation(db);
@@ -1039,7 +1044,7 @@ export async function obtenerDetallePublicoTorneo(
     },
   });
 
-  if (!torneo) {
+  if (!torneo || torneo.eliminadoEn !== null) {
     throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
   }
 
