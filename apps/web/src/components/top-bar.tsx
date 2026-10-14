@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, LogOut, Menu, Moon, Sun, X } from 'lucide-react'
 import { Brand } from '@/components/brand'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
@@ -13,6 +14,7 @@ export function TopBar() {
   const pathname = usePathname()
   const { session, ready, logout } = useApp()
   const [openMenu, setOpenMenu] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
   const { dark, toggleTheme } = useThemeToggle()
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`))
@@ -54,7 +56,7 @@ export function TopBar() {
         { label: 'Inicio', href: '/' },
         { label: 'Servicios', href: '/services' },
         { label: 'Membresías', href: '/portal/membership' },
-        { label: 'Reglamentos', href: '/legal' },
+        { label: 'Reglamentos', href: '/rules' },
       ]
 
   return (
@@ -86,58 +88,67 @@ export function TopBar() {
               Accede al club <ArrowRight size={15} />
             </Link>
           )}
-          <button
+          <motion.button
             type="button"
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.92 }}
             aria-label={openMenu ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={openMenu}
             className="mobile-menu md:hidden"
             onClick={() => setOpenMenu(!openMenu)}
           >
             {openMenu ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {openMenu && (
-        <div className="mobile-nav">
-          {navItems.map(({ label, href }) => (
-            <Link key={href} href={href} onClick={close}>
-              {label}
-              <ArrowRight size={15} />
-            </Link>
-          ))}
-          {!session && (
-            <Link href="/login" onClick={close} className="font-semibold">
-              Accede al club
-              <ArrowRight size={15} />
-            </Link>
-          )}
-          <button
-            type="button"
-            className="mobile-theme-option"
-            aria-pressed={dark}
-            onClick={() => {
-              toggleTheme()
-              close()
-            }}
+      <AnimatePresence>
+        {openMenu && (
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="mobile-nav overflow-hidden"
           >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-            {dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          </button>
-          {ready && session && (
+            {navItems.map(({ label, href }) => (
+              <Link key={href} href={href} onClick={close}>
+                {label}
+                <ArrowRight size={15} />
+              </Link>
+            ))}
+            {!session && (
+              <Link href="/login" onClick={close} className="font-semibold">
+                Accede al club
+                <ArrowRight size={15} />
+              </Link>
+            )}
             <button
               type="button"
-              className="mobile-logout flex items-center justify-between py-3 text-red-500 font-medium"
+              className="mobile-theme-option"
+              aria-pressed={dark}
               onClick={() => {
+                toggleTheme()
                 close()
-                logout()
               }}
             >
-              Cerrar sesión <LogOut size={15} />
+              {dark ? <Sun size={16} /> : <Moon size={16} />}
+              {dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
             </button>
-          )}
-        </div>
-      )}
+            {ready && session && (
+              <button
+                type="button"
+                className="mobile-logout flex items-center justify-between py-3 text-red-500 font-medium"
+                onClick={() => {
+                  close()
+                  logout()
+                }}
+              >
+                Cerrar sesión <LogOut size={15} />
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   )
 }

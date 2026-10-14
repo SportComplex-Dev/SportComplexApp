@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ChevronDown, LogOut } from 'lucide-react'
 import { initials } from '@sportcomplex/core'
 import { useApp } from '@/components/app-provider'
@@ -8,6 +9,7 @@ import { useApp } from '@/components/app-provider'
 export function UserMenu({ variant = 'topbar' }: { variant?: 'topbar' | 'dark' | 'sidebar' }) {
   const { session, logout } = useApp()
   const [open, setOpen] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,8 +34,10 @@ export function UserMenu({ variant = 'topbar' }: { variant?: 'topbar' | 'dark' |
 
   return (
     <div className={`user-menu user-menu-${variant}`} ref={ref}>
-      <button
+      <motion.button
         type="button"
+        whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+        whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
         className={variant === 'sidebar' ? 'admin-user' : 'profile-chip user-trigger'}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -54,27 +58,36 @@ export function UserMenu({ variant = 'topbar' }: { variant?: 'topbar' | 'dark' |
             <span className="user-name hidden lg:inline">{firstName}</span>
           </>
         )}
-        <ChevronDown size={14} className={`user-chevron ${open ? 'user-chevron-open' : ''}`} />
-      </button>
-      {open && (
-        <div role="menu" className="user-dropdown">
-          <div className="user-dropdown-head">
-            <b>{session.name}</b>
-            <small>{session.email}</small>
-          </div>
-          <button
-            role="menuitem"
-            type="button"
-            className="user-logout"
-            onClick={() => {
-              setOpen(false)
-              logout()
-            }}
+        <ChevronDown size={14} className={`user-chevron transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -6 }}
+            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+            className="user-dropdown"
           >
-            <LogOut size={15} /> Cerrar sesión
-          </button>
-        </div>
-      )}
+            <div className="user-dropdown-head">
+              <b>{session.name}</b>
+              <small>{session.email}</small>
+            </div>
+            <button
+              role="menuitem"
+              type="button"
+              className="user-logout"
+              onClick={() => {
+                setOpen(false)
+                logout()
+              }}
+            >
+              <LogOut size={15} /> Cerrar sesión
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

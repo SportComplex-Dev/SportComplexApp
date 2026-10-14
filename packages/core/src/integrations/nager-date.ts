@@ -1,9 +1,11 @@
 import ky from "ky";
+import type * as DbModule from "@sportcomplex/db";
 
-async function getDbFns() {
+async function getDbFns(): Promise<typeof DbModule | null> {
   if (typeof window !== "undefined") return null;
   try {
-    return await import("@sportcomplex/db");
+    const dbPkg = "@sportcomplex/db";
+    return (await import(/* webpackIgnore: true */ dbPkg)) as typeof DbModule;
   } catch {
     return null;
   }

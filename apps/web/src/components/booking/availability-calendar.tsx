@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   CalendarDays,
   CheckCircle2,
@@ -45,6 +46,7 @@ export function AvailabilityCalendar({
   onSelectDate,
   onSelectSlot,
 }: AvailabilityCalendarProps) {
+  const shouldReduceMotion = useReducedMotion()
   const [holidays, setHolidays] = useState<HolidayItem[]>([])
 
   // 1. Generar días con restricción estricta de ventana de 15 días en America/Bogota (TSK-FE-06 / RN-01)
@@ -212,11 +214,13 @@ export function AvailabilityCalendar({
             const isDisabled = day.isBeyondWindow || day.isPast
 
             return (
-              <button
+              <motion.button
                 key={day.dateISO}
                 type="button"
                 disabled={isDisabled}
                 onClick={() => !isDisabled && onSelectDate(day.dateISO)}
+                whileHover={isDisabled || shouldReduceMotion ? undefined : { scale: 1.05 }}
+                whileTap={isDisabled || shouldReduceMotion ? undefined : { scale: 0.95 }}
                 aria-pressed={isSelected}
                 aria-disabled={isDisabled}
                 title={
@@ -274,7 +278,7 @@ export function AvailabilityCalendar({
                 {isDisabled && (
                   <Lock size={10} className="mt-1 text-slate-400 dark:text-slate-600" />
                 )}
-              </button>
+              </motion.button>
             )
           })}
         </div>
@@ -383,11 +387,13 @@ export function AvailabilityCalendar({
             const isDisabled = !slot.isAvailable
 
             return (
-              <button
+              <motion.button
                 key={slot.time}
                 type="button"
                 disabled={isDisabled}
                 onClick={() => !isDisabled && onSelectSlot(slot)}
+                whileHover={isDisabled || shouldReduceMotion ? undefined : { scale: 1.03 }}
+                whileTap={isDisabled || shouldReduceMotion ? undefined : { scale: 0.96 }}
                 aria-pressed={isSelected}
                 aria-disabled={isDisabled}
                 className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[92px] ${
@@ -440,7 +446,7 @@ export function AvailabilityCalendar({
                       : 'Disponible'}
                   </span>
                 </div>
-              </button>
+              </motion.button>
             )
           })}
         </div>

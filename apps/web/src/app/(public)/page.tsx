@@ -16,15 +16,16 @@ import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital
 import { TestimonialsSection } from "@/components/home/testimonials-section";
 import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
+import { HeroCarousel } from "@/components/home/hero-carousel";
 
 export default function HomePage() {
   return (
     <>
       <SplashScreen />
 
-      {/* Hero Cinematográfico */}
+      {/* Hero Cinematográfico con Carrusel Multideporte */}
       <section className="hero-wrap">
-        <div className="hero-image" />
+        <HeroCarousel />
         <div className="hero-content">
           <div className="eyebrow hero-eyebrow">
             <span className="live-dot" /> UN LUGAR PARA LLEGAR MÁS LEJOS
