@@ -154,7 +154,7 @@ Conforme a `ARCHITECTURE.md` §6.2 y `SRS.md`, el sistema implementa una matriz 
 | Ruta / Superficie | Anónimo / Público | `Cliente` | `Empleado_Vendedor` | `Empleado_Lector` | `Administrador` |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | Landing Page (`/`) | Lectura (SSG) | Lectura | Lectura | Lectura | Lectura |
-| Reglamentos (`/legal`) | Lectura (SSG) | Lectura | Lectura | Lectura | Lectura |
+| Reglamentos (`/rules`) | Lectura (SSG) | Lectura | Lectura | Lectura | Lectura |
 | Portal Cliente (`/portal/*`) | Redirección 307 a `/login` | Acceso Total | Denegado (403) | Denegado (403) | Modo Auditor |
 | Taquilla POS (`/pos`) | Redirección 307 a `/login` | Denegado (403) | Operar Turnos | Denegado (403) | Operar Turnos |
 | Escáner Móvil (`/scanner`) | Redirección 307 a `/login` | Denegado (403) | Denegado (403) | Validar QR | Validar QR |

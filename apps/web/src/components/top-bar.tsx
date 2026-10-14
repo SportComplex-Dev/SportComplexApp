@@ -54,7 +54,7 @@ export function TopBar() {
         { label: 'Inicio', href: '/' },
         { label: 'Servicios', href: '/services' },
         { label: 'Membresías', href: '/portal/membership' },
-        { label: 'Reglamentos', href: '/legal' },
+        { label: 'Reglamentos', href: '/rules' },
       ]
 
   return (
