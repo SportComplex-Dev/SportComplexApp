@@ -320,7 +320,13 @@ function VerifyPageContent() {
               <h3 className="text-sm font-bold text-emerald-950">¡Cuenta verificada con éxito!</h3>
               <p className="text-xs text-emerald-700 mt-1">Ya puedes iniciar sesión con tu correo y contraseña.</p>
               <Link
-                href="/login"
+                href={
+                  searchParams.get('redirect') || searchParams.get('next')
+                    ? `/login?redirect=${encodeURIComponent(
+                        (searchParams.get('redirect') || searchParams.get('next'))!
+                      )}`
+                    : '/login'
+                }
                 className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d3b2e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#14513f]"
               >
                 Ir a iniciar sesión <ArrowRight size={16} />

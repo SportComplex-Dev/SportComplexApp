@@ -12,6 +12,18 @@ import { GoogleMark } from '@/components/google-mark'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
 import { signIn } from 'next-auth/react'
 
+function getSafeNextPath() {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  const path = params.get('redirect') || params.get('next')
+  if (!path || !path.startsWith('/') || path.startsWith('//')) return null
+  try {
+    return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+  } catch {
+    return null
+  }
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const { dark, toggleTheme } = useThemeToggle()
@@ -26,7 +38,8 @@ export default function RegisterPage() {
     setError(null)
     setLoading(true)
     try {
-      await signIn('google', { redirectTo: '/portal' })
+      const destination = getSafeNextPath() ?? '/portal'
+      await signIn('google', { redirectTo: destination, callbackUrl: destination })
     } catch {
       setError('No se pudo iniciar sesión con Google. Inténtalo nuevamente.')
       setLoading(false)
@@ -62,7 +75,9 @@ export default function RegisterPage() {
         setError(result?.error?.message || 'No se pudo conectar con el servidor o la base de datos.')
         return
       }
-      router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
+      const safeNext = getSafeNextPath()
+      const nextQuery = safeNext ? `&redirect=${encodeURIComponent(safeNext)}` : ''
+      router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}${nextQuery}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al registrar la cuenta.')
     } finally {
@@ -186,7 +201,18 @@ export default function RegisterPage() {
             </form>
 
             <div className="auth-switch">
-              ¿Ya tienes cuenta? <Link href="/login">Ingresar</Link>
+              ¿Ya tienes cuenta?{' '}
+              <Link
+                href={
+                  typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))
+                    ? `/login?redirect=${encodeURIComponent(
+                        (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))!
+                      )}`
+                    : '/login'
+                }
+              >
+                Ingresar
+              </Link>
             </div>
           </div>
         </div>

@@ -135,6 +135,55 @@ export function calcularDesglosePlan(
 }
 
 /**
+ * Criterios de validación de sesión y rol para la compra de membresía
+ */
+export interface PurchaseAccessValidation {
+  allowed: boolean;
+  status: "UNAUTHENTICATED" | "FORBIDDEN_ROLE" | "ACTIVE_MEMBERSHIP" | "ALLOWED";
+  redirectUrl?: string;
+  message?: string;
+}
+
+export function evaluateMembershipPurchaseAccess(params: {
+  session: { role?: string } | null;
+  planId: number | string;
+  hasVigenteMembership?: boolean;
+}): PurchaseAccessValidation {
+  if (params.hasVigenteMembership) {
+    return {
+      allowed: false,
+      status: "ACTIVE_MEMBERSHIP",
+      message: "Ya posees una membresía VIGENTE en el club.",
+    };
+  }
+
+  if (!params.session) {
+    const targetUrl = `/portal/membership?planId=${params.planId}`;
+    return {
+      allowed: false,
+      status: "UNAUTHENTICATED",
+      redirectUrl: `/login?redirect=${encodeURIComponent(targetUrl)}`,
+      message: "Inicia sesión o regístrate para adquirir tu plan de membresía.",
+    };
+  }
+
+  const role = params.session.role;
+  const isClient = role === "Cliente" || role === "customer";
+  if (!isClient) {
+    return {
+      allowed: false,
+      status: "FORBIDDEN_ROLE",
+      message: "La adquisición de membresías está habilitada exclusivamente para cuentas de Clientes.",
+    };
+  }
+
+  return {
+    allowed: true,
+    status: "ALLOWED",
+  };
+}
+
+/**
  * Realiza la petición para iniciar la sesión de suscripción en Stripe Checkout.
  */
 export async function iniciarSuscripcionStripe(planId: number): Promise<{

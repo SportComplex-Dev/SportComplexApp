@@ -24,4 +24,8 @@ test("perimeter role policy grants only the configured role groups", () => {
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt", "Empleado_Lector"), false);
   assert.equal(isRoleAllowedForPath("/portal", "Administrador"), false);
   assert.equal(isRoleAllowedForPath("/portal", null), false);
+  // /portal/membership es de libre acceso público
+  assert.equal(isRoleAllowedForPath("/portal/membership", null), true);
+  assert.equal(isRoleAllowedForPath("/portal/membership", "Cliente"), true);
+  assert.equal(isRoleAllowedForPath("/portal/membership", "Administrador"), true);
 });

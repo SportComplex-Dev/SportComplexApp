@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   calcularDesglosePlan,
+  evaluateMembershipPurchaseAccess,
   iniciarSuscripcionStripe,
   BENEFICIOS_POR_PERIODICIDAD,
   type PlanMembresiaDTO,
@@ -141,4 +142,60 @@ test("TSK-FE-20: iniciarSuscripcionStripe detecta 401 UNAUTHORIZED", async () =>
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("TSK-FE-20: evaluateMembershipPurchaseAccess valida visitante no autenticado y preserva planId en redirectUrl", () => {
+  const result = evaluateMembershipPurchaseAccess({
+    session: null,
+    planId: 2,
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, "UNAUTHENTICATED");
+  assert.equal(result.redirectUrl, "/login?redirect=%2Fportal%2Fmembership%3FplanId%3D2");
+  assert.ok(result.message);
+});
+
+test("TSK-FE-20: evaluateMembershipPurchaseAccess rechaza rol no cliente (ej. Empleado_Vendedor)", () => {
+  const result = evaluateMembershipPurchaseAccess({
+    session: { role: "Empleado_Vendedor" },
+    planId: 2,
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, "FORBIDDEN_ROLE");
+  assert.equal(result.redirectUrl, undefined);
+  assert.ok(result.message);
+});
+
+test("TSK-FE-20: evaluateMembershipPurchaseAccess rechaza rol no cliente (ej. Administrador)", () => {
+  const result = evaluateMembershipPurchaseAccess({
+    session: { role: "Administrador" },
+    planId: 1,
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, "FORBIDDEN_ROLE");
+});
+
+test("TSK-FE-20: evaluateMembershipPurchaseAccess rechaza compra si ya tiene membresía vigente", () => {
+  const result = evaluateMembershipPurchaseAccess({
+    session: { role: "Cliente" },
+    planId: 3,
+    hasVigenteMembership: true,
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, "ACTIVE_MEMBERSHIP");
+});
+
+test("TSK-FE-20: evaluateMembershipPurchaseAccess permite compra a cliente autenticado", () => {
+  const result = evaluateMembershipPurchaseAccess({
+    session: { role: "Cliente" },
+    planId: 2,
+    hasVigenteMembership: false,
+  });
+
+  assert.equal(result.allowed, true);
+  assert.equal(result.status, "ALLOWED");
 });
