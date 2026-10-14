@@ -66,8 +66,29 @@ test.describe("Flujo 4: Selección de Servicio y Proceso de Reserva", () => {
     await expect(ticketsBtn).toHaveAttribute("href", "/portal/tickets");
   });
 
-  test("4.5 Portal de membresías está protegido por seguridad perimetral", async ({ page }) => {
+  test("4.5 Portal de membresías es de consulta pública y redirige a login al intentar suscribirse sin autenticación", async ({ page }) => {
     await page.goto("/portal/membership");
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/portal\/membership/);
+    await expect(page.locator("h1")).toContainText(/Membresías/i);
+
+    // Esperar respuesta exitosa de la API de planes o contenido visible
+    try {
+      await page.waitForResponse(
+        (res) => res.url().includes("/api/memberships") && res.status() === 200,
+        { timeout: 20000 }
+      );
+    } catch {
+      await page.waitForLoadState("networkidle");
+    }
+
+    // Localizador tolerante que soporta button, a y data-testid
+    const subscribeBtn = page.locator('[data-testid="subscribe-plan-btn"], button:has-text("Suscribirme"), a:has-text("Suscribirme")').first();
+    await subscribeBtn.waitFor({ state: "visible", timeout: 20000 });
+    await expect(subscribeBtn).toBeVisible({ timeout: 20000 });
+    await subscribeBtn.click();
+
+    // Validar redirección a login preservando la intención de compra
+    await page.waitForURL((url) => url.pathname.includes("/login"), { timeout: 20000 });
+    expect(page.url()).toContain("redirect=%2Fportal%2Fmembership");
   });
 });

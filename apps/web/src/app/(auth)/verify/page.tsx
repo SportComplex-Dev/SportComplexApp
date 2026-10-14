@@ -319,12 +319,25 @@ function VerifyPageContent() {
               <CheckCircle2 size={40} className="mx-auto text-emerald-600 mb-2" />
               <h3 className="text-sm font-bold text-emerald-950">¡Cuenta verificada con éxito!</h3>
               <p className="text-xs text-emerald-700 mt-1">Ya puedes iniciar sesión con tu correo y contraseña.</p>
-              <Link
-                href="/login"
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d3b2e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#14513f]"
-              >
-                Ir a iniciar sesión <ArrowRight size={16} />
-              </Link>
+              {(() => {
+                const rawRedirect = searchParams.get('redirect') || searchParams.get('next')
+                const safeRedirect =
+                  rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') && !rawRedirect.includes('\\')
+                    ? rawRedirect
+                    : null
+                return (
+                  <Link
+                    href={
+                      safeRedirect
+                        ? `/login?redirect=${encodeURIComponent(safeRedirect)}`
+                        : '/login'
+                    }
+                    className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d3b2e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#14513f]"
+                  >
+                    Ir a iniciar sesión <ArrowRight size={16} />
+                  </Link>
+                )
+              })()}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">

@@ -182,7 +182,13 @@ export function MembershipsSection() {
 
               <div className="membership-card-cta">
                 <Link
-                  href="/portal/membership"
+                  href={
+                    plan.id === 'active'
+                      ? `/portal/membership?planId=${billingCycle === 'annual' ? 'ANUAL' : 'MENSUAL'}`
+                      : plan.id === 'black'
+                      ? `/portal/membership?planId=${billingCycle === 'annual' ? 'ANUAL' : 'MENSUAL'}`
+                      : '/portal/membership?planId=SEMANAL'
+                  }
                   className={plan.popular ? 'action-button w-full justify-center' : 'membership-outline-btn'}
                 >
                   {plan.ctaText} <ArrowRight size={16} />

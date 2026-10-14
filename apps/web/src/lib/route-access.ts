@@ -24,10 +24,15 @@ const ROUTE_ROLES: ReadonlyArray<{
   },
 ];
 
+const PUBLIC_PORTAL_ROUTES: readonly string[] = ["/portal/membership"];
+
 export function isRoleAllowedForPath(
   pathname: string,
   role: CanonicalRole | null,
 ): boolean {
+  if (PUBLIC_PORTAL_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    return true;
+  }
   const policy = ROUTE_ROLES.find(({ prefixes }) =>
     prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)),
   );
