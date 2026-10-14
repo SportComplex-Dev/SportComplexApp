@@ -59,11 +59,12 @@ jobs:
           APPS_WEB_ENV: ${{ secrets.APPS_WEB_ENV }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: IMAGE_TAG,APPS_WEB_ENV,DEPLOY_SHA,GHCR_PAT,RESEND_API_KEY
+          envs: IMAGE_TAG,APPS_WEB_ENV,DEPLOY_SHA,GHCR_PAT,RESEND_API_KEY,INTERNAL_API_KEY
           script: |
             set -e
 
@@ -93,6 +94,15 @@ jobs:
             if [ -n "$RESEND_API_KEY" ]; then
               printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY" > ~/SportComplexApp/docker/.env
               chmod 600 "$HOME/SportComplexApp/docker/.env"
+            fi
+            # 5c. Key interna compartida web<->n8n (endpoint /api/internal/*).
+            #     Va a ambos .env porque web la verifica y n8n la envía.
+            if [ -n "$INTERNAL_API_KEY" ]; then
+              sed -i '/^INTERNAL_API_KEY=/d' ~/SportComplexApp/docker/.env 2>/dev/null || true
+              printf 'INTERNAL_API_KEY=%s\n' "$INTERNAL_API_KEY" >> ~/SportComplexApp/docker/.env
+              sed -i '/^INTERNAL_API_KEY=/d' ~/SportComplexApp/apps/web/.env
+              printf 'INTERNAL_API_KEY=%s\n' "$INTERNAL_API_KEY" >> ~/SportComplexApp/apps/web/.env
+              chmod 600 "$HOME/SportComplexApp/docker/.env" "$HOME/SportComplexApp/apps/web/.env"
             fi
 
             # 6. Migrar y levantar web/caddy (n8n se levanta tras el import)

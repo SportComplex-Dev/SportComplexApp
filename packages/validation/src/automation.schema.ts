@@ -144,6 +144,38 @@ export type ColombianHolidaySyncPayload = z.infer<
 >;
 
 // ============================================================================
+// WORKFLOW: sincronizacion-festivos (upsert vía endpoint interno)
+// El workflow envía el lote validado a POST /api/internal/festivos en lugar
+// de usar el nodo Postgres con credenciales guardadas.
+// ============================================================================
+
+/**
+ * Un festivo del lote: mismos campos que consume `upsertManyFestivos`.
+ */
+export const FestivoItemSchema = z.object({
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+  nombre: z
+    .string()
+    .min(1, "El nombre es requerido")
+    .max(100, "El nombre no puede exceder 100 caracteres"),
+  anio: z.number().int().min(1).max(9999),
+});
+
+export type FestivoItem = z.infer<typeof FestivoItemSchema>;
+
+/**
+ * Lote de festivos para el endpoint interno. Un año de Colombia tiene
+ * ~20 festivos; el tope de 100 es holgura contra payloads anómalos.
+ */
+export const FestivosBatchSchema = z.object({
+  festivos: z.array(FestivoItemSchema).min(1).max(100),
+});
+
+export type FestivosBatch = z.infer<typeof FestivosBatchSchema>;
+
+// ============================================================================
 // SCHEMAS GENÉRICOS PARA WORKFLOWS
 // ============================================================================
 
