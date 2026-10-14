@@ -60,14 +60,16 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.resend.com/emails",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
             }
           ]
         },
@@ -87,13 +89,7 @@
         0
       ],
       "id": "6ec7375b-07ef-495b-96e0-6352904e9c06",
-      "name": "Enviar Reporte Resend",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "Kh9OT3GVIJLhIvTY",
-          "name": "Header Auth account"
-        }
-      }
+      "name": "Enviar Reporte Resend"
     }
   ],
   "pinData": {},

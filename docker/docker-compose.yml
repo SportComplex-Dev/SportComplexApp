@@ -44,6 +44,7 @@ services:
       NODE_ENV: production
       WEBHOOK_URL: https://n8n.akros.lat/
       GENERIC_TIMEZONE: America/Bogota
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
     volumes:
       - ./data/n8n:/home/node/.n8n
       - ../packages/automation/workflows:/opt/workflows:ro
