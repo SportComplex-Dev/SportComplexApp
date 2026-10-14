@@ -1,29 +1,27 @@
+import { getServicios, getCategorias } from "@sportcomplex/db";
 import { ok, fail } from "@/lib/api-response";
-import {
-  getServicios,
-  getCategorias,
-  getServicios as obtenerServicios,
-  getCategorias as obtenerCategorias,
-} from "@sportcomplex/db";
 
 export const revalidate = 60;
 
+/**
+ * GET /api/public/catalogo
+ * Retorna servicios activos y categorías del complejo deportivo con cache ISR de 60s.
+ */
 export async function GET() {
   try {
-    const fetchServicios = obtenerServicios || getServicios;
-    const fetchCategorias = obtenerCategorias || getCategorias;
-
     const [servicios, categorias] = await Promise.all([
-      fetchServicios({ estado: "ACTIVO" }),
-      fetchCategorias(),
+      getServicios({ estado: "ACTIVO" }),
+      getCategorias(),
     ]);
 
     return ok(
       { servicios, categorias },
-      { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30" }
+      {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      }
     );
   } catch (error: unknown) {
-    console.error("Error en GET /api/public/catalogo:", error);
-    return fail("ERROR_CATALOGO", "No se pudo cargar el catálogo público.", 500);
+    console.error("Error al obtener catálogo público:", error);
+    return fail("SERVER_ERROR", "Error al consultar el catálogo público.", 500);
   }
 }

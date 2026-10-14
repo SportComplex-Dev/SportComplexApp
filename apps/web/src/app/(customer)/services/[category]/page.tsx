@@ -9,12 +9,12 @@ import { categoryIcons } from '@/components/category-icons'
 import { CategoryFilters } from '@/components/category-filters'
 import { IconBox } from '@/components/icon-box'
 import { LiveConditions } from '@/components/live-conditions'
-import { useCatalog } from '@/lib/stores'
+import { usePublicCatalog } from '@/hooks/use-public-catalog'
 
 export default function CategoryCatalogPage() {
   const { category: slug } = useParams<{ category: string }>()
   const category = categoryBySlug(slug)
-  const [catalog] = useCatalog()
+  const { catalog } = usePublicCatalog()
   const [activeFilter, setActiveFilter] = useState('all')
 
   if (!category) notFound()

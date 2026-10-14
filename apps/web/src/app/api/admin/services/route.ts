@@ -24,11 +24,12 @@ import type { EstadoServicio } from "@prisma/client";
  */
 export async function GET(request: Request) {
   try {
-    const authorization = await authorizeApiRequest(["Administrador"]);
+    const authorization = await authorizeApiRequest(["Administrador", "Empleado_Vendedor"]);
     if (!authorization.authorized) return authorization.response;
 
     const { searchParams } = new URL(request.url);
-    const entity = searchParams.get("entity")?.toLowerCase();
+    const rawEntity = searchParams.get("entity") || searchParams.get("entidad");
+    const entity = rawEntity?.toLowerCase();
     const rawCategoriaId = searchParams.get("categoriaId");
     const categoriaId = rawCategoriaId ? parseInt(rawCategoriaId, 10) : undefined;
     const estado = searchParams.get("estado") as EstadoServicio | undefined;

@@ -12,7 +12,7 @@ export function LifestyleAndDigitalPass() {
         <div className="lifestyle-card">
           <div className="lifestyle-media">
             <Image
-              src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1000&q=80"
+              src="/images/catalogo/sports-bar-lounge.webp"
               alt="AKROS Club Lounge y Café Saludable"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
