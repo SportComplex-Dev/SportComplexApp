@@ -113,8 +113,6 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
   });
 
   test("1.8 Carrusel interactivo del Hero rota automáticamente y navega con flechas en extremos y dots centrados", async ({ page }) => {
-    page.on("console", (msg) => console.log(`[BROWSER]: ${msg.type()}: ${msg.text()}`));
-    page.on("pageerror", (err) => console.log(`[PAGE ERROR]: ${err}`));
     await page.goto("/");
     await page.locator(".splash-overlay").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
     const carousel = page.locator('[aria-roledescription="carousel"]');
@@ -125,19 +123,19 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
     await expect(tabs).toHaveCount(5);
 
     // Navegar directamente haciendo click en el tercer tab (índice 2)
-    await tabs.nth(2).evaluate((el: HTMLElement) => el.click());
+    await tabs.nth(2).click();
     await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
 
     // Click en la flecha siguiente (debe pasar al índice 3)
     const nextButton = carousel.getByRole("button", { name: "Siguiente" });
     await expect(nextButton).toBeVisible();
-    await nextButton.evaluate((el: HTMLElement) => el.click());
+    await nextButton.click();
     await expect(tabs.nth(3)).toHaveAttribute("aria-selected", "true");
 
     // Click en la flecha anterior (debe volver al índice 2)
     const prevButton = carousel.getByRole("button", { name: "Anterior" });
     await expect(prevButton).toBeVisible();
-    await prevButton.evaluate((el: HTMLElement) => el.click());
+    await prevButton.click();
     await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   });
 });

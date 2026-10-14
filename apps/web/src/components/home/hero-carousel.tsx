@@ -126,7 +126,7 @@ export function HeroCarousel() {
 
   return (
     <div
-      className="hero-carousel absolute inset-0 z-10 overflow-hidden select-none pointer-events-none"
+      className="hero-carousel absolute inset-0 z-0 overflow-hidden select-none touch-pan-y"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
