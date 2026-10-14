@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export interface HeroSlide {
   id: string
@@ -56,11 +56,10 @@ export const HERO_SLIDES: HeroSlide[] = [
   },
 ]
 
-const SLIDE_DURATION_MS = 6000
+const SLIDE_DURATION_MS = 4000
 
 export function HeroCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
@@ -76,16 +75,14 @@ export function HeroCarousel() {
     setCurrentIndex(index)
   }, [])
 
-  // Autoplay con pausado reactivo por interacción
+  // Autoplay continuo de 4 segundos sin interrupción
   useEffect(() => {
-    if (isPaused) return
-
     const timer = setInterval(() => {
       goToNext()
     }, SLIDE_DURATION_MS)
 
     return () => clearInterval(timer)
-  }, [isPaused, goToNext])
+  }, [goToNext])
 
   // Controles con teclado (Flechas Izquierda / Derecha)
   useEffect(() => {
@@ -130,8 +127,6 @@ export function HeroCarousel() {
   return (
     <div
       className="absolute inset-0 overflow-hidden select-none"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -147,7 +142,7 @@ export function HeroCarousel() {
             aria-hidden={!isActive}
             className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
               isActive ? 'opacity-100 z-0 scale-100' : 'opacity-0 -z-10 scale-105 pointer-events-none'
-            } transform transition-transform duration-[6000ms]`}
+            } transform transition-transform duration-[4000ms]`}
           >
             <Image
               src={slide.src}
@@ -171,58 +166,43 @@ export function HeroCarousel() {
         }}
       />
 
-      {/* Badge de Instalación Activa y Controles del Carrusel */}
-      <div className="absolute top-6 right-6 md:top-8 md:right-12 z-20 flex items-center gap-2">
-        {/* Badge Informativo de la Foto */}
-        <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white shadow-lg animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-[var(--brand-accent,#c9ef75)] animate-pulse" />
-          <span className="text-[11px] font-bold tracking-wider uppercase text-[var(--brand-accent,#c9ef75)]">
-            {activeSlide.tag}
-          </span>
-          <span className="text-white/40 text-xs">•</span>
-          <span className="text-xs font-medium text-white/90 max-w-[200px] truncate">
-            {activeSlide.title}
-          </span>
-        </div>
-
-        {/* Botón de Pausa / Reproducción */}
-        <button
-          type="button"
-          onClick={() => setIsPaused((prev) => !prev)}
-          className="p-2 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/15 text-white/80 hover:text-white transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
-          title={isPaused ? 'Reanudar carrusel automático' : 'Pausar carrusel automático'}
-          aria-label={isPaused ? 'Reanudar carrusel' : 'Pausar carrusel'}
-        >
-          {isPaused ? <Play size={13} /> : <Pause size={13} />}
-        </button>
+      {/* Badge Informativo de la Foto Activa (Esquina superior derecha) */}
+      <div className="absolute top-6 right-6 md:top-8 md:right-12 z-20 hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white shadow-lg animate-fade-in">
+        <span className="w-2 h-2 rounded-full bg-[var(--brand-accent,#c9ef75)] animate-pulse" />
+        <span className="text-[11px] font-bold tracking-wider uppercase text-[var(--brand-accent,#c9ef75)]">
+          {activeSlide.tag}
+        </span>
+        <span className="text-white/40 text-xs">•</span>
+        <span className="text-xs font-medium text-white/90 max-w-[200px] truncate">
+          {activeSlide.title}
+        </span>
       </div>
 
-      {/* Flechas de Navegación Lateral (Desktop / Tablet) */}
-      <div className="absolute right-6 bottom-20 md:right-12 md:bottom-20 z-20 hidden sm:flex items-center gap-2">
-        <button
-          type="button"
-          onClick={goToPrev}
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
-          aria-label="Ver fotografía anterior de las instalaciones"
-          title="Anterior"
-        >
-          <ChevronLeft size={17} />
-        </button>
+      {/* Flecha Izquierda (Extremo Izquierdo) */}
+      <button
+        type="button"
+        onClick={goToPrev}
+        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
+        aria-label="Ver fotografía anterior de las instalaciones"
+        title="Anterior"
+      >
+        <ChevronLeft size={20} />
+      </button>
 
-        <button
-          type="button"
-          onClick={goToNext}
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
-          aria-label="Ver siguiente fotografía de las instalaciones"
-          title="Siguiente"
-        >
-          <ChevronRight size={17} />
-        </button>
-      </div>
+      {/* Flecha Derecha (Extremo Derecho) */}
+      <button
+        type="button"
+        onClick={goToNext}
+        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
+        aria-label="Ver siguiente fotografía de las instalaciones"
+        title="Siguiente"
+      >
+        <ChevronRight size={20} />
+      </button>
 
-      {/* Indicadores de Diapositiva (Pills con Progreso) */}
+      {/* Indicadores de Diapositiva Centrados en la Parte Inferior */}
       <div
-        className="absolute bottom-5 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-12 z-20 flex items-center gap-2"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2"
         role="tablist"
         aria-label="Indicadores de fotos del carrusel"
       >
@@ -241,12 +221,10 @@ export function HeroCarousel() {
             >
               {isActive && (
                 <span
-                  key={`progress-${currentIndex}-${isPaused}`}
+                  key={`progress-${currentIndex}`}
                   className="absolute left-0 top-0 bottom-0 rounded-full bg-[var(--brand-accent,#c9ef75)]"
                   style={{
-                    animation: isPaused
-                      ? 'none'
-                      : `hero-pill-fill ${SLIDE_DURATION_MS}ms linear forwards`,
+                    animation: `hero-pill-fill ${SLIDE_DURATION_MS}ms linear forwards`,
                   }}
                 />
               )}

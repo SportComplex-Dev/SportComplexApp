@@ -112,28 +112,33 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
     await expect(page.getByText(/Contenido estático institucional/i)).toBeVisible();
   });
 
-  test("1.8 Carrusel interactivo del Hero permite pausar y navegar diapositivas", async ({ page, isMobile }) => {
+  test("1.8 Carrusel interactivo del Hero rota automáticamente y navega con flechas en extremos y dots centrados", async ({ page }) => {
     await page.goto("/");
     const carousel = page.locator('[aria-roledescription="carousel"]');
     await expect(carousel).toBeVisible();
 
-    // Controles de diapositivas (tabs)
+    // Controles de diapositivas (tabs) centrados
     const tabs = carousel.getByRole("tab");
     await expect(tabs).toHaveCount(5);
 
     // Primer tab activo por defecto
     await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
 
-    // Click en la segunda diapositiva
-    await tabs.nth(1).click();
+    // Click en la flecha siguiente (extremo derecho)
+    const nextButton = carousel.getByRole("button", { name: "Siguiente" });
+    await expect(nextButton).toBeVisible();
+    await nextButton.click();
     await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
-    await expect(tabs.first()).toHaveAttribute("aria-selected", "false");
 
-    // Botón de pausa / reanudación
-    const pauseButton = carousel.getByRole("button", { name: /Pausar carrusel|Reanudar carrusel/i });
-    await expect(pauseButton).toBeVisible();
-    await pauseButton.click();
-    await expect(pauseButton).toHaveAttribute("aria-label", "Reanudar carrusel");
+    // Click en la flecha anterior (extremo izquierdo)
+    const prevButton = carousel.getByRole("button", { name: "Anterior" });
+    await expect(prevButton).toBeVisible();
+    await prevButton.click();
+    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+
+    // Click directo en dot
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   });
 });
 
