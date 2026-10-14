@@ -20,10 +20,25 @@ jobs:
   headless-e2e:
     name: Pruebas Headless E2E y Visuales
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       AUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.NEXTAUTH_SECRET || 'ci-headless-test-secret-min-32-chars-long' }}
       NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.NEXTAUTH_SECRET || 'ci-headless-test-secret-min-32-chars-long' }}
       NEXTAUTH_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/testdb
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -41,7 +56,24 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
+      - name: Esperar a que PostgreSQL esté listo
+        run: |
+          for i in {1..60}; do
+            pg_isready -h 127.0.0.1 -p 5432 -U postgres && break
+            echo "Esperando a PostgreSQL..."
+            sleep 1
+          done
+
+      - name: Preparar base de datos (migraciones y seed)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/testdb
+        run: |
+          pnpm --filter @sportcomplex/db exec prisma migrate deploy --schema prisma/schema.prisma
+          pnpm --filter @sportcomplex/db run db:seed || true
+
       - name: Compilar aplicación web (Next.js standalone)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/testdb
         run: pnpm --filter web build
 
       - name: Instalar Chromium y dependencias del sistema
