@@ -94,6 +94,17 @@ jobs:
               printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY" > ~/SportComplexApp/docker/.env
               chmod 600 "$HOME/SportComplexApp/docker/.env"
             fi
+            # 5c. Key interna compartida web<->n8n (endpoint /api/internal/*).
+            #     Vive en APPS_WEB_ENV (apps/web/.env); se propaga a docker/.env
+            #     para que n8n la consuma. Sin secrets adicionales.
+            INTERNAL_KEY=$(grep -E '^INTERNAL_API_KEY=' ~/SportComplexApp/apps/web/.env | tail -n 1 | cut -d= -f2-)
+            if [ -n "$INTERNAL_KEY" ]; then
+              sed -i '/^INTERNAL_API_KEY=/d' ~/SportComplexApp/docker/.env 2>/dev/null || true
+              printf 'INTERNAL_API_KEY=%s\n' "$INTERNAL_KEY" >> ~/SportComplexApp/docker/.env
+              chmod 600 "$HOME/SportComplexApp/docker/.env"
+            else
+              echo "AVISO: INTERNAL_API_KEY ausente en APPS_WEB_ENV; /api/internal/* responderá 503"
+            fi
 
             # 6. Migrar y levantar web/caddy (n8n se levanta tras el import)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)
