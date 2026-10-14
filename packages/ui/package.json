@@ -8,17 +8,24 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "lint": "echo \"lint ui (todo)\"",
+    "test": "tsx --test \"src/**/__tests__/**/*.test.tsx\"",
+    "lint": "eslint .",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "motion": "^14.1.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@sportcomplex/config": "workspace:*",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.10",
+    "eslint-plugin-react-hooks": "7.1.1",
     "tailwindcss": "4.3.3",
-    "typescript": "5.7.3",
-    "@types/react": "19.0.10"
+    "tsx": "^4.19.3",
+    "typescript": "5.7.3"
   },
   "peerDependencies": {
     "react": "19.0.0",

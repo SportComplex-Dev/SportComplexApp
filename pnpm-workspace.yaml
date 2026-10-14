@@ -2,6 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  '@prisma/engines': set this to true or false
-  esbuild: set this to true or false
-  prisma: set this to true or false
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+minimumReleaseAgeExclude:
+  - pg-protocol@1.16.1
+  - pg@8.23.1

@@ -14,7 +14,6 @@ export function TicketReceipt(props: {
       <p>
         {props.startTime} → {props.endTime}
       </p>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={props.qrDataUrl} alt="QR de acceso" className="mx-auto h-48 w-48" />
       <p className="no-print">Usa Imprimir → Guardar como PDF (RN-14).</p>
     </article>

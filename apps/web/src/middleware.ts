@@ -1,75 +1,453 @@
 import { NextResponse, type NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { createSupabaseRestClient } from "@/lib/supabase/admin";
+import { authConfig } from "@/auth.config";
+import {
+  extractSupabaseAccessToken,
+  extractSession,
+  escapeIlikePattern,
+  isAccountActive,
+  normalizeEmbeddedRole,
+  normalizeRole,
+  ROLE_HOME,
+  type SessionUser,
+} from "@/lib/session";
+import { isRoleAllowedForPath } from "@/lib/route-access";
 
-// RBAC perimetral — ARCHITECTURE §8.3 + redirección landing §4.1
-// Rutas:
-//  /admin/* + /api/admin/* → Administrador
-//  /pos/* + /api/pos/* → Administrador | Empleado Vendedor
-//  /scanner/* + /api/access/* → Administrador | Empleado Lector
-//  /portal/* → Cliente Activo
-//  (public)/ landing SSG: si hay sesión, 307 al portal según rol.
-
-const ROLE_HOME: Record<string, string> = {
-  Administrador: "/admin/dashboard",
-  Empleado_Vendedor: "/pos",
-  Empleado_Lector: "/scanner",
-  Cliente: "/portal",
-};
-
-function getSessionRole(req: NextRequest): string | null {
-  // Placeholder: lee cookie de sesión Supabase/Auth.
-  // TODO(feature/auth-provider-email): validar JWT real + estado Activo/Inactivo (RN-10).
-  const role = req.cookies.get("sc-role")?.value ?? null;
-  return role;
+interface SupabasePrincipal {
+  id: string;
+  email?: string;
 }
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const role = getSessionRole(req);
+async function verifySupabasePrincipal(req: NextRequest): Promise<SupabasePrincipal | null> {
+  const authorization = req.headers.get("authorization");
+  const bearerToken = authorization?.toLowerCase().startsWith("bearer ")
+    ? authorization.slice(7).trim()
+    : null;
+  const accessToken = bearerToken || extractSupabaseAccessToken(req);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!accessToken || !supabaseUrl || !supabaseAnonKey) return null;
 
-  // 1. Landing pública: redirige autenticados a su portal (307)
-  if (pathname === "/") {
-    if (role && ROLE_HOME[role]) {
+  const supabase = createSupabaseRestClient(supabaseAnonKey);
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error) {
+    if (error.status === 400 || error.status === 401 || error.status === 403) {
+      return null;
+    }
+    throw error;
+  }
+  if (!data.user) return null;
+
+  return {
+    id: data.user.id,
+    email: data.user.email ?? undefined,
+  };
+}
+
+/**
+ * RBAC perimetral y redirección de landing — ARCHITECTURE §4.1 y §8.3
+ *
+ * Flujo perimetral en la raíz (/) y páginas de autenticación (/login, /register):
+ * - Visitante anónimo: Despacha HTML estático (SSG force-static en /) sin coste de CPU por petición (LCP < 1.5s).
+ * - Usuario autenticado: Redirección inmediata 307 a la página base según su rol:
+ *     - Cliente          → /portal
+ *     - Empleado_Vendedor → /pos
+ *     - Empleado_Lector   → /scanner
+ *     - Administrador     → /admin
+ *
+ * Restricciones de rutas protegidas:
+ * - /portal/*               → Cliente activo
+ * - /pos/* y /api/pos/*     → Administrador | Empleado Vendedor
+ * - /scanner/* y /api/access/* → Administrador | Empleado Lector
+ * - /admin/* y /api/admin/* → Administrador
+ */
+
+const { auth: withAuth } = NextAuth(authConfig);
+// Aviso único por proceso cuando la lectura de `usuario` cae a la anon key (ver abajo).
+let warnedAnonAccountLookup = false;
+const protectedRoutePrefixes = [
+  "/admin",
+  "/pos",
+  "/scanner",
+  "/portal",
+  "/api/admin",
+  "/api/pos",
+  "/api/payments/intent",
+  "/api/access",
+  "/api/tickets/verify",
+  "/api/pdf/receipt",
+  "/api/bookings",
+];
+// Client-supplied values are stripped before these middleware-validated claims are forwarded.
+const internalActorHeaders = [
+  "x-sc-authenticated-user-id",
+  "x-sc-authenticated-role",
+];
+
+function createForbiddenResponse(req: NextRequest, message: string) {
+  const acceptsHtml = req.headers.get("accept")?.includes("text/html");
+
+  if (acceptsHtml) {
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>403 - Acceso Denegado | SportComplex</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0b0f17; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1.5rem; box-sizing: border-box; }
+    .card { background: #161e2e; border: 1px solid #273549; border-radius: 0.75rem; padding: 2rem; max-width: 440px; text-align: center; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); }
+    h1 { color: #f87171; font-size: 1.5rem; margin-top: 0; margin-bottom: 0.75rem; }
+    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin: 0.5rem 0; }
+    a { display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.25rem; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 0.5rem; font-weight: 500; font-size: 0.9rem; transition: background 0.15s ease; }
+    a:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>403 - Acceso Denegado</h1>
+    <p><strong>${message}</strong></p>
+    <p>No posees los privilegios requeridos para acceder a este módulo.</p>
+    <a href="/">Ir al inicio</a>
+  </div>
+</body>
+</html>`;
+
+    return new NextResponse(html, {
+      status: 403,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  return NextResponse.json(
+    { success: false, error: { code: "FORBIDDEN", message }, timestamp: new Date().toISOString() },
+    { status: 403 },
+  );
+}
+
+export default withAuth(async (req) => {
+  const { pathname } = req.nextUrl;
+  const isDev = process.env.NODE_ENV !== "production";
+  const queryRole = isDev
+    ? (req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole"))
+    : null;
+  const cookieRole = isDev ? req.cookies.get("sc-role")?.value : null;
+  const effectiveOverride = isDev ? (queryRole || cookieRole) : null;
+
+  const isProtectedRoute = protectedRoutePrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  const needsFreshAccount =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    isProtectedRoute;
+  const authUser = req.auth?.user;
+  let supabasePrincipal: SupabasePrincipal | null = null;
+  if (!authUser && needsFreshAccount) {
+    try {
+      supabasePrincipal = await verifySupabasePrincipal(req);
+    } catch (error: unknown) {
+      console.error("Error al verificar la sesión de Supabase:", error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "AUTHORIZATION_UNAVAILABLE",
+            message: "No se pudo verificar la sesión.",
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 503 },
+      );
+    }
+  }
+  const authRole = normalizeRole(authUser?.role);
+  const session: SessionUser | null = authUser
+    ? authRole
+      ? {
+          role: authRole,
+          status: authUser.estado ?? "ACTIVO",
+          userId: authUser.id,
+          email: authUser.email ?? undefined,
+        }
+      : null
+    : supabasePrincipal
+      ? {
+          role: "Cliente",
+          status: "ACTIVO",
+          userId: supabasePrincipal.id,
+          email: supabasePrincipal.email,
+        }
+    : (effectiveOverride && normalizeRole(effectiveOverride)
+      ? {
+          role: normalizeRole(effectiveOverride)!,
+          status: "ACTIVO",
+          userId: "dev-override",
+          email: "admin@sportcomplex.co",
+        }
+      : (await extractSession(req)));
+  let currentSession = session;
+  if (
+    needsFreshAccount &&
+    currentSession &&
+    currentSession.userId !== "dev-override"
+  ) {
+    const sessionToRefresh = currentSession;
+    if (!sessionToRefresh.userId) {
+      currentSession = null;
+    } else {
+      let account: { id: string; estado: string; deletedAt: Date | null; rol: { nombre: string } | null } | null = null;
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const usingServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const isPlaceholderKey = !supabaseKey || supabaseKey === "service-role-key" || supabaseKey === "anon-key";
+        if (supabaseUrl && supabaseKey && !isPlaceholderKey) {
+          if (!usingServiceRole && !warnedAnonAccountLookup) {
+            warnedAnonAccountLookup = true;
+            console.warn(
+              "middleware: sin SUPABASE_SERVICE_ROLE_KEY, la lectura de `usuario` usa la anon key " +
+                "y queda sujeta a RLS (puede ocultar filas y tratar sesiones válidas como anónimas).",
+            );
+          }
+          const supabase = createSupabaseRestClient(supabaseKey);
+          const { data: userById } = await supabase
+            .from("usuario")
+            .select("id, estado, deleted_at, rol:rol_id(nombre)")
+            .eq("id", sessionToRefresh.userId)
+            .maybeSingle();
+
+          let row = userById;
+          if (!row && supabasePrincipal?.email) {
+            const { data: userByEmail } = await supabase
+              .from("usuario")
+              .select("id, estado, deleted_at, rol:rol_id(nombre)")
+              .ilike("correo", escapeIlikePattern(supabasePrincipal.email))
+              .maybeSingle();
+            row = userByEmail;
+          }
+
+          if (row) {
+            account = {
+              id: row.id,
+              estado: row.estado,
+              deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+              rol: normalizeEmbeddedRole(row.rol),
+            };
+          }
+        }
+      } catch (error: unknown) {
+        console.error("Error al validar el estado de la sesión:", error);
+        if (!authUser) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "AUTHORIZATION_UNAVAILABLE",
+                message: "No se pudo verificar el estado de la cuenta.",
+              },
+              timestamp: new Date().toISOString(),
+            },
+            { status: 503 },
+          );
+        }
+      }
+
+      const isAuthenticationLanding =
+        pathname === "/" || pathname === "/login" || pathname === "/register";
+
+      if (account) {
+        const currentRole = normalizeRole(account.rol?.nombre);
+        if (
+          (account.estado === "PENDIENTE" && !isAuthenticationLanding) ||
+          !currentRole
+        ) {
+          currentSession = null;
+        } else {
+          currentSession = {
+            ...sessionToRefresh,
+            role: currentRole,
+            status: account.deletedAt ? "INACTIVO" : account.estado,
+            userId: account.id,
+          };
+        }
+      } else if (!authUser) {
+        // Solo descartar sesión si no proviene de un token NextAuth firmado
+        currentSession = null;
+      }
+    }
+  }
+
+  const status = currentSession?.status ?? "ACTIVO";
+  const isActive = currentSession !== null && isAccountActive(status);
+  const role = currentSession && isActive ? currentSession.role : null;
+  const continueRequest = () => {
+    const requestHeaders = new Headers(req.headers);
+    for (const header of internalActorHeaders) requestHeaders.delete(header);
+    if (currentSession && isActive && role && currentSession.userId) {
+      requestHeaders.set("x-sc-authenticated-user-id", currentSession.userId);
+      requestHeaders.set("x-sc-authenticated-role", role);
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  };
+
+  // 1. Landing pública (/) y páginas de login/registro (/login, /register):
+  // Si el usuario ya está autenticado, redirigir con 307 a su portal según rol (o a /verify si su cuenta está PENDIENTE)
+  if (pathname === "/" || pathname === "/login" || pathname === "/register") {
+    if (status.toUpperCase() === "PENDIENTE") {
+      return NextResponse.redirect(new URL("/verify", req.url), 307);
+    }
+    if (role && isAccountActive(status) && ROLE_HOME[role]) {
       const url = req.nextUrl.clone();
       url.pathname = ROLE_HOME[role];
       return NextResponse.redirect(url, 307);
     }
-    return NextResponse.next();
+    // Anónimo: continúa sin cómputo hacia la landing SSG o formulario
+    return continueRequest();
   }
 
-  // 2. RBAC
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    if (role !== "Administrador")
+  if (isProtectedRoute && currentSession && !isActive) {
+    return createForbiddenResponse(req, "La cuenta no está activa");
+  }
+
+  // 2. Control perimetral para API Routes protegidas (401 si no hay sesión, 403 si rol no autorizado)
+  if (pathname.startsWith("/api/admin")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Administrador" }, timestamp: new Date().toISOString() },
         { status: 403 },
       );
+    }
+    return continueRequest();
   }
 
-  if (pathname.startsWith("/pos") || pathname.startsWith("/api/pos")) {
-    if (role !== "Administrador" && role !== "Empleado_Vendedor")
+  if (pathname.startsWith("/api/pos")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Vendedor" }, timestamp: new Date().toISOString() },
         { status: 403 },
       );
+    }
+    return continueRequest();
   }
 
-  if (pathname.startsWith("/scanner") || pathname.startsWith("/api/access")) {
-    if (role !== "Administrador" && role !== "Empleado_Lector")
+  if (pathname.startsWith("/api/access")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Lector" }, timestamp: new Date().toISOString() },
         { status: 403 },
       );
+    }
+    return continueRequest();
   }
 
+  if (pathname.startsWith("/api/tickets/verify")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Lector" }, timestamp: new Date().toISOString() },
+        { status: 403 },
+      );
+    }
+    return continueRequest();
+  }
+
+  if (pathname.startsWith("/api/pdf/receipt")) {
+    if (!role) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Sesión requerida" }, timestamp: new Date().toISOString() },
+        { status: 401 },
+      );
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "Requiere rol Cliente o personal de taquilla" }, timestamp: new Date().toISOString() },
+        { status: 403 },
+      );
+    }
+    return continueRequest();
+  }
+
+  // 3. Control perimetral para páginas protegidas (Web Views)
   if (pathname.startsWith("/portal")) {
-    if (!role)
+    if (!currentSession) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
-    // TODO: validar estado Activo (bloqueo Pendiente/Inactivo)
+    }
+    if (status.toUpperCase() === "PENDIENTE") {
+      return NextResponse.redirect(new URL("/verify", req.url), 307);
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return createForbiddenResponse(req, "Acceso exclusivo para clientes");
+    }
+    return continueRequest();
   }
 
-  return NextResponse.next();
-}
+  if (pathname.startsWith("/admin")) {
+    if (!role) {
+      return NextResponse.redirect(new URL("/login", req.url), 307);
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return createForbiddenResponse(req, "Requiere rol Administrador");
+    }
+    const res = continueRequest();
+    if (queryRole) {
+      res.cookies.set("sc-role", queryRole, { path: "/", maxAge: 60 * 60 * 24 });
+    }
+    return res;
+  }
+
+  if (pathname.startsWith("/pos")) {
+    if (!role) {
+      return NextResponse.redirect(new URL("/login", req.url), 307);
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return createForbiddenResponse(req, "Requiere rol Vendedor");
+    }
+    return continueRequest();
+  }
+
+  if (pathname.startsWith("/scanner")) {
+    if (!role) {
+      return NextResponse.redirect(new URL("/login", req.url), 307);
+    }
+    if (!isRoleAllowedForPath(pathname, role)) {
+      return createForbiddenResponse(req, "Requiere rol Lector");
+    }
+    return continueRequest();
+  }
+
+  const res = continueRequest();
+  if (queryRole) {
+    res.cookies.set("sc-role", queryRole, { path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return res;
+});
 
 export const config = {
-  matcher: ["/", "/portal/:path*", "/pos/:path*", "/scanner/:path*", "/admin/:path*", "/api/:path*"],
+  matcher: ["/", "/login", "/register", "/portal/:path*", "/pos/:path*", "/scanner/:path*", "/admin/:path*", "/api/:path*"],
 };

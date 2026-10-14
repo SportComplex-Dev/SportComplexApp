@@ -364,3 +364,10 @@ ALTER TABLE "inhabilitacion_servicio" ADD CONSTRAINT "inhabilitacion_servicio_se
 
 -- AddForeignKey
 ALTER TABLE "inhabilitacion_servicio" ADD CONSTRAINT "inhabilitacion_servicio_admin_id_fkey" FOREIGN KEY ("admin_id") REFERENCES "usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddCheckConstraints
+ALTER TABLE "servicio" ADD CONSTRAINT "servicio_capacidad_maxima_check" CHECK (capacidad_maxima > 0);
+
+ALTER TABLE "franja_horaria" ADD CONSTRAINT "franja_horaria_hora_fin_hora_inicio_check" CHECK (hora_fin > hora_inicio);
+
+ALTER TABLE "disponibilidad" ADD CONSTRAINT "disponibilidad_cupos_ocupados_check" CHECK (cupos_ocupados BETWEEN 0 AND cupos_totales);
