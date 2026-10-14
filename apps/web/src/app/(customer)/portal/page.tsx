@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import {
   ArrowRight,
   CalendarCheck,
@@ -50,6 +51,7 @@ export default function CustomerDashboardPage() {
   const today = useToday()
 
   // Tabs de HU-13 / RF-12: Activas, Historial, Canceladas
+  const shouldReduceMotion = useReducedMotion()
   const [activeTab, setActiveTab] = useState<TabType>('activas')
   const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
   const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
@@ -200,36 +202,83 @@ export default function CustomerDashboardPage() {
               <div className="eyebrow text-xs">AUTOGESTIÓN Y TIQUETES (RF-12)</div>
               <h2 className="text-xl font-bold tracking-tight mt-1">Mis Pases y Reservas</h2>
             </div>
-            <div className="portal-tabs-nav">
-              <button
+            <div className="portal-tabs-nav" role="tablist" aria-label="Filtro de reservas">
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'activas' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'activas'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'activas' ? 'active' : ''}`}
                 onClick={() => setActiveTab('activas')}
               >
-                Reservas Activas
-                <span className="portal-tab-badge">{activeBookings.length}</span>
-              </button>
-              <button
+                {activeTab === 'activas' && (
+                  <motion.span
+                    layoutId="activePortalTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Reservas Activas
+                  <span className="portal-tab-badge">{activeBookings.length}</span>
+                </span>
+              </motion.button>
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'historial'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'historial' ? 'active' : ''}`}
                 onClick={() => setActiveTab('historial')}
               >
-                Historial de Compras
-                <span className="portal-tab-badge">{historyBookings.length}</span>
-              </button>
-              <button
+                {activeTab === 'historial' && (
+                  <motion.span
+                    layoutId="activePortalTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Historial de Compras
+                  <span className="portal-tab-badge">{historyBookings.length}</span>
+                </span>
+              </motion.button>
+              <motion.button
                 type="button"
-                className={`portal-tab-btn ${activeTab === 'canceladas' ? 'active' : ''}`}
+                role="tab"
+                aria-selected={activeTab === 'canceladas'}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className={`portal-tab-btn relative overflow-hidden ${activeTab === 'canceladas' ? 'active' : ''}`}
                 onClick={() => setActiveTab('canceladas')}
               >
-                Canceladas
-                <span className="portal-tab-badge">{cancelledBookings.length}</span>
-              </button>
+                {activeTab === 'canceladas' && (
+                  <motion.span
+                    layoutId="activePortalTab"
+                    className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-xl -z-0 dark:bg-[#1a3828]"
+                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  Canceladas
+                  <span className="portal-tab-badge">{cancelledBookings.length}</span>
+                </span>
+              </motion.button>
             </div>
           </div>
 
-          {/* Listado de Reservas de la Pestaña Activa */}
-          {currentTabItems.length === 0 ? (
+          {/* Listado de Reservas de la Pestaña Activa con Transición Suave */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+            >
+              {currentTabItems.length === 0 ? (
             <div className="demo-card text-center py-12">
               <Ticket size={36} className="mx-auto text-[var(--subtle)] mb-3 opacity-60" />
               <b className="block text-base">No hay reservas en esta categoría</b>
@@ -249,7 +298,11 @@ export default function CustomerDashboardPage() {
               {currentTabItems.map((booking) => {
                 const isConfirmed = booking.status === 'Confirmada'
                 return (
-                  <div key={booking.id} className="portal-ticket-item">
+                  <motion.div
+                    key={booking.id}
+                    whileHover={shouldReduceMotion ? undefined : { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } }}
+                    className="portal-ticket-item transition-colors"
+                  >
                     <div className="portal-ticket-info">
                       <div className="flex items-center gap-2.5">
                         <b className="text-base tracking-tight">{booking.service}</b>
@@ -332,12 +385,14 @@ export default function CustomerDashboardPage() {
                         </>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 )
               })}
             </div>
           )}
-        </section>
+          </motion.div>
+        </AnimatePresence>
+      </section>
 
         {/* Sección Hecho para Ti: Catálogo de Servicios */}
         <div className="section-heading dashboard-heading">
@@ -404,76 +459,89 @@ export default function CustomerDashboardPage() {
       </main>
 
       {/* Modal QR de Alta Definición para Torniquetes (RF-12 / RF-10) */}
-      {selectedTicket && (
-        <div
-          className="qr-modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="qr-modal-title"
-          onClick={() => setSelectedTicket(null)}
-        >
-          <div className="qr-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              aria-label="Cerrar modal de QR"
-              onClick={() => setSelectedTicket(null)}
+      <AnimatePresence>
+        {selectedTicket && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="qr-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qr-modal-title"
+            onClick={() => setSelectedTicket(null)}
+          >
+            <motion.div
+              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 14 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="qr-modal-dialog"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X size={18} />
-            </button>
-
-            <span className="eyebrow justify-center text-xs">PASE DE ACCESO DIGITAL</span>
-            <h2 id="qr-modal-title" className="text-xl font-bold tracking-tight mt-1 mb-1">
-              {selectedTicket.service}
-            </h2>
-            <p className="text-xs text-[var(--subtle)]">
-              Sede {selectedTicket.sede} · {formatDate(selectedTicket.date)}, {selectedTicket.time}
-            </p>
-
-            {/* Código QR en Alta Definición */}
-            <QRGraphicHD code={selectedTicket.code} />
-
-            <AccessWindowIndicator
-              date={selectedTicket.date}
-              time={selectedTicket.time}
-              accessWindowStart={selectedTicket.accessWindowStart}
-              accessWindowEnd={selectedTicket.accessWindowEnd}
-            />
-
-            <div className="mt-2 mb-3">
-              <b className="text-lg font-mono tracking-widest block text-[var(--ink)]">
-                {selectedTicket.code}
-              </b>
-              <span className="text-xs text-[var(--subtle)] mt-0.5 block">
-                Titular: <strong>{selectedTicket.client}</strong> · {selectedTicket.attendees}{' '}
-                {selectedTicket.attendees === 1 ? 'cupo' : 'cupos'}
-              </span>
-            </div>
-
-            <div className="qr-turnstile-hint">
-              <ShieldCheck size={16} className="text-[var(--brand-accent)] shrink-0" />
-              <span>Pase transferible sin biometría. Acerca la pantalla al lector óptico del torniquete.</span>
-            </div>
-
-            <div className="qr-modal-actions">
               <button
                 type="button"
-                className="action-button text-xs py-2 px-4 gap-2"
-                onClick={() => handlePrintTicket(selectedTicket)}
-              >
-                <Printer size={15} /> Imprimir / PDF
-              </button>
-              <button
-                type="button"
-                className="calendar-shortcut text-xs py-2 px-4"
+                className="modal-close"
+                aria-label="Cerrar modal de QR"
                 onClick={() => setSelectedTicket(null)}
               >
-                Cerrar
+                <X size={18} />
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+              <span className="eyebrow justify-center text-xs">PASE DE ACCESO DIGITAL</span>
+              <h2 id="qr-modal-title" className="text-xl font-bold tracking-tight mt-1 mb-1">
+                {selectedTicket.service}
+              </h2>
+              <p className="text-xs text-[var(--subtle)]">
+                Sede {selectedTicket.sede} · {formatDate(selectedTicket.date)}, {selectedTicket.time}
+              </p>
+
+              {/* Código QR en Alta Definición */}
+              <QRGraphicHD code={selectedTicket.code} />
+
+              <AccessWindowIndicator
+                date={selectedTicket.date}
+                time={selectedTicket.time}
+                accessWindowStart={selectedTicket.accessWindowStart}
+                accessWindowEnd={selectedTicket.accessWindowEnd}
+              />
+
+              <div className="mt-2 mb-3">
+                <b className="text-lg font-mono tracking-widest block text-[var(--ink)]">
+                  {selectedTicket.code}
+                </b>
+                <span className="text-xs text-[var(--subtle)] mt-0.5 block">
+                  Titular: <strong>{selectedTicket.client}</strong> · {selectedTicket.attendees}{' '}
+                  {selectedTicket.attendees === 1 ? 'cupo' : 'cupos'}
+                </span>
+              </div>
+
+              <div className="qr-turnstile-hint">
+                <ShieldCheck size={16} className="text-[var(--brand-accent)] shrink-0" />
+                <span>Pase transferible sin biometría. Acerca la pantalla al lector óptico del torniquete.</span>
+              </div>
+
+              <div className="qr-modal-actions">
+                <button
+                  type="button"
+                  className="action-button text-xs py-2 px-4 gap-2"
+                  onClick={() => handlePrintTicket(selectedTicket)}
+                >
+                  <Printer size={15} /> Imprimir / PDF
+                </button>
+                <button
+                  type="button"
+                  className="calendar-shortcut text-xs py-2 px-4"
+                  onClick={() => setSelectedTicket(null)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Comprobante en formato imprimible PDF */}
       <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} />

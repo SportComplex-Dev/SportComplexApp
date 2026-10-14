@@ -106,3 +106,4 @@ test('Accessibility & Reduced Motion (WCAG 2.2): globals.css desactiva transform
   assert.ok(css.includes('animation: none !important;'), 'Debe cancelar animaciones en modo reducido')
   assert.ok(css.includes('transition: none !important;'), 'Debe cancelar transiciones en modo reducido')
 })
+

@@ -20,10 +20,10 @@ import {
 } from '../index'
 
 // ============================================================================
-// SCRUM-172: Tests de Componentes UI y Microinteracciones
+// SCRUM-172: Tests de Componentes UI y Microinteracciones (Motion & WCAG 2.2)
 // ============================================================================
 
-test('Button (SCRUM-172): Renderiza con clase base interactive-button y microinteracciones de active/focus', () => {
+test('Button (SCRUM-172): Renderiza con clase base interactive-button y microinteracciones accesibles de foco', () => {
   const html = renderToStaticMarkup(
     <Button variant="default" size="default">
       Reservar ahora
@@ -32,11 +32,10 @@ test('Button (SCRUM-172): Renderiza con clase base interactive-button y microint
 
   // Debe incluir la clase semántica global interactive-button
   assert.ok(html.includes('interactive-button'), 'Debe incluir interactive-button')
-  // Debe incluir feedback activo de pulsación (active:scale-[0.98])
-  assert.ok(html.includes('active:scale-[0.98]'), 'Debe incluir active:scale')
-  // Debe incluir soporte accesible de foco visible
-  assert.ok(html.includes('focus-visible:ring-2'), 'Debe incluir foco visible accesible')
-  assert.ok(html.includes('focus-visible:ring-[#1d6048]'), 'Debe usar el token de foco semántico')
+  // Debe incluir soporte accesible de foco visible WCAG 2.2
+  assert.ok(html.includes('focus-visible:ring-2'), 'Debe incluir anillo de foco visible')
+  assert.ok(html.includes('focus-visible:ring-primary'), 'Debe usar el anillo de foco del tema primario')
+  assert.ok(html.includes('focus-visible:ring-offset-2'), 'Debe incluir separación ring-offset')
   // Debe respetar movimiento reducido
   assert.ok(html.includes('motion-reduce:transform-none'), 'Debe respetar prefers-reduced-motion')
   // Debe preservar el contenido
@@ -57,21 +56,31 @@ test('Button (SCRUM-172): Preserva variantes (brand, accent, secondary, destruct
   )
   assert.ok(customHtml.includes('my-custom-class'), 'Preserva clases personalizadas')
 
-  // Variante link no debe tener escalado activo que salte el texto
   const linkHtml = renderToStaticMarkup(<Button variant="link">Link</Button>)
-  assert.ok(!linkHtml.includes('active:scale-[0.98]'), 'Variante link evita distorsión de escala')
+  assert.ok(linkHtml.includes('text-primary underline-offset-4'), 'Variante link preserva estilo accesible')
 })
 
-test('Button (SCRUM-172): Respeta estado disabled sin permitir microinteracciones activas', () => {
-  const html = renderToStaticMarkup(
+test('Button (SCRUM-172): Respeta estado disabled y estado isLoading con aria-disabled y aria-busy', () => {
+  // 1. Estado disabled
+  const disabledHtml = renderToStaticMarkup(
     <Button disabled variant="default">
       Deshabilitado
     </Button>
   )
-  assert.ok(html.includes('disabled'), 'El atributo disabled debe estar presente')
-  assert.ok(html.includes('disabled:pointer-events-none'), 'Debe bloquear eventos cuando disabled')
-  assert.ok(html.includes('disabled:opacity-50'), 'Debe atenuar opacidad cuando disabled')
-  assert.ok(html.includes('disabled:transform-none'), 'Debe desactivar transforms cuando disabled')
+  assert.ok(disabledHtml.includes('disabled=""') || disabledHtml.includes('disabled'), 'El atributo disabled debe estar presente')
+  assert.ok(disabledHtml.includes('aria-disabled="true"'), 'Debe comunicar aria-disabled a lectores de pantalla')
+  assert.ok(disabledHtml.includes('disabled:pointer-events-none'), 'Debe bloquear eventos cuando disabled')
+  assert.ok(disabledHtml.includes('disabled:opacity-50'), 'Debe atenuar opacidad cuando disabled')
+  assert.ok(disabledHtml.includes('disabled:transform-none'), 'Debe desactivar transforms cuando disabled')
+
+  // 2. Estado isLoading
+  const loadingHtml = renderToStaticMarkup(
+    <Button isLoading variant="default">
+      Guardando...
+    </Button>
+  )
+  assert.ok(loadingHtml.includes('aria-busy="true"'), 'Debe comunicar aria-busy="true"')
+  assert.ok(loadingHtml.includes('animate-spin'), 'Debe renderizar spinner accesible')
 })
 
 test('Card (SCRUM-172): Distingue entre tarjeta informativa (default) y tarjeta interactiva', () => {
@@ -89,8 +98,10 @@ test('Card (SCRUM-172): Distingue entre tarjeta informativa (default) y tarjeta 
 
   assert.ok(!infoHtml.includes('interactive-card'), 'Card informativa NO debe tener clase interactive-card')
   assert.ok(!infoHtml.includes('cursor-pointer'), 'Card informativa NO debe tener cursor-pointer')
-  assert.ok(!infoHtml.includes('hover:-translate-y-0.5'), 'Card informativa NO debe tener elevación en hover')
+  assert.ok(!infoHtml.includes('role="button"'), 'Card informativa NO debe simular ser un botón')
+  assert.ok(!infoHtml.includes('data-interactive="true"'), 'Card informativa NO debe tener data-interactive')
   assert.ok(infoHtml.includes('Horario de atención'), 'Contenido preservado')
+  assert.ok(infoHtml.includes('data-slot="card"'), 'Estructura semántica preservada')
 
   // 2. Tarjeta interactiva con interactive={true}
   const interactiveHtml = renderToStaticMarkup(
@@ -103,33 +114,44 @@ test('Card (SCRUM-172): Distingue entre tarjeta informativa (default) y tarjeta 
 
   assert.ok(interactiveHtml.includes('interactive-card'), 'Card interactiva debe tener clase interactive-card')
   assert.ok(interactiveHtml.includes('cursor-pointer'), 'Card interactiva debe tener cursor-pointer')
-  assert.ok(interactiveHtml.includes('hover:-translate-y-0.5'), 'Card interactiva debe tener elevación suave en hover')
-  assert.ok(interactiveHtml.includes('active:translate-y-0'), 'Card interactiva debe estabilizarse en active')
+  assert.ok(interactiveHtml.includes('hover:shadow-xl'), 'Card interactiva debe tener elevación envolvente shadow-xl')
+  assert.ok(interactiveHtml.includes('hover:border-primary/50'), 'Card interactiva debe tener realce de borde')
   assert.ok(interactiveHtml.includes('focus-visible:ring-2'), 'Card interactiva debe tener foco visible accesible')
+  assert.ok(interactiveHtml.includes('role="button"'), 'Card interactiva debe exponer role="button"')
+  assert.ok(interactiveHtml.includes('tabindex="0"'), 'Card interactiva debe ser navegable con teclado')
   assert.ok(interactiveHtml.includes('data-interactive="true"'), 'Card interactiva marca atributo semántico')
 })
 
-test('Badge (SCRUM-172): Distingue entre badge informativo y badge interactivo sin falso hover', () => {
+test('Badge (SCRUM-172): Distingue entre badge informativo, interactivo y con estado en vivo (isLive / pulse)', () => {
   // 1. Badge puramente informativo (default)
   const infoBadge = renderToStaticMarkup(<Badge variant="success">CONFIRMADA</Badge>)
   assert.ok(!infoBadge.includes('interactive-badge'), 'Badge informativo no debe tener interactive-badge')
   assert.ok(!infoBadge.includes('cursor-pointer'), 'Badge informativo no debe tener cursor-pointer')
-  assert.ok(!infoBadge.includes('hover:-translate-y-0.5'), 'Badge informativo no debe elevarse en hover')
-  assert.ok(!infoBadge.includes('active:scale-95'), 'Badge informativo no debe escalarse al hacer click')
+  assert.ok(!infoBadge.includes('role="button"'), 'Badge informativo no debe tener role="button"')
   assert.ok(infoBadge.includes('CONFIRMADA'), 'Badge informativo renderiza texto')
 
-  // 2. Badge interactivo (interactive={true})
+  // 2. Badge interactivo (interactive={true}) con selección
   const interactiveBadge = renderToStaticMarkup(
-    <Badge variant="secondary" interactive>
+    <Badge variant="secondary" interactive isSelected={true}>
       Filtro Tenis
     </Badge>
   )
   assert.ok(interactiveBadge.includes('interactive-badge'), 'Badge interactivo debe tener interactive-badge')
   assert.ok(interactiveBadge.includes('cursor-pointer'), 'Badge interactivo debe tener cursor-pointer')
-  assert.ok(interactiveBadge.includes('hover:-translate-y-0.5'), 'Badge interactivo tiene microinteracción hover')
-  assert.ok(interactiveBadge.includes('active:scale-95'), 'Badge interactivo tiene respuesta táctil active')
+  assert.ok(interactiveBadge.includes('role="button"'), 'Badge interactivo debe exponer role="button"')
+  assert.ok(interactiveBadge.includes('tabindex="0"'), 'Badge interactivo debe tener tabIndex')
+  assert.ok(interactiveBadge.includes('aria-pressed="true"'), 'Badge interactivo comunica estado aria-pressed')
   assert.ok(interactiveBadge.includes('focus-visible:ring-2'), 'Badge interactivo tiene foco visible accesible')
-  assert.ok(interactiveBadge.includes('data-interactive="true"'), 'Badge interactivo tiene atributo semántico')
+
+  // 3. Badge en vivo (isLive={true})
+  const liveBadge = renderToStaticMarkup(
+    <Badge variant="success" isLive>
+      Disponible Ahora
+    </Badge>
+  )
+  assert.ok(liveBadge.includes('role="status"'), 'Badge en vivo debe exponer role="status"')
+  assert.ok(liveBadge.includes('aria-live="polite"'), 'Badge en vivo debe declarar aria-live="polite"')
+  assert.ok(liveBadge.includes('animate-pulse'), 'Badge en vivo debe incluir micro-pulso')
 })
 
 test('Badge (SCRUM-172): Preserva todas las variantes semánticas existentes', () => {

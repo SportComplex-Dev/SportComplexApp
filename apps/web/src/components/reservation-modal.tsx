@@ -24,12 +24,12 @@ export function ReservationModal({
   const total = isCourt || isPrivatePool ? item.price : item.price * attendees
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={close}>
+    <div className="modal-backdrop animate-in fade-in-0 duration-200" role="presentation" onClick={close}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="reservation-modal"
+        className="reservation-modal animate-in fade-in-0 zoom-in-95 duration-200"
         onClick={(event) => event.stopPropagation()}
       >
         <button onClick={close} className="modal-close" aria-label="Cerrar">

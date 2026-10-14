@@ -8,14 +8,12 @@ export interface PageTransitionProps {
 }
 
 /**
- * PageTransition component (SCRUM-173)
- * Provides smooth, flicker-free view transitions between routes.
- * Driven by standard CSS tokens and keyframes (--motion-duration-normal and --motion-ease-out).
- * Automatically respects prefers-reduced-motion: reduce without layout shifts.
+ * PageTransition Component (SCRUM-173)
+ * Semantic view wrapper used across route group templates.
  */
 export function PageTransition({ children, className = '' }: PageTransitionProps) {
   return (
-    <div className={`page-transition ${className}`.trim()}>
+    <div className={`page-transition w-full ${className}`.trim()}>
       {children}
     </div>
   )

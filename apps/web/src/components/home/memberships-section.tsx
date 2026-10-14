@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Check, Sparkles, Zap } from 'lucide-react'
 
 interface PlanTier {
@@ -75,6 +76,7 @@ const PLANS: PlanTier[] = [
 
 export function MembershipsSection() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly')
+  const shouldReduceMotion = useReducedMotion()
 
   return (
     <section className="section-shell memberships-section">
@@ -90,22 +92,42 @@ export function MembershipsSection() {
           zona húmeda y descuento del 30% en pistas (RN-08).
         </p>
 
-        {/* Toggle Mensual / Anual */}
+        {/* Toggle Mensual / Anual con layoutId deslizante */}
         <div className="membership-toggle-wrap">
-          <button
+          <motion.button
             type="button"
-            className={`membership-toggle-btn ${billingCycle === 'monthly' ? 'toggle-active' : ''}`}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            className={`membership-toggle-btn relative ${billingCycle === 'monthly' ? 'toggle-active' : ''}`}
             onClick={() => setBillingCycle('monthly')}
           >
-            Facturación Mensual
-          </button>
-          <button
+            {billingCycle === 'monthly' && (
+              <motion.span
+                layoutId="activeBillingCycle"
+                className="absolute inset-0 rounded-full bg-[#123e30] border border-[#c9ef75] -z-0 dark:bg-[#1a3828]"
+                transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">Facturación Mensual</span>
+          </motion.button>
+          <motion.button
             type="button"
-            className={`membership-toggle-btn ${billingCycle === 'annual' ? 'toggle-active' : ''}`}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            className={`membership-toggle-btn relative ${billingCycle === 'annual' ? 'toggle-active' : ''}`}
             onClick={() => setBillingCycle('annual')}
           >
-            Plan Anual <span className="annual-save-pill">-20% AHORRO</span>
-          </button>
+            {billingCycle === 'annual' && (
+              <motion.span
+                layoutId="activeBillingCycle"
+                className="absolute inset-0 rounded-full bg-[#123e30] border border-[#c9ef75] -z-0 dark:bg-[#1a3828]"
+                transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-1.5">
+              Plan Anual <span className="annual-save-pill">-20% AHORRO</span>
+            </span>
+          </motion.button>
         </div>
       </div>
 
@@ -117,9 +139,10 @@ export function MembershipsSection() {
             : plan.price
 
           return (
-            <div
+            <motion.div
               key={plan.id}
-              className={`membership-card ${plan.popular ? 'membership-card-popular' : ''}`}
+              whileHover={shouldReduceMotion ? undefined : { y: -6, transition: { type: 'spring', stiffness: 320, damping: 20 } }}
+              className={`membership-card transition-colors ${plan.popular ? 'membership-card-popular' : ''}`}
             >
               {plan.popular && (
                 <div className="membership-popular-badge">
@@ -166,7 +189,7 @@ export function MembershipsSection() {
                 </Link>
                 <small className="membership-guarantee">Cancela o pausa cuando quieras sin penalidad</small>
               </div>
-            </div>
+            </motion.div>
           )
         })}
       </div>

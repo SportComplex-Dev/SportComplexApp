@@ -26,12 +26,12 @@ export function Modal({
   }, [onClose])
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop animate-in fade-in-0 duration-200" role="presentation" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="form-modal"
+        className="form-modal animate-in fade-in-0 zoom-in-95 duration-200"
         style={{ maxWidth }}
         onClick={(event) => event.stopPropagation()}
       >

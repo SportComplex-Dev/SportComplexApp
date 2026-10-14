@@ -32,7 +32,7 @@ export function BookingSummaryModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1710]/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1710]/60 p-4 backdrop-blur-sm animate-in fade-in-0 duration-200"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !isProcessing) onClose();
       }}
@@ -44,7 +44,7 @@ export function BookingSummaryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="booking-review-title"
-        className="w-full max-w-lg rounded-2xl border border-[#e5e9e2] bg-white p-5 text-[#14251d] shadow-2xl dark:border-[#39483e] dark:bg-[#19231d] dark:text-[#edf3ee] sm:p-6"
+        className="w-full max-w-lg rounded-2xl border border-[#e5e9e2] bg-white p-5 text-[#14251d] shadow-2xl dark:border-[#39483e] dark:bg-[#19231d] dark:text-[#edf3ee] sm:p-6 animate-in fade-in-0 zoom-in-95 duration-200"
       >
         {/* Cabecera del Modal */}
         <div className="flex items-start justify-between gap-4">

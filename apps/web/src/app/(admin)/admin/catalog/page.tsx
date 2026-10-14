@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 import {
   CalendarDays,
   Loader2,
@@ -813,9 +814,11 @@ export default function AdminCatalogPage() {
       <section className="demo-card mb-6 p-4">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Pestañas de categoría (Tabs) */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
+          <div className="flex items-center gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar por categoría">
+            <motion.button
               type="button"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
               className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                 selectedCategoryFilter === 'todas'
                   ? 'bg-[var(--brand-accent)] text-[#111815] font-bold border-[var(--brand-accent)] shadow-xs'
@@ -824,13 +827,15 @@ export default function AdminCatalogPage() {
               onClick={() => setSelectedCategoryFilter('todas')}
             >
               Todas ({catalog.length})
-            </button>
+            </motion.button>
             {categories.map((cat) => {
               const count = catalog.filter((c) => c.category === cat.slug).length
               return (
-                <button
+                <motion.button
                   key={cat.slug}
                   type="button"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                   className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                     selectedCategoryFilter === cat.slug
                       ? 'bg-[var(--brand-accent)] text-[#111815] font-bold border-[var(--brand-accent)] shadow-xs'
@@ -839,7 +844,7 @@ export default function AdminCatalogPage() {
                   onClick={() => setSelectedCategoryFilter(cat.slug)}
                 >
                   {cat.name} ({count})
-                </button>
+                </motion.button>
               )
             })}
           </div>

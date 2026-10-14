@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'motion/react'
 import { Activity, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
 import { loginSchema, registerSchema } from '@sportcomplex/validation'
@@ -23,6 +24,7 @@ function getSafeNextPath() {
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const register = mode === 'register'
   const router = useRouter()
+  const shouldReduceMotion = useReducedMotion()
   const { login: syncLogin } = useApp()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -108,16 +110,18 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
               {register ? 'Un paso más cerca de tu próxima aventura.' : 'Tu próximo momento de bienestar te espera.'}
             </p>
 
-            <button
+            <motion.button
               type="button"
-              className="google-button"
+              whileHover={shouldReduceMotion ? undefined : { scale: 1.025, filter: 'brightness(1.02)' }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+              className="google-button cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               onClick={() => {
                 const destination = getSafeNextPath() ?? '/portal';
                 void signIn('google', { redirectTo: destination, callbackUrl: destination });
               }}
             >
               <GoogleMark /> Continuar con Google
-            </button>
+            </motion.button>
 
             <div className="auth-divider">
               <span />o con tu correo<span />

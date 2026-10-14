@@ -28,9 +28,9 @@ export function PosAltLinkModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="pos-alt-link-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200"
     >
-      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--line)] mb-4">
           <h3 id="pos-alt-link-title" className="font-bold text-sm flex items-center gap-2">
             <Smartphone size={16} className="text-[#123e30] dark:text-[#c9ef75]" /> Enlace de Pago Alternativo
