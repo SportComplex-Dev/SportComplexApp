@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Clock, MapPin, MessageCircle, Phone, ShieldCheck } from 'lucide-react'
 
+const BrandImage = (Image as unknown as { default?: typeof Image })?.default || Image
+
 export function InstitutionalFooter() {
   return (
     <footer className="institutional-footer">
@@ -46,7 +48,7 @@ export function InstitutionalFooter() {
         <div className="footer-main-grid">
           <div className="footer-brand-col">
             <div className="footer-brand-lockup">
-              <Image
+              <BrandImage
                 src="/images/Akros-logo.png"
                 alt="AKROS Active Lifestyle Club"
                 width={36}
@@ -97,7 +99,7 @@ export function InstitutionalFooter() {
               <li><Link href="/portal/membership">Planes de Membresía</Link></li>
               <li><Link href="/portal/book">Agenda de Torneos</Link></li>
               <li><Link href="/portal/tickets">Mis Pases Digitales QR</Link></li>
-              <li><Link href="/legal">Reglamentos Institucionales</Link></li>
+              <li><Link href="/rules">Reglamentos Institucionales</Link></li>
             </ul>
           </div>
 
@@ -117,7 +119,7 @@ export function InstitutionalFooter() {
         <div className="footer-bottom-bar">
           <div className="footer-legal-copy">
             <span>© 2026 AKROS Club Deportivo S.A.S. Todos los derechos reservados.</span>
-            <Link href="/legal" className="hover:underline">Reglamentos y Condiciones</Link>
+            <Link href="/rules" className="hover:underline">Reglamentos y Condiciones</Link>
             <span>Medellín, Antioquia, Colombia.</span>
           </div>
 

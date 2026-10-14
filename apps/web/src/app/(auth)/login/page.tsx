@@ -21,9 +21,14 @@ function getUserRole(role: unknown): Role {
 }
 
 function getSafeNextPath() {
-  const path = new URLSearchParams(window.location.search).get('next')
-  if (!path || !path.startsWith('/')) return null
-  return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+  const params = new URLSearchParams(window.location.search)
+  const path = params.get('redirect') || params.get('next')
+  if (!path || !path.startsWith('/') || path.startsWith('//')) return null
+  try {
+    return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+  } catch {
+    return null
+  }
 }
 
 export default function LoginPage() {
@@ -35,9 +40,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(false)
+  const [registerHref, setRegisterHref] = useState('/register')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const safeRedirect = getSafeNextPath()
+    if (safeRedirect) {
+      setRegisterHref(`/register?redirect=${encodeURIComponent(safeRedirect)}`)
+    }
     const authError = params.get('error')
     if (
       authError === 'google' ||
@@ -221,7 +231,10 @@ export default function LoginPage() {
             </form>
 
             <div className="auth-switch">
-              ¿Aún no tienes cuenta? <Link href="/register">Regístrate</Link>
+              ¿Aún no tienes cuenta?{' '}
+              <Link href={registerHref}>
+                Regístrate
+              </Link>
             </div>
           </div>
         </div>

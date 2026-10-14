@@ -105,11 +105,11 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
 
   test("1.7 Página de reglamentos legales carga contenido institucional SSG", async ({ page }) => {
     await page.goto("/legal");
-    await expect(page).toHaveURL(/\/legal/);
+    await expect(page).toHaveURL(/\/rules/);
 
     // Contenido legal presente
-    await expect(page.locator("h1")).toContainText(/Reglamentos/i);
-    await expect(page.getByText(/Contenido estático institucional/i)).toBeVisible();
+    await expect(page.locator("h1")).toContainText(/Reglamento/i);
+    await expect(page.getByText(/MARCO LEGAL Y DE CONVIVENCIA/i)).toBeVisible();
   });
 
   test("1.8 Carrusel interactivo del Hero rota automáticamente y navega con flechas en extremos y dots centrados", async ({ page }) => {

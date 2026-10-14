@@ -135,9 +135,14 @@ export default withAuth(async (req) => {
   const cookieRole = isDev ? req.cookies.get("sc-role")?.value : null;
   const effectiveOverride = isDev ? (queryRole || cookieRole) : null;
 
-  const isProtectedRoute = protectedRoutePrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  const isPublicMembershipPage =
+    pathname === "/portal/membership" || pathname.startsWith("/portal/membership/");
+
+  const isProtectedRoute =
+    !isPublicMembershipPage &&
+    protectedRoutePrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
   const needsFreshAccount =
     pathname === "/" ||
     pathname === "/login" ||
@@ -394,7 +399,7 @@ export default withAuth(async (req) => {
   }
 
   // 3. Control perimetral para páginas protegidas (Web Views)
-  if (pathname.startsWith("/portal")) {
+  if (pathname.startsWith("/portal") && !isPublicMembershipPage) {
     if (!currentSession) {
       return NextResponse.redirect(new URL("/login", req.url), 307);
     }

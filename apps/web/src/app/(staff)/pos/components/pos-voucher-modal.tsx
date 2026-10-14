@@ -25,9 +25,9 @@ export function PosVoucherModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="pos-voucher-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200"
     >
-      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in-0 zoom-in-95 duration-200">
         <div className="text-center mb-4">
           <div className="size-12 rounded-full bg-[#edf5e2] text-[#4b7652] mx-auto flex items-center justify-center mb-2">
             <CheckCircle2 size={28} />

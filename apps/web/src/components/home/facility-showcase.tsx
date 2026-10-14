@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, CheckCircle2, Clock, Flame, Lightbulb, Shield, Sparkles, SunMedium, Trophy } from 'lucide-react'
 
 interface Facility {
@@ -137,6 +138,7 @@ const FACILITIES: Facility[] = [
 
 export function FacilityShowcase() {
   const [activeId, setActiveId] = useState('padel')
+  const shouldReduceMotion = useReducedMotion()
   const facility = FACILITIES.find((f) => f.id === activeId) ?? FACILITIES[0]
 
   return (
@@ -154,7 +156,7 @@ export function FacilityShowcase() {
         </p>
       </div>
 
-      {/* Selector de Pestañas Flotante */}
+      {/* Selector de Pestañas Flotante con layoutId deslizante */}
       <div className="facility-tabs-wrap" role="tablist" aria-label="Instalaciones deportivas">
         {FACILITIES.map((item) => {
           const isActive = item.id === activeId
@@ -164,97 +166,116 @@ export function FacilityShowcase() {
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveId(item.id)}
-              className={`facility-tab-btn ${isActive ? 'facility-tab-active' : ''}`}
+              className={`facility-tab-btn relative overflow-hidden ${isActive ? 'facility-tab-active' : ''}`}
             >
-              <span>{item.tabName}</span>
-              {isActive && <span className="facility-tab-indicator" />}
+              {isActive && (
+                <motion.span
+                  layoutId="activeServiceTab"
+                  className="absolute inset-0 bg-[#123e30] border border-[#c9ef75] rounded-full -z-0 dark:bg-[#1a3828]"
+                  transition={
+                    shouldReduceMotion
+                      ? { duration: 0 }
+                      : { type: 'spring', stiffness: 450, damping: 32 }
+                  }
+                />
+              )}
+              <span className="relative z-10">{item.tabName}</span>
             </button>
           )
         })}
       </div>
 
-      {/* Tarjeta de Exhibición Panorámica */}
-      <div className="facility-display-card">
-        <div className="facility-display-media">
-          <Image
-            src={facility.image}
-            alt={facility.title}
-            fill
-            sizes="(max-width: 1024px) 100vw, 65vw"
-            className="facility-display-img object-cover"
-          />
-          <div className="facility-media-overlay" />
-          <div className="facility-floating-badges">
-            <span className="facility-badge-live">
-              <span className="live-dot" /> {facility.statusTag}
-            </span>
-          </div>
-          <div className="facility-media-caption">
-            <span className="facility-caption-tag">{facility.tabName}</span>
-            <h3>{facility.title}</h3>
-          </div>
-        </div>
-
-        <div className="facility-display-body">
-          <div className="facility-info-header">
-            <div>
-              <span className="facility-kicker">{facility.subtitle}</span>
-              <p className="facility-description">{facility.description}</p>
+      {/* Tarjeta de Exhibición Panorámica con Transición Fluida */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={facility.id}
+          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="facility-display-card"
+        >
+          <div className="facility-display-media">
+            <Image
+              src={facility.image}
+              alt={facility.title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 65vw"
+              className="facility-display-img object-cover"
+            />
+            <div className="facility-media-overlay" />
+            <div className="facility-floating-badges">
+              <span className="facility-badge-live">
+                <span className="live-dot" /> {facility.statusTag}
+              </span>
             </div>
-            <div className="facility-price-box">
-              <span className="facility-price-label">Tarifa de uso</span>
-              <div className="facility-price-val">
-                <b>{facility.priceFrom}</b>
-                <small>/ {facility.unit}</small>
+            <div className="facility-media-caption">
+              <span className="facility-caption-tag">{facility.tabName}</span>
+              <h3>{facility.title}</h3>
+            </div>
+          </div>
+
+          <div className="facility-display-body">
+            <div className="facility-info-header">
+              <div>
+                <span className="facility-kicker">{facility.subtitle}</span>
+                <p className="facility-description">{facility.description}</p>
+              </div>
+              <div className="facility-price-box">
+                <span className="facility-price-label">Tarifa de uso</span>
+                <div className="facility-price-val">
+                  <b>{facility.priceFrom}</b>
+                  <small>/ {facility.unit}</small>
+                </div>
+              </div>
+            </div>
+
+            {/* Especificaciones Técnicas */}
+            <div className="facility-specs-grid">
+              {facility.specs.map((spec, i) => {
+                const Icon = spec.icon
+                return (
+                  <div key={i} className="facility-spec-item">
+                    <div className="facility-spec-icon">
+                      <Icon size={17} />
+                    </div>
+                    <div>
+                      <span className="facility-spec-label">{spec.label}</span>
+                      <strong className="facility-spec-val">{spec.value}</strong>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Ventajas & Botones de Acción */}
+            <div className="facility-footer-actions">
+              <div className="facility-perks-list">
+                {facility.perks.map((perk, i) => (
+                  <span key={i} className="facility-perk-pill">
+                    <CheckCircle2 size={13} className="text-brand-lime" /> {perk}
+                  </span>
+                ))}
+              </div>
+
+              <div className="facility-action-group">
+                <Link
+                  href="/portal/book"
+                  className="action-button"
+                >
+                  Reservar {facility.tabName} <ArrowRight size={16} />
+                </Link>
+                <Link
+                  href="/portal/book"
+                  className="action-secondary text-sm"
+                >
+                  Ver todos los turnos
+                </Link>
               </div>
             </div>
           </div>
-
-          {/* Especificaciones Técnicas */}
-          <div className="facility-specs-grid">
-            {facility.specs.map((spec, i) => {
-              const Icon = spec.icon
-              return (
-                <div key={i} className="facility-spec-item">
-                  <div className="facility-spec-icon">
-                    <Icon size={17} />
-                  </div>
-                  <div>
-                    <span className="facility-spec-label">{spec.label}</span>
-                    <strong className="facility-spec-val">{spec.value}</strong>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Ventajas & Botones de Acción */}
-          <div className="facility-footer-actions">
-            <div className="facility-perks-list">
-              {facility.perks.map((perk, i) => (
-                <span key={i} className="facility-perk-pill">
-                  <CheckCircle2 size={13} className="text-brand-lime" /> {perk}
-                </span>
-              ))}
-            </div>
-
-            <div className="facility-action-group">
-              <Link
-                href="/portal/book"
-                className="action-button"
-              >
-                Reservar {facility.tabName} <ArrowRight size={16} />
-              </Link>
-              <Link
-                href="/portal/book"
-                className="action-secondary text-sm"
-              >
-                Ver todos los turnos
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </section>
   )
 }

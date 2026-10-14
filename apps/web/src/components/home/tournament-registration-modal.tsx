@@ -32,6 +32,13 @@ export interface TournamentRegisterTarget {
   cuposOcupados: number
   precioInscripcion: number | string
   yaInscrito?: boolean
+  bloqueos?: Array<{
+    id?: number
+    servicioId?: number
+    servicio?: { id?: number; nombre: string }
+    horaInicio?: string
+    horaFin?: string
+  }>
   miInscripcion?: {
     id: string
     estado: string
