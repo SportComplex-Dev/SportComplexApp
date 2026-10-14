@@ -168,7 +168,8 @@ export function evaluateMembershipPurchaseAccess(params: {
   }
 
   const role = params.session.role;
-  const isClient = role === "Cliente" || role === "customer";
+  const normalizedRole = role?.toLowerCase();
+  const isClient = normalizedRole === "cliente" || normalizedRole === "customer";
   if (!isClient) {
     return {
       allowed: false,

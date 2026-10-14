@@ -198,4 +198,13 @@ test("TSK-FE-20: evaluateMembershipPurchaseAccess permite compra a cliente auten
 
   assert.equal(result.allowed, true);
   assert.equal(result.status, "ALLOWED");
+
+  // Soporte case-insensitive (CLIENTE o customer)
+  const resultUpper = evaluateMembershipPurchaseAccess({
+    session: { role: "CLIENTE" },
+    planId: 2,
+    hasVigenteMembership: false,
+  });
+  assert.equal(resultUpper.allowed, true);
+  assert.equal(resultUpper.status, "ALLOWED");
 });

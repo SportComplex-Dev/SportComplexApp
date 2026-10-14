@@ -44,9 +44,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const redirectParam = params.get('redirect') || params.get('next')
-    if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
-      setRegisterHref(`/register?redirect=${encodeURIComponent(redirectParam)}`)
+    const safeRedirect = getSafeNextPath()
+    if (safeRedirect) {
+      setRegisterHref(`/register?redirect=${encodeURIComponent(safeRedirect)}`)
     }
     const authError = params.get('error')
     if (

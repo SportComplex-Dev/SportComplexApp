@@ -511,8 +511,17 @@ function MembershipPortalContent() {
             <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--line)] text-[11px] text-[var(--subtle)] mb-5 flex items-start gap-2">
               <Info size={15} className="text-[#c9ef75] shrink-0 mt-0.5" />
               <span>
-                Al continuar serás transferido a Stripe Checkout para registrar tu método de pago con total seguridad.
-                La tarifa de renovación periódica es de {selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}.
+                {!session ? (
+                  <>
+                    Inicia sesión o regístrate para formalizar tu suscripción. Al continuar, preservaremos tu selección
+                    del {selectedPlanForModal.nombre} ({selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}).
+                  </>
+                ) : (
+                  <>
+                    Al continuar serás transferido a Stripe Checkout para registrar tu método de pago con total seguridad.
+                    La tarifa de renovación periódica es de {selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}.
+                  </>
+                )}
               </span>
             </div>
 
@@ -533,7 +542,15 @@ function MembershipPortalContent() {
                   handleSubscribe(plan)
                 }}
               >
-                <CreditCard size={14} /> Proceder a Stripe
+                {!session ? (
+                  <>
+                    Iniciar sesión para continuar <ArrowRight size={13} />
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={14} /> Proceder a Stripe
+                  </>
+                )}
               </button>
             </div>
           </div>
