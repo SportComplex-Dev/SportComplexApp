@@ -418,6 +418,7 @@ function MembershipPortalContent() {
                       ) : (
                         <button
                           type="button"
+                          data-testid="subscribe-plan-btn"
                           onClick={() => handleSelectPlan(plan)}
                           disabled={isSubscribingThis}
                           className={
