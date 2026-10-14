@@ -1,5 +1,11 @@
 {
   "extends": "../config/typescript/base.json",
-  "compilerOptions": { "strict": true, "noEmit": true },
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "noEmit": false,
+    "strict": true
+  },
   "include": ["src"]
 }

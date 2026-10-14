@@ -33,8 +33,8 @@ function timeToSeconds(time: string): number {
 }
 
 function piscinaModalidadIsConsistent(data: {
-  tipoPiscina?: TipoPiscinaInput | null;
-  modalidad?: ModalidadServicioInput;
+  tipoPiscina?: TipoPiscinaInput | null | undefined;
+  modalidad?: ModalidadServicioInput | undefined;
 }): boolean {
   if (!data.tipoPiscina || !data.modalidad) return true;
   return data.tipoPiscina === "PRIVADA"
