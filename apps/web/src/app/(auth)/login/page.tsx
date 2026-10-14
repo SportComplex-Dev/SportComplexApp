@@ -40,9 +40,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(false)
+  const [registerHref, setRegisterHref] = useState('/register')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const redirectParam = params.get('redirect') || params.get('next')
+    if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+      setRegisterHref(`/register?redirect=${encodeURIComponent(redirectParam)}`)
+    }
     const authError = params.get('error')
     if (
       authError === 'google' ||
@@ -227,15 +232,7 @@ export default function LoginPage() {
 
             <div className="auth-switch">
               ¿Aún no tienes cuenta?{' '}
-              <Link
-                href={
-                  typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))
-                    ? `/register?redirect=${encodeURIComponent(
-                        (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))!
-                      )}`
-                    : '/register'
-                }
-              >
+              <Link href={registerHref}>
                 Regístrate
               </Link>
             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
@@ -33,6 +33,15 @@ export default function RegisterPage() {
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loginHref, setLoginHref] = useState('/login')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const redirectParam = params.get('redirect') || params.get('next')
+    if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+      setLoginHref(`/login?redirect=${encodeURIComponent(redirectParam)}`)
+    }
+  }, [])
 
   const handleGoogleLogin = async () => {
     setError(null)
@@ -202,15 +211,7 @@ export default function RegisterPage() {
 
             <div className="auth-switch">
               ¿Ya tienes cuenta?{' '}
-              <Link
-                href={
-                  typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))
-                    ? `/login?redirect=${encodeURIComponent(
-                        (new URLSearchParams(window.location.search).get('redirect') || new URLSearchParams(window.location.search).get('next'))!
-                      )}`
-                    : '/login'
-                }
-              >
+              <Link href={loginHref}>
                 Ingresar
               </Link>
             </div>
