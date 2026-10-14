@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "node ../../apps/web/node_modules/tsx/dist/cli.mjs --test \"src/**/__tests__/**/*.test.tsx\"",
+    "test": "tsx --test \"src/**/__tests__/**/*.test.tsx\"",
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },
@@ -24,6 +24,7 @@
     "@types/react": "19.0.10",
     "eslint-plugin-react-hooks": "7.1.1",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.19.3",
     "typescript": "5.7.3"
   },
   "peerDependencies": {

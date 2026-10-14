@@ -817,6 +817,8 @@ export default function AdminCatalogPage() {
           <div className="flex items-center gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar por categoría">
             <motion.button
               type="button"
+              role="tab"
+              aria-selected={selectedCategoryFilter === 'todas'}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
@@ -834,6 +836,8 @@ export default function AdminCatalogPage() {
                 <motion.button
                   key={cat.slug}
                   type="button"
+                  role="tab"
+                  aria-selected={selectedCategoryFilter === cat.slug}
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   className={`py-1.5 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${

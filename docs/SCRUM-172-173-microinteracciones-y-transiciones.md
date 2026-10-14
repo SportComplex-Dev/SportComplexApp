@@ -148,11 +148,10 @@ Se integró `motion/react` de forma nativa en la arquitectura de Next.js App Rou
 
 1. **Plantilla Raíz Global (`apps/web/src/app/template.tsx`):**
    - Implementado como Client Component (`'use client';`) con `motion.div`.
-   - Utiliza `usePathname()` para asignar `key={pathname}`, garantizando que **cada navegación entre páginas y subrutas** monte una transición suave y cinematográfica:
+   - Utiliza `usePathname()` para asignar `key={pathname}`, garantizando que **cada navegación entre páginas y subrutas** monte una transición suave:
      * Opacidad: `0` a `1`
-     * Desplazamiento vertical: `y: 14` a `0`
-     * Desenfoque cinemático: `filter: 'blur(3px)'` a `blur(0px)`
-     * Duración y curva: `0.3s` con curva cúbica suave `[0.22, 1, 0.36, 1]`
+     * Duración y curva: `0.2s` con curva cúbica suave `[0.22, 1, 0.36, 1]`
+     * Optimización GPU: Opacidad pura sin desenfoques (`filter: blur`) ni desplazamientos verticales redundantes para evitar sobrecargar compositores móviles o colisionar con las plantillas de grupo.
      * Soporte automático de accesibilidad: detección de `useReducedMotion()`.
 
 2. **`apps/web/src/components/page-transition.tsx`**:
@@ -360,7 +359,7 @@ export default function CustomerTemplate({ children }: { children: React.ReactNo
 | **14** | **Carrito de Reserva Multi-Servicio** | `apps/web/src/app/(customer)/portal/book/components/cart.tsx` | Lista de servicios en carrito | Entrada y eliminación elástica de ítems con `<AnimatePresence initial={false}><motion.li layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>`. Botón eliminar con `whileHover={{ scale: 1.15 }}`. |
 | **15** | **Calendario de Disponibilidad** | `apps/web/src/components/booking/availability-calendar.tsx` | Carrusel de días y matriz de turnos | Días con `whileHover={{ scale: 1.05 }}` y `whileTap={{ scale: 0.95 }}`. Ranuras horarias con `whileHover={{ scale: 1.03 }}` y `whileTap={{ scale: 0.96 }}`. |
 | **16** | **Modal de Validación de Tickets** | `apps/web/src/components/scanner/ticket-validation-modal.tsx` | Modal de escaneo y torniquete | Telón de fondo con `AnimatePresence` (`opacity: 0` a `1`), diálogo flotante con `scale: 0.96` a `1` e `y: 18` a `0`. Botones con foco visible y retroalimentación táctil. |
-| **17** | **Plantilla Raíz Global (Rutas)** | `apps/web/src/app/template.tsx` | Contenedor principal de vistas | `key={pathname}` en `motion.div`. Transición suave al cambiar de URL (`y: 14` a `0`, `opacity: 0` a `1`, `blur(3px)` a `blur(0px)`, 300ms, curva `[0.22, 1, 0.36, 1]`). |
+| **17** | **Plantilla Raíz Global (Rutas)** | `apps/web/src/app/template.tsx` | Contenedor principal de vistas | `key={pathname}` en `motion.div`. Transición de opacidad pura sin blur ni desplazamiento vertical para evitar colisión con subplantillas (`opacity: 0` a `1`, 200ms, curva `[0.22, 1, 0.36, 1]`). |
 
 ---
 
@@ -371,9 +370,9 @@ export default function CustomerTemplate({ children }: { children: React.ReactNo
   - Microinteracciones físicas basadas en resortes naturales (`spring`, stiffness 320–450, damping 17–32) con `whileHover` y `whileTap`.
   - Fondo deslizante continuo con `layoutId` para transiciones de tabs en Home (`activeServiceTab`), Portal (`activePortalTab`), Tiquetes (`activeTicketsTab`), Membresías (`activeBillingCycle`) y Selector de Servicios (`activeCategoryFilter`).
   - Acordeones, dropdowns y menús sin saltos abruptos mediante `<AnimatePresence>` y `overflow-hidden`.
-  - Transición de páginas sin parpadeos con desenfoque de entrada (`blur(3px)` a `blur(0px)`), desplazamiento vertical suave (14px) y duración de 300 ms en `apps/web/src/app/template.tsx`.
-  - Conmutación automática a modo de opacidad sutil instantánea ante `prefers-reduced-motion` mediante `useReducedMotion()`.
-- **Rendimiento:** Propiedades aceleradas por hardware (`transform`, `opacity`, `filter`), sin CLS ni bloqueos en la navegación.
+  - Transición de páginas fluida con fundido cruzado ligero (`opacity: 0` a `1`), sin desenfoques pesados de GPU ni sacudidas en layouts persistentes, y duración óptima de 200 ms.
+  - Conmutación automática a modo de opacidad instantánea ante `prefers-reduced-motion` mediante `useReducedMotion()`.
+- **Rendimiento:** Propiedades aceleradas por hardware (`transform`, `opacity`), sin CLS ni bloqueos en la navegación.
 - **SCRUM-171:** El carrusel del Hero se mantuvo intacto sin ninguna alteración a su lógica ni estilos.
 
 
