@@ -44,7 +44,7 @@ test.describe("Flujo 3: Seguridad Perimetral, Middleware y Rutas Protegidas (RBA
   test("3.7 Acceso anónimo a /portal/membership es público y no debe redirigir a /login", async ({ page }) => {
     await page.goto("/portal/membership");
     await expect(page).toHaveURL(/\/portal\/membership/);
-    await expect(page.getByText(/membresía|planes|beneficios|visitante/i).first()).toBeVisible();
+    await expect(page.locator("h1")).toContainText(/Membresías/i);
   });
 
   test("3.8 Rutas de API protegidas devuelven status 401 JSON ante peticiones sin autenticación", async ({ request }) => {

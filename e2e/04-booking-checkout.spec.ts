@@ -66,8 +66,16 @@ test.describe("Flujo 4: Selección de Servicio y Proceso de Reserva", () => {
     await expect(ticketsBtn).toHaveAttribute("href", "/portal/tickets");
   });
 
-  test("4.5 Portal de membresías está protegido por seguridad perimetral", async ({ page }) => {
+  test("4.5 Portal de membresías es de consulta pública y redirige a login al intentar suscribirse sin autenticación", async ({ page }) => {
     await page.goto("/portal/membership");
+    await expect(page).toHaveURL(/\/portal\/membership/);
+    await expect(page.locator("h1")).toContainText(/Membresías/i);
+
+    // Intentar suscribirse como visitante anónimo redirige a login con intención de compra preservada
+    const subscribeBtn = page.getByRole("button", { name: /Suscribirme/i }).first();
+    await expect(subscribeBtn).toBeVisible();
+    await subscribeBtn.click();
     await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/redirect=%2Fportal%2Fmembership/);
   });
 });
