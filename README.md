@@ -47,3 +47,28 @@ Variables: copiar `apps/web/.env.example` a `apps/web/.env.local`.
 
 `docker/docker-compose.yml` + `docker/Dockerfile.web` (multi-stage, `output: 'standalone'`) + Caddy (SSL auto).
 Migraciones como init-container (`prisma migrate deploy`) antes de levantar `web`.
+
+## Gestión de Entornos Supabase & Mantenimiento (SCRUM-208)
+
+### 1. Mapeo de Proyectos Supabase
+- **Producción (`prod`):**
+  - Proyecto Supabase Ref: `phyesjwtzrmrcvmtajay`
+  - Uso: Base de datos oficial de producción (clientes reales, reservas y transacciones).
+- **Desarrollo (`develop`):**
+  - Proyecto Supabase Ref: `ouemmmwpygmizyvtcpuc` (`SportComplex-Dev`)
+  - Uso: Entorno aislado para integración y pruebas de desarrollo. Configurado en `packages/db/.env`.
+
+### 2. Backup Cifrado de Producción
+Comando para generar el volcado binario y cifrarlo con AES-256 antes de tareas de mantenimiento/purga:
+```bash
+pg_dump "postgresql://postgres:PASSWORD@db.phyesjwtzrmrcvmtajay.supabase.co:5432/postgres" -Fc -f backup_prod_prod.dump
+openssl enc -aes-256-cbc -salt -in backup_prod_prod.dump -out backup_prod_prod.dump.enc
+```
+
+### 3. Ventana de Mantenimiento y Purga de Datos de Prueba en Producción
+- **Ventana:** Horario de menor afluencia (madrugada).
+- **Script de purga de usuarios bot/prueba (~78 cuentas residuales):**
+```sql
+DELETE FROM token_verificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%test%' OR correo LIKE '%bot%' OR correo LIKE '%example%');
+DELETE FROM usuario WHERE correo LIKE '%test%' OR correo LIKE '%bot%' OR correo LIKE '%example%';
+```
