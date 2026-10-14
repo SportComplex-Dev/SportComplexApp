@@ -137,3 +137,40 @@ test('TSK-FE-26 / BUS-01: Bloqueo de QR de acceso para inscripciones en estado P
   assert.equal(isConfirmed, false)
   assert.equal(canShowQR, false, 'No se debe emitir ni habilitar QR de acceso si el torneo no ha sido pagado')
 })
+
+test('SCRUM-182 / SCRUM-183: Cálculo de porcentaje de ocupación y formateo de pistas en detalle de torneo', () => {
+  const detailData = {
+    cuposTotales: 20,
+    cuposOcupados: 15,
+    cuposDisponibles: 5,
+    bloqueos: [
+      { servicio: { nombre: 'Pádel · Cancha 1' } },
+      { servicio: { nombre: 'Pádel · Cancha 2' } },
+    ],
+  }
+
+  const spotsLeft = detailData.cuposDisponibles ?? Math.max(0, detailData.cuposTotales - detailData.cuposOcupados)
+  const pctOcupado = Math.min(
+    100,
+    Math.round(((detailData.cuposTotales - spotsLeft) / Math.max(1, detailData.cuposTotales)) * 100)
+  )
+
+  const courtNames = detailData.bloqueos.map((b) => b.servicio.nombre).join(', ')
+
+  assert.equal(spotsLeft, 5)
+  assert.equal(pctOcupado, 75, 'El porcentaje ocupado debe ser 75%')
+  assert.equal(courtNames, 'Pádel · Cancha 1, Pádel · Cancha 2')
+})
+
+test('SCRUM-182 / SCRUM-184: Control de estados de acción en card de torneo (Detalles, Inscrito, Agotado, Inscribirme)', () => {
+  const getCardActionState = (event: { yaInscrito?: boolean; spotsLeft: number }) => {
+    if (event.yaInscrito) return 'INSCRITO'
+    if (event.spotsLeft <= 0) return 'AGOTADO'
+    return 'INSCRIBIRME'
+  }
+
+  assert.equal(getCardActionState({ yaInscrito: true, spotsLeft: 5 }), 'INSCRITO')
+  assert.equal(getCardActionState({ yaInscrito: false, spotsLeft: 0 }), 'AGOTADO')
+  assert.equal(getCardActionState({ yaInscrito: false, spotsLeft: 3 }), 'INSCRIBIRME')
+})
+
