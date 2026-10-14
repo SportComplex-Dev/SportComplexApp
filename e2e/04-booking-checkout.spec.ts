@@ -71,11 +71,16 @@ test.describe("Flujo 4: Selección de Servicio y Proceso de Reserva", () => {
     await expect(page).toHaveURL(/\/portal\/membership/);
     await expect(page.locator("h1")).toContainText(/Membresías/i);
 
-    // Intentar suscribirse como visitante anónimo redirige a login con intención de compra preservada
+    // Esperar a que el cliente termine de cargar los planes de la API
+    await page.waitForLoadState("networkidle");
+
+    // Localizar botón o enlace de suscripción de forma tolerante a rendering asíncrono
     const subscribeBtn = page.getByRole("button", { name: /Suscribirme/i }).first();
-    await expect(subscribeBtn).toBeVisible();
+    await expect(subscribeBtn).toBeVisible({ timeout: 15000 });
     await subscribeBtn.click();
-    await expect(page).toHaveURL(/\/login/);
+
+    // Validar redirección a login preservando la intención de compra
+    await page.waitForURL(/\/login/, { timeout: 15000 });
     await expect(page).toHaveURL(/redirect=%2Fportal%2Fmembership/);
   });
 });
