@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 (globalThis as any).React = React;
 
-import NotFound from '../not-found';
+import NotFound from '@/app/not-found';
 
 test('NOTFOUND-UI-01: Renderiza marcador táctico 404, badge atlético y texto descriptivo', () => {
   const html = renderToStaticMarkup(<NotFound />);

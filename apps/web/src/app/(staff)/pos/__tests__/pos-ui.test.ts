@@ -12,11 +12,11 @@ import { posCheckoutSchema } from "@sportcomplex/validation";
 import { calcularDesgloseComprobante } from "@/components/portal/portal-utils";
 import QRCode from "qrcode";
 
-import { PosCatalogSelector } from "../components/pos-catalog-selector";
-import { PosClientForm } from "../components/pos-client-form";
-import { PosPaymentStripe } from "../components/pos-payment-stripe";
-import { PosVoucherModal } from "../components/pos-voucher-modal";
-import { PosAltLinkModal } from "../components/pos-alt-link-modal";
+import { PosCatalogSelector } from "@/app/(staff)/pos/components/pos-catalog-selector";
+import { PosClientForm } from "@/app/(staff)/pos/components/pos-client-form";
+import { PosPaymentStripe } from "@/app/(staff)/pos/components/pos-payment-stripe";
+import { PosVoucherModal } from "@/app/(staff)/pos/components/pos-voucher-modal";
+import { PosAltLinkModal } from "@/app/(staff)/pos/components/pos-alt-link-modal";
 
 // TSK-FE-18: Suite de Pruebas de la Interfaz y Componentes POS 100% Cashless (HU-18 / RF-17 / RN-13)
 

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import { prisma } from "@sportcomplex/db";
-import { authConfig } from "./auth.config";
+import { authConfig } from "@/auth.config";
 
 type UsuarioTransaction = Pick<typeof prisma, "usuario">;
 

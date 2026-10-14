@@ -22,7 +22,7 @@ import {
 } from "@/hooks/use-network-resilience";
 import { ConsultationResultCard } from "@/components/scanner/consultation-result-card";
 import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
-import ScannerPage from "../page";
+import ScannerPage from "@/app/(staff)/scanner/page";
 
 // Mock de localStorage en memoria para pruebas aisladas
 function createMockStorage(initialData: Record<string, string> = {}): Storage {

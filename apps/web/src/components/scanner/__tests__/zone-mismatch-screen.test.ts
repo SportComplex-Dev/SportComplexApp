@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).React = React;
 
-import ZoneMismatchScreen from "../ZoneMismatchScreen";
+import ZoneMismatchScreen from "@/components/scanner/ZoneMismatchScreen";
 
 // TSK-FE-16 (HU-16 / RF-14): renderizado de la alerta roja de discrepancia de zona.
 

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Modal } from '@/components/modal'
 import { ActionButton } from '@/components/action-button'
-import type { TournamentRegisterTarget } from './tournament-registration-modal'
+import type { TournamentRegisterTarget } from '@/components/home/tournament-registration-modal'
 
 export interface PublicTournamentDetailData extends TournamentRegisterTarget {
   court?: string

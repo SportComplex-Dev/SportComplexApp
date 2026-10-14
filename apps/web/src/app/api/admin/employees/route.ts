@@ -6,7 +6,7 @@ import {
   EmployeeError,
 } from "@sportcomplex/db";
 import { createEmployeeSchema } from "@sportcomplex/validation";
-import { hashSecret } from "@sportcomplex/core/src/security/token";
+import { hashSecret } from "@sportcomplex/security";
 import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,

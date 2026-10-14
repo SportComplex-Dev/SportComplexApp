@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 process.env.BOT_API_KEY = "bot-api-test-secret";
@@ -9,8 +9,8 @@ process.env.QR_HMAC_SECRET = qrSecret;
 
 const mock = createMockPrisma();
 Reflect.set(globalThis, "__scPrisma", mock);
-const availabilityRoute = await import("../availability/route");
-const { handleBotTicketValidation } = await import("../validate-ticket/route");
+const availabilityRoute = await import("@/app/api/v1/bot/availability/route");
+const { handleBotTicketValidation } = await import("@/app/api/v1/bot/validate-ticket/route");
 const { signTicket } = await import("@sportcomplex/core");
 
 const ticketId = "9f0d6f4e-0000-4000-8000-000000000023";

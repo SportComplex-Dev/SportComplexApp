@@ -17,10 +17,10 @@ import {
   validateCanAddToCart,
   type CartItem,
   type DynamicTimeSlot,
-} from './cart-utils';
-import { ServiceSelector } from './components/service-selector';
-import { Cart } from './components/cart';
-import { BookingSummaryModal } from './components/booking-summary-modal';
+} from '@/app/(customer)/portal/book/cart-utils';
+import { ServiceSelector } from '@/app/(customer)/portal/book/components/service-selector';
+import { Cart } from '@/app/(customer)/portal/book/components/cart';
+import { BookingSummaryModal } from '@/app/(customer)/portal/book/components/booking-summary-modal';
 
 export default function BookPage() {
   const router = useRouter();

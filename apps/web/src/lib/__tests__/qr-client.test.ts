@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseTicketQr } from "../qr-client";
+import { parseTicketQr } from "@/lib/qr-client";
 
 const VALID_UUID = "9f0d6f4e-0000-4000-8000-0000000000ff";
 const VALID_SIG = "a".repeat(64);

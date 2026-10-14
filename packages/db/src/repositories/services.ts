@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import type { ClienteDb } from "../tipos-db";
 import type {
   CategoriaServicio,
   TipoCategoriaServicio,
@@ -225,8 +226,7 @@ export async function deleteCategoria(id: number) {
 export async function generateDisponibilidadesForServicio(
   servicioId: number,
   windowDays = 15,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ) {
   const servicio = await db.servicio.findUnique({
     where: { id: servicioId },
@@ -391,8 +391,7 @@ export async function getServicios(options?: ServiceFilterOptions) {
 
 export async function getServicioById(
   id: number,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ) {
   return db.servicio.findUnique({
     where: { id },
@@ -410,8 +409,7 @@ export async function getServicioById(
 /** Datos mínimos del servicio usados al resolver el mensaje de acceso. */
 export async function getServicioParaAccesoById(
   id: number,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ) {
   return db.servicio.findUnique({
     where: { id },

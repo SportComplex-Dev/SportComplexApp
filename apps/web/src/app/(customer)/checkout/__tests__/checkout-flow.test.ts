@@ -4,7 +4,7 @@ import {
   pollPaymentConfirmation,
   resolvePaymentOutcome,
   type VerificationState,
-} from "../checkout-flow";
+} from "@/app/(customer)/checkout/checkout-flow";
 
 test("pollPaymentConfirmation: retorna confirmed=false y bookingCode=null si reservationId es nulo", async () => {
   const result = await pollPaymentConfirmation({

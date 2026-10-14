@@ -15,11 +15,11 @@ import {
 import {
   TournamentRegistrationModal,
   type TournamentRegisterTarget,
-} from './tournament-registration-modal'
+} from '@/components/home/tournament-registration-modal'
 import {
   PublicTournamentDetailModal,
   type PublicTournamentDetailData,
-} from './tournament-detail-modal'
+} from '@/components/home/tournament-detail-modal'
 import { useApp } from '@/components/app-provider'
 
 interface ClubEventView {

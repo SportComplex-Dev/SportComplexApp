@@ -3,7 +3,7 @@
 import { Pencil, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { formatMoney, type CatalogItem, type OperatingScheduleConfig } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import type { CustomCategory } from '../types'
+import type { CustomCategory } from '@/app/(admin)/admin/catalog/types'
 
 interface CatalogTableProps {
   services: CatalogItem[]

@@ -5,7 +5,7 @@ import {
   formatIncidentDate,
   formatIncidentHour,
   isIncidentReasonValid,
-} from '../incident-utils'
+} from '@/app/(admin)/admin/incident/incident-utils'
 
 test('TSK-FE-22 / HIGH-01: formatIncidentDate preserva la fecha exacta sin desfase off-by-one (America/Bogota UTC-5)', () => {
   // En PostgreSQL/Prisma, @db.Date se serializa como medianoche UTC

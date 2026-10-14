@@ -1,5 +1,6 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../client";
+import type { ClienteDb, TxDb } from "../tipos-db";
 import { BookingError } from "./bookings";
 
 /**
@@ -31,7 +32,7 @@ export interface AttachPendingPagoInput {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type DbLike = PrismaClient | any;
+type DbLike = ClienteDb;
 
 function isP2002UniqueViolation(err: unknown): boolean {
   return (
@@ -65,7 +66,7 @@ export async function attachPendingPagoToReserva(
     );
   }
 
-  return db.$transaction(async (tx: DbLike) => {
+  return db.$transaction(async (tx: TxDb) => {
     const existing = await tx.pago.findUnique({
       where: { stripePaymentIntentId: piId },
     });
@@ -110,7 +111,7 @@ export async function attachPendingPagoToReserva(
  * `PENDIENTE_PAGO`. Lanza `HOLD_EXPIRED` cuando el bloqueo ya no existe.
  */
 async function ensureReservaLinked(
-  tx: DbLike,
+  tx: TxDb,
   reservaId: string,
   pagoId: string,
 ): Promise<void> {
@@ -164,7 +165,7 @@ export async function compensateFailedCheckout(
   now: Date = new Date(),
 ): Promise<boolean> {
   void now; // firma alineada con expirations.ts; la guarda no depende de `now`.
-  return db.$transaction(async (tx: DbLike) => {
+  return db.$transaction(async (tx: TxDb) => {
     const reserva = await tx.reserva.findUnique({
       where: { id: reservaId },
       select: {

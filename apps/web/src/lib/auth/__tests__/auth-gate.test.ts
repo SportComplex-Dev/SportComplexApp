@@ -4,7 +4,7 @@ import {
   authGateFor,
   ACCOUNT_INACTIVE_MESSAGE,
   ACCOUNT_PENDING_MESSAGE,
-} from "../auth-gate";
+} from "@/lib/auth/auth-gate";
 
 test("PENDIENTE bloquea con ACCOUNT_PENDING (flujo /verify)", () => {
   assert.deepEqual(authGateFor("PENDIENTE", false), {

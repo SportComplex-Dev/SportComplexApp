@@ -10,7 +10,7 @@ import {
   ConsultationResultCard,
   type TicketInfo,
 } from "@/components/scanner/consultation-result-card";
-import ScannerPage from "../page";
+import ScannerPage from "@/app/(staff)/scanner/page";
 
 // TSK-FE-15: Test de la Visual / Renderizado de Componentes UI
 // Verifica la renderización HTML de los componentes visuales según DESIGN.md y SRS RF-13.

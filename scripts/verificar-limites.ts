@@ -135,6 +135,8 @@ function isTestFile(relPath: string): boolean {
 // ----------------------------------------------------
 function checkRule1(relPath: string, content: string): Finding[] {
   const norm = normalizePath(relPath);
+  // tsconfig/lockfiles mapean subpaths como texto: no son imports de código.
+  if (norm.endsWith('.json')) return [];
   const inScope =
     norm.startsWith('apps/web/') ||
     /^packages\/[^/]+\/src\//.test(norm);
@@ -335,6 +337,38 @@ function checkRule5(relPath: string, content: string): Finding[] {
   return findings;
 }
 
+// ----------------------------------------------------
+// Regla 6: Solo path aliases en apps/web (sin imports relativos)
+// Patrón: from "@/... o import("@/..., @db-test/...; prohibido ./ y ../
+// Alcance: apps/web/src/**
+// Excluye: — (tests incluidos: TODO usa aliases)
+// Nota: packages/* conservan relativos internos porque tsc no reescribe
+// aliases en el emit ESM de dist/ (moduleResolution Bundler sin bundler).
+// ----------------------------------------------------
+function checkRule6(relPath: string, content: string): Finding[] {
+  const norm = normalizePath(relPath);
+  if (!norm.startsWith('apps/web/src/')) return [];
+  if (!/\.(ts|tsx|js|jsx)$/.test(norm)) return [];
+
+  const findings: Finding[] = [];
+  const lines = content.split('\n');
+  const relativeRegex = /(?:import|export)[^'"]*?from\s*['"]\.[./]|import\s*\(\s*['"]\.[./]/;
+
+  lines.forEach((line, idx) => {
+    if (relativeRegex.test(line)) {
+      findings.push({
+        ruleId: 6,
+        ruleName: 'Solo path aliases en apps/web',
+        file: relPath,
+        line: idx + 1,
+        snippet: line.trim(),
+      });
+    }
+  });
+
+  return findings;
+}
+
 function run(): void {
   const options = parseArgs();
   console.log('='.repeat(70));
@@ -386,8 +420,9 @@ function run(): void {
     const f3 = checkRule3(relFile, content);
     const f4 = checkRule4(relFile, content);
     const f5 = checkRule5(relFile, content);
+    const f6 = checkRule6(relFile, content);
 
-    allFindings.push(...f1, ...f2, ...f3, ...f4, ...f5);
+    allFindings.push(...f1, ...f2, ...f3, ...f4, ...f5, ...f6);
   }
 
   // Agrupar conteo por regla
@@ -397,6 +432,7 @@ function run(): void {
     3: 0,
     4: 0,
     5: 0,
+    6: 0,
   };
 
   const ruleTitles: Record<number, string> = {
@@ -405,6 +441,7 @@ function run(): void {
     3: 'Regla 3: Sin Unsplash (images.unsplash.com)',
     4: 'Regla 4: Sin any en prod (\\bany\\b)',
     5: 'Regla 5: Sin dependencias circulares en domain',
+    6: 'Regla 6: Solo path aliases en apps/web (@/, @db-test/)',
   };
 
   for (const f of allFindings) {
@@ -423,7 +460,7 @@ function run(): void {
 
   console.log('\nRESUMEN DE VERIFICACIÓN POR REGLA:');
   console.log('-'.repeat(70));
-  for (let r = 1; r <= 5; r++) {
+  for (let r = 1; r <= 6; r++) {
     const count = counts[r] || 0;
     const status = count === 0 ? '✓ OK' : `✗ ${count} infracción(es)`;
     console.log(` ${status.padEnd(20)} | ${ruleTitles[r]}`);

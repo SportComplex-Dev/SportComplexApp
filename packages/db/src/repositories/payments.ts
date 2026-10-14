@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import type { ClienteDb, TxDb } from "../tipos-db";
 import { PeriodicidadPlan } from "@prisma/client";
 import { calculateRenewalDate } from "./memberships";
 
@@ -85,16 +86,8 @@ export interface ProcesarPagoResultado {
   reservasEstado?: Record<string, string>;
 }
 
-type DbLike = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  $transaction: (fn: (tx: any) => Promise<unknown>) => Promise<unknown>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-};
-
 export interface ProcesarPagoOptions {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db?: any;
+    db?: ClienteDb;
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -190,7 +183,7 @@ type ReservaResumen = {
  * Se verifica previamente con findUnique para no provocar abortos de bloque transaccional.
  */
 async function emitirTicketQr(
-  tx: DbLike,
+  tx: TxDb,
   reservaId: string,
   codigoUuid?: string,
 ): Promise<boolean> {
@@ -211,7 +204,7 @@ async function emitirTicketQr(
  * Restituye la franja de una reserva cancelada reutilizando los datos en memoria.
  */
 async function restituirFranja(
-  tx: DbLike,
+  tx: TxDb,
   reserva: ReservaResumen,
 ): Promise<boolean> {
   const disponibilidadId = reserva.disponibilidadId;
@@ -231,7 +224,7 @@ async function restituirFranja(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<ProcesarPagoResultado> {
+async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
 
   const rawReservaIds =
@@ -244,7 +237,7 @@ async function procesarIntento(input: ProcesarPagoInput, db: any): Promise<Proce
     new Set(rawReservaIds.map((id) => id.trim()).filter(Boolean)),
   );
 
-  return db.$transaction(async (tx: DbLike) => {
+  return db.$transaction(async (tx: TxDb) => {
     let reservasExistentes: ReservaResumen[] = [];
     if (targetReservaIds.length > 0) {
       reservasExistentes = (await tx.reserva.findMany({
@@ -483,7 +476,7 @@ export async function procesarFacturaWebhook(
 
   for (let intento = 1; intento <= MAX_INTENTOS; intento += 1) {
     try {
-      return await db.$transaction(async (tx: DbLike) => {
+      return await db.$transaction(async (tx: TxDb): Promise<ProcesarFacturaResultado> => {
         type MembresiaResumen = {
           id: number;
           usuarioId: string;

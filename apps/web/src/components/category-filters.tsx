@@ -18,7 +18,7 @@ import {
   FaGunSquirtIcon,
   FaHeatIcon,
   FaHotTubPersonIcon,
-} from './custom-icons'
+} from '@/components/custom-icons'
 
 export type FilterIconProps = {
   size?: number

@@ -1,5 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "../client";
+import type { Prisma } from "@prisma/client";
+import type { ClienteDb, TxDb } from "../tipos-db";
 
 export type EstadoTorneoValor =
   | "BORRADOR"
@@ -75,7 +76,7 @@ export interface InscribirUsuarioInput {
 }
 
 export interface TournamentDbOptions {
-  db?: any;
+  db?: ClienteDb;
 }
 
 export const BOGOTA_TIME_ZONE = "America/Bogota";
@@ -158,7 +159,7 @@ export async function verificarConflictoReservas(
     // Verificar si se solapan en franja horaria
     const solapa = fStart < endSec && fEnd > startSec;
     if (solapa && Array.isArray(disp.reservas)) {
-      const activas = disp.reservas.filter((r: any) => {
+      const activas = disp.reservas.filter((r: { estado: string; expiraEn?: Date | string | null }) => {
         if (r.estado === "CONFIRMADA") return true;
         if (r.estado === "PENDIENTE_PAGO" && r.expiraEn && new Date(r.expiraEn) > now) {
           return true;
@@ -358,7 +359,7 @@ export async function crearTorneo(
     throw new TournamentError("La fecha de finalización debe ser posterior a la de inicio.", "VALIDATION_ERROR", 400);
   }
 
-  const runOperation = async (tx: any) => {
+  const runOperation = async (tx: TxDb) => {
     // Validar solapamiento preventivo con reservas existentes dentro de la transacción
     if (input.bloqueos && input.bloqueos.length > 0) {
       for (const b of input.bloqueos) {
@@ -430,7 +431,7 @@ export async function listarTorneos(
   options: TournamentDbOptions = {},
 ) {
   const db = options.db ?? prisma;
-  const where: any = {
+  const where: Prisma.TorneoWhereInput = {
     eliminadoEn: null,
   };
 
@@ -448,7 +449,7 @@ export async function listarTorneos(
     where.titulo = { contains: filtros.search, mode: "insensitive" };
   }
 
-  const findOptions: any = {
+  const findOptions: Prisma.TorneoFindManyArgs = {
     where,
     orderBy: { fechaInicio: "asc" },
     include: {
@@ -534,7 +535,7 @@ export async function actualizarEstadoTorneo(
 ) {
   const db = options.db ?? prisma;
 
-  const runOperation = async (tx: any) => {
+  const runOperation = async (tx: TxDb) => {
     const torneo = await tx.torneo.findUnique({ where: { id } });
     if (!torneo) {
       throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
@@ -569,7 +570,7 @@ export async function actualizarTorneo(
 ) {
   const db = options.db ?? prisma;
 
-  const runOperation = async (tx: any) => {
+  const runOperation = async (tx: TxDb) => {
     const torneo = await tx.torneo.findUnique({
       where: { id },
       include: { bloqueos: true },
@@ -578,7 +579,7 @@ export async function actualizarTorneo(
       throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.TorneoUpdateInput = {};
     if (input.titulo !== undefined) {
       if (!input.titulo.trim()) {
         throw new TournamentError("El título del torneo no puede estar vacío.", "VALIDATION_ERROR", 400);
@@ -589,7 +590,7 @@ export async function actualizarTorneo(
       updateData.descripcion = input.descripcion?.trim() ?? null;
     }
     if (input.categoriaId !== undefined) {
-      updateData.categoriaId = input.categoriaId;
+      updateData.categoria = { connect: { id: input.categoriaId } };
     }
     if (input.nivel !== undefined) {
       updateData.nivel = input.nivel.trim();
@@ -601,8 +602,12 @@ export async function actualizarTorneo(
       updateData.fechaFin = new Date(input.fechaFin);
     }
 
-    const fIni = updateData.fechaInicio ?? torneo.fechaInicio;
-    const fFin = updateData.fechaFin ?? torneo.fechaFin;
+    const fIni = updateData.fechaInicio instanceof Date
+      ? updateData.fechaInicio
+      : torneo.fechaInicio;
+    const fFin = updateData.fechaFin instanceof Date
+      ? updateData.fechaFin
+      : torneo.fechaFin;
     if (new Date(fFin) <= new Date(fIni)) {
       throw new TournamentError("La fecha de finalización debe ser posterior a la de inicio.", "VALIDATION_ERROR", 400);
     }
@@ -689,7 +694,7 @@ export async function eliminarTorneo(
 ) {
   const db = options.db ?? prisma;
 
-  const runOperation = async (tx: any) => {
+  const runOperation = async (tx: TxDb) => {
     const torneo = await tx.torneo.findUnique({
       where: { id },
       include: {
@@ -740,7 +745,7 @@ export async function inscribirUsuarioTorneo(
 ) {
   const db = options.db ?? prisma;
 
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async (tx: TxDb) => {
     const torneo = await tx.torneo.findUnique({ where: { id: input.torneoId } });
     if (!torneo) {
       throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
@@ -859,11 +864,17 @@ export async function inscribirUsuarioTorneo(
           usuario: { select: { id: true, nombre: true, correo: true } },
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof TournamentError) {
         throw err;
       }
-      if (err?.code === "P2002" || err?.message?.includes("Unique constraint")) {
+      const codigo = typeof err === "object" && err !== null
+        ? (err as { code?: unknown }).code
+        : undefined;
+      const mensaje = typeof err === "object" && err !== null
+        ? (err as { message?: unknown }).message
+        : undefined;
+      if (codigo === "P2002" || (typeof mensaje === "string" && mensaje.includes("Unique constraint"))) {
         throw new TournamentError(
           "El usuario ya se encuentra inscrito en este torneo.",
           "ALREADY_REGISTERED",
@@ -908,7 +919,7 @@ export async function canjearTicketTorneo(
 ) {
   const db = options.db ?? prisma;
 
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async (tx: TxDb) => {
     const inscripcion = await tx.inscripcionTorneo.findUnique({
       where: { ticketCodigoUuid },
       include: { torneo: true },

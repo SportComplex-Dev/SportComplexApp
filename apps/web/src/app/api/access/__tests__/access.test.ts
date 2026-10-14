@@ -5,15 +5,14 @@ import assert from "node:assert/strict";
 const SECRET = "test-qr-secret";
 process.env.QR_HMAC_SECRET = SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Importar el orquestador DESPUÉS de inyectar el mock de Prisma.
-const { procesarEscaneo, AccessError } = await import("../../../../lib/access");
-const { handleAccess } = await import("../route");
+const { procesarEscaneo, AccessError } = await import("@/lib/access");
+const { handleAccess } = await import("@/app/api/access/route");
 const { TicketError } = await import("@sportcomplex/db");
 const { signTicket } = await import("@sportcomplex/core");
 

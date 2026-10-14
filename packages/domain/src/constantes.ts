@@ -11,3 +11,10 @@ export const CHECKOUT_TTL_MINUTES = minutosTtlCheckout;
 
 export const tasaDescuentoMembresia = 0.3 as const;
 export const MEMBERSHIP_DISCOUNT_RATE = tasaDescuentoMembresia;
+
+// Horario operativo canónico del complejo (RF-04): franjas de 60 min entre 06:00 y 22:00.
+// Fuente única para frontend (calendario) y application (generarFranjasOperativas).
+export const horaApertura = 6 as const;
+export const OPENING_HOUR = horaApertura;
+export const horaCierre = 22 as const;
+export const CLOSING_HOUR = horaCierre;

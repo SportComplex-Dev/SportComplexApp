@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 const mock = createMockPrisma();
@@ -78,8 +78,8 @@ mock._state.disponibilidades.push({
 });
 
 // Import route handlers
-const tournamentsRoute = await import("../route");
-const tournamentDetailRoute = await import("../[id]/route");
+const tournamentsRoute = await import("@/app/api/admin/tournaments/route");
+const tournamentDetailRoute = await import("@/app/api/admin/tournaments/[id]/route");
 
 test("API: Validación de permisos en /api/admin/tournaments", async () => {
   // 1. Petición sin sesión -> 401

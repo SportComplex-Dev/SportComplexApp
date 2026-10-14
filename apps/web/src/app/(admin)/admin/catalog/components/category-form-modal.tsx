@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Input } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
 import { Modal } from '@/components/modal'
-import { type CustomCategory, slugify } from '../types'
+import { type CustomCategory, slugify } from '@/app/(admin)/admin/catalog/types'
 
 export function CategoryFormModal({
   onSave,

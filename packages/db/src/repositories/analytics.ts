@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma as defaultPrisma } from "../client";
+import type { ClienteDb } from "../tipos-db";
 
 export type AnalyticsPeriod = "daily" | "weekly";
 
@@ -76,7 +76,48 @@ export interface GetAnalyticsOptions {
   startDate?: string;
   endDate?: string;
   period?: AnalyticsPeriod;
-  db?: any;
+  db?: ClienteDb;
+}
+
+/**
+ * Contrato del estado en memoria del doble de tests (`test/mocks`).
+ * Solo las vistas que consume la calculadora de analítica; el doble
+ * completo vive en `test/mocks/estado.ts`.
+ */
+interface EstadoMockAnalitica {
+  tickets?: Array<{
+    estado: string;
+    usadoEn: Date | string | null;
+    reservaId: string;
+  }>;
+  reservas?: Array<{
+    id: string;
+    estado: string;
+    creadoEn?: Date | string | null;
+    titularId?: string;
+    disponibilidadId: bigint;
+    cantidadCupos?: number;
+    total?: string | number;
+  }>;
+  pagos?: Array<{
+    estado: string;
+    creadoEn?: Date | string | null;
+    tipo?: string;
+    monto?: string | number;
+  }>;
+  categorias?: Array<{ id: number; nombre: string; tipo: string }>;
+  servicios?: Array<{
+    id: number;
+    categoriaId: number;
+    nombre: string;
+    modalidad: string;
+  }>;
+  disponibilidades?: Array<{ id: bigint; servicioId: number }>;
+}
+
+/** Guard: reconoce al doble de tests por su marcador `_state`. */
+function esClienteMock(db: ClienteDb): db is ClienteDb & { _state: EstadoMockAnalitica } {
+  return "_state" in db && db._state !== null && typeof db._state === "object";
 }
 
 function toBogotaDate(date: Date): string {
@@ -93,11 +134,18 @@ function getWeekKey(dateStr: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
-function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): AnalyticsData {
+type TicketMock = EstadoMockAnalitica["tickets"] extends (infer T)[] | undefined ? T : never;
+type ReservaMock = EstadoMockAnalitica["reservas"] extends (infer R)[] | undefined ? R : never;
+type PagoMock = EstadoMockAnalitica["pagos"] extends (infer P)[] | undefined ? P : never;
+type CategoriaMock = EstadoMockAnalitica["categorias"] extends (infer C)[] | undefined ? C : never;
+type ServicioMock = EstadoMockAnalitica["servicios"] extends (infer S)[] | undefined ? S : never;
+type DisponibilidadMock = EstadoMockAnalitica["disponibilidades"] extends (infer D)[] | undefined ? D : never;
+
+function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: EstadoMockAnalitica): AnalyticsData {
   const { startDate, endDate, period = "daily" } = options;
 
   // Filter tickets
-  const usedTickets = (mockState.tickets || []).filter((t: any) => {
+  const usedTickets = (mockState.tickets || []).filter((t: TicketMock) => {
     if (t.estado !== "USADO" || !t.usadoEn) return false;
     const dateStr = toBogotaDate(new Date(t.usadoEn));
     if (startDate && dateStr < startDate) return false;
@@ -108,10 +156,11 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
   // Group attendance by day
   const dailyAttendanceMap = new Map<string, { ticketsUsed: number; userIds: Set<string> }>();
   for (const t of usedTickets) {
-    const dateStr = toBogotaDate(new Date(t.usadoEn));
+    // t.usadoEn is guaranteed non-null by the filter above
+    const dateStr = toBogotaDate(new Date(t.usadoEn!));
     const entry = dailyAttendanceMap.get(dateStr) || { ticketsUsed: 0, userIds: new Set<string>() };
     entry.ticketsUsed += 1;
-    const res = mockState.reservas?.find((r: any) => r.id === t.reservaId);
+    const res = mockState.reservas?.find((r: ReservaMock) => r.id === t.reservaId);
     if (res?.titularId) entry.userIds.add(res.titularId);
     dailyAttendanceMap.set(dateStr, entry);
   }
@@ -125,7 +174,7 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Filter payments
-  const approvedPayments = (mockState.pagos || []).filter((p: any) => {
+  const approvedPayments = (mockState.pagos || []).filter((p: PagoMock) => {
     if (p.estado !== "APROBADO") return false;
     const dateStr = toBogotaDate(p.creadoEn ? new Date(p.creadoEn) : new Date());
     if (startDate && dateStr < startDate) return false;
@@ -158,7 +207,7 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
   }
 
   // Filter confirmed bookings
-  const confirmedReservas = (mockState.reservas || []).filter((r: any) => {
+  const confirmedReservas = (mockState.reservas || []).filter((r: ReservaMock) => {
     if (r.estado !== "CONFIRMADA") return false;
     const dateStr = toBogotaDate(r.creadoEn ? new Date(r.creadoEn) : new Date());
     if (startDate && dateStr < startDate) return false;
@@ -171,16 +220,16 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
   const servicesList = mockState.servicios || [];
 
   let totalRevenueCategories = 0;
-  const categoryMetrics: CategoryPerformanceMetric[] = categoriesList.map((c: any) => {
-    const cServicios = servicesList.filter((s: any) => s.categoriaId === c.id);
-    const sIds = new Set(cServicios.map((s: any) => s.id));
-    const disps = (mockState.disponibilidades || []).filter((d: any) => sIds.has(d.servicioId));
-    const dIds = new Set(disps.map((d: any) => d.id));
-    const catRes = confirmedReservas.filter((r: any) => dIds.has(r.disponibilidadId));
+  const categoryMetrics: CategoryPerformanceMetric[] = categoriesList.map((c: CategoriaMock) => {
+    const cServicios = servicesList.filter((s: ServicioMock) => s.categoriaId === c.id);
+    const sIds = new Set(cServicios.map((s: ServicioMock) => s.id));
+    const disps = (mockState.disponibilidades || []).filter((d: DisponibilidadMock) => sIds.has(d.servicioId));
+    const dIds = new Set(disps.map((d: DisponibilidadMock) => d.id));
+    const catRes = confirmedReservas.filter((r: ReservaMock) => dIds.has(r.disponibilidadId));
 
     const totalBookings = catRes.length;
-    const totalSpotsSold = catRes.reduce((acc: number, r: any) => acc + (r.cantidadCupos || 1), 0);
-    const totalRev = catRes.reduce((acc: number, r: any) => acc + Number(r.total || 0), 0);
+    const totalSpotsSold = catRes.reduce((acc: number, r: ReservaMock) => acc + (r.cantidadCupos || 1), 0);
+    const totalRev = catRes.reduce((acc: number, r: ReservaMock) => acc + Number(r.total || 0), 0);
     totalRevenueCategories += totalRev;
 
     return {
@@ -203,16 +252,16 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
   categoryMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
   // Services sold vs used
-  const serviceMetrics: ServicePerformanceMetric[] = servicesList.map((s: any) => {
-    const disps = (mockState.disponibilidades || []).filter((d: any) => d.servicioId === s.id);
-    const dIds = new Set(disps.map((d: any) => d.id));
-    const sReservas = confirmedReservas.filter((r: any) => dIds.has(r.disponibilidadId));
-    const rIds = new Set(sReservas.map((r: any) => r.id));
-    const sTickets = usedTickets.filter((t: any) => rIds.has(t.reservaId));
+  const serviceMetrics: ServicePerformanceMetric[] = servicesList.map((s: ServicioMock) => {
+    const disps = (mockState.disponibilidades || []).filter((d: DisponibilidadMock) => d.servicioId === s.id);
+    const dIds = new Set(disps.map((d: DisponibilidadMock) => d.id));
+    const sReservas = confirmedReservas.filter((r: ReservaMock) => dIds.has(r.disponibilidadId));
+    const rIds = new Set(sReservas.map((r: ReservaMock) => r.id));
+    const sTickets = usedTickets.filter((t: TicketMock) => rIds.has(t.reservaId));
 
-    const totalSold = sReservas.reduce((acc: number, r: any) => acc + (r.cantidadCupos || 1), 0);
+    const totalSold = sReservas.reduce((acc: number, r: ReservaMock) => acc + (r.cantidadCupos || 1), 0);
     const totalUsed = sTickets.length;
-    const totalRev = sReservas.reduce((acc: number, r: any) => acc + Number(r.total || 0), 0);
+    const totalRev = sReservas.reduce((acc: number, r: ReservaMock) => acc + Number(r.total || 0), 0);
 
     return {
       serviceId: s.id,
@@ -228,13 +277,13 @@ function calculateMockAnalytics(options: GetAnalyticsOptions, mockState: any): A
   // Summary
   const totalAttendance = usedTickets.length;
   const totalTransactions = approvedPayments.length;
-  const totalRevenue = Number(approvedPayments.reduce((acc: number, p: any) => acc + Number(p.monto || 0), 0).toFixed(2));
-  const uniqueAttendees = new Set(usedTickets.map((t: any) => {
-    const res = mockState.reservas?.find((r: any) => r.id === t.reservaId);
+  const totalRevenue = Number(approvedPayments.reduce((acc: number, p: PagoMock) => acc + Number(p.monto || 0), 0).toFixed(2));
+  const uniqueAttendees = new Set(usedTickets.map((t: TicketMock) => {
+    const res = mockState.reservas?.find((r: ReservaMock) => r.id === t.reservaId);
     return res?.titularId;
   }).filter(Boolean)).size;
   const totalBookings = confirmedReservas.length;
-  const totalSpotsSold = confirmedReservas.reduce((acc: number, r: any) => acc + (r.cantidadCupos || 1), 0);
+  const totalSpotsSold = confirmedReservas.reduce((acc: number, r: ReservaMock) => acc + (r.cantidadCupos || 1), 0);
 
   // Period breakdown
   const breakdownMap = new Map<string, { attendance: number; transactions: number; revenue: number }>();
@@ -293,7 +342,7 @@ export async function getAnalytics(options: GetAnalyticsOptions = {}): Promise<A
   const { startDate, endDate, period = "daily" } = options;
 
   // Si db tiene _state, es un mock en memoria
-  if (db && db._state) {
+  if (esClienteMock(db)) {
     return calculateMockAnalytics(options, db._state);
   }
 

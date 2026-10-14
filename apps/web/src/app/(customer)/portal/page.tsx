@@ -9,11 +9,11 @@ import { useToday } from '@/lib/persistent-state'
 import { usePublicCatalog } from '@/hooks/use-public-catalog'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
 
-import { useCustomerPortal } from './hooks/use-customer-portal'
-import { UpcomingBookingCard } from './components/upcoming-booking-card'
-import { PortalBookingsList } from './components/portal-bookings-list'
-import { CategoryShowcase } from './components/category-showcase'
-import { PortalQrModal } from './components/portal-qr-modal'
+import { useCustomerPortal } from '@/app/(customer)/portal/hooks/use-customer-portal'
+import { UpcomingBookingCard } from '@/app/(customer)/portal/components/upcoming-booking-card'
+import { PortalBookingsList } from '@/app/(customer)/portal/components/portal-bookings-list'
+import { CategoryShowcase } from '@/app/(customer)/portal/components/category-showcase'
+import { PortalQrModal } from '@/app/(customer)/portal/components/portal-qr-modal'
 
 export default function CustomerDashboardPage() {
   const { session } = useApp()

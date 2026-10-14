@@ -14,7 +14,7 @@ import {
   mapDbCategory,
   mapDbSchedule,
   mapDbService,
-} from '../types'
+} from '@/app/(admin)/admin/catalog/types'
 
 export function useAdminCatalog(notify: (msg: string, type?: ToastKind) => void) {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])

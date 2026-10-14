@@ -132,7 +132,7 @@ export function TournamentFormModal({
   const [formData, setFormData] = useState<TournamentFormData>({
     titulo: '',
     descripcion: '',
-    categoriaId: categories[0]?.id ?? 1,
+    categoriaId: categories[0]?.id ?? -1,
     nivel: NIVELES_SUGERIDOS[1],
     fechaInicio: '',
     fechaFin: '',
@@ -157,7 +157,7 @@ export function TournamentFormModal({
         id: tournamentToEdit.id,
         titulo: tournamentToEdit.titulo ?? '',
         descripcion: tournamentToEdit.descripcion ?? '',
-        categoriaId: tournamentToEdit.categoriaId ?? (categories[0]?.id ?? 1),
+        categoriaId: tournamentToEdit.categoriaId ?? categories[0]?.id ?? -1,
         nivel: tournamentToEdit.nivel ?? NIVELES_SUGERIDOS[1],
         fechaInicio: toDatetimeLocal(tournamentToEdit.fechaInicio),
         fechaFin: toDatetimeLocal(tournamentToEdit.fechaFin),
@@ -180,7 +180,7 @@ export function TournamentFormModal({
       setFormData({
         titulo: '',
         descripcion: '',
-        categoriaId: categories[0]?.id ?? 1,
+        categoriaId: categories[0]?.id ?? -1,
         nivel: NIVELES_SUGERIDOS[1],
         fechaInicio: toDatetimeLocal(nextMonth),
         fechaFin: toDatetimeLocal(finMonth),
@@ -197,7 +197,11 @@ export function TournamentFormModal({
   if (!isOpen) return null
 
   const handleAddBloqueo = () => {
-    const defaultServiceId = filteredServices[0]?.id ?? services[0]?.id ?? 1
+    const defaultServiceId = filteredServices[0]?.id ?? services[0]?.id
+    if (defaultServiceId === undefined) {
+      setErrorMsg('Sin servicios en BD: no se puede bloquear pista.')
+      return
+    }
     setFormData((prev) => ({
       ...prev,
       bloqueos: [
@@ -237,6 +241,11 @@ export function TournamentFormModal({
 
     if (!formData.fechaInicio || !formData.fechaFin) {
       setErrorMsg('Debes especificar las fechas y horas de inicio y fin.')
+      return
+    }
+
+    if (!Number.isInteger(Number(formData.categoriaId)) || Number(formData.categoriaId) < 1) {
+      setErrorMsg('Sin categorías en BD: cree una categoría antes de crear torneos.')
       return
     }
 

@@ -8,16 +8,14 @@ const CODIGO_QR = "9f0d6f4e-0000-4000-8000-0000000000ff";
 const CLIENTE = "00000000-0000-4000-8000-000000000001";
 const VENDEDOR = "00000000-0000-4000-8000-000000000002";
 
-const { createMockPrisma } = await import(
-  "../../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Orquestador importado DESPUÉS de inyectar el mock de Prisma.
 const { ReceiptError } = await import("@sportcomplex/db");
-const { construirComprobante, leerMembrete, validarSolicitudComprobante } = await import(
-  "../../../../../lib/receipt"
+const { construirComprobante, leerMembrete, validarSolicitudComprobante } = await import("@/lib/receipt"
 );
 const { parseTicketQrPayload, verifyTicketSignature } = await import("@sportcomplex/core");
 

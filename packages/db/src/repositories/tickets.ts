@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import type { ClienteDb, TxDb } from "../tipos-db";
 
 /**
  * TSK-BD-10 — Canje de ticket y pista de auditoría de accesos (HU-14..17).
@@ -74,8 +75,7 @@ export interface EjecutarLecturaInput {
   /** Obligatorio nulo en modo CONSULTA (RF-15: "ampara 0..1, nulo en consulta"). */
   asignacionId: number | null;
   now?: Date;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db?: any;
+    db?: ClienteDb;
 }
 
 export interface ResultadoLecturaSalida {
@@ -101,8 +101,7 @@ type TicketRow = {
  */
 export async function getTicketForScan(
   codigoUuid: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ): Promise<TicketParaEscaneo> {
   const ticket = await db.ticketQr.findUnique({
     where: { codigoUuid },
@@ -137,8 +136,7 @@ export async function getAsignacionVigente(
   empleadoId: string,
   servicioId: number,
   now: Date,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ): Promise<{ id: number } | null> {
   const asignacion = await db.asignacionPuesto.findFirst({
     where: {
@@ -171,7 +169,7 @@ export async function ejecutarLectura(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async (tx: TxDb) => {
     let resultado: ResultadoLecturaValor = input.resultado;
     let canjeado = false;
 

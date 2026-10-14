@@ -81,13 +81,20 @@ export function createPosCheckoutPostHandler(
         const rolCliente = await db.rol.findFirst({
           where: { nombre: { in: ["CLIENTE", "Cliente"] } },
         });
+        if (!rolCliente) {
+          return fail(
+            "ROLE_NOT_CONFIGURED",
+            "Rol CLIENTE inexistente en BD: ejecute el seed antes de vender en POS.",
+            500,
+          );
+        }
         cliente = await db.usuario.create({
           data: {
             correo: input.clienteEmail,
             nombre: input.clienteNombre,
             passwordHash: "$2b$10$pos_dummy_hash_for_cashless_walk_in",
             estado: "ACTIVO",
-            rolId: rolCliente?.id ?? 1,
+            rolId: rolCliente.id,
           },
         });
       }

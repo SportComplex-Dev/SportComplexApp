@@ -15,7 +15,7 @@ import {
   isTransientNetworkError,
   useNetworkResilience,
 } from "@/hooks/use-network-resilience";
-import type { VerifyResponseData } from "../types";
+import type { VerifyResponseData } from "@/app/(staff)/scanner/types";
 
 export function useScannerController() {
   const { isOnline, executeWithRetry, getCachedTicket, setCachedTicket } =

@@ -4,8 +4,8 @@ import {
   hashSecret,
   generateVerificationCode,
   TOKEN_TTL_MS,
-} from "@sportcomplex/core/src/security/token";
-import { sendVerificationCodeEmail } from "@sportcomplex/core";
+} from "@sportcomplex/security";
+import { sendVerificationCodeEmail } from "@sportcomplex/security";
 import { prisma, createToken } from "@sportcomplex/db";
 import {
   createSupabaseAuthUser,

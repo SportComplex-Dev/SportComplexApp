@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isRoleAllowedForPath } from "./route-access";
+import { isRoleAllowedForPath } from "@/lib/route-access";
 
 test("perimeter role policy denies readers access to POS and admin", () => {
   assert.equal(isRoleAllowedForPath("/pos", "Empleado_Lector"), false);

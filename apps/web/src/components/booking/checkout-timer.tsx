@@ -9,7 +9,7 @@ import {
   calculateRemainingSeconds,
   getTimerStatus,
   calculateProgressPercentage,
-} from './checkout-timer-utils'
+} from '@/components/booking/checkout-timer-utils'
 
 export interface CheckoutTimerProps {
   /** Timestamp en milisegundos cuando la reserva expira */

@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import type { ClienteDb, TxDb } from "../tipos-db";
 
 /**
  * TSK-BD-08 — Job de expiración del TTL de 30 minutos (HU-09 / RF-08 / RN-04 rev.).
@@ -31,8 +32,7 @@ export interface ExpireReservasOptions {
   now?: Date;
   /** Tamaño del lote; por defecto 500, clamp 1..1000. */
   batchSize?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db?: any;
+    db?: ClienteDb;
 }
 
 export interface ExpireReservasResult {
@@ -96,7 +96,7 @@ export async function expireReservasVencidas(
 
   // 2. Transacción: lock best-effort + updates condicionales por fila.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await db.$transaction(async (tx: any) => {
+  await db.$transaction(async (tx: TxDb) => {
     // Advisory lock solo en Postgres real; en mocks $queryRaw no existe o falla.
     try {
       if (typeof tx.$queryRaw === "function") {
@@ -155,7 +155,6 @@ export async function expireReservasVencidas(
             });
             const cur =
               (disp?.cuposOcupados as number | undefined) ??
-              (disp?.cupos_ocupados as number | undefined) ??
               v.cantidadCupos;
             await tx.disponibilidad.update({
               where: { id: v.disponibilidadId },

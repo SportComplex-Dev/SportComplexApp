@@ -11,7 +11,7 @@ import {
   type ReceiptApiResponse,
 } from '@/components/portal/portal-utils'
 import type { ToastKind } from '@/components/toast-message'
-import type { TabType, UserTournamentItem } from '../types'
+import type { TabType, UserTournamentItem } from '@/app/(customer)/portal/tickets/types'
 
 export function usePortalTickets(
   sessionName: string | undefined,

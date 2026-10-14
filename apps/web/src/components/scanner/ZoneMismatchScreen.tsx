@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { MapPin, ShieldAlert } from "lucide-react";
-import { parseZoneMismatch } from "./scanner.service";
+import { parseZoneMismatch } from "@/components/scanner/scanner.service";
 
 interface ZoneMismatchScreenProps {
   /** Mensaje literal devuelto por el backend (HTTP 403 SERVICE_MISMATCH). */

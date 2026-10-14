@@ -118,15 +118,14 @@ export function createMockPrisma() {
     usuario: usuarioHandler,
     rol: {
       async findFirst({ where, select }: any = {}) {
-        const roles = [
-          { id: 1, nombre: "ADMIN" },
-          { id: 2, nombre: "VENDEDOR" },
-          { id: 3, nombre: "LECTOR" },
-          { id: 4, nombre: "CLIENTE" },
-        ];
+        const roles = state.roles;
         let found: { id: number; nombre: string } | null = null;
         if (where?.nombre) {
-          found = roles.find((r) => r.nombre === where.nombre) ?? null;
+          if (typeof where.nombre === "string") {
+            found = roles.find((r) => r.nombre === where.nombre) ?? null;
+          } else if (Array.isArray(where.nombre.in)) {
+            found = roles.find((r) => where.nombre.in.includes(r.nombre)) ?? null;
+          }
         } else if (where?.OR) {
           const names = where.OR.map((o: any) => o.nombre);
           found = roles.find((r) => names.includes(r.nombre)) ?? null;
@@ -142,7 +141,11 @@ export function createMockPrisma() {
         return picked;
       },
       async create({ data, select }: any) {
-        const created = { id: 5, nombre: data.nombre };
+        const created = {
+          id: Math.max(0, ...state.roles.map((r) => r.id)) + 1,
+          nombre: data.nombre,
+        };
+        state.roles.push(created);
         if (!select) return created;
         const picked: Record<string, unknown> = {};
         for (const key of Object.keys(select)) {

@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import type { ClienteDb } from "../tipos-db";
 
 /**
  * TSK-BE-19 — Datos del comprobante en PDF (HU-19 / RF-17 / RNF-05).
@@ -55,8 +56,7 @@ export interface ReceiptData {
  */
 export async function getReceiptReserva(
   reservaId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any = prisma,
+    db: ClienteDb = prisma,
 ): Promise<ReceiptData> {
   const reserva = await db.reserva.findUnique({
     where: { id: reservaId },

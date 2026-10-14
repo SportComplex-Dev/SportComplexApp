@@ -13,7 +13,7 @@ import { ActionButton } from '@/components/action-button'
 import {
   TournamentStatusBadge,
   InscriptionStatusBadge,
-} from './tournament-status-badge'
+} from '@/components/admin/tournaments/tournament-status-badge'
 
 export interface BloqueoDetailItem {
   id?: number

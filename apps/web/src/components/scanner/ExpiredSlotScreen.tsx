@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { Clock3, Ticket } from "lucide-react";
 import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
-import type { ExpiredSlotDetails } from "./scanner.service";
+import type { ExpiredSlotDetails } from "@/components/scanner/scanner.service";
 
 interface ExpiredSlotScreenProps {
   userName: string;

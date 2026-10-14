@@ -6,7 +6,7 @@ import {
   calculateCartTotal,
   formatMoney,
   type CartItem,
-} from '../cart-utils';
+} from '@/app/(customer)/portal/book/cart-utils';
 
 export interface BookingSummaryModalProps {
   isOpen: boolean;

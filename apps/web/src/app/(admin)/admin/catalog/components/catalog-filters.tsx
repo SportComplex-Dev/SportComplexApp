@@ -3,7 +3,7 @@
 import { motion } from 'motion/react'
 import { Search } from 'lucide-react'
 import type { CatalogItem } from '@sportcomplex/core'
-import type { CustomCategory } from '../types'
+import type { CustomCategory } from '@/app/(admin)/admin/catalog/types'
 
 interface CatalogFiltersProps {
   catalog: CatalogItem[]

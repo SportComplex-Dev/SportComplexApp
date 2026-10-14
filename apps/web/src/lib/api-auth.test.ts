@@ -4,7 +4,7 @@ import {
   authorizeApiRequest,
   type AuthorizationAccount,
   type AuthorizationDatabase,
-} from "./api-auth";
+} from "@/lib/api-auth";
 
 function dbFor(account: AuthorizationAccount | null): AuthorizationDatabase {
   return {

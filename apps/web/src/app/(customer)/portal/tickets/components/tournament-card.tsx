@@ -3,7 +3,7 @@
 import { Download, QrCode } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import type { UserTournamentItem } from '../types'
+import type { UserTournamentItem } from '@/app/(customer)/portal/tickets/types'
 import type { PortalTicket } from '@/components/portal/portal-utils'
 
 interface TournamentCardProps {

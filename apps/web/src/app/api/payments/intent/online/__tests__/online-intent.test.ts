@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import Stripe from "stripe";
-import { createMockPrisma } from "../../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 const STRIPE_SECRET_KEY = "sk_test_online_key_secret_dummy";
@@ -10,7 +10,7 @@ process.env.STRIPE_SECRET_KEY = STRIPE_SECRET_KEY;
 const mock = createMockPrisma();
 (globalThis as typeof globalThis & { __scPrisma: unknown }).__scPrisma = mock;
 
-const onlineRoute = await import("../route");
+const onlineRoute = await import("@/app/api/payments/intent/online/route");
 
 const titularId = "cliente-online-1";
 const anotherUserId = "cliente-online-2";

@@ -137,8 +137,14 @@ export interface MockSequences {
   asignacionIdSeq: number;
 }
 
+export interface MockRol {
+  id: number;
+  nombre: string;
+}
+
 export interface MockState {
   categorias: MockCategoria[];
+  roles: MockRol[];
   servicios: MockServicio[];
   franjas: MockFranja[];
   disponibilidades: MockDisponibilidad[];
@@ -160,6 +166,12 @@ export interface MockState {
 export function crearEstadoInicial(): MockState {
   return {
     categorias: [],
+    roles: [
+      { id: 1, nombre: "ADMIN" },
+      { id: 2, nombre: "VENDEDOR" },
+      { id: 3, nombre: "LECTOR" },
+      { id: 4, nombre: "CLIENTE" },
+    ],
     servicios: [],
     franjas: [],
     disponibilidades: [],

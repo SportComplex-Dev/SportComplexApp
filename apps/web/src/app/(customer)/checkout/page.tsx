@@ -21,7 +21,7 @@ import { useDraft, useLastCode } from '@/lib/stores'
 import { usePublicCatalog } from '@/hooks/use-public-catalog'
 import { PaymentMethodSelector } from '@/components/payment-method-selector'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
-import { pollPaymentConfirmation, resolvePaymentOutcome } from './checkout-flow'
+import { pollPaymentConfirmation, resolvePaymentOutcome } from '@/app/(customer)/checkout/checkout-flow'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
   try {

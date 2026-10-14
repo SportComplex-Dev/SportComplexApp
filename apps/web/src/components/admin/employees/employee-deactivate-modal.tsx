@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { AlertTriangle, Loader2, ShieldAlert, UserX } from 'lucide-react'
-import type { Employee } from './employee-table'
+import type { Employee } from '@/components/admin/employees/employee-table'
 
 interface EmployeeDeactivateModalProps {
   employee: Employee | null

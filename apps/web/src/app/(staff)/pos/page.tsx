@@ -1,13 +1,13 @@
 'use client'
 
 import { useApp } from '@/components/app-provider'
-import { PosCatalogSelector } from './components/pos-catalog-selector'
-import { PosClientForm } from './components/pos-client-form'
-import { PosPaymentStripe } from './components/pos-payment-stripe'
-import { PosVoucherModal } from './components/pos-voucher-modal'
-import { PosAltLinkModal } from './components/pos-alt-link-modal'
-import { PosHeader } from './components/pos-header'
-import { usePosSession } from './hooks/use-pos-session'
+import { PosCatalogSelector } from '@/app/(staff)/pos/components/pos-catalog-selector'
+import { PosClientForm } from '@/app/(staff)/pos/components/pos-client-form'
+import { PosPaymentStripe } from '@/app/(staff)/pos/components/pos-payment-stripe'
+import { PosVoucherModal } from '@/app/(staff)/pos/components/pos-voucher-modal'
+import { PosAltLinkModal } from '@/app/(staff)/pos/components/pos-alt-link-modal'
+import { PosHeader } from '@/app/(staff)/pos/components/pos-header'
+import { usePosSession } from '@/app/(staff)/pos/hooks/use-pos-session'
 
 export default function PosPage() {
   const { session, notify } = useApp()

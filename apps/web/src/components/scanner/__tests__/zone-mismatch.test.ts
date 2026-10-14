@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseZoneMismatch } from "../scanner.service";
+import { parseZoneMismatch } from "@/components/scanner/scanner.service";
 
 // TSK-FE-16 (HU-16 / RF-14): parser del mensaje literal del 403 SERVICE_MISMATCH.
 

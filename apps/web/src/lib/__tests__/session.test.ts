@@ -8,7 +8,7 @@ import {
   normalizeEmbeddedRole,
   isAccountActive,
   verifyScSessionToken,
-} from "../session";
+} from "@/lib/session";
 
 test("extracts Supabase access tokens from JSON cookies", () => {
   const request = new NextRequest("http://localhost/");

@@ -12,7 +12,7 @@ import {
   formatMoney,
   getBogotaDateAfter,
   type DynamicTimeSlot,
-} from '../cart-utils';
+} from '@/app/(customer)/portal/book/cart-utils';
 import { usePublicCatalog } from '@/hooks/use-public-catalog';
 
 export interface ServiceSelectorProps {

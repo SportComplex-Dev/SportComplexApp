@@ -4,7 +4,7 @@ import {
   verifySecret,
   isTokenExpired,
   RESEND_COOLDOWN_MS,
-} from "@sportcomplex/core/src/security/token";
+} from "@sportcomplex/security";
 import {
   consumeRateLimit,
   resetRateLimit,

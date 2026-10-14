@@ -14,10 +14,10 @@ import {
   getNumericServiceId,
   resolveCheckoutRedirection,
   type CartItem,
-} from '../cart-utils';
-import { Cart } from '../components/cart';
-import { BookingSummaryModal } from '../components/booking-summary-modal';
-import { ServiceSelector } from '../components/service-selector';
+} from '@/app/(customer)/portal/book/cart-utils';
+import { Cart } from '@/app/(customer)/portal/book/components/cart';
+import { BookingSummaryModal } from '@/app/(customer)/portal/book/components/booking-summary-modal';
+import { ServiceSelector } from '@/app/(customer)/portal/book/components/service-selector';
 
 /**
  * TSK-FE-12 / HU-12 / RF-11 / RN-07:

@@ -9,13 +9,13 @@ import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
 import { SlotCapacityEditor } from '@/components/admin/slot-capacity-editor'
 
-import { blankCatalogItem } from './types'
-import { useAdminCatalog } from './hooks/use-admin-catalog'
-import { CatalogFilters } from './components/catalog-filters'
-import { CatalogTable } from './components/catalog-table'
-import { CatalogScheduleView } from './components/catalog-schedule-view'
-import { CategoryFormModal } from './components/category-form-modal'
-import { CatalogFormModal } from './components/catalog-form-modal'
+import { blankCatalogItem } from '@/app/(admin)/admin/catalog/types'
+import { useAdminCatalog } from '@/app/(admin)/admin/catalog/hooks/use-admin-catalog'
+import { CatalogFilters } from '@/app/(admin)/admin/catalog/components/catalog-filters'
+import { CatalogTable } from '@/app/(admin)/admin/catalog/components/catalog-table'
+import { CatalogScheduleView } from '@/app/(admin)/admin/catalog/components/catalog-schedule-view'
+import { CategoryFormModal } from '@/app/(admin)/admin/catalog/components/category-form-modal'
+import { CatalogFormModal } from '@/app/(admin)/admin/catalog/components/catalog-form-modal'
 
 export default function AdminCatalogPage() {
   const { notify } = useApp()

@@ -25,7 +25,7 @@ import {
   formatIncidentDate,
   formatIncidentHour,
   isIncidentReasonValid,
-} from './incident-utils'
+} from '@/app/(admin)/admin/incident/incident-utils'
 
 interface ServiceOption {
   id: number

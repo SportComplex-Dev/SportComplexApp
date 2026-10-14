@@ -3,7 +3,7 @@
 import React from 'react'
 import { BarChart3, Building2, Download, Layers } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
-import type { CategoryPerformanceItem } from './dashboard-kpis'
+import type { CategoryPerformanceItem } from '@/components/admin/dashboard/dashboard-kpis'
 
 export interface ServiceComparisonItem {
   serviceId: number

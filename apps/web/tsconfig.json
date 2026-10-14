@@ -4,6 +4,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@db-test/*": ["../../packages/db/test/*"],
       "@sportcomplex/validation": ["../../packages/validation/dist"],
       "@sportcomplex/validation/src/*": ["../../packages/validation/dist/*"],
       "@sportcomplex/validation/*": ["../../packages/validation/dist/*"],
@@ -15,7 +16,11 @@
       "@sportcomplex/core/*": ["../../packages/core/dist/*"],
       "@sportcomplex/ui": ["../../packages/ui/dist"],
       "@sportcomplex/ui/src/*": ["../../packages/ui/dist/*"],
-      "@sportcomplex/ui/*": ["../../packages/ui/dist/*"]
+      "@sportcomplex/ui/*": ["../../packages/ui/dist/*"],
+      "@sportcomplex/domain": ["../../packages/domain/dist"],
+      "@sportcomplex/domain/*": ["../../packages/domain/dist/*"],
+      "@sportcomplex/security": ["../../packages/security/dist"],
+      "@sportcomplex/security/*": ["../../packages/security/dist/*"]
     },
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": false,

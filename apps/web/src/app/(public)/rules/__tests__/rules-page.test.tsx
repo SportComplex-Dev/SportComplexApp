@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 (globalThis as any).React = React;
 
-import RulesPage from '../page';
+import RulesPage from '@/app/(public)/rules/page';
 import { InstitutionalFooter } from '@/components/home/institutional-footer';
 
 test('RULES-UI-01: Renderiza el encabezado institucional, hero y metadatos normativos', () => {
