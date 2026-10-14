@@ -1,14 +1,117 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-dotenv.config();
 
-import crypto from "crypto";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Cargar variables de entorno locales de web o db
+dotenv.config();
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../../apps/web/.env.local"));
+  } catch {}
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../../../apps/web/.env"));
+  } catch {}
+  try {
+    process.loadEnvFile(path.resolve(__dirname, "../.env"));
+  } catch {}
+}
+
 import { PeriodicidadPlan, EstadoUsuario } from "@prisma/client";
 import { prisma } from "../src/client.js";
 
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
+async function hashArgon2id(password: string): Promise<string> {
+  const { hash } = await import("@node-rs/argon2");
+  return hash(password, {
+    algorithm: 2,
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+}
+
+interface SupabaseAuthUser {
+  id: string;
+  email?: string;
+}
+
+async function syncSupabaseAuthUser(
+  supabaseUrl: string,
+  serviceKey: string,
+  email: string,
+  password: string,
+  rotatePassword = false
+): Promise<{ success: boolean; action: "created" | "updated" | "exists" | "skipped"; detail?: string }> {
+  const adminHeaders = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+  };
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // 1. Buscar usuario existente en Supabase Auth
+  let existingUser: SupabaseAuthUser | null = null;
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const listRes = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: adminHeaders,
+    });
+
+    if (!listRes.ok) {
+      const errText = await listRes.text();
+      throw new Error(`Admin list Supabase Auth falló (${listRes.status}): ${errText}`);
+    }
+
+    const body = (await listRes.json()) as { users?: SupabaseAuthUser[] };
+    const batch = body.users ?? [];
+    const match = batch.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    if (match) {
+      existingUser = match;
+      break;
+    }
+    if (batch.length < perPage) break;
+  }
+
+  // 2. Crear si no existe
+  if (!existingUser) {
+    const createRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: adminHeaders,
+      body: JSON.stringify({
+        email: normalizedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: { role: "ADMIN", name: "Administrador de Producción" },
+      }),
+    });
+
+    if (!createRes.ok) {
+      const errText = await createRes.text();
+      return { success: false, action: "skipped", detail: `Error al crear en Supabase Auth (${createRes.status}): ${errText}` };
+    }
+
+    return { success: true, action: "created" };
+  }
+
+  // 3. Actualizar contraseña si se solicitó explícitamente (--rotate-password)
+  if (rotatePassword) {
+    const updateRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${existingUser.id}`, {
+      method: "PUT",
+      headers: adminHeaders,
+      body: JSON.stringify({ password }),
+    });
+
+    if (!updateRes.ok) {
+      const errText = await updateRes.text();
+      return { success: false, action: "skipped", detail: `Error al rotar contraseña en Supabase Auth (${updateRes.status}): ${errText}` };
+    }
+
+    return { success: true, action: "updated" };
+  }
+
+  return { success: true, action: "exists" };
 }
 
 async function main() {
@@ -21,7 +124,36 @@ async function main() {
     process.exit(1);
   }
 
-  const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@sportcomplex.lat";
+  const adminEmail = (process.env.SEED_ADMIN_EMAIL || "admin@sportcomplex.lat").toLowerCase().trim();
+  const rotatePassword = process.argv.includes("--rotate-password") || process.argv.includes("--reset");
+
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+  // Criterio 4: Altas en Supabase Auth vía Admin API con script auditado sin adivinanzas
+  if (supabaseUrl && serviceKey) {
+    console.log(`Verificando/sincronizando identidad en Supabase Auth Admin API (${adminEmail})...`);
+    try {
+      const authResult = await syncSupabaseAuthUser(supabaseUrl, serviceKey, adminEmail, adminPassword, rotatePassword);
+      if (authResult.action === "created") {
+        console.log(`✅ Identidad creada en Supabase Auth con email confirmado (${adminEmail}).`);
+      } else if (authResult.action === "updated") {
+        console.log(`✅ Contraseña de identidad en Supabase Auth rotada exitosamente (${adminEmail}).`);
+      } else if (authResult.action === "exists") {
+        console.log(`ℹ️ Identidad preexistente en Supabase Auth preservada (${adminEmail}). Use --rotate-password para actualizarla.`);
+      }
+    } catch (authError) {
+      console.error("❌ Error al interactuar con Supabase Auth Admin API:", authError);
+      process.exit(1);
+    }
+  } else {
+    console.warn("⚠️ AVISO [SCRUM-209 CA-04]: SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY no están configuradas.");
+    console.warn("   Para garantizar el inicio de sesión del administrador en producción, configure estas variables.");
+    if (process.env.NODE_ENV === "production") {
+      console.error("❌ ERROR CRÍTICO: No se puede omitir Supabase Auth Admin API en entorno de producción.");
+      process.exit(1);
+    }
+  }
 
   // 1. Roles del sistema (Idempotente)
   const roles = ["ADMIN", "VENDEDOR", "LECTOR", "CLIENTE"];
@@ -77,13 +209,13 @@ async function main() {
   }
   console.log("✅ Planes oficiales de membresía sincronizados (30% descuento)");
 
-  // 3. Cuenta de Administrador Inicial de Producción (Idempotente)
+  // 3. Cuenta de Administrador Inicial de Producción (Idempotente en PostgreSQL)
   const rolAdmin = await prisma.rol.findUnique({ where: { nombre: "ADMIN" } });
   if (!rolAdmin) {
     throw new Error("Rol ADMIN no encontrado tras el upsert.");
   }
 
-  const passwordHash = hashPassword(adminPassword);
+  const passwordHash = await hashArgon2id(adminPassword);
 
   const existingAdmin = await prisma.usuario.findUnique({
     where: { correo: adminEmail },
@@ -99,18 +231,24 @@ async function main() {
         estado: EstadoUsuario.ACTIVO,
       },
     });
-    console.log(`✅ Cuenta de administrador inicial creada (${adminEmail})`);
+    console.log(`✅ Cuenta de administrador creada en tabla 'usuario' (${adminEmail}) con hash Argon2id.`);
   } else {
-    // Actualizar contraseña si se proporciona el bootstrap
+    const updateData: { estado: EstadoUsuario; rolId: number; deletedAt: null; passwordHash?: string } = {
+      estado: EstadoUsuario.ACTIVO,
+      rolId: rolAdmin.id,
+      deletedAt: null,
+    };
+    if (rotatePassword) {
+      updateData.passwordHash = passwordHash;
+      console.log(`✅ Contraseña de administrador actualizada en tabla 'usuario' (${adminEmail}).`);
+    } else {
+      console.log(`ℹ️ Cuenta de administrador ya existe en tabla 'usuario' (${adminEmail}). Se validó estado ACTIVO y rol ADMIN.`);
+    }
+
     await prisma.usuario.update({
       where: { correo: adminEmail },
-      data: {
-        passwordHash,
-        estado: EstadoUsuario.ACTIVO,
-        rolId: rolAdmin.id,
-      },
+      data: updateData,
     });
-    console.log(`✅ Cuenta de administrador inicial actualizada (${adminEmail})`);
   }
 
   console.log("🚀 Bootstrap de producción completado con éxito (cero datos de prueba insertados).");
