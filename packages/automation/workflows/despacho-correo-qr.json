@@ -35,14 +35,16 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.resend.com/emails",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
             }
           ]
         },
@@ -58,13 +60,7 @@
         0
       ],
       "id": "fedc3e34-6a00-4258-95d8-871955d26416",
-      "name": "HTTP Request",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "Kh9OT3GVIJLhIvTY",
-          "name": "Header Auth account"
-        }
-      }
+      "name": "HTTP Request"
     },
     {
       "parameters": {
