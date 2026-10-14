@@ -30,10 +30,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = "default", size = "default", className, ...rest }: ButtonProps) {
+  const isLink = variant === "link";
   return (
     <button
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50",
+        "interactive-button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent font-semibold transition-all duration-150 ease-out cursor-pointer select-none disabled:pointer-events-none disabled:opacity-50 disabled:transform-none motion-reduce:transform-none motion-reduce:transition-none",
+        !isLink && "active:scale-[0.98]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d6048] focus-visible:ring-offset-2 dark:focus-visible:ring-[#8cd766] dark:focus-visible:ring-offset-[#111815]",
         variantClasses[variant],
         sizeClasses[size],
         className,

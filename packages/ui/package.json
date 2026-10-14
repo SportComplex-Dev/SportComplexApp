@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test": "node ../../apps/web/node_modules/tsx/dist/cli.mjs --test \"src/**/__tests__/**/*.test.tsx\"",
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },
