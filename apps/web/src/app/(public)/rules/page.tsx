@@ -276,16 +276,24 @@ export default function RulesPage() {
 
   const handleDownloadPdf = () => {
     if (typeof window !== 'undefined') {
-      // Activa el cuadro de impresión nativo del navegador configurado para documento/PDF
-      window.print();
+      // Expande todos los módulos antes de imprimir para garantizar que el PDF contenga toda la normativa
+      expandAll();
+      setTimeout(() => {
+        window.print();
+      }, 150);
     }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     if (typeof window !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setNotification('Enlace copiado al portapapeles');
-      setTimeout(() => setNotification(null), 3000);
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setNotification('Enlace copiado al portapapeles');
+        setTimeout(() => setNotification(null), 3000);
+      } catch {
+        setNotification('No se pudo copiar el enlace al portapapeles');
+        setTimeout(() => setNotification(null), 3000);
+      }
     }
   };
 
@@ -405,62 +413,64 @@ export default function RulesPage() {
                   : 'border-[#e2e6df] dark:border-[#26352d] bg-[#f7f8f5]/60 dark:bg-[#111815]/40 hover:bg-white dark:hover:bg-[#15201b]'
               }`}
             >
-              {/* Encabezado del Acordeón (Botón Interactivo) */}
-              <button
-                type="button"
-                id={buttonId}
-                aria-expanded={isOpen}
-                aria-controls={contentId}
-                onClick={() => toggleModule(module.id)}
-                className="w-full flex items-start sm:items-center justify-between gap-4 p-5 sm:p-6 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123e30] dark:focus-visible:ring-[#c9ef75] focus-visible:ring-offset-2 transition-colors cursor-pointer"
-              >
-                <div className="flex items-start sm:items-center gap-4">
-                  {/* Icono temático */}
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                      isOpen
-                        ? 'bg-[#c9ef75] text-[#123e30]'
-                        : 'bg-[#123e30]/5 dark:bg-[#c9ef75]/10 text-[#123e30] dark:text-[#c9ef75]'
-                    }`}
-                  >
-                    <IconComponent className="w-6 h-6" aria-hidden="true" />
-                  </div>
-
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-bold text-[#526058] dark:text-[#9eaba3]">
-                        MÓDULO {module.number}
-                      </span>
-                      {module.lawBadge && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                          {module.lawBadge}
-                        </span>
-                      )}
-                      {module.rulesBadge && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
-                          {module.rulesBadge}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-[#121a16] dark:text-[#f2f5f1]">
-                      {module.title}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-[#526058] dark:text-[#9eaba3] mt-0.5">
-                      {module.subtitle}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Flecha indicadora de estado */}
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#123e30]/5 dark:bg-[#c9ef75]/10 text-[#123e30] dark:text-[#c9ef75] transition-transform duration-200 ${
-                    isOpen ? 'rotate-180 bg-[#c9ef75]/30' : ''
-                  }`}
-                  aria-hidden="true"
+              {/* Encabezado del Acordeón (W3C APG: Heading wraps Button) */}
+              <h2 className="m-0 p-0 font-normal">
+                <button
+                  type="button"
+                  id={buttonId}
+                  aria-expanded={isOpen}
+                  aria-controls={contentId}
+                  onClick={() => toggleModule(module.id)}
+                  className="w-full flex items-start sm:items-center justify-between gap-4 p-5 sm:p-6 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123e30] dark:focus-visible:ring-[#c9ef75] focus-visible:ring-offset-2 transition-colors cursor-pointer"
                 >
-                  <ChevronDown className="w-5 h-5" />
-                </div>
-              </button>
+                  <div className="flex items-start sm:items-center gap-4">
+                    {/* Icono temático */}
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        isOpen
+                          ? 'bg-[#c9ef75] text-[#123e30]'
+                          : 'bg-[#123e30]/5 dark:bg-[#c9ef75]/10 text-[#123e30] dark:text-[#c9ef75]'
+                      }`}
+                    >
+                      <IconComponent className="w-6 h-6" aria-hidden="true" />
+                    </div>
+
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="text-xs font-mono font-bold text-[#526058] dark:text-[#9eaba3]">
+                          MÓDULO {module.number}
+                        </span>
+                        {module.lawBadge && (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                            {module.lawBadge}
+                          </span>
+                        )}
+                        {module.rulesBadge && (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
+                            {module.rulesBadge}
+                          </span>
+                        )}
+                      </div>
+                      <span className="block text-lg sm:text-xl font-bold text-[#121a16] dark:text-[#f2f5f1]">
+                        {module.title}
+                      </span>
+                      <p className="text-xs sm:text-sm text-[#526058] dark:text-[#9eaba3] mt-0.5">
+                        {module.subtitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Flecha indicadora de estado */}
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#123e30]/5 dark:bg-[#c9ef75]/10 text-[#123e30] dark:text-[#c9ef75] transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 bg-[#c9ef75]/30' : ''
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                  </div>
+                </button>
+              </h2>
 
               {/* Contenido Desplegable Animado */}
               <motion.div

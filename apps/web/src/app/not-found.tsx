@@ -284,7 +284,7 @@ export default function NotFound() {
             ¿Crees que se trata de un error del sistema?
           </span>
           <Link
-            href="https://wa.me/573000000000"
+            href="https://wa.me/573001234567"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-xs font-bold text-[#123e30] dark:text-[#c9ef75] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123e30] dark:focus-visible:ring-[#c9ef75] focus-visible:ring-offset-2 rounded-lg px-2.5 py-1.5 transition-all"
