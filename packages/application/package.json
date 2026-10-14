@@ -1,0 +1,67 @@
+{
+  "name": "@sportcomplex/application",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./precio": {
+      "types": "./dist/precio/index.d.ts",
+      "import": "./dist/precio/index.js",
+      "default": "./src/precio/index.ts"
+    },
+    "./disponibilidad": {
+      "types": "./dist/disponibilidad/index.d.ts",
+      "import": "./dist/disponibilidad/index.js",
+      "default": "./src/disponibilidad/index.ts"
+    },
+    "./control-acceso": {
+      "types": "./dist/control-acceso/index.d.ts",
+      "import": "./dist/control-acceso/index.js",
+      "default": "./src/control-acceso/index.ts"
+    },
+    "./politica-piscina": {
+      "types": "./dist/politica-piscina/index.d.ts",
+      "import": "./dist/politica-piscina/index.js",
+      "default": "./src/politica-piscina/index.ts"
+    },
+    "./reserva": {
+      "types": "./dist/reserva/index.d.ts",
+      "import": "./dist/reserva/index.js",
+      "default": "./src/reserva/index.ts"
+    },
+    "./membresia": {
+      "types": "./dist/membresia/index.d.ts",
+      "import": "./dist/membresia/index.js",
+      "default": "./src/membresia/index.ts"
+    },
+    "./torneo": {
+      "types": "./dist/torneo/index.d.ts",
+      "import": "./dist/torneo/index.js",
+      "default": "./src/torneo/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sportcomplex/domain": "workspace:*",
+    "@sportcomplex/validation": "workspace:*",
+    "date-fns": "4.1.0",
+    "date-fns-tz": "3.2.0"
+  },
+  "devDependencies": {
+    "@sportcomplex/config": "workspace:*",
+    "@types/node": "22.13.10",
+    "typescript": "5.7.3"
+  }
+}
