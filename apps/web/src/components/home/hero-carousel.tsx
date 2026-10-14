@@ -162,7 +162,7 @@ export function HeroCarousel() {
         className="absolute inset-0 z-1 pointer-events-none"
         style={{
           background:
-            'linear-gradient(90deg, rgba(8, 29, 21, 0.92) 0%, rgba(8, 29, 21, 0.78) 42%, rgba(8, 29, 21, 0.22) 100%), linear-gradient(0deg, rgba(10, 29, 22, 0.52) 0%, transparent 40%)',
+            'linear-gradient(90deg, rgba(8, 29, 21, 0.92) 0%, rgba(8, 29, 21, 0.78) 36%, rgba(8, 29, 21, 0.28) 58%, rgba(8, 29, 21, 0.05) 80%, transparent 100%), linear-gradient(0deg, rgba(10, 29, 22, 0.35) 0%, transparent 28%)',
         }}
       />
 
