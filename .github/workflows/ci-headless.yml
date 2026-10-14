@@ -20,6 +20,10 @@ jobs:
   headless-e2e:
     name: Pruebas Headless E2E y Visuales
     runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.NEXTAUTH_SECRET || 'ci-headless-test-secret-min-32-chars-long' }}
+      NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.NEXTAUTH_SECRET || 'ci-headless-test-secret-min-32-chars-long' }}
+      NEXTAUTH_URL: http://127.0.0.1:3000
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4

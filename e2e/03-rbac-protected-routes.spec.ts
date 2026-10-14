@@ -29,7 +29,6 @@ test.describe("Flujo 3: Seguridad Perimetral, Middleware y Rutas Protegidas (RBA
   test("3.6 Subrutas administrativas y de cliente son interceptadas y redirigidas a /login", async ({ page }) => {
     const routes = [
       "/portal/tickets",
-      "/portal/membership",
       "/admin/dashboard",
       "/admin/employees",
       "/admin/tournaments",
@@ -42,7 +41,13 @@ test.describe("Flujo 3: Seguridad Perimetral, Middleware y Rutas Protegidas (RBA
     }
   });
 
-  test("3.7 Rutas de API protegidas devuelven status 401 JSON ante peticiones sin autenticación", async ({ request }) => {
+  test("3.7 Acceso anónimo a /portal/membership es público y no debe redirigir a /login", async ({ page }) => {
+    await page.goto("/portal/membership");
+    await expect(page).toHaveURL(/\/portal\/membership/);
+    await expect(page.getByText(/membresía|planes|beneficios|visitante/i).first()).toBeVisible();
+  });
+
+  test("3.8 Rutas de API protegidas devuelven status 401 JSON ante peticiones sin autenticación", async ({ request }) => {
     const protectedApis = [
       "/api/admin/employees",
       "/api/pos",
