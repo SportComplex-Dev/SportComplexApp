@@ -8,6 +8,11 @@ Guía del **CI/CD** de GitHub Actions: CI en cada push/PR y CD hacia el VPS comp
 | `.github/workflows/ci.yml` | `push` a `develop`/`main` + PRs | `pnpm install` → `typecheck` → `lint` → `test` → build de `web` |
 | `.github/workflows/deploy.yml` | `push` a `main` (+ manual) | Build de `docker/Dockerfile.web`, push a **GHCR** (`ghcr.io/sportcomplex-dev/sportcomplex-web:latest` y `:sha`) y despliegue SSH al VPS |
 
+### Convención de ramas (tech lead, 2026-10-14)
+
+- `hotfix/*` → base `main`. Solo incidentes de producción, alcance mínimo, CI verde + approval, verificación del deploy y **back-merge a `develop` inmediato y obligatorio**.
+- `fix/*`, `feat/*` → base `develop`. Flujo normal vía PR release.
+
 Usamos **GHCR (GitHub Container Registry)**, no Docker Hub: cero cuenta externa, el push lo hace el `GITHUB_TOKEN` automático del workflow (permiso `packages: write`).
 
 ## 2. Despliegue SSH
@@ -16,7 +21,8 @@ El job `deploy` se conecta por SSH como `ubuntu` y ejecuta:
 cd ~/SportComplexApp/docker
 sudo docker compose pull
 sudo docker compose up migrate        # prisma migrate deploy (sale solo)
-sudo docker compose up -d web caddy n8n
+sudo docker compose up -d web caddy   # n8n se levanta tras el import (paso 7)
+# 7. run --rm n8n import --separate + publish por --id + up -d n8n
 ```
 La imagen ya viene construida desde GitHub (`ghcr.io/sportcomplex-dev/sportcomplex-web:<sha>` y `:latest`); el VPS no compila.
 
@@ -34,10 +40,13 @@ La imagen ya viene construida desde GitHub (`ghcr.io/sportcomplex-dev/sportcompl
 | `VPS_HOST` | `148.113.252.230` | IPv4 del VPS (`ip a`) |
 | `VPS_USER` | `ubuntu` | Usuario SSH del VPS |
 | `VPS_SSH_KEY` | `-----BEGIN ...` | Llave **privada** ed25519 dedicada a Actions |
-| `APPS_WEB_ENV` | *(archivo completo)* | Contenido íntegro del `.env` de `apps/web` en producción |
-| `GHCR_PAT` | `github_pat_...` | **Opcional.** PAT classic con `read:packages`, solo si el package GHCR queda privado. Si el package es público, déjalo sin crear |
+| `APPS_WEB_ENV` | *(archivo completo)* | Contenido íntegro del `.env` de `apps/web` en producción. **Incluye `INTERNAL_API_KEY`** (key web↔n8n); el deploy la propaga además a `docker/.env` |
+| `RESEND_API_KEY` | `re_...` | Key de Resend para los 6 workflows de email. El deploy la escribe en `docker/.env` (n8n la lee como `$env.RESEND_API_KEY`) |
+| `GHCR_PAT` | `github_pat_...` | **Opcional.** Solo si el package GHCR volviera a privado. Hoy el package es público: no crear |
 
 *(Ya no se necesitan `DOCKERHUB_*`: la imagen vive en GHCR con el `GITHUB_TOKEN` automático del workflow.)*
+
+> **Repo secrets (nivel repo, no environment):** `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_APP_URL`. Los consume el job `build` como build-args (tiene `environment: production`, que también resuelve los de repo). Sin ellos la imagen compila con valores vacíos.
 
 ## 3.2. Garantías del pipeline
 
