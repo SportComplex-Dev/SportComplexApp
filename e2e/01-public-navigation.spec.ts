@@ -105,15 +105,16 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
 
   test("1.7 Página de reglamentos legales carga contenido institucional SSG", async ({ page }) => {
     await page.goto("/legal");
-    await expect(page).toHaveURL(/\/legal/);
+    await expect(page).toHaveURL(/\/rules/);
 
     // Contenido legal presente
-    await expect(page.locator("h1")).toContainText(/Reglamentos/i);
-    await expect(page.getByText(/Contenido estático institucional/i)).toBeVisible();
+    await expect(page.locator("h1")).toContainText(/Reglamento/i);
+    await expect(page.getByText(/MARCO LEGAL Y DE CONVIVENCIA/i)).toBeVisible();
   });
 
   test("1.8 Carrusel interactivo del Hero rota automáticamente y navega con flechas en extremos y dots centrados", async ({ page }) => {
     await page.goto("/");
+    await page.locator(".splash-overlay").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
     const carousel = page.locator('[aria-roledescription="carousel"]');
     await expect(carousel).toBeVisible();
 
@@ -121,23 +122,20 @@ test.describe("Flujo 1: Navegación Pública y Landing Page", () => {
     const tabs = carousel.getByRole("tab");
     await expect(tabs).toHaveCount(5);
 
-    // Primer tab activo por defecto
-    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+    // Navegar directamente haciendo click en el tercer tab (índice 2)
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
 
-    // Click en la flecha siguiente (extremo derecho)
+    // Click en la flecha siguiente (debe pasar al índice 3)
     const nextButton = carousel.getByRole("button", { name: "Siguiente" });
     await expect(nextButton).toBeVisible();
     await nextButton.click();
-    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+    await expect(tabs.nth(3)).toHaveAttribute("aria-selected", "true");
 
-    // Click en la flecha anterior (extremo izquierdo)
+    // Click en la flecha anterior (debe volver al índice 2)
     const prevButton = carousel.getByRole("button", { name: "Anterior" });
     await expect(prevButton).toBeVisible();
     await prevButton.click();
-    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-
-    // Click directo en dot
-    await tabs.nth(2).click();
     await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   });
 });

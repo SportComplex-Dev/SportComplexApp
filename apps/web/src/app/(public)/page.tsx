@@ -3,17 +3,14 @@ export const dynamic = 'force-static';
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, MapPin, Star } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 import { formatMoney, minPrice, serviceCategories, initialCatalog } from "@sportcomplex/core";
 import { categoryIcons } from "@/components/category-icons";
 import { IconBox } from "@/components/icon-box";
-import { AthleticMarquee } from "@/components/athletic-marquee";
 import { SplashScreen } from "@/components/splash-screen";
 import { FacilityShowcase } from "@/components/home/facility-showcase";
-import { MembershipsSection } from "@/components/home/memberships-section";
 import { ClubEvents } from "@/components/home/club-events";
 import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital-pass";
-import { TestimonialsSection } from "@/components/home/testimonials-section";
 import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 import { HeroCarousel } from "@/components/home/hero-carousel";
@@ -45,46 +42,15 @@ export default function HomePage() {
             <Link href="/services" className="action-button">
               Reserva tu espacio <ArrowRight size={17} />
             </Link>
-            <Link href="/services" className="hero-secondary">
-              Explorar servicios
-            </Link>
-            <Link href="/register" className="hero-secondary">
-              Hazte socio
-            </Link>
-          </div>
-          <div className="hero-proof">
-            <div className="avatar-stack">
-              <span>J</span>
-              <span>L</span>
-              <span>A</span>
-              <span>+</span>
-            </div>
-            <div>
-              <b>+2.400 personas</b>
-              <small>ya entrenan en Altura</small>
-            </div>
-            <span className="proof-divider" />
-            <div className="rating">
-              <span className="rating-stars" aria-label="Calificación 4.9 de 5">
-                {Array.from({ length: 5 }, (_, index) => (
-                  <Star key={index} size={11} fill="currentColor" />
-                ))}
-              </span>
-              <small>4.9 / 5</small>
-            </div>
           </div>
         </div>
         <div className="hero-location">
-          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> ☀️ 23°C{" "}
-          <span className="hero-location-dot" /> Abierto hoy hasta las 11:00 p. m.
+          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> Abierto hoy hasta las 11:00 p. m.
         </div>
         <div className="hero-scroll">
           DESLIZA PARA EXPLORAR <span />
         </div>
       </section>
-
-      {/* Novedades e Instalaciones en Vivo */}
-      <AthleticMarquee />
 
       {/* Sección 4: Showcase Interactivo de Instalaciones */}
       <FacilityShowcase />
@@ -164,22 +130,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Sección 5: Membresías & Planes de Acceso */}
-      <MembershipsSection />
-
       {/* Sección 6: Agenda de Torneos & Vida en el Club */}
       <ClubEvents />
 
       {/* Sección 7 & 8: Tercer Tiempo (Lounge & Coworking) y Pase Digital QR */}
       <LifestyleAndDigitalPass />
 
-      {/* Sección 9: Testimonios de Atletas & Socios */}
-      <TestimonialsSection />
-
       {/* Sección 10: Preguntas Frecuentes y Políticas */}
       <FaqSection />
-
-      
 
       {/* Footer Institucional Completo */}
       <InstitutionalFooter />
