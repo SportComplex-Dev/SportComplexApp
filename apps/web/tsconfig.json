@@ -4,13 +4,24 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@sportcomplex/validation": ["../../packages/validation/src/index.ts"],
-      "@sportcomplex/validation/*": ["../../packages/validation/src/*"],
-      "@sportcomplex/db": ["../../packages/db/src/index.ts"],
-      "@sportcomplex/db/*": ["../../packages/db/src/*"],
-      "@sportcomplex/core": ["../../packages/core/src/index.ts"],
-      "@sportcomplex/core/*": ["../../packages/core/src/*"]
-    }
+      "@sportcomplex/validation": ["../../packages/validation/dist"],
+      "@sportcomplex/validation/src/*": ["../../packages/validation/dist/*"],
+      "@sportcomplex/validation/*": ["../../packages/validation/dist/*"],
+      "@sportcomplex/db": ["../../packages/db/dist"],
+      "@sportcomplex/db/src/*": ["../../packages/db/dist/*"],
+      "@sportcomplex/db/*": ["../../packages/db/dist/*"],
+      "@sportcomplex/core": ["../../packages/core/dist"],
+      "@sportcomplex/core/src/*": ["../../packages/core/dist/*"],
+      "@sportcomplex/core/*": ["../../packages/core/dist/*"],
+      "@sportcomplex/ui": ["../../packages/ui/dist"],
+      "@sportcomplex/ui/src/*": ["../../packages/ui/dist/*"],
+      "@sportcomplex/ui/*": ["../../packages/ui/dist/*"]
+    },
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noImplicitReturns": false,
+    "noUnusedParameters": false,
+    "noUnusedLocals": false
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]

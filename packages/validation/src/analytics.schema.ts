@@ -52,8 +52,8 @@ export const analyticsQuerySchema = z
 export type AnalyticsQueryInput = z.infer<typeof analyticsQuerySchema>;
 
 export interface NormalizedAnalyticsFilter {
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
   period: AnalyticsPeriod;
 }
 
