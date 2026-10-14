@@ -1,10 +1,6 @@
-export const dynamic = "force-static";
+import { redirect } from 'next/navigation';
 
 export default function LegalPage() {
-  return (
-    <article>
-      <h1>Reglamentos e instalaciones</h1>
-      <p>Contenido estático institucional (SSG).</p>
-    </article>
-  );
+  redirect('/rules');
 }
+
