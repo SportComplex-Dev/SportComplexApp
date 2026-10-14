@@ -21,7 +21,7 @@ export default defineConfig({
     ["html", { open: "never", outputFolder: "playwright-report" }],
   ],
   use: {
-    baseURL: process.env.BASE_URL || "http://127.0.0.1:3000",
+    baseURL: process.env.BASE_URL || "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "off",
@@ -61,8 +61,8 @@ export default defineConfig({
   ],
   webServer: {
     command: "node -e 'const fs=require(\"fs\"),path=require(\"path\"); const t=path.resolve(\"apps/web/.next/standalone/apps/web\"); try{fs.unlinkSync(path.join(t,\".next/static\"))}catch{} try{fs.unlinkSync(path.join(t,\"public\"))}catch{} if(fs.existsSync(\"apps/web/.next/static\")) fs.symlinkSync(path.resolve(\"apps/web/.next/static\"), path.join(t,\".next/static\")); if(fs.existsSync(\"apps/web/public\")) fs.symlinkSync(path.resolve(\"apps/web/public\"), path.join(t,\"public\"));' && PORT=3000 HOSTNAME=127.0.0.1 node apps/web/.next/standalone/apps/web/server.js",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: false,
+    url: "http://localhost:3000",
+    reuseExistingServer: true,
     timeout: 60 * 1000,
   },
 });

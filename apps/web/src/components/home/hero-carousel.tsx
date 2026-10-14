@@ -126,7 +126,7 @@ export function HeroCarousel() {
 
   return (
     <div
-      className="absolute inset-0 overflow-hidden select-none"
+      className="hero-carousel absolute inset-0 z-10 overflow-hidden select-none pointer-events-none"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -141,8 +141,8 @@ export function HeroCarousel() {
             key={slide.id}
             aria-hidden={!isActive}
             className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              isActive ? 'opacity-100 z-0 scale-100' : 'opacity-0 -z-10 scale-105 pointer-events-none'
-            } transform transition-transform duration-[4000ms]`}
+              isActive ? 'opacity-100 -z-10 scale-100' : 'opacity-0 -z-20 scale-105 pointer-events-none'
+            } transform transition-transform duration-[4000ms] pointer-events-none`}
           >
             <Image
               src={slide.src}
@@ -159,7 +159,7 @@ export function HeroCarousel() {
 
       {/* Superposición de Gradientes Cinematográficos para Máximo Contraste */}
       <div
-        className="absolute inset-0 z-1 pointer-events-none"
+        className="absolute inset-0 -z-5 pointer-events-none"
         style={{
           background:
             'linear-gradient(90deg, rgba(8, 29, 21, 0.92) 0%, rgba(8, 29, 21, 0.78) 36%, rgba(8, 29, 21, 0.28) 58%, rgba(8, 29, 21, 0.05) 80%, transparent 100%), linear-gradient(0deg, rgba(10, 29, 22, 0.35) 0%, transparent 28%)',
@@ -167,7 +167,7 @@ export function HeroCarousel() {
       />
 
       {/* Badge Informativo de la Foto Activa (Esquina superior derecha) */}
-      <div className="absolute top-6 right-6 md:top-8 md:right-12 z-20 hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white shadow-lg animate-fade-in">
+      <div className="absolute top-6 right-6 md:top-8 md:right-12 z-20 hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white shadow-lg animate-fade-in pointer-events-none">
         <span className="w-2 h-2 rounded-full bg-[var(--brand-accent,#c9ef75)] animate-pulse" />
         <span className="text-[11px] font-bold tracking-wider uppercase text-[var(--brand-accent,#c9ef75)]">
           {activeSlide.tag}
@@ -182,8 +182,8 @@ export function HeroCarousel() {
       <button
         type="button"
         onClick={goToPrev}
-        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
-        aria-label="Ver fotografía anterior de las instalaciones"
+        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
+        aria-label="Anterior"
         title="Anterior"
       >
         <ChevronLeft size={20} />
@@ -193,8 +193,8 @@ export function HeroCarousel() {
       <button
         type="button"
         onClick={goToNext}
-        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)]"
-        aria-label="Ver siguiente fotografía de las instalaciones"
+        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
+        aria-label="Siguiente"
         title="Siguiente"
       >
         <ChevronRight size={20} />
@@ -202,7 +202,7 @@ export function HeroCarousel() {
 
       {/* Indicadores de Diapositiva Centrados en la Parte Inferior */}
       <div
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 pointer-events-auto"
         role="tablist"
         aria-label="Indicadores de fotos del carrusel"
       >

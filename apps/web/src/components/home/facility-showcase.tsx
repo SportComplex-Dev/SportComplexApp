@@ -16,7 +16,6 @@ interface Facility {
   priceFrom: string
   unit: string
   statusTag: string
-  weatherPill: string
   specs: {
     icon: typeof SunMedium
     label: string
@@ -37,7 +36,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$90.000',
     unit: 'hora (4 jugadores)',
     statusTag: 'Pistas disponibles hoy',
-    weatherPill: '☀️ 23°C · Cristal Seco',
     specs: [
       { icon: Shield, label: 'Superficie', value: 'Césped Pro WPT 12mm' },
       { icon: Lightbulb, label: 'Iluminación', value: '8 Focos LED 800 Lux' },
@@ -56,7 +54,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$75.000',
     unit: 'hora',
     statusTag: 'Humedad controlada',
-    weatherPill: '🎾 Arcilla Óptima',
     specs: [
       { icon: Shield, label: 'Superficie', value: 'Polvo de Ladrillo 5 capas' },
       { icon: Trophy, label: 'Norma', value: 'Medidas ITF Oficiales' },
@@ -75,7 +72,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$160.000',
     unit: 'hora',
     statusTag: 'Reserva activa',
-    weatherPill: '⚽ Césped Seco',
     specs: [
       { icon: Shield, label: 'Césped', value: 'Fibrilado FIFA Pro 50mm' },
       { icon: Lightbulb, label: 'Torres LED', value: '1.200 Lux Transmisión' },
@@ -94,7 +90,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$32.000',
     unit: 'sesión / carril',
     statusTag: 'Agua a 28°C',
-    weatherPill: '💧 pH 7.2 Equilibrado',
     specs: [
       { icon: Shield, label: 'Longitud', value: '25m x 6 carriles técnicos' },
       { icon: Flame, label: 'Temperatura', value: '28°C Constante' },
@@ -113,7 +108,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$38.000',
     unit: 'pase de día',
     statusTag: 'Aforo actual 42%',
-    weatherPill: '⚡ Aire Climatizado 21°C',
     specs: [
       { icon: Shield, label: 'Equipamiento', value: 'Eleiko & Hammer Strength' },
       { icon: Trophy, label: 'Área', value: '680 m² climatizados' },
@@ -132,7 +126,6 @@ const FACILITIES: Facility[] = [
     priceFrom: '$45.000',
     unit: 'circuito 90 min',
     statusTag: 'Ambiente sereno',
-    weatherPill: '🌿 Eucalipto Natural',
     specs: [
       { icon: Flame, label: 'Sauna Seco', value: '85°C Madera de Cedro' },
       { icon: Shield, label: 'Crioterapia', value: 'Pozo de Hielo a 10°C' },
@@ -195,7 +188,6 @@ export function FacilityShowcase() {
             <span className="facility-badge-live">
               <span className="live-dot" /> {facility.statusTag}
             </span>
-            <span className="facility-badge-weather">{facility.weatherPill}</span>
           </div>
           <div className="facility-media-caption">
             <span className="facility-caption-tag">{facility.tabName}</span>
