@@ -1,12 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check, Clock3, Plus } from 'lucide-react';
 import {
-  categoryBySlug,
-  initialCatalog,
-  serviceCategories,
   type CategorySlug,
   type CatalogItem,
 } from '@sportcomplex/core';
@@ -16,6 +13,7 @@ import {
   getBogotaDateAfter,
   type DynamicTimeSlot,
 } from '../cart-utils';
+import { usePublicCatalog } from '@/hooks/use-public-catalog';
 
 export interface ServiceSelectorProps {
   date: string;
@@ -33,7 +31,7 @@ export interface ServiceSelectorProps {
 export function ServiceSelector({
   date,
   onDateChange,
-  timeSlots,
+  timeSlots: initialTimeSlots,
   selectedSlot,
   onSelectSlot,
   selectedCategory,
@@ -43,9 +41,79 @@ export function ServiceSelector({
   disabledDateChange = false,
 }: ServiceSelectorProps) {
   const shouldReduceMotion = useReducedMotion();
+  const { catalog, categories } = usePublicCatalog();
+
+  // Consumir /api/bookings/availability?fecha=
+  const [availabilitySlots, setAvailabilitySlots] = useState<DynamicTimeSlot[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!date) return;
+
+    fetch(`/api/bookings/availability?fecha=${encodeURIComponent(date)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Error al consultar disponibilidad');
+        return res.json();
+      })
+      .then((json) => {
+        if (!active) return;
+        // json.data es un array de servicios con slots, o array directo de slots
+        if (json.success && json.data) {
+          // Si es array de servicios con slots, recopilar disponibilidad o verificar
+          // Si alguno tiene slots disponibles o mapear las franjas
+          const raw = json.data;
+          if (Array.isArray(raw)) {
+            // Recopilamos todas las franjas devueltas
+            const slotMap = new Map<string, boolean>();
+            for (const item of raw) {
+              const slots = Array.isArray(item.slots) ? item.slots : (Array.isArray(item) ? item : []);
+              for (const s of slots) {
+                if (s.franja?.horaInicio && s.franja?.horaFin) {
+                  const startStr = typeof s.franja.horaInicio === 'string'
+                    ? s.franja.horaInicio.slice(11, 16)
+                    : new Date(s.franja.horaInicio).toISOString().slice(11, 16);
+                  const available = !s.bloqueadaMantenimiento && (s.cuposDisponibles > 0);
+                  if (available) {
+                    slotMap.set(startStr, true);
+                  } else if (!slotMap.has(startStr)) {
+                    slotMap.set(startStr, false);
+                  }
+                }
+              }
+            }
+            if (slotMap.size > 0) {
+              const updatedSlots = initialTimeSlots.map((slot) => {
+                const hasAvail = slotMap.get(slot.startTime);
+                if (hasAvail !== undefined) {
+                  return {
+                    ...slot,
+                    isAvailable: slot.isAvailable && hasAvail,
+                    disabledReason: !hasAvail ? 'Sin cupos disponibles' : slot.disabledReason,
+                  };
+                }
+                return slot;
+              });
+              setAvailabilitySlots(updatedSlots);
+              return;
+            }
+          }
+        }
+        setAvailabilitySlots(null);
+      })
+      .catch(() => {
+        if (active) setAvailabilitySlots(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [date, initialTimeSlots]);
+
+  const activeTimeSlots = availabilitySlots || initialTimeSlots;
+
   const availableCatalog = useMemo(
-    () => initialCatalog.filter((s) => s.status === 'Disponible'),
-    [],
+    () => catalog.filter((s) => s.status === 'Disponible'),
+    [catalog],
   );
 
   const visibleServices = useMemo(() => {
@@ -80,7 +148,7 @@ export function ServiceSelector({
 
         {/* Franjas Horarias Dinámicas */}
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Franjas horarias disponibles">
-          {timeSlots.map((slot) => {
+          {activeTimeSlots.map((slot) => {
             const isActive = selectedSlot?.startTime === slot.startTime;
             const isBlocked = !slot.isAvailable || (disabledDateChange && !isActive);
 
@@ -150,14 +218,14 @@ export function ServiceSelector({
           )}
           <span className="relative z-10">Todos</span>
         </motion.button>
-        {serviceCategories.map((category) => (
+        {categories.map((category) => (
           <motion.button
             key={category.slug}
             type="button"
             whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
             whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
             aria-pressed={selectedCategory === category.slug}
-            onClick={() => onCategoryChange(category.slug)}
+            onClick={() => onCategoryChange(category.slug as CategorySlug)}
             className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
               selectedCategory === category.slug
                 ? 'text-white dark:text-[#19352a]'
@@ -171,7 +239,7 @@ export function ServiceSelector({
                 transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 450, damping: 30 }}
               />
             )}
-            <span className="relative z-10">{category.name}</span>
+            <span className="relative z-10">{category.nombre}</span>
           </motion.button>
         ))}
       </div>
@@ -190,6 +258,7 @@ export function ServiceSelector({
             const inCart = cartServiceIds.includes(service.id);
             const color = ['#eaf2d9', '#e4f1f3', '#faeee1', '#eeeafa'][index % 4];
             const isAddDisabled = !selectedSlot || inCart;
+            const categoryName = categories.find((c) => c.slug === service.category)?.nombre ?? 'Servicio';
 
             return (
               <motion.article
@@ -208,7 +277,7 @@ export function ServiceSelector({
                 </span>
                 <div className="min-w-0 flex-1">
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 uppercase tracking-[0.08em]">
-                    {categoryBySlug(service.category)?.name ?? 'Servicio'}
+                    {categoryName}
                   </Badge>
                   <h3 className="truncate text-sm font-bold text-[#18291f] dark:text-[#edf3ee]">
                     {service.name}

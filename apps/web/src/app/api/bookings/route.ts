@@ -6,8 +6,8 @@ import { created, fail, ok } from "@/lib/api-response";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parsed = availabilityQuerySchema.safeParse({
-    serviceId: searchParams.get("serviceId"),
-    date: searchParams.get("date"),
+    serviceId: searchParams.get("serviceId") || searchParams.get("servicioId"),
+    date: searchParams.get("date") || searchParams.get("fecha"),
   });
   if (!parsed.success) {
     return fail("VALIDATION_ERROR", "Servicio o fecha inválidos.", 400, parsed.error.flatten());

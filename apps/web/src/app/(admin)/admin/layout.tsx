@@ -25,7 +25,6 @@ import { Badge } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
 import { UserMenu } from '@/components/user-menu'
 import { useApp } from '@/components/app-provider'
-import { useBookings } from '@/lib/stores'
 import { useToday } from '@/lib/persistent-state'
 import { ToastMessage } from '@/components/toast-message'
 
@@ -43,13 +42,12 @@ const navigation: { name: string; icon: LucideIcon; href: string }[] = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { session, notify, toast, closeToast, dark, setDark } = useApp()
-  const [bookings] = useBookings()
   const today = useToday()
 
   const active =
     navigation.find((item) => pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href)))
       ?.name ?? 'Catálogo'
-  const pending = bookings.filter((booking) => booking.status === 'Pendiente').length
+  const pending = 0
   const initials = session?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'AD'
 
   return (

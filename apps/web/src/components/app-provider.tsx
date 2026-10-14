@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SessionProvider, useSession, signOut } from 'next-auth/react'
 import { usePersistentState, useHydrated } from '@/lib/persistent-state'
-import { sampleAccounts, useStoredSession, type Session } from '@/lib/stores'
+import { type Session } from '@/lib/stores'
 import { normalizeRole } from '@/lib/session'
 import type { ToastKind } from '@/components/toast-message'
 
@@ -33,14 +33,12 @@ export function useOptionalApp() {
 
 function InnerAppProvider({ children }: { children: ReactNode }) {
   const ready = useHydrated()
-  const [storedSession, setStoredSession] = useStoredSession()
   const { data: authSession } = useSession()
   const [dark, setDarkState] = usePersistentState<boolean>('akros_theme_dark', false)
   const [toast, setToast] = useState<{ message: string; kind: ToastKind }>({ message: '', kind: 'info' })
   const timer = useRef<number | undefined>(undefined)
 
   const session = useMemo<Session | null>(() => {
-    if (storedSession) return storedSession
     if (authSession?.user) {
       const userRole = (authSession.user as { role?: string }).role
       const canonical = normalizeRole(userRole) ?? 'Cliente'
@@ -51,7 +49,7 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
       }
     }
     return null
-  }, [storedSession, authSession])
+  }, [authSession])
 
   useEffect(() => {
     if (ready && typeof document !== 'undefined') {
@@ -93,21 +91,19 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     (email: string, name?: string, role?: string) => {
       const normalized = email.trim().toLowerCase()
-      const known = sampleAccounts.find((account) => account.email.toLowerCase() === normalized)
+      const canonicalRole = role ? (normalizeRole(role) ?? 'Cliente') : 'Cliente'
       const next: Session = {
-        name: name?.trim() || known?.name || 'Cliente',
+        name: name?.trim() || 'Cliente',
         email: normalized,
-        role: role?.trim() || known?.role || 'Cliente',
+        role: canonicalRole,
       }
-      setStoredSession(next)
       notify(`Bienvenido, ${next.name}`, 'success')
       return next
     },
-    [notify, setStoredSession]
+    [notify]
   )
 
   const logout = useCallback(async () => {
-    setStoredSession(null)
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
       await signOut({ redirect: false })
@@ -119,7 +115,7 @@ function InnerAppProvider({ children }: { children: ReactNode }) {
         window.location.assign('/')
       }
     }
-  }, [notify, setStoredSession])
+  }, [notify])
 
   return (
     <AppContext.Provider

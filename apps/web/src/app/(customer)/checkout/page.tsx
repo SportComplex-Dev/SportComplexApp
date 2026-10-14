@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
-  type Booking,
 } from '@sportcomplex/core'
 import { CheckoutTimer } from '@/components/booking/checkout-timer'
 import {
@@ -18,10 +17,10 @@ import {
 } from '@/components/booking/checkout-timer-utils'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
-import { useBookings, useCatalog, useDraft, useLastCode } from '@/lib/stores'
+import { useDraft, useLastCode } from '@/lib/stores'
+import { usePublicCatalog } from '@/hooks/use-public-catalog'
 import { PaymentMethodSelector } from '@/components/payment-method-selector'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
-import { resolveCatalogServiceId } from '@sportcomplex/core'
 import { pollPaymentConfirmation, resolvePaymentOutcome } from './checkout-flow'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
@@ -72,8 +71,7 @@ function CheckoutContent() {
     searchParams.get('bookingId')
 
   const { session, notify } = useApp()
-  const [catalog] = useCatalog()
-  const [bookings, setBookings] = useBookings()
+  const { catalog } = usePublicCatalog()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
@@ -158,10 +156,8 @@ function CheckoutContent() {
       }
 
       try {
-        let serviceId: number
-        try {
-          serviceId = resolveCatalogServiceId(currentItem)
-        } catch {
+        const serviceId = Number(currentItem.id)
+        if (isNaN(serviceId) || serviceId <= 0) {
           setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
           setIsCreatingReservation(false)
           creatingRef.current = false
@@ -263,25 +259,7 @@ function CheckoutContent() {
     resolvePaymentOutcome({
       verification,
       onConfirmed: (officialCode) => {
-        const newBooking: Booking = {
-          id: targetId || `b${Date.now()}`,
-          code: officialCode,
-          client: session?.name ?? 'Cliente',
-          category: item.category,
-          service: item.name,
-          sede: item.sede,
-          date: activeDraft.date,
-          time: activeDraft.time,
-          attendees: activeDraft.attendees,
-          amount: total,
-          status: 'Confirmada',
-          paymentMethod: 'card',
-          paymentStatus: 'Aprobada',
-          transactionRef: `STRIPE-${Date.now()}`,
-        }
-
-        setBookings([newBooking, ...bookings])
-        setLastCode(newBooking.code)
+        setLastCode(officialCode)
         setDraft(null)
         setIsConfirmingPayment(false)
         notify('¡Pago confirmado por el servidor y comprobante emitido!', 'success')

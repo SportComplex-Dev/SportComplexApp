@@ -12,13 +12,14 @@ import { SportsSpecsGrid } from '@/components/sports-specs-grid'
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
 import { ReservationModal } from '@/components/reservation-modal'
 import { useApp } from '@/components/app-provider'
-import { useCatalog, useDraft } from '@/lib/stores'
+import { useDraft } from '@/lib/stores'
+import { usePublicCatalog } from '@/hooks/use-public-catalog'
 
 export default function ServiceBookingPage() {
   const router = useRouter()
   const { category: slug, id } = useParams<{ category: string; id: string }>()
   const { notify, ready, session } = useApp()
-  const [catalog] = useCatalog()
+  const { catalog, loading } = usePublicCatalog()
   const [, setDraft] = useDraft()
   const category = categoryBySlug(slug)
   const item = catalog.find((entry) => entry.id === id && entry.category === slug)
@@ -28,8 +29,8 @@ export default function ServiceBookingPage() {
   const [attendees, setAttendees] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
+  if (!ready || loading) return <main className="section-shell booking-page" aria-busy="true" />
   if (!category || !item) notFound()
-  if (!ready) return <main className="section-shell booking-page" aria-busy="true" />
 
   const available = item.status === 'Disponible'
   const isCourt = item.category === 'canchas'
