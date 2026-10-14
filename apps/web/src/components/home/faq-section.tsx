@@ -165,7 +165,7 @@ export function FaqSection() {
             <p>Nuestro equipo de atención al socio está disponible todos los días de 06:00 a 22:00.</p>
           </div>
         </div>
-        <Link href="/legal" className="text-link faq-support-link">
+        <Link href="/rules" className="text-link faq-support-link">
           Ver reglamentos oficiales <ArrowRight size={15} />
         </Link>
       </div>

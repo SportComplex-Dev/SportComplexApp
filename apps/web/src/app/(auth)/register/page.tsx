@@ -166,7 +166,7 @@ export default function RegisterPage() {
                 />
                 <span>
                   Acepto la{' '}
-                  <Link href="/legal" target="_blank" rel="noopener noreferrer" className="font-bold underline">
+                  <Link href="/rules" target="_blank" rel="noopener noreferrer" className="font-bold underline">
                     Política de Tratamiento de Datos Personales
                   </Link>
                   .
