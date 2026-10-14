@@ -10,7 +10,6 @@ import {
   Users,
   CheckCircle2,
   Info,
-  Sparkles,
 } from 'lucide-react'
 import {
   TournamentRegistrationModal,
@@ -148,7 +147,7 @@ function getCategoryTone(categoryName: string = ''): 'lime' | 'blue' | 'orange' 
 export function ClubEvents() {
   const { notify } = useApp()
   const [events, setEvents] = useState<ClubEventView[]>(STATIC_EVENTS)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   // Modales
   const [selectedTournament, setSelectedTournament] = useState<TournamentRegisterTarget | null>(null)
@@ -241,7 +240,11 @@ export function ClubEvents() {
 
   const handleOpenDetails = (eventItem: ClubEventView) => {
     if (eventItem.rawTournament) {
-      setSelectedDetailTournament(eventItem.rawTournament)
+      setSelectedDetailTournament({
+        ...eventItem.rawTournament,
+        yaInscrito: eventItem.yaInscrito,
+        cuposDisponibles: eventItem.spotsLeft,
+      })
     } else {
       setSelectedDetailTournament({
         id: eventItem.id,
@@ -297,6 +300,14 @@ export function ClubEvents() {
               ...ev,
               spotsLeft: Math.max(0, ev.spotsLeft - 1),
               yaInscrito: true,
+              rawTournament: ev.rawTournament
+                ? {
+                    ...ev.rawTournament,
+                    yaInscrito: true,
+                    cuposOcupados: (ev.rawTournament.cuposOcupados ?? 0) + 1,
+                    cuposDisponibles: Math.max(0, (ev.rawTournament.cuposDisponibles ?? ev.spotsLeft) - 1),
+                  }
+                : undefined,
             }
           : ev
       )
@@ -353,7 +364,15 @@ export function ClubEvents() {
                   </div>
 
                   <h3
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleOpenDetails(event)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleOpenDetails(event)
+                      }
+                    }}
                     className="event-title cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                     title="Click para ver detalles del torneo"
                   >

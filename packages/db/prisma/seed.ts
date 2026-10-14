@@ -87,7 +87,7 @@ async function main() {
       }
     }
 
-    await prisma.usuario.upsert({
+    const adminUser = await prisma.usuario.upsert({
       where: { correo: adminEmail },
       update: {
         nombre: "Administrador SportComplex",
@@ -130,7 +130,8 @@ async function main() {
 
       const nuevoTorneoPadel = await prisma.torneo.create({
         data: {
-          adminId: adminRole.id ? (await prisma.usuario.findFirst({ where: { rolId: adminRole.id } }))?.id || "" : "",
+          id: "071522c5-8967-4647-b934-fd2c3c821150",
+          adminId: adminUser.id,
           categoriaId: catId,
           titulo: "Torneo Relámpago Nocturno de Pádel",
           descripcion: "Fase de grupos + eliminatorias directas. Incluye pelotas oficiales, hidratación, cóctel de premiación y premios de patrocinadores.",
@@ -179,7 +180,8 @@ async function main() {
 
       const nuevoTorneoTenis = await prisma.torneo.create({
         data: {
-          adminId: adminRole.id ? (await prisma.usuario.findFirst({ where: { rolId: adminRole.id } }))?.id || "" : "",
+          id: "9b4a4c0e-2fb7-4dc0-ab7d-d8132e65b8e4",
+          adminId: adminUser.id,
           categoriaId: catId,
           titulo: "Copa Primavera de Tenis Individual & Dobles",
           descripcion: "Cuadro principal a 3 sets con super tie-break. Canchas centrales de arcilla con arbitraje profesional en finales. Kit de bienvenida conmemorativo.",
@@ -228,7 +230,8 @@ async function main() {
 
       const nuevoTorneoPiscina = await prisma.torneo.create({
         data: {
-          adminId: adminRole.id ? (await prisma.usuario.findFirst({ where: { rolId: adminRole.id } }))?.id || "" : "",
+          id: "0b2123a0-31cb-47b2-85fc-0c6aa8c15f8e",
+          adminId: adminUser.id,
           categoriaId: catId,
           titulo: "Desafío Acuático 100m Estilo Libre & Relevos",
           descripcion: "Competencia contrarreloj en piscina semiolímpica climatizada con cronometraje electrónico touch-pad. Categorías individual y relevos.",

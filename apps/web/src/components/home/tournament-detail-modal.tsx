@@ -186,7 +186,14 @@ export function PublicTournamentDetailModal({
             </span>
             <span className="font-bold text-slate-800 dark:text-slate-200">{pctOcupado}% completado</span>
           </div>
-          <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={pctOcupado}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Porcentaje de ocupación del torneo"
+            className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"
+          >
             <div
               className={`h-full transition-all duration-300 ${
                 cuposRestantes <= 3 ? 'bg-rose-500' : 'bg-emerald-500'
