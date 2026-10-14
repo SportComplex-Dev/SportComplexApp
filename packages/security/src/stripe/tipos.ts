@@ -20,12 +20,12 @@ export interface BuildPaymentMetadataOptions {
 }
 
 export interface ParsedPaymentIntentMetadata {
-  userId?: string;
-  bookingId?: string;
+  userId?: string | undefined;
+  bookingId?: string | undefined;
   bookingIds: string[];
-  membershipId?: string;
-  vendedorId?: string;
-  serviceId?: number;
+  membershipId?: string | undefined;
+  vendedorId?: string | undefined;
+  serviceId?: number | undefined;
 }
 
 export interface PosPaymentIntentInput {

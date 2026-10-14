@@ -90,7 +90,7 @@ export interface GeneratedOperatingSlot {
   capacity: number;
   isShared: boolean;
   isAvailable: boolean;
-  disabledReason?: string;
+  disabledReason?: string | undefined;
 }
 
 /**

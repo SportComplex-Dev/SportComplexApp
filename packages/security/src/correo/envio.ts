@@ -22,7 +22,7 @@ export interface VerificationCodeEmailParams {
  * Formato en camelCase: `usuarioId`, `correo`, `nombre`, `codigoVerificacion`, `expiraEnMinutos`.
  */
 export interface VerificationCodeWebhookPayload {
-  usuarioId?: string;
+  usuarioId?: string | undefined;
   correo: string;
   nombre: string;
   codigoVerificacion: string;

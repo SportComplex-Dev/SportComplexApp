@@ -11,8 +11,8 @@ export interface NagerHoliday {
 }
 
 export interface FetchHolidaysOptions {
-  timeoutMs?: number;
-  baseUrl?: string;
+  timeoutMs?: number | undefined;
+  baseUrl?: string | undefined;
 }
 
 /**

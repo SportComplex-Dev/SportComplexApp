@@ -1,5 +1,5 @@
-import type { EstadoMembresia, Membresia } from "@sportcomplex/domain/membresia";
-import { aplicarDescuentoMembresia, calcularPrecioConDescuento } from "../precio/index.js";
+import type { Membresia } from "@sportcomplex/domain/membresia";
+import { aplicarDescuentoMembresia } from "../precio/index.js";
 
 export class MembresiaInvarianteError extends Error {
   constructor(

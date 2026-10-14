@@ -10,7 +10,7 @@ export async function descargarImagenesCatalogo(): Promise<{ descargadas: number
   let descargadas = 0;
   let omitidas = 0;
 
-  for (const slug of slugs) {
+  for (const _slug of slugs) {
     // Si ya existe en /public/images/catalogo/<slug>.webp se omite
     omitidas++;
   }

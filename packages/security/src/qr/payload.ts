@@ -29,6 +29,7 @@ export function parseTicketQrPayload(text: string): { ticketId: string; signatur
   if (partes.length !== 3) return null;
   const [prefijo, ticketId, signature] = partes;
   if (prefijo !== TICKET_QR_PREFIX) return null;
+  if (!ticketId || !signature) return null;
   if (!isValidTicketId(ticketId) || !FIRMA_RE.test(signature)) return null;
   return { ticketId, signature };
 }

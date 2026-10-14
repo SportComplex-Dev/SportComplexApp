@@ -488,7 +488,7 @@ export async function obtenerTorneoPorId(
     },
   });
 
-  if (!torneo || torneo.eliminadoEn !== null) {
+  if (!torneo || torneo.eliminadoEn !== null && torneo.eliminadoEn !== undefined) {
     throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
   }
 
@@ -698,7 +698,7 @@ export async function eliminarTorneo(
       },
     });
 
-    if (!torneo || torneo.eliminadoEn !== null) {
+    if (!torneo || torneo.eliminadoEn !== null && torneo.eliminadoEn !== undefined) {
       throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
     }
 
@@ -1044,7 +1044,7 @@ export async function obtenerDetallePublicoTorneo(
     },
   });
 
-  if (!torneo || torneo.eliminadoEn !== null) {
+  if (!torneo || torneo.eliminadoEn !== null && torneo.eliminadoEn !== undefined) {
     throw new TournamentError("Torneo no encontrado.", "NOT_FOUND", 404);
   }
 

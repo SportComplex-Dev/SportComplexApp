@@ -1,8 +1,6 @@
 import type {
   EstadoInscripcionTorneo,
   EstadoTorneo,
-  InscripcionTorneo,
-  Torneo,
 } from "@sportcomplex/domain/torneo";
 
 export class TorneoInvarianteError extends Error {
@@ -26,9 +24,9 @@ export interface ValidarInscripcionTorneoInput {
   inscripcionExistente?: {
     id: string;
     estado: EstadoInscripcionTorneo | string;
-  } | null;
-  pagoId?: string | null;
-  confirmado?: boolean;
+  } | null | undefined;
+  pagoId?: string | null | undefined;
+  confirmado?: boolean | undefined;
 }
 
 /**
@@ -85,12 +83,12 @@ export function inscribir(
     cuposTotales: number;
     cuposOcupados: number;
   },
-  usuarioId: string,
+  _usuarioId: string,
   opciones: {
     nombrePareja?: string | null;
-    inscripcionExistente?: { id: string; estado: EstadoInscripcionTorneo | string } | null;
-    pagoId?: string | null;
-    confirmado?: boolean;
+    inscripcionExistente?: { id: string; estado: EstadoInscripcionTorneo | string } | null | undefined;
+    pagoId?: string | null | undefined;
+    confirmado?: boolean | undefined;
     now?: Date;
   } = {},
 ): {

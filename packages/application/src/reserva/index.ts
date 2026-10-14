@@ -1,4 +1,4 @@
-import type { EstadoReserva, Reserva } from "@sportcomplex/domain/reserva";
+import type { EstadoReserva } from "@sportcomplex/domain/reserva";
 import { validarVentanaReserva } from "../disponibilidad/index.js";
 
 export class ReservaInvarianteError extends Error {
