@@ -145,28 +145,35 @@
     },
     {
       "parameters": {
-        "authentication": "apiKey",
-        "from": "Akros Latam <no-reply@akros.lat>",
-        "to": "={{ $json.customerEmail }}",
-        "subject": " Problema al procesar el pago de tu membresía",
-        "html": "=<div style=\"background-color:#0b0f0d;padding:24px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\">\n  <div style=\"max-width:540px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:32px;\">\n    <span style=\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\">Pago fallido</span>\n    <h1 style=\"font-size:20px;color:#ffffff;margin:0 0 12px 0;\">Atención con tu renovación de membresía</h1>\n    <p style=\"font-size:14px;color:#cbd5e1;margin:0 0 12px 0;\">Hola <strong style=\"color:#ffffff;\">{{ $json.customerName }}</strong>,</p>\n    <p style=\"font-size:14px;color:#94a3b8;line-height:1.6;margin:0 0 24px 0;\">Tuvimos un problema al procesar el pago de tu suscripción en <strong style=\"color:#c9ef75;\">AKROS</strong>. Para evitar la desactivación de tu membresía, actualiza tu método de pago:</p>\n    <div style=\"text-align:center;margin:24px 0;\">\n      <a href=\"{{ $json.billingPortalUrl }}\" style=\"display:inline-block;background:#c9ef75;color:#111815;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:9999px;\">Actualizar método de pago</a>\n    </div>\n    <p style=\"font-size:13px;color:#64748b;margin:24px 0 0 0;\">Si ya lo hiciste, puedes ignorar este mensaje.</p>\n    <p style=\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\">AKROS CLUB &middot; ATHLETIC &amp; WELLNESS CLUB</p>\n  </div>\n</div>",
-        "additionalOptions": {}
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Akros Latam <no-reply@akros.lat>\",\n  \"to\": \"{{ $json.customerEmail }}\",\n  \"subject\": \" Problema al procesar el pago de tu membresía\",\n  \"html\": \"<div style=\\\"background-color:#0b0f0d;padding:24px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\\\">\\n  <div style=\\\"max-width:540px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:32px;\\\">\\n    <span style=\\\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\\\">Pago fallido</span>\\n    <h1 style=\\\"font-size:20px;color:#ffffff;margin:0 0 12px 0;\\\">Atención con tu renovación de membresía</h1>\\n    <p style=\\\"font-size:14px;color:#cbd5e1;margin:0 0 12px 0;\\\">Hola <strong style=\\\"color:#ffffff;\\\">{{ $json.customerName }}</strong>,</p>\\n    <p style=\\\"font-size:14px;color:#94a3b8;line-height:1.6;margin:0 0 24px 0;\\\">Tuvimos un problema al procesar el pago de tu suscripción en <strong style=\\\"color:#c9ef75;\\\">AKROS</strong>. Para evitar la desactivación de tu membresía, actualiza tu método de pago:</p>\\n    <div style=\\\"text-align:center;margin:24px 0;\\\">\\n      <a href=\\\"{{ $json.billingPortalUrl }}\\\" style=\\\"display:inline-block;background:#c9ef75;color:#111815;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:9999px;\\\">Actualizar método de pago</a>\\n    </div>\\n    <p style=\\\"font-size:13px;color:#64748b;margin:24px 0 0 0;\\\">Si ya lo hiciste, puedes ignorar este mensaje.</p>\\n    <p style=\\\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\\\">AKROS CLUB &middot; ATHLETIC &amp; WELLNESS CLUB</p>\\n  </div>\\n</div>\"\n}",
+        "options": {}
       },
-      "type": "n8n-nodes-resend.resend",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
       "position": [
         704,
         0
       ],
       "id": "60a67e54-8f62-4a07-a180-f36c2ada2337",
       "name": "Send a new email",
-      "webhookId": "b91d7ba4-e51f-4b82-9606-9af023ab29ce",
-      "credentials": {
-        "resendApi": {
-          "id": "XmmDZQvEj1MO36Uq",
-          "name": "Resend account"
-        }
-      }
+      "webhookId": "b91d7ba4-e51f-4b82-9606-9af023ab29ce"
     }
   ],
   "pinData": {},

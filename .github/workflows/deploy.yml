@@ -16,6 +16,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
@@ -57,11 +58,12 @@ jobs:
           DEPLOY_SHA: ${{ github.sha }}
           APPS_WEB_ENV: ${{ secrets.APPS_WEB_ENV }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: IMAGE_TAG,APPS_WEB_ENV,DEPLOY_SHA,GHCR_PAT
+          envs: IMAGE_TAG,APPS_WEB_ENV,DEPLOY_SHA,GHCR_PAT,RESEND_API_KEY
           script: |
             set -e
 
@@ -87,12 +89,35 @@ jobs:
             mkdir -p ~/SportComplexApp/apps/web
             printf '%s\n' "$APPS_WEB_ENV" > ~/SportComplexApp/apps/web/.env
             chmod 600 "$HOME/SportComplexApp/apps/web/.env"
+            # 5b. API key de Resend para n8n (solo si el secret existe)
+            if [ -n "$RESEND_API_KEY" ]; then
+              printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY" > ~/SportComplexApp/docker/.env
+              chmod 600 "$HOME/SportComplexApp/docker/.env"
+            fi
+            # 5c. Key interna compartida web<->n8n (endpoint /api/internal/*).
+            #     Vive en APPS_WEB_ENV (apps/web/.env); se propaga a docker/.env
+            #     para que n8n la consuma. Sin secrets adicionales.
+            INTERNAL_KEY=$(grep -E '^INTERNAL_API_KEY=' ~/SportComplexApp/apps/web/.env | tail -n 1 | cut -d= -f2-)
+            if [ -n "$INTERNAL_KEY" ]; then
+              sed -i '/^INTERNAL_API_KEY=/d' ~/SportComplexApp/docker/.env 2>/dev/null || true
+              printf 'INTERNAL_API_KEY=%s\n' "$INTERNAL_KEY" >> ~/SportComplexApp/docker/.env
+              chmod 600 "$HOME/SportComplexApp/docker/.env"
+            else
+              echo "AVISO: INTERNAL_API_KEY ausente en APPS_WEB_ENV; /api/internal/* responderá 503"
+            fi
 
-            # 6. Migrar y levantar (downtime = recreación de contenedores)
+            # 6. Migrar y levantar web/caddy (n8n se levanta tras el import)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)
-            sudo docker compose up -d web caddy n8n
+            sudo docker compose up -d web caddy
 
-            # 7. Importar y activar workflows nuevos en n8n (los existentes los omite)
-            sudo docker compose exec -i n8n sh -c \
-              'for f in /opt/workflows/*.json; do n8n import:workflow --input="$f" || true; done'
-            sudo docker compose exec -i n8n n8n activate:workflow --all || true
+            # 7. Importar y publicar workflows con n8n DETENIDO mediante
+            #    contenedores one-off: evita el race SQLite ("table migrations
+            #    already exists") y el publish con servidor corriendo.
+            #    (activate:workflow no existe en n8n actual: se publica por --id.)
+            sudo docker compose run --rm n8n \
+              import:workflow --separate --input=/opt/workflows/
+            IDS=$(python3 -c "import sqlite3; c=sqlite3.connect('file:$HOME/SportComplexApp/docker/data/n8n/database.sqlite?mode=ro', uri=True, timeout=30); print(' '.join(r[0] for r in c.execute('select id from workflow_entity order by id')))")
+            for id in $IDS; do
+              sudo docker compose run --rm n8n publish:workflow --id="$id" || true
+            done
+            sudo docker compose up -d n8n

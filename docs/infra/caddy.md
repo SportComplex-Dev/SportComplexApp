@@ -12,11 +12,11 @@ Caddy es el **único proxy** del VPS en `80/443`. Auto-HTTPS con Let's Encrypt p
 }
 
 akros.lat, www.akros.lat {
-  reverse_proxy web:3000
+  reverse_proxy sportcomplex-prod-web-1:3000
 }
 
 n8n.akros.lat {
-  reverse_proxy n8n:5678
+  reverse_proxy sportcomplex-prod-n8n-1:5678
 }
 
 otium.coderhivex.com {
@@ -29,9 +29,11 @@ otium.coderhivex.com {
 ## Reglas duras
 
 1. **`reverse_proxy`, no `proxy_pass`** — eso es sintaxis Nginx.
-2. **Nunca `localhost`** dentro del Caddyfile: el contenedor Caddy resolvería `localhost` consigo mismo (`502`). Se usa el nombre del servicio en la red Docker (`web`, `n8n`, `jorge-web`).
-3. **`jorge-web` solo es alcanzable vía la red externa `edge-shared`** — los contenedores del otro equipo deben estar conectados a ella, no a `sportcomplex-net`.
-4. Sin `A record` en DNS no hay certificado: antes de encender, `dig +short <dominio>` debe devolver la IP del VPS.
+2. **Nunca `localhost`** dentro del Caddyfile: el contenedor Caddy resolvería `localhost` consigo mismo (`502`).
+3. **Upstreams por nombre de contenedor único, nunca por alias de servicio.** **2026-10-14**: `akros.lat` sirvió la app de otium porque su servicio compose también se llama `web` y publica ese alias en `edge-shared`; Caddy (conectado a ambas redes) resolvía `web:3000` de forma ambigua. `sportcomplex-prod-web-1`, `sportcomplex-prod-n8n-1` y `jorge-web` son únicos y no colisionan.
+4. **`jorge-web` solo es alcanzable vía la red externa `edge-shared`** — los contenedores del otro equipo deben estar conectados a ella, no a `sportcomplex-net`.
+5. Sin `A record` en DNS no hay certificado: antes de encender, `dig +short <dominio>` debe devolver la IP del VPS.
+6. **Convivencia del proxy compartido**: nunca `compose down` del proyecto `sportcomplex-prod` (bajaría Caddy y con él el sitio de otium), no publicar nada más en 80/443, no borrar la red `edge-shared`.
 
 ## Operación
 

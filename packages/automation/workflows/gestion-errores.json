@@ -27,28 +27,35 @@
     },
     {
       "parameters": {
-        "authentication": "apiKey",
-        "from": "no-reply@akros.lat",
-        "to": "official@akros.lat",
-        "subject": "{{ $json.asunto }}",
-        "html": "=<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin:0;padding:24px;background-color:#0b0f0d;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\">\n  <div style=\"max-width:580px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:28px;\">\n    <span style=\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\">Alerta interna</span>\n    <h1 style=\"font-size:20px;color:#ffffff;margin:0 0 16px 0;\">Fallo en workflow: {{ $json.workflow }}</h1>\n    <div style=\"background:#0b0f0d;border:1px solid #1f2c25;border-radius:12px;padding:16px;margin-bottom:16px;\">\n      <p style=\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\">Último nodo ejecutado</p>\n      <p style=\"font-size:14px;color:#f1f5f9;margin:0 0 12px 0;\">{{ $json.ultimoNodo }}</p>\n      <p style=\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\">Mensaje</p>\n      <p style=\"font-size:14px;color:#f87171;margin:0;font-family:monospace;\">{{ $json.mensaje }}</p>\n    </div>\n    <p style=\"font-size:13px;color:#94a3b8;margin:0 0 16px 0;\">Fecha: {{ $json.fecha }}</p>\n    <a href=\"{{ $json.ejecucionUrl }}\" style=\"display:inline-block;background:#c9ef75;color:#111815;font-size:13px;font-weight:700;text-decoration:none;padding:10px 20px;border-radius:9999px;\">Ver ejecución en n8n</a>\n    <p style=\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\">AKROS CLUB &middot; AUTOMATION</p>\n  </div>\n</body>\n</html>",
-        "additionalOptions": {}
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"no-reply@akros.lat\",\n  \"to\": \"official@akros.lat\",\n  \"subject\": \"{{ $json.asunto }}\",\n  \"html\": \"<!DOCTYPE html>\\n<html lang=\\\"es\\\">\\n<head>\\n  <meta charset=\\\"utf-8\\\">\\n  <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\\n</head>\\n<body style=\\\"margin:0;padding:24px;background-color:#0b0f0d;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;\\\">\\n  <div style=\\\"max-width:580px;margin:0 auto;background:#111815;border:1px solid #1f2c25;border-radius:16px;padding:28px;\\\">\\n    <span style=\\\"display:inline-block;background:rgba(239,68,68,0.15);color:#f87171;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;padding:6px 14px;border-radius:9999px;margin-bottom:16px;\\\">Alerta interna</span>\\n    <h1 style=\\\"font-size:20px;color:#ffffff;margin:0 0 16px 0;\\\">Fallo en workflow: {{ $json.workflow }}</h1>\\n    <div style=\\\"background:#0b0f0d;border:1px solid #1f2c25;border-radius:12px;padding:16px;margin-bottom:16px;\\\">\\n      <p style=\\\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\\\">Último nodo ejecutado</p>\\n      <p style=\\\"font-size:14px;color:#f1f5f9;margin:0 0 12px 0;\\\">{{ $json.ultimoNodo }}</p>\\n      <p style=\\\"font-size:12px;color:#64748b;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:1px;\\\">Mensaje</p>\\n      <p style=\\\"font-size:14px;color:#f87171;margin:0;font-family:monospace;\\\">{{ $json.mensaje }}</p>\\n    </div>\\n    <p style=\\\"font-size:13px;color:#94a3b8;margin:0 0 16px 0;\\\">Fecha: {{ $json.fecha }}</p>\\n    <a href=\\\"{{ $json.ejecucionUrl }}\\\" style=\\\"display:inline-block;background:#c9ef75;color:#111815;font-size:13px;font-weight:700;text-decoration:none;padding:10px 20px;border-radius:9999px;\\\">Ver ejecución en n8n</a>\\n    <p style=\\\"font-size:11px;color:#475569;text-align:center;margin:24px 0 0 0;letter-spacing:1px;\\\">AKROS CLUB &middot; AUTOMATION</p>\\n  </div>\\n</body>\\n</html>\"\n}",
+        "options": {}
       },
-      "type": "n8n-nodes-resend.resend",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
       "position": [
         464,
         0
       ],
       "id": "933dacb0-aba7-4589-ac03-cc5efc9fbe5d",
       "name": "Send a new email",
-      "webhookId": "f3330977-adf6-484f-9773-6f40c0edeca7",
-      "credentials": {
-        "resendApi": {
-          "id": "QoyCY6ZzewUYBXCt",
-          "name": "Resend account"
-        }
-      }
+      "webhookId": "f3330977-adf6-484f-9773-6f40c0edeca7"
     }
   ],
   "pinData": {},
