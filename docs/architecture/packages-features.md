@@ -45,13 +45,12 @@ DAG: `ui` ← `shared` ← `booking` ← `pos`; `tournament` ← `portal` (+`boo
 
 ## Pendiente (no bloquea el Gate)
 
-- **Backfill unit tests**: booking 2 (`PaymentMethodSelector`, `ReservationModal`),
-  tournament 5, pos 6, scanner 11 colocados pendientes (portal ya 12/12).
-- **Deduplicar QR**: `QrModal`/`PortalQrModal`/`TicketQrModal` + `QRGraphicHD` + `PrintableReceipt`
-  → un componente parametrizado.
-- **Schemas Zod**: `features/*/types` redefinen schemas que ya existen en
-  `packages/validation` — importar en vez de redefinir.
-- **Chrome web→ui**: borrar `apps/web/src/components/modal.tsx` y `action-button.tsx`
-  tras migrar sus consumidores a `@sportcomplex/ui`.
-- **Backlog tech-lead**: `middleware.ts` → `proxy.ts` (convención Next 16; `middleware`
-  aún soportado en 16.3.7). Rename + build real + smoke 307 por rol. Rollback 1 commit.
+- **Schemas Zod**: resuelto — `bookingRequestSchema` se re-exporta de
+  `packages/validation`; los schemas de bloqueo quedan locales (dominio carrito).
+- **Chrome web→ui**: resuelto — `Modal`/`ActionButton`/`ConfirmDialog` en `ui`,
+  consumidores migrados, copias web borradas.
+- **Deduplicar QR**: resuelto — `TicketQrModal` único + `QrGraphic` extraído;
+  `QrModal` muerto y `PortalQrModal` eliminados.
+- **Proxy**: resuelto — `apps/web/src/proxy.ts` (Next 16, ruta `ƒ Proxy` en build).
+- **Backfill unit tests**: resuelto — booking 45, tournament 36, pos 41,
+  scanner 62, portal 57, todos verdes + typecheck limpio.
