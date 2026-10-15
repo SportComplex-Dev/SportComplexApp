@@ -26,14 +26,11 @@ const mockTicket: PortalTicket = {
   accessWindowEnd: '19:00:00',
 }
 
-test('TicketQrModal: returns null when selectedTicket is null (closed state)', () => {
+test('TicketQrModal: returns null when ticket is null (closed state)', () => {
   const html = renderToStaticMarkup(
     <TicketQrModal
-      selectedTicket={null}
-      downloadingId={null}
-      isPrinting={false}
+      ticket={null}
       onClose={() => {}}
-      onDownloadQr={() => {}}
       onPrintTicket={() => {}}
     />
   )
@@ -44,9 +41,7 @@ test('TicketQrModal: returns null when selectedTicket is null (closed state)', (
 test('TicketQrModal: renders ticket details, QR, access window and actions when open', () => {
   const html = renderToStaticMarkup(
     <TicketQrModal
-      selectedTicket={mockTicket}
-      downloadingId={null}
-      isPrinting={false}
+      ticket={mockTicket}
       onClose={() => {}}
       onDownloadQr={() => {}}
       onPrintTicket={() => {}}
@@ -76,9 +71,9 @@ test('TicketQrModal: renders ticket details, QR, access window and actions when 
 test('TicketQrModal: disables buttons during download or printing', () => {
   const html = renderToStaticMarkup(
     <TicketQrModal
-      selectedTicket={mockTicket}
-      downloadingId="ticket-qr-001"
-      isPrinting={true}
+      ticket={mockTicket}
+      downloading={true}
+      printing={true}
       onClose={() => {}}
       onDownloadQr={() => {}}
       onPrintTicket={() => {}}
@@ -86,4 +81,17 @@ test('TicketQrModal: disables buttons during download or printing', () => {
   )
 
   assert.ok(html.includes('disabled=""'), 'Los botones deben deshabilitarse durante acciones en curso')
+})
+
+test('TicketQrModal: print-only variant omits download action (dashboard usage)', () => {
+  const html = renderToStaticMarkup(
+    <TicketQrModal
+      ticket={mockTicket}
+      onClose={() => {}}
+      onPrintTicket={() => {}}
+    />
+  )
+
+  assert.ok(html.includes('Imprimir / PDF'), 'Debe mostrar acción de impresión del dashboard')
+  assert.ok(!html.includes('Descargar Imagen QR'), 'No debe mostrar descarga cuando se omite onDownloadQr')
 })

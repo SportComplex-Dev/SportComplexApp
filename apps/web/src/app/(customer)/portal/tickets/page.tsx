@@ -140,7 +140,7 @@ export default function TicketsPage() {
       </main>
 
       <TicketQrModal
-        selectedTicket={selectedTicket} downloadingId={downloadingId} isPrinting={isPrinting}
+        ticket={selectedTicket} downloading={downloadingId === selectedTicket?.id} printing={isPrinting}
         onClose={() => setSelectedTicket(null)} onDownloadQr={handleDownloadQr} onPrintTicket={handlePrintTicket}
       />
       <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} receiptData={printingReceipt} />

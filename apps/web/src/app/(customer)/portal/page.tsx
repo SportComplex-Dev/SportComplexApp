@@ -13,7 +13,7 @@ import {
   UpcomingBookingCard,
   PortalBookingsList,
   CategoryShowcase,
-  PortalQrModal,
+  TicketQrModal,
 } from '@sportcomplex/features-portal'
 
 export default function CustomerDashboardPage() {
@@ -68,7 +68,7 @@ export default function CustomerDashboardPage() {
       </main>
 
       {/* Modal QR de Alta Definición para Torniquetes (RF-12 / RF-10) */}
-      <PortalQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} onPrint={handlePrintTicket} />
+      <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} onPrintTicket={handlePrintTicket} />
 
       {/* Comprobante en formato imprimible PDF */}
       <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} />

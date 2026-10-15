@@ -466,6 +466,9 @@ importers:
       '@sportcomplex/ui':
         specifier: workspace:*
         version: link:../../ui
+      '@sportcomplex/validation':
+        specifier: workspace:*
+        version: link:../../validation
       '@stripe/react-stripe-js':
         specifier: 3.1.1
         version: 3.1.1(@stripe/stripe-js@5.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)

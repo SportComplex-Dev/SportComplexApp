@@ -4,12 +4,11 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import {
-  QrModal,
+  TicketQrModal,
   QRGraphicHD,
   PrintableReceipt,
   AccessWindowIndicator,
   PortalBookingsList,
-  PortalQrModal,
   UpcomingBookingCard,
   CategoryShowcase,
   categoryIcons,
@@ -30,12 +29,11 @@ import {
 } from '../utils/portal-utils'
 
 test('packages/features/portal exports all core portal components and utilities', () => {
-  assert.equal(typeof QrModal, 'function')
+  assert.equal(typeof TicketQrModal, 'function')
   assert.equal(typeof QRGraphicHD, 'function')
   assert.equal(typeof PrintableReceipt, 'function')
   assert.equal(typeof AccessWindowIndicator, 'function')
   assert.equal(typeof PortalBookingsList, 'function')
-  assert.equal(typeof PortalQrModal, 'function')
   assert.equal(typeof UpcomingBookingCard, 'function')
   assert.equal(typeof CategoryShowcase, 'function')
   assert.equal(typeof IconBox, 'function')
