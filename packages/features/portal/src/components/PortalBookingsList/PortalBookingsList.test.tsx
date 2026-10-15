@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PortalBookingsList } from './PortalBookingsList'
-import type { PortalTicket } from '../utils/portal-utils'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 test('PortalBookingsList: empty state renders empty message when tickets array is empty', () => {
   const html = renderToStaticMarkup(

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Download, Printer, QrCode, ShieldCheck, X } from 'lucide-react'
 import { formatDate, type Booking } from '@sportcomplex/core'
-import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from '../utils/portal-utils'
+import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from '../../utils/portal-utils'
 
 export interface QrModalProps {
   ticket: Booking | null

@@ -6,7 +6,7 @@ import {
   getAccessWindowLabel,
   getAccessWindowStatus,
   type AccessWindowStatus,
-} from '../utils/portal-utils'
+} from '../../utils/portal-utils'
 
 export type AccessWindowIndicatorStatus =
   | AccessWindowStatus

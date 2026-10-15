@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PortalQrModal } from './PortalQrModal'
-import type { PortalTicket } from '../utils/portal-utils'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 test('PortalQrModal: open=false or ticket=null returns empty/null markup', () => {
   const sampleTicket: PortalTicket = {

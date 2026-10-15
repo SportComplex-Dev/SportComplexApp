@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { UpcomingBookingCard } from './UpcomingBookingCard'
-import type { PortalTicket } from '../utils/portal-utils'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 test('UpcomingBookingCard: booking=null renders empty state', () => {
   const html = renderToStaticMarkup(

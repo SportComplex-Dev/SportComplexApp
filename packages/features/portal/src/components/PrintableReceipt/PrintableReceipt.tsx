@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
-import { calcularDesgloseComprobante, generarQRDataUrl, type ReceiptApiResponse } from '../utils/portal-utils'
+import { calcularDesgloseComprobante, generarQRDataUrl, type ReceiptApiResponse } from '../../utils/portal-utils'
 
 export interface PrintableReceiptProps {
   ticket: Booking | null

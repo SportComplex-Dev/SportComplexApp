@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { TournamentCard } from './TournamentCard'
-import type { UserTournamentItem } from '../types/portal'
+import type { UserTournamentItem } from '../../types/portal'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).React = React

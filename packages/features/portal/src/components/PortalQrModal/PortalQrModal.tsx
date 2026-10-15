@@ -3,9 +3,9 @@
 import { Printer, ShieldCheck, X } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { formatDate, type Booking } from '@sportcomplex/core'
-import { QRGraphicHD } from './QrModal'
-import { AccessWindowIndicator } from './AccessWindowIndicator'
-import type { PortalTicket } from '../utils/portal-utils'
+import { QRGraphicHD } from '../QrModal'
+import { AccessWindowIndicator } from '../AccessWindowIndicator'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 export interface PortalQrModalProps {
   ticket: PortalTicket | null
