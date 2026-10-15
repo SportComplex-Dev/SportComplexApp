@@ -15,7 +15,7 @@ export const catalogoSemilla: ItemSemillaCatalogo[] = [
     name: mapaIdServicio['tenis-cancha-1'].nombre,
     category: 'canchas',
     description: 'Cancha central de tenis en polvo de ladrillo con iluminación LED nocturna.',
-    price: 55000,
+    price: 48000,
     capacity: 4,
     durationMinutes: 60,
     requiresMembership: false,
