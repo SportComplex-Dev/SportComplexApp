@@ -107,7 +107,7 @@ async function main() {
 
     console.log(`Usuario administrador creado/actualizado con éxito: ${adminEmail}`);
 
-    // 4. Categorías de Servicio para Torneos (CUOTA-001)
+    // 4. Categorías de Servicio (todas las del dominio: Canchas, Piscinas, Gimnasio, Zona húmeda)
     let catCanchas = await prisma.categoriaServicio.findFirst({
       where: { nombre: { contains: "Canchas", mode: "insensitive" } },
     });
@@ -132,6 +132,32 @@ async function main() {
         },
       });
       console.log(`Categoría Piscinas creada: ${catPiscinas.id}`);
+    }
+
+    let catGimnasio = await prisma.categoriaServicio.findFirst({
+      where: { nombre: { contains: "Gimnasio", mode: "insensitive" } },
+    });
+    if (!catGimnasio) {
+      catGimnasio = await prisma.categoriaServicio.create({
+        data: {
+          nombre: "Gimnasio",
+          tipo: TipoCategoriaServicio.GIMNASIO,
+        },
+      });
+      console.log(`Categoría Gimnasio creada: ${catGimnasio.id}`);
+    }
+
+    let catZonaHumeda = await prisma.categoriaServicio.findFirst({
+      where: { nombre: { contains: "Zona húmeda", mode: "insensitive" } },
+    });
+    if (!catZonaHumeda) {
+      catZonaHumeda = await prisma.categoriaServicio.create({
+        data: {
+          nombre: "Zona húmeda",
+          tipo: TipoCategoriaServicio.ZONA_HUMEDA,
+        },
+      });
+      console.log(`Categoría Zona húmeda creada: ${catZonaHumeda.id}`);
     }
 
     // 4b. Servicios base para Torneos (CUOTA-001: en BD fresca no existen
