@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseTicketQr } from "../../../../../apps/web/src/lib/qr-client";
+import { parseTicketQr } from "@sportcomplex/shared/lib";
 import {
   type ScannerFlowState,
   type ScannedTicket,
@@ -15,7 +15,7 @@ import {
   HttpError,
   isTransientNetworkError,
   useNetworkResilience,
-} from "../../../../../apps/web/src/hooks/use-network-resilience";
+} from "@sportcomplex/shared/hooks";
 
 export function useScannerController() {
   const { isOnline, executeWithRetry, getCachedTicket, setCachedTicket } =

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseTicketQr } from "../../../../../../apps/web/src/lib/qr-client";
+import { parseTicketQr } from "@sportcomplex/shared/lib";
 
 // TSK-FE-15: Modo consulta informativo (HU-15 / RF-13)
 // Alcance técnico:

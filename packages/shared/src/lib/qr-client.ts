@@ -21,8 +21,9 @@ export function parseTicketQr(text: string): ParsedTicketQr | null {
   // 1. Formato oficial SC1:<uuid>:<firma>
   const parts = trimmed.split(":");
   if (parts.length === 3 && parts[0] === TICKET_QR_PREFIX) {
-    const [, ticketId, signature] = parts;
-    if (UUID_RE.test(ticketId) && FIRMA_RE.test(signature)) {
+    const ticketId = parts[1];
+    const signature = parts[2];
+    if (ticketId !== undefined && signature !== undefined && UUID_RE.test(ticketId) && FIRMA_RE.test(signature)) {
       return { ticketId, signature };
     }
   }
@@ -45,8 +46,10 @@ export function parseTicketQr(text: string): ParsedTicketQr | null {
 
   // 3. Formato separado por espacios o barras verticales
   const tokens = trimmed.split(/[|\s]+/);
-  if (tokens.length === 2 && UUID_RE.test(tokens[0]) && FIRMA_RE.test(tokens[1])) {
-    return { ticketId: tokens[0], signature: tokens[1] };
+  const tokenId = tokens[0];
+  const tokenSig = tokens[1];
+  if (tokens.length === 2 && tokenId !== undefined && tokenSig !== undefined && UUID_RE.test(tokenId) && FIRMA_RE.test(tokenSig)) {
+    return { ticketId: tokenId, signature: tokenSig };
   }
 
   return null;

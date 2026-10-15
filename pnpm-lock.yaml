@@ -220,9 +220,24 @@ importers:
       '@sportcomplex/features-booking':
         specifier: workspace:*
         version: link:../../packages/features/booking
+      '@sportcomplex/features-portal':
+        specifier: workspace:*
+        version: link:../../packages/features/portal
+      '@sportcomplex/features-pos':
+        specifier: workspace:*
+        version: link:../../packages/features/pos
+      '@sportcomplex/features-scanner':
+        specifier: workspace:*
+        version: link:../../packages/features/scanner
+      '@sportcomplex/features-tournament':
+        specifier: workspace:*
+        version: link:../../packages/features/tournament
       '@sportcomplex/security':
         specifier: workspace:*
         version: link:../../packages/security
+      '@sportcomplex/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@sportcomplex/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -492,6 +507,211 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
+  packages/features/portal:
+    dependencies:
+      '@sportcomplex/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@sportcomplex/features-booking':
+        specifier: workspace:*
+        version: link:../booking
+      '@sportcomplex/features-tournament':
+        specifier: workspace:*
+        version: link:../tournament
+      '@sportcomplex/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
+      motion:
+        specifier: ^14.1.0
+        version: 14.1.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/features/pos:
+    dependencies:
+      '@sportcomplex/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@sportcomplex/features-booking':
+        specifier: workspace:*
+        version: link:../booking
+      '@sportcomplex/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@sportcomplex/validation':
+        specifier: workspace:*
+        version: link:../../validation
+      '@stripe/react-stripe-js':
+        specifier: 3.1.1
+        version: 3.1.1(@stripe/stripe-js@5.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@stripe/stripe-js':
+        specifier: 5.0.0
+        version: 5.0.0
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
+      motion:
+        specifier: ^14.1.0
+        version: 14.1.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/features/scanner:
+    dependencies:
+      '@sportcomplex/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@sportcomplex/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@sportcomplex/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      framer-motion:
+        specifier: ^14.0.0
+        version: 14.1.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      html5-qrcode:
+        specifier: 2.3.8
+        version: 2.3.8
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/features/tournament:
+    dependencies:
+      '@sportcomplex/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@sportcomplex/validation':
+        specifier: workspace:*
+        version: link:../../validation
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
   packages/security:
     dependencies:
       '@node-rs/argon2':
@@ -530,8 +750,38 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
+  packages/shared:
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
   packages/ui:
     dependencies:
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
       motion:
         specifier: ^14.1.0
         version: 14.1.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)

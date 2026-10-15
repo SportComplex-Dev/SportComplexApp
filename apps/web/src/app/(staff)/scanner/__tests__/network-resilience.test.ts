@@ -19,7 +19,7 @@ import {
   SCANNER_TICKET_CACHE_KEY,
   CACHE_TTL_MS,
   type TicketConsultationData,
-} from "@/hooks/use-network-resilience";
+} from "@sportcomplex/shared/hooks";
 import { ConsultationResultCard, TicketValidationModal } from "@sportcomplex/features-scanner";
 import ScannerPage from "@/app/(staff)/scanner/page";
 
