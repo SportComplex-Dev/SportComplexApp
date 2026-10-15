@@ -78,9 +78,9 @@ function createFakeDb() {
 }
 
 const { attachPendingPagoToReserva, compensateFailedCheckout } = await import(
-  "../../src/repositories/reservas/checkout.ts"
+  "../../src/repositories/reservations/checkout.ts"
 );
-const { BookingError } = await import("../../src/repositories/reservas/bookings/index.ts");
+const { BookingError } = await import("../../src/repositories/reservations/bookings/index.ts");
 
 function seedHold(db: ReturnType<typeof createFakeDb>, overrides: Record<string, unknown> = {}) {
   const dispId = 1n;

@@ -10,10 +10,10 @@ import { Badge } from "@sportcomplex/ui";
 import {
   ConsultationResultCard,
   type TicketInfo,
-} from "./respuesta/ConsultationResultCard";
-import { ConsultationModeCard } from "./respuesta/ConsultationModeCard";
-import { ScannerCameraView } from "./captura/ScannerCameraView";
-import { ManualEntryCard } from "./captura/ManualEntryCard";
+} from "./response/ConsultationResultCard";
+import { ConsultationModeCard } from "./response/ConsultationModeCard";
+import { ScannerCameraView } from "./capture/ScannerCameraView";
+import { ManualEntryCard } from "./capture/ManualEntryCard";
 
 // TSK-FE-15: Test de la Visual / Renderizado de Componentes UI
 // Verifica la renderización HTML de los componentes visuales según DESIGN.md y SRS RF-13.

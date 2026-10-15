@@ -15,7 +15,7 @@ const {
   updateServicio,
   deleteServicio,
   generateDisponibilidadesForServicio,
-} = await import("../../src/repositories/catalogo/services.ts");
+} = await import("../../src/repositories/catalog/services.ts");
 
 test("CRUD de Categoría: creación y rechazo de nombres duplicados", async () => {
   const cat = await createCategoria({

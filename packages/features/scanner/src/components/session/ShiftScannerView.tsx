@@ -3,7 +3,7 @@
 import { CheckCircle2, ShieldAlert } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ShiftOption, ScannerFlowState } from "../../types";
-import { QrCameraViewport } from "../captura/QrCameraViewport";
+import { QrCameraViewport } from "../capture/QrCameraViewport";
 import { ShiftSelector } from "./ShiftSelector";
 
 export interface ShiftScannerViewProps {

@@ -13,7 +13,7 @@ import { ActionButton } from '@sportcomplex/ui'
 import {
   TournamentStatusBadge,
   InscriptionStatusBadge,
-} from '../gestion/TournamentStatusBadge'
+} from '../manage/TournamentStatusBadge'
 import type {
   BloqueoDetailItem,
   InscripcionDetailItem,

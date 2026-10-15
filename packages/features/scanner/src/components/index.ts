@@ -1,19 +1,19 @@
-export { ScannerHeader, type ScannerHeaderProps } from "./sesion/ScannerHeader";
-export { QrCameraViewport, type QrCameraViewportProps } from "./captura/QrCameraViewport";
-export { ShiftSelector, type ShiftSelectorProps } from "./sesion/ShiftSelector";
-export { TicketValidationModal, type TicketValidationModalProps } from "./respuesta/TicketValidationModal";
-export { ZoneMismatchScreen, type ZoneMismatchScreenProps } from "./respuesta/ZoneMismatchScreen";
-export { ExpiredSlotScreen, type ExpiredSlotScreenProps } from "./respuesta/ExpiredSlotScreen";
+export { ScannerHeader, type ScannerHeaderProps } from "./session/ScannerHeader";
+export { QrCameraViewport, type QrCameraViewportProps } from "./capture/QrCameraViewport";
+export { ShiftSelector, type ShiftSelectorProps } from "./session/ShiftSelector";
+export { TicketValidationModal, type TicketValidationModalProps } from "./response/TicketValidationModal";
+export { ZoneMismatchScreen, type ZoneMismatchScreenProps } from "./response/ZoneMismatchScreen";
+export { ExpiredSlotScreen, type ExpiredSlotScreenProps } from "./response/ExpiredSlotScreen";
 export {
   ConsultationResultCard,
   type ConsultationResultCardProps,
   type TicketInfo,
-} from "./respuesta/ConsultationResultCard";
-export { ScannerCameraView, type ScannerCameraViewProps } from "./captura/ScannerCameraView";
-export { ShiftScannerView, type ShiftScannerViewProps } from "./sesion/ShiftScannerView";
-export { ManualEntryCard, type ManualEntryCardProps } from "./captura/ManualEntryCard";
+} from "./response/ConsultationResultCard";
+export { ScannerCameraView, type ScannerCameraViewProps } from "./capture/ScannerCameraView";
+export { ShiftScannerView, type ShiftScannerViewProps } from "./session/ShiftScannerView";
+export { ManualEntryCard, type ManualEntryCardProps } from "./capture/ManualEntryCard";
 export {
   ConsultationModeCard,
   type ConsultationModeCardProps,
   OfflineBanner,
-} from "./respuesta/ConsultationModeCard";
+} from "./response/ConsultationModeCard";

@@ -1,8 +1,8 @@
-export * from './gestion/TournamentStatusBadge'
-export * from './gestion/TournamentFormModal'
-export * from './detalle/TournamentDetailModal'
-export * from './inscripcion/TournamentRegistrationModal'
-export * from './detalle/PublicTournamentDetailModal'
+export * from './manage/TournamentStatusBadge'
+export * from './manage/TournamentFormModal'
+export * from './detail/TournamentDetailModal'
+export * from './registration/TournamentRegistrationModal'
+export * from './detail/PublicTournamentDetailModal'
 export {
   TIMEZONE_BOGOTA,
   toDatetimeLocal,

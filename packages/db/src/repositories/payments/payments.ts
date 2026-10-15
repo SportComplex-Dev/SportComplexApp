@@ -1,7 +1,7 @@
 import { prisma } from "../../client";
 import type { ClienteDb, TxDb } from "../tipos-db";
 import { PeriodicidadPlan } from "@prisma/client";
-import { calculateRenewalDate } from "../personas/memberships";
+import { calculateRenewalDate } from "../people/memberships";
 
 /**
  * TSK-BD-09 — Idempotencia de pagos con Stripe (HU-10 / RF-09).
@@ -639,20 +639,22 @@ export async function procesarFacturaWebhook(
           if (membresiaRecienCreada) {
             membresiaRenovada = true;
           } else if (membresia) {
+            let proximaRenovacionUpdate: Date;
             if (input.periodEnd) {
-              proximaRenovacion = input.periodEnd;
+              proximaRenovacionUpdate = input.periodEnd;
             } else if (membresia.plan?.periodicidad) {
               const base = membresia.proximaRenovacion ? new Date(membresia.proximaRenovacion) : new Date();
-              proximaRenovacion = calculateRenewalDate(base, membresia.plan.periodicidad as PeriodicidadPlan);
+              proximaRenovacionUpdate = calculateRenewalDate(base, membresia.plan.periodicidad as PeriodicidadPlan);
             } else {
-              proximaRenovacion = calculateRenewalDate(new Date(), PeriodicidadPlan.MENSUAL);
+              proximaRenovacionUpdate = calculateRenewalDate(new Date(), PeriodicidadPlan.MENSUAL);
             }
+            proximaRenovacion = proximaRenovacionUpdate;
 
             await tx.membresia.update({
               where: { id: membresia.id },
               data: {
                 estado: "VIGENTE",
-                proximaRenovacion,
+                proximaRenovacion: proximaRenovacionUpdate,
                 ...(input.stripeSubscriptionId && !membresia.stripeSubscriptionId
                   ? { stripeSubscriptionId: input.stripeSubscriptionId }
                   : {}),

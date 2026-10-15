@@ -13,9 +13,9 @@ import QRCode from "qrcode";
 
 import { PosCatalogSelector } from "./PosCatalogSelector";
 import { PosClientForm } from "./PosClientForm";
-import { PosPaymentStripe } from "../cobro/PosPaymentStripe";
-import { PosVoucherModal } from "../cobro/PosVoucherModal";
-import { PosAltLinkModal } from "../cobro/PosAltLinkModal";
+import { PosPaymentStripe } from "../billing/PosPaymentStripe";
+import { PosVoucherModal } from "../billing/PosVoucherModal";
+import { PosAltLinkModal } from "../billing/PosAltLinkModal";
 import { calcularDesgloseComprobante } from "../../services/receipt";
 
 // TSK-FE-18: Suite de Pruebas de la Interfaz y Componentes POS 100% Cashless (HU-18 / RF-17 / RN-13)

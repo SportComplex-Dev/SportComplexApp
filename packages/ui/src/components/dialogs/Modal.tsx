@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
-import { ActionButton } from '../formularios/ActionButton'
+import { ActionButton } from '../forms/ActionButton'
 
 export interface ModalProps {
   title: string

@@ -3,7 +3,7 @@
 import { ArrowRight, Download, Printer, QrCode } from 'lucide-react'
 import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { AccessWindowIndicator } from '../pases/AccessWindowIndicator'
+import { AccessWindowIndicator } from '../passes/AccessWindowIndicator'
 import type { PortalTicket } from '../../utils/portal-utils'
 
 interface TicketListItemProps {

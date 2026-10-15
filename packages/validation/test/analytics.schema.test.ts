@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyticsQuerySchema, normalizeAnalyticsQuery } from "../src/negocio/analytics.schema.ts";
+import { analyticsQuerySchema, normalizeAnalyticsQuery } from "../src/business/analytics.schema.ts";
 
 test("analyticsQuerySchema accepts empty query and valid dates", () => {
   const empty = analyticsQuerySchema.safeParse({});

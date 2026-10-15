@@ -185,7 +185,7 @@ export type FestivosBatch = z.infer<typeof FestivosBatchSchema>;
  */
 export const WebhookPayloadBaseSchema = z.object({
   timestamp: z.date().optional().default(() => new Date()),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -194,7 +194,7 @@ export const WebhookPayloadBaseSchema = z.object({
 export const WebhookResponseSchema = z.object({
   ok: z.boolean(),
   mensaje: z.string(),
-  data: z.record(z.string(), z.any()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
   errores: z.array(z.string()).optional(),
 });
 

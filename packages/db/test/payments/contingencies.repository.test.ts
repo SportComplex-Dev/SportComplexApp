@@ -6,7 +6,7 @@ const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 const { disableServiceForContingency, ContingencyError } = await import(
-  "../../src/repositories/pagos/contingencies.ts"
+  "../../src/repositories/payments/contingencies.ts"
 );
 
 test("TSK-BE-22: contingencia inhabilita el servicio y cancela reservas sin borrar ventas", async () => {

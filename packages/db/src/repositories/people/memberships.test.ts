@@ -6,7 +6,7 @@ import {
   findActiveMembership,
   listMembershipPlans,
   MembershipError,
-} from "../personas/memberships";
+} from "./memberships";
 import { createMockPrisma } from "../../../test/mock-prisma";
 
 test("TSK-BE-20 / TSK-BD-11: listMembershipPlans devuelve planes activos ordenados", async () => {

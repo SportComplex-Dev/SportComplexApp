@@ -3,8 +3,8 @@
 import { Download, ShieldCheck, Printer, X } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { formatDate } from '@sportcomplex/core'
-import { QRGraphicHD } from '../pases/QrGraphic'
-import { AccessWindowIndicator } from '../pases/AccessWindowIndicator'
+import { QRGraphicHD } from '../passes/QrGraphic'
+import { AccessWindowIndicator } from '../passes/AccessWindowIndicator'
 import type { PortalTicket } from '../../utils/portal-utils'
 
 export interface TicketQrModalProps {

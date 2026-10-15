@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FestivosBatchSchema } from "../src/negocio/automation.schema.ts";
+import { FestivosBatchSchema } from "../src/business/automation.schema.ts";
 
 test("festivos: acepta lote válido", () => {
   assert.equal(

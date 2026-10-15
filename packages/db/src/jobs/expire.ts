@@ -3,7 +3,7 @@
  * Uso: `pnpm --filter @sportcomplex/db db:expire`
  * Programar cada minuto vía cron del SO / contenedor / pg_cron alternativo.
  */
-import { expireReservasVencidas } from "../repositories/reservas/expirations.js";
+import { expireReservasVencidas } from "../repositories/reservations/expirations.js";
 
 const batchSize = Number.parseInt(process.env.EXPIRE_BATCH_SIZE ?? "500", 10);
 
