@@ -1,16 +1,6 @@
-import React from "react";
+import type { EstadoTorneoTipo, EstadoInscripcionTipo } from "../../types";
 
-export type EstadoTorneoTipo =
-  | "BORRADOR"
-  | "INSCRIPCIONES_ABIERTAS"
-  | "EN_CURSO"
-  | "FINALIZADO"
-  | "CANCELADO";
-
-export type EstadoInscripcionTipo =
-  | "CONFIRMADA"
-  | "PENDIENTE_PAGO"
-  | "CANCELADA";
+export type { EstadoTorneoTipo, EstadoInscripcionTipo };
 
 export const tournamentConfig: Record<
   EstadoTorneoTipo,

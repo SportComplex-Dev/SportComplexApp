@@ -12,14 +12,13 @@ import {
   CheckCircle2,
   Info,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import {
   TournamentRegistrationModal,
-  type TournamentRegisterTarget,
-} from '@/components/home/tournament-registration-modal'
-import {
   PublicTournamentDetailModal,
+  type TournamentRegisterTarget,
   type PublicTournamentDetailData,
-} from '@/components/home/tournament-detail-modal'
+} from '@sportcomplex/features-tournament'
 import { useApp } from '@/components/app-provider'
 
 interface ClubEventView {
@@ -146,7 +145,8 @@ function getCategoryTone(categoryName: string = ''): 'lime' | 'blue' | 'orange' 
 }
 
 export function ClubEvents() {
-  const { notify } = useApp()
+  const router = useRouter()
+  const { session, notify } = useApp()
   const shouldReduceMotion = useReducedMotion()
   const [events, setEvents] = useState<ClubEventView[]>(STATIC_EVENTS)
   const [loading, setLoading] = useState(true)
@@ -472,6 +472,10 @@ export function ClubEvents() {
         onClose={() => setIsRegisterModalOpen(false)}
         tournament={selectedTournament}
         onRegistrationSuccess={handleRegistrationSuccess}
+        session={session}
+        notify={notify}
+        onNavigateToLogin={(callbackUrl) => router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`)}
+        onNavigateToTickets={() => router.push('/portal/tickets')}
       />
     </section>
   )

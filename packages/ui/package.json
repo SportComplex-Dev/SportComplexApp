@@ -22,6 +22,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "lucide-react": "^1.52.0",
     "motion": "^14.1.0",
     "tailwindcss-animate": "^1.0.7"
   },

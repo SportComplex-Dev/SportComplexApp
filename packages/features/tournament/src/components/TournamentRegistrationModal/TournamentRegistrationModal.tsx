@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Trophy,
   Users,
@@ -14,53 +13,31 @@ import {
   Clock,
   CircleDollarSign,
 } from 'lucide-react'
-import { Modal } from '@/components/modal'
-import { ActionButton } from '@/components/action-button'
+import { Modal } from '@sportcomplex/ui'
+import { ActionButton } from '@sportcomplex/ui'
 import { Input } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import type {
+  TournamentRegisterTarget,
+  IssuedTournamentTicket,
+} from '../../types'
 
-export interface TournamentRegisterTarget {
-  id: string
-  titulo: string
-  descripcion?: string | null
-  nivel: string
-  categoria?: { id?: number; nombre: string }
-  fechaInicio: string
-  fechaFin: string
-  cuposTotales: number
-  cuposDisponibles?: number
-  cuposOcupados: number
-  precioInscripcion: number | string
-  yaInscrito?: boolean
-  bloqueos?: Array<{
-    id?: number
-    servicioId?: number
-    servicio?: { id?: number; nombre: string }
-    horaInicio?: string
-    horaFin?: string
-  }>
-  miInscripcion?: {
-    id: string
-    estado: string
-    nombrePareja?: string | null
-    ticketCodigoUuid?: string | null
-    ticketQrPayload?: string | null
-  } | null
+export type { TournamentRegisterTarget, IssuedTournamentTicket }
+
+export interface TournamentUserSession {
+  email?: string | null
+  name?: string | null
+  role?: string | null
 }
 
-interface TournamentRegistrationModalProps {
+export interface TournamentRegistrationModalProps {
   isOpen: boolean
   onClose: () => void
   tournament: TournamentRegisterTarget | null
   onRegistrationSuccess?: (tournamentId: string) => void
-}
-
-export interface IssuedTournamentTicket {
-  id?: string
-  codigo?: string
-  codigoUuid?: string
-  firma?: string
-  qrPayload?: string
+  session?: TournamentUserSession | null
+  notify?: (msg: string, kind?: 'success' | 'error' | 'info') => void
+  onNavigateToLogin?: (callbackUrl: string) => void
+  onNavigateToTickets?: () => void
 }
 
 export function TournamentRegistrationModal({
@@ -68,10 +45,11 @@ export function TournamentRegistrationModal({
   onClose,
   tournament,
   onRegistrationSuccess,
+  session,
+  notify = () => {},
+  onNavigateToLogin,
+  onNavigateToTickets,
 }: TournamentRegistrationModalProps) {
-  const router = useRouter()
-  const { session, notify } = useApp()
-
   const [nombrePareja, setNombrePareja] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -95,10 +73,28 @@ export function TournamentRegistrationModal({
     onClose()
   }
 
+  const navigateToLogin = () => {
+    const callbackUrl = typeof window !== 'undefined' ? window.location.pathname : '/'
+    if (onNavigateToLogin) {
+      onNavigateToLogin(callbackUrl)
+    } else if (typeof window !== 'undefined') {
+      window.location.assign(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`)
+    }
+  }
+
+  const navigateToTickets = () => {
+    handleClose()
+    if (onNavigateToTickets) {
+      onNavigateToTickets()
+    } else if (typeof window !== 'undefined') {
+      window.location.assign('/portal/tickets')
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isAuthenticated) {
-      router.push(`/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`)
+      navigateToLogin()
       return
     }
 
@@ -224,10 +220,7 @@ export function TournamentRegistrationModal({
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
               <ActionButton
-                onClick={() => {
-                  handleClose()
-                  router.push('/portal/tickets')
-                }}
+                onClick={navigateToTickets}
                 className="w-full sm:w-auto"
               >
                 <Ticket size={14} /> Ir a mis Inscripciones
@@ -252,10 +245,7 @@ export function TournamentRegistrationModal({
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
               <ActionButton
-                onClick={() => {
-                  handleClose()
-                  router.push('/portal/tickets')
-                }}
+                onClick={navigateToTickets}
                 className="w-full sm:w-auto"
               >
                 <Ticket size={14} /> Ver Entrada en Mi Portal
@@ -272,10 +262,7 @@ export function TournamentRegistrationModal({
               Ya estás inscrito en este torneo deportivo. Puedes revisar tu pase de ingreso en la sección de tickets.
             </p>
             <ActionButton
-              onClick={() => {
-                handleClose()
-                router.push('/portal/tickets')
-              }}
+              onClick={navigateToTickets}
             >
               <Ticket size={14} /> Ir a mis Entradas
             </ActionButton>
@@ -327,7 +314,7 @@ export function TournamentRegistrationModal({
                 </p>
                 <ActionButton
                   type="button"
-                  onClick={() => router.push(`/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`)}
+                  onClick={navigateToLogin}
                   className="w-full mt-2"
                 >
                   Iniciar Sesión
