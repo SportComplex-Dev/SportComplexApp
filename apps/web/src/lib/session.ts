@@ -75,7 +75,7 @@ export function escapeIlikePattern(value: string): string {
  * RN-10: Cuentas inactivas o con borrado lógico tienen credenciales revocadas de inmediato.
  */
 export function isAccountActive(statusStr?: string | null): boolean {
-  // Fail-closed: sin estado explícito no se asume activo (RN-10). El middleware
+  // Fail-closed: sin estado explícito no se asume activo (RN-10). El proxy
   // re-verifica el estado real contra la tabla `usuario` en rutas protegidas.
   if (!statusStr || !statusStr.trim()) return false;
   const s = statusStr.trim().toUpperCase();
@@ -217,7 +217,7 @@ export async function verifyScSessionToken(token: string): Promise<ScSessionClai
     }
     return payload;
   } catch {
-    // Un `sc-token` corrupto (base64 inválido, JSON roto, etc.) nunca debe tumbar el middleware.
+    // Un `sc-token` corrupto (base64 inválido, JSON roto, etc.) nunca debe tumbar el proxy.
     return null;
   }
 }
@@ -281,7 +281,7 @@ export function extractSupabaseAccessToken(req: NextRequest): string | null {
  * 4. Cookie `sc-session` (JSON con { role, status, userId, email })
  * 5. Cookie `sc-role` (con soporte para cookie complementaria `sc-status`)
  *
- * En producción la identidad de Supabase se verifica contra Auth en `middleware.ts`;
+ * En producción la identidad de Supabase se verifica contra Auth en `proxy.ts`;
  * el `sc-token` propio se valida por firma HMAC con AUTH_SECRET. `sc-session` y
  * `sc-role` solo se aceptan en desarrollo.
  */
@@ -329,7 +329,7 @@ export async function extractSession(req: NextRequest): Promise<SessionUser | nu
     }
   }
 
-  // 3. Cookies de Supabase. La firma y vigencia se verifican en el middleware con Auth.
+  // 3. Cookies de Supabase. La firma y vigencia se verifican en el proxy con Auth.
   const supabaseToken = extractSupabaseAccessToken(req);
   if (supabaseToken) {
     const payload = decodeJwtPayload(supabaseToken);

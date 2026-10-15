@@ -86,7 +86,7 @@ export function EmployeeCreateModal({
               <option value="ADMIN">Administrador (Control total del club)</option>
             </select>
             <span className="text-[11px] text-[var(--subtle)] block mt-1">
-              Los permisos se aplicarán perimetralmente en el middleware de Next.js.
+              Los permisos se aplicarán perimetralmente en el proxy de Next.js.
             </span>
           </div>
 

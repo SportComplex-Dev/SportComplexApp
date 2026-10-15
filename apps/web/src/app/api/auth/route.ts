@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       },
     })
 
-    // Cookies de sesión para middleware perimetral (session.ts) y cliente
+    // Cookies de sesión para proxy perimetral (session.ts) y cliente
     response.headers.append('Set-Cookie', `sc-session=${JSON.stringify(sessionData)}; Path=/; SameSite=Lax; Max-Age=86400`)
     response.headers.append('Set-Cookie', `sc-role=${role}; Path=/; SameSite=Lax; Max-Age=86400`)
     response.headers.append('Set-Cookie', `sc-status=${user.estado}; Path=/; SameSite=Lax; Max-Age=86400`)

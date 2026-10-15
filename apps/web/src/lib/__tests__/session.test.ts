@@ -80,7 +80,7 @@ test("escapeIlikePattern neutraliza %, _ y \\ para coincidencia literal", () => 
   assert.equal(escapeIlikePattern("normal@x.com"), "normal@x.com");
 });
 
-// Bloqueante de code review: un sc-token malformado NO debe lanzar (tumbaba el middleware con 500).
+// Bloqueante de code review: un sc-token malformado NO debe lanzar (tumbaba el proxy con 500).
 test("verifyScSessionToken con token malformado devuelve null y no lanza", async () => {
   process.env.AUTH_SECRET = process.env.AUTH_SECRET || "test-secret";
   for (const malformed of ["aaaa.@@@@", "sin-punto", ".", "a.", "....", "abc.def"]) {

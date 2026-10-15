@@ -12,7 +12,7 @@ export function isSupabaseAdminConfigured(): boolean {
 
 /**
  * Cliente Supabase REST reutilizable. Si no se pasa `apiKey`, usa la service role.
- * Permite compartir la misma fábrica entre la Admin API y el middleware (que puede
+ * Permite compartir la misma fábrica entre la Admin API y el proxy (que puede
  * operar con la anon key cuando no hay service role disponible).
  */
 export function createSupabaseRestClient(apiKey?: string): SupabaseClient {
