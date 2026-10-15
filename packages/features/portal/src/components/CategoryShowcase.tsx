@@ -44,9 +44,10 @@ function Link({
 
 export interface CategoryShowcaseProps {
   catalog: CatalogItem[]
+  onSelectCategory?: (category: string) => void
 }
 
-export function CategoryShowcase({ catalog }: CategoryShowcaseProps) {
+export function CategoryShowcase({ catalog, onSelectCategory }: CategoryShowcaseProps) {
   const available = catalog.filter((item) => item.status === 'Disponible').length
 
   return (
@@ -67,7 +68,12 @@ export function CategoryShowcase({ catalog }: CategoryShowcaseProps) {
         {serviceCategories.map(({ slug, name, description, icon, tone, unit }) => {
           const from = minPrice(catalog, slug)
           return (
-            <Link href={`/services/${slug}`} key={slug} className="dashboard-category">
+            <Link
+              href={`/services/${slug}`}
+              key={slug}
+              className="dashboard-category"
+              onClick={() => onSelectCategory?.(slug)}
+            >
               <IconBox icon={categoryIcons[icon]} tone={tone} />
               <span className="dash-card-arrow">
                 <ArrowRight size={16} />

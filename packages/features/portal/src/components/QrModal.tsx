@@ -5,10 +5,12 @@ import { Download, Printer, QrCode, ShieldCheck, X } from 'lucide-react'
 import { formatDate, type Booking } from '@sportcomplex/core'
 import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from '../utils/portal-utils'
 
-interface QrModalProps {
+export interface QrModalProps {
   ticket: Booking | null
   onClose: () => void
   onPrint?: (ticket: Booking) => void
+  open?: boolean
+  isOpen?: boolean
 }
 
 /**
@@ -63,7 +65,13 @@ export function QRGraphicHD({
 /**
  * Modal interactivo de visualización de pase digital y código QR HD.
  */
-export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
+export function QrModal({
+  ticket,
+  onClose,
+  onPrint,
+  open = true,
+  isOpen = true,
+}: QrModalProps) {
   const [currentTicket, setCurrentTicket] = useState<Booking | null>(ticket)
   const [downloading, setDownloading] = useState(false)
 
@@ -93,7 +101,7 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
     return undefined
   }, [ticket])
 
-  if (!currentTicket) return null
+  if (!open || !isOpen || !currentTicket) return null
 
   const handleDownload = async () => {
     if (downloading) return

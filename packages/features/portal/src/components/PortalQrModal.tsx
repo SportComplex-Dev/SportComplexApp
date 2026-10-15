@@ -11,11 +11,19 @@ export interface PortalQrModalProps {
   ticket: PortalTicket | null
   onClose: () => void
   onPrint: (ticket: Booking) => void
+  open?: boolean
+  isOpen?: boolean
 }
 
-export function PortalQrModal({ ticket, onClose, onPrint }: PortalQrModalProps) {
+export function PortalQrModal({
+  ticket,
+  onClose,
+  onPrint,
+  open = true,
+  isOpen = true,
+}: PortalQrModalProps) {
   const shouldReduceMotion = useReducedMotion()
-  if (!ticket) return null
+  if (!open || !isOpen || !ticket) return null
 
   return (
     <AnimatePresence>
