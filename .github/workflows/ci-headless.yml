@@ -71,6 +71,8 @@ jobs:
           pnpm db:generate
           pnpm --filter @sportcomplex/db exec prisma migrate deploy --schema prisma/schema.prisma
           pnpm --filter @sportcomplex/db run db:seed
+          # Sincronizar catálogo semilla (tarifas > 0, estado ACTIVO) para tests E2E
+          pnpm exec tsx scripts/sync-catalog.ts
 
 
       - name: Construir paquetes (dist/ para alias @sportcomplex/*)

@@ -42,8 +42,8 @@ test.describe("Flujo 7: Auditoría y Experiencia de Torneos en Landing Page (SCR
     // Click en 'Detalles'
     await firstCard.locator(".event-detail-btn").click();
 
-    // Modal de detalle visible
-    const modal = page.locator(".form-modal");
+    // Modal de detalle visible - usar role="dialog" del Modal de @sportcomplex/ui
+    const modal = page.locator('[role="dialog"]').first();
     await expect(modal).toBeVisible();
     await expect(modal.getByRole("heading", { level: 2 })).toContainText(
       /Información Oficial del Torneo/i
@@ -60,7 +60,9 @@ test.describe("Flujo 7: Auditoría y Experiencia de Torneos en Landing Page (SCR
     // Click en 'Inscribirme al Torneo' desde el modal de detalle abre el modal de inscripción
     await registerCta.click();
 
-    await expect(modal.getByRole("heading", { level: 2 })).toContainText(
+    const regModal = page.locator('[role="dialog"]').first();
+    await expect(regModal).toBeVisible();
+    await expect(regModal.getByRole("heading", { level: 2 })).toContainText(
       /Inscripción a Torneo Deportivo/i
     );
   });
@@ -77,7 +79,7 @@ test.describe("Flujo 7: Auditoría y Experiencia de Torneos en Landing Page (SCR
 
     await registerBtn.click();
 
-    const modal = page.locator(".form-modal");
+    const modal = page.locator('[role="dialog"]').first();
     await expect(modal).toBeVisible();
     await expect(modal.getByRole("heading", { level: 2 })).toContainText(
       /Inscripción a Torneo Deportivo/i

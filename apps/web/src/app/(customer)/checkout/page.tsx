@@ -72,7 +72,7 @@ function CheckoutContent() {
     searchParams.get('bookingId')
 
   const { session, notify } = useApp()
-  const { catalog } = usePublicCatalog()
+  const { catalog, loading: catalogLoading } = usePublicCatalog()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
@@ -222,6 +222,18 @@ function CheckoutContent() {
       router.push('/services')
     }
   }, [item, router, setDraft])
+
+  if (catalogLoading) {
+    return (
+      <main className="section-shell payment-page">
+        <div className="dashboard-empty">
+          <Loader2 className="mx-auto size-8 animate-spin text-primary mb-3" />
+          <b>Cargando catálogo…</b>
+          <p>Por favor espera un momento.</p>
+        </div>
+      </main>
+    )
+  }
 
   if (!activeDraft || !item || !category) {
     return (

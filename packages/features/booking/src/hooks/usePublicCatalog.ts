@@ -74,7 +74,7 @@ export function usePublicCatalog(): PublicCatalogData {
             const catSlug = (cat?.slug ?? 'canchas') as CatalogItem['category']
             const serviceSlug = s.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
             const item: CatalogItem = {
-              id: String(s.id),
+              id: serviceSlug,
               name: s.nombre,
               category: catSlug,
               sede: 'Poblado',
