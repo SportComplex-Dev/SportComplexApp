@@ -6,7 +6,7 @@ const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 const { BookingError, getBookingHistory } = await import(
-  "../src/repositories/bookings.ts"
+  "../src/repositories/bookings/index.ts"
 );
 
 const userId = "00000000-0000-4000-8000-000000000001";

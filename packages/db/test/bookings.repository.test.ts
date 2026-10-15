@@ -12,7 +12,7 @@ const {
   getBookableAvailability,
   getReadOnlyBookableAvailability,
 } = await import(
-  "../src/repositories/bookings.ts"
+  "../src/repositories/bookings/index.ts"
 );
 
 function tomorrowInBogota(now: Date): string {
