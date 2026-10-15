@@ -134,16 +134,39 @@ async function main() {
       console.log(`Categoría Piscinas creada: ${catPiscinas.id}`);
     }
 
+    // 4b. Servicios base para Torneos (CUOTA-001: en BD fresca no existen
+    // servicios y los torneos quedaban sin bloqueos en silencio).
+    // Se aseguran por nombre único ANTES de crear torneos; los bloqueos
+    // pasan a ser incondicionales.
+    async function ensureServicio(
+      nombre: string,
+      categoriaId: number,
+      capacidadMaxima: number,
+    ) {
+      return prisma.servicio.upsert({
+        where: { nombre },
+        update: {},
+        create: {
+          nombre,
+          categoriaId,
+          capacidadMaxima,
+          tarifa: 0.0,
+          modalidad: "AFORO",
+        },
+      });
+    }
+
+    const padelService = await ensureServicio("Cancha de Pádel — Torneo", catCanchas.id, 16);
+    const tenisService = await ensureServicio("Cancha de Tenis — Torneo", catCanchas.id, 12);
+    const piscinaService = await ensureServicio("Piscina — Torneo", catPiscinas.id, 20);
+    console.log("Servicios base para torneos asegurados: Pádel, Tenis, Piscina.");
+
     // 5. Torneos Oficiales en INSCRIPCIONES_ABIERTAS
     const torneoPadel = await prisma.torneo.findFirst({
       where: { titulo: "Torneo Relámpago Nocturno de Pádel" },
     });
 
     if (!torneoPadel) {
-      const padelService = await prisma.servicio.findFirst({
-        where: { nombre: { contains: "Pádel", mode: "insensitive" } },
-      });
-
       const catId = catCanchas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 7);
@@ -166,17 +189,15 @@ async function main() {
           cuposOcupados: 4,
           precioInscripcion: 0.00,
           estado: EstadoTorneo.INSCRIPCIONES_ABIERTAS,
-          bloqueos: padelService
-            ? {
-                create: [
-                  {
-                    servicioId: padelService.id,
-                    horaInicio: startDate,
-                    horaFin: endDate,
-                  },
-                ],
-              }
-            : undefined,
+          bloqueos: {
+            create: [
+              {
+                servicioId: padelService.id,
+                horaInicio: startDate,
+                horaFin: endDate,
+              },
+            ],
+          },
         },
       });
       console.log(`Torneo de Pádel creado: ${nuevoTorneoPadel.id}`);
@@ -187,10 +208,6 @@ async function main() {
     });
 
     if (!torneoTenis) {
-      const tenisService = await prisma.servicio.findFirst({
-        where: { nombre: { contains: "Tenis", mode: "insensitive" } },
-      });
-
       const catId = catCanchas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 10);
@@ -213,17 +230,15 @@ async function main() {
           cuposOcupados: 5,
           precioInscripcion: 0.00,
           estado: EstadoTorneo.INSCRIPCIONES_ABIERTAS,
-          bloqueos: tenisService
-            ? {
-                create: [
-                  {
-                    servicioId: tenisService.id,
-                    horaInicio: startDate,
-                    horaFin: endDate,
-                  },
-                ],
-              }
-            : undefined,
+          bloqueos: {
+            create: [
+              {
+                servicioId: tenisService.id,
+                horaInicio: startDate,
+                horaFin: endDate,
+              },
+            ],
+          },
         },
       });
       console.log(`Torneo de Tenis creado: ${nuevoTorneoTenis.id}`);
@@ -234,10 +249,6 @@ async function main() {
     });
 
     if (!torneoPiscina) {
-      const piscinaService = await prisma.servicio.findFirst({
-        where: { nombre: { contains: "Piscina", mode: "insensitive" } },
-      });
-
       const catId = catPiscinas.id;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 14);
@@ -260,17 +271,15 @@ async function main() {
           cuposOcupados: 8,
           precioInscripcion: 0.00,
           estado: EstadoTorneo.INSCRIPCIONES_ABIERTAS,
-          bloqueos: piscinaService
-            ? {
-                create: [
-                  {
-                    servicioId: piscinaService.id,
-                    horaInicio: startDate,
-                    horaFin: endDate,
-                  },
-                ],
-              }
-            : undefined,
+          bloqueos: {
+            create: [
+              {
+                servicioId: piscinaService.id,
+                horaInicio: startDate,
+                horaFin: endDate,
+              },
+            ],
+          },
         },
       });
       console.log(`Torneo de Natación creado: ${nuevoTorneoPiscina.id}`);
