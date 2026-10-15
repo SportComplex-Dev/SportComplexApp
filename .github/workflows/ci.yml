@@ -30,7 +30,7 @@ jobs:
           version: 12.6.0
       - run: pnpm install --frozen-lockfile
       - name: Construir paquetes (dist/ para paths y OpenAPI)
-        run: pnpm build
+        run: pnpm build --force
       - name: Verificar limites arquitectonicos
         run: pnpm verificar:limites
       - run: pnpm typecheck

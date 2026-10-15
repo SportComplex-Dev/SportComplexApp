@@ -76,7 +76,7 @@ jobs:
       - name: Construir paquetes (dist/ para alias @sportcomplex/*)
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/testdb
-        run: pnpm exec turbo run build --filter='!web'
+        run: pnpm exec turbo run build --filter='!web' --force
 
       - name: Sincronizar catálogo semilla (tarifas > 0, estado ACTIVO) para tests E2E
         env:
