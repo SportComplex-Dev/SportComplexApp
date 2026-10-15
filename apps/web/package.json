@@ -20,6 +20,7 @@
     "@sportcomplex/features-booking": "workspace:*",
     "@sportcomplex/features-scanner": "workspace:*",
     "@sportcomplex/features-tournament": "workspace:*",
+    "@sportcomplex/features-pos": "workspace:*",
     "@sportcomplex/security": "workspace:*",
     "@sportcomplex/ui": "workspace:*",
     "@sportcomplex/validation": "workspace:*",

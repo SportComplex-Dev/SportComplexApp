@@ -1,13 +1,15 @@
 'use client'
 
 import { useApp } from '@/components/app-provider'
-import { PosCatalogSelector } from '@/app/(staff)/pos/components/pos-catalog-selector'
-import { PosClientForm } from '@/app/(staff)/pos/components/pos-client-form'
-import { PosPaymentStripe } from '@/app/(staff)/pos/components/pos-payment-stripe'
-import { PosVoucherModal } from '@/app/(staff)/pos/components/pos-voucher-modal'
-import { PosAltLinkModal } from '@/app/(staff)/pos/components/pos-alt-link-modal'
-import { PosHeader } from '@/app/(staff)/pos/components/pos-header'
-import { usePosSession } from '@/app/(staff)/pos/hooks/use-pos-session'
+import {
+  PosCatalogSelector,
+  PosClientForm,
+  PosPaymentStripe,
+  PosVoucherModal,
+  PosAltLinkModal,
+  PosHeader,
+  usePosSession,
+} from '@sportcomplex/features-pos'
 
 export default function PosPage() {
   const { session, notify } = useApp()

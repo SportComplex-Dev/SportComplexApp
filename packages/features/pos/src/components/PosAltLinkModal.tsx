@@ -1,10 +1,9 @@
 'use client'
 
-import React from 'react'
 import { Button, Input } from '@sportcomplex/ui'
 import { Smartphone, X, Copy, Check } from 'lucide-react'
 
-interface PosAltLinkModalProps {
+export interface PosAltLinkModalProps {
   isOpen: boolean
   onClose: () => void
   altLinkUrl: string

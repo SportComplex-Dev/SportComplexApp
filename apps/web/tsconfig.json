@@ -26,7 +26,9 @@
       "@sportcomplex/features-scanner": ["../../packages/features/scanner/src", "../../packages/features/scanner/dist"],
       "@sportcomplex/features-scanner/*": ["../../packages/features/scanner/src/*", "../../packages/features/scanner/dist/*"],
       "@sportcomplex/features-tournament": ["../../packages/features/tournament/dist", "../../packages/features/tournament/src"],
-      "@sportcomplex/features-tournament/*": ["../../packages/features/tournament/dist/*", "../../packages/features/tournament/src/*"]
+      "@sportcomplex/features-tournament/*": ["../../packages/features/tournament/dist/*", "../../packages/features/tournament/src/*"],
+      "@sportcomplex/features-pos": ["../../packages/features/pos/src", "../../packages/features/pos/dist"],
+      "@sportcomplex/features-pos/*": ["../../packages/features/pos/src/*", "../../packages/features/pos/dist/*"]
     },
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": false,

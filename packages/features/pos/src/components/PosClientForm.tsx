@@ -1,10 +1,9 @@
 'use client'
 
-import React from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@sportcomplex/ui'
 import { Sparkles, Percent } from 'lucide-react'
 
-interface PosClientFormProps {
+export interface PosClientFormProps {
   clientDoc: string
   onClientDocChange: (doc: string) => void
   clientName: string

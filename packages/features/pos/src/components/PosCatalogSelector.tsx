@@ -1,12 +1,21 @@
 'use client'
 
-import React from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Badge, Card, CardContent, CardHeader, CardTitle, Input } from '@sportcomplex/ui'
-import { serviceCategories, formatMoney, type CatalogItem } from '@sportcomplex/core'
-import { categoryIcons } from '@/components/category-icons'
+import { serviceCategories, type CatalogItem, type CategoryIcon } from '@sportcomplex/core'
+import { ServiceSelector, formatMoney } from '@sportcomplex/features-booking'
+import { Dumbbell, Footprints, Sparkles, Waves, type LucideIcon } from 'lucide-react'
 
-interface PosCatalogSelectorProps {
+export { ServiceSelector }
+
+export const categoryIcons: Record<CategoryIcon, LucideIcon> = {
+  court: Footprints,
+  pool: Waves,
+  gym: Dumbbell,
+  wellness: Sparkles,
+}
+
+export interface PosCatalogSelectorProps {
   selectedCategory: string
   onSelectCategory: (category: string) => void
   selectedServiceId: string

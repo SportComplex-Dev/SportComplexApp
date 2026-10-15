@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { loadStripe } from '@stripe/stripe-js'
 import type { Booking, CatalogItem } from '@sportcomplex/core'
-import { calcularDesgloseComprobante } from '@/components/portal/portal-utils'
-import type { ToastKind } from '@/components/toast-message'
+import { calcularDesgloseComprobante } from '../services/receipt'
 
-interface UsePosSessionProps {
+export type ToastKind = 'success' | 'error' | 'info'
+
+export interface UsePosSessionProps {
   notify: (msg: string, type?: ToastKind) => void
 }
 
@@ -16,7 +17,7 @@ export function usePosSession({ notify }: UsePosSessionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('canchas')
   const [selectedServiceId, setSelectedServiceId] = useState<string>('')
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0] ?? '', [])
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [selectedSlot, setSelectedSlot] = useState<string>('')
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
@@ -89,7 +90,10 @@ export function usePosSession({ notify }: UsePosSessionProps) {
 
   useEffect(() => {
     if (filteredServices.length > 0 && (!selectedServiceId || !filteredServices.some((s) => s.id === selectedServiceId))) {
-      setSelectedServiceId(filteredServices[0].id)
+      const first = filteredServices[0]
+      if (first) {
+        setSelectedServiceId(first.id)
+      }
     }
   }, [filteredServices, selectedServiceId])
 
@@ -108,8 +112,9 @@ export function usePosSession({ notify }: UsePosSessionProps) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const backendSlots = json.data.map((item: any) => `${item.franja.horaInicio} - ${item.franja.horaFin}`)
             setAvailableSlots(backendSlots)
-            if (!backendSlots.includes(selectedSlot)) {
-              setSelectedSlot(backendSlots[0])
+            const firstSlot = backendSlots[0]
+            if (firstSlot && !backendSlots.includes(selectedSlot)) {
+              setSelectedSlot(firstSlot)
             }
             return
           }

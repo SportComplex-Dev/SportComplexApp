@@ -1,11 +1,10 @@
 'use client'
 
-import React from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@sportcomplex/ui'
 import { CreditCard, Smartphone, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { formatMoney, type CatalogItem } from '@sportcomplex/core'
 
-interface PosPaymentStripeProps {
+export interface PosPaymentStripeProps {
   currentService?: CatalogItem
   subtotalBruto: number
   descuentoMonto: number
