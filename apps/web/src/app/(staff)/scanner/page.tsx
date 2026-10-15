@@ -3,17 +3,19 @@
 import React from "react";
 import { AlertTriangle, QrCode } from "lucide-react";
 import { Badge, Button, Card, CardContent } from "@sportcomplex/ui";
-import { ConsultationResultCard } from "@/components/scanner/consultation-result-card";
-import { ScannerHeader } from "@/components/scanner/scanner-header";
-import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
-import ZoneMismatchScreen from "@/components/scanner/ZoneMismatchScreen";
+import {
+  ConsultationResultCard,
+  ScannerHeader,
+  TicketValidationModal,
+  ZoneMismatchScreen,
+  useScannerController,
+  ConsultationModeCard,
+  OfflineBanner,
+  ScannerCameraView,
+  ManualEntryCard,
+  ShiftScannerView,
+} from "@sportcomplex/features-scanner";
 import { useOptionalApp } from "@/components/app-provider";
-
-import { useScannerController } from "@/app/(staff)/scanner/hooks/use-scanner-controller";
-import { ConsultationModeCard, OfflineBanner } from "@/app/(staff)/scanner/components/consultation-mode-card";
-import { ScannerCameraView } from "@/app/(staff)/scanner/components/scanner-camera-view";
-import { ManualEntryCard } from "@/app/(staff)/scanner/components/manual-entry-card";
-import { ShiftScannerView } from "@/app/(staff)/scanner/components/shift-scanner-view";
 
 export default function ScannerPage() {
   const c = useScannerController();

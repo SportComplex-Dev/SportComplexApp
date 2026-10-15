@@ -5,7 +5,7 @@ import {
   ScannerServiceError,
   scannerService,
   validateTicket,
-} from "@/components/scanner/scanner.service";
+} from "../scannerService";
 import { ACCESS_WINDOW_EXPIRED_MESSAGE } from "@sportcomplex/core";
 
 const ticketId = "123e4567-e89b-42d3-a456-426614174000";

@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CameraOff, QrCode, ShieldAlert } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 
-type QrCameraViewportProps = {
+export type QrCameraViewportProps = {
   enabled: boolean;
   facingMode: "user" | "environment";
   onScan: (decodedText: string) => void;
@@ -146,3 +146,5 @@ export function QrCameraViewport({ enabled, facingMode, onScan, onCameraError }:
     </div>
   );
 }
+
+export default QrCameraViewport;

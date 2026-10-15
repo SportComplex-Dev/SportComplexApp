@@ -1,21 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseTicketQr } from "@/lib/qr-client";
+import { parseTicketQr } from "../../../../../apps/web/src/lib/qr-client";
 import {
   type ScannerFlowState,
   type ScannedTicket,
   type ShiftOption,
   type RedeemTicketResponse,
-  scannerService,
-} from "@/components/scanner/scanner.service";
-import { useAudioFeedback } from "@/components/scanner/use-audio-feedback";
+  type VerifyResponseData,
+} from "../types";
+import { scannerService } from "../services";
+import { useAudioFeedback } from "./useAudioFeedback";
 import {
   HttpError,
   isTransientNetworkError,
   useNetworkResilience,
-} from "@/hooks/use-network-resilience";
-import type { VerifyResponseData } from "@/app/(staff)/scanner/types";
+} from "../../../../../apps/web/src/hooks/use-network-resilience";
 
 export function useScannerController() {
   const { isOnline, executeWithRetry, getCachedTicket, setCachedTicket } =

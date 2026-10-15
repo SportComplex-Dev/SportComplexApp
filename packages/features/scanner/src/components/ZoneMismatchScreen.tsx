@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { MapPin, ShieldAlert } from "lucide-react";
-import { parseZoneMismatch } from "@/components/scanner/scanner.service";
+import { parseZoneMismatch } from "../services/scannerService";
 
-interface ZoneMismatchScreenProps {
+export interface ZoneMismatchScreenProps {
   /** Mensaje literal devuelto por el backend (HTTP 403 SERVICE_MISMATCH). */
   message: string;
   /** Ticket escaneado (solo referencia, sin acciones). */
@@ -20,7 +20,7 @@ interface ZoneMismatchScreenProps {
  * usuario) destacado para lectura de un vistazo. Pantalla bloqueante sin
  * acciones de canje: el boleto permanece EMITIDO.
  */
-export default function ZoneMismatchScreen({
+export function ZoneMismatchScreen({
   message,
   ticketId,
   postServiceName,
@@ -111,3 +111,5 @@ export default function ZoneMismatchScreen({
     </section>
   );
 }
+
+export default ZoneMismatchScreen;

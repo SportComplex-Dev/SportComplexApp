@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import {
   Calendar,
   CheckCircle2,
@@ -18,18 +17,9 @@ import {
   CardFooter,
 } from "@sportcomplex/ui";
 
-export interface TicketInfo {
-  id: string;
-  reservaId: string;
-  estado: "EMITIDO" | "USADO";
-  servicioId: number;
-  servicioNombre: string;
-  fecha: string;
-  horaInicio: string;
-  horaFin: string;
-  titularId: string;
-  titularNombre: string;
-}
+import type { TicketInfo } from "../types";
+
+export type { TicketInfo };
 
 export interface ConsultationResultCardProps {
   ticket: TicketInfo;
@@ -190,3 +180,5 @@ export function ConsultationResultCard({
     </Card>
   );
 }
+
+export default ConsultationResultCard;

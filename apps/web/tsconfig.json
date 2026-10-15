@@ -22,7 +22,9 @@
       "@sportcomplex/security": ["../../packages/security/dist"],
       "@sportcomplex/security/*": ["../../packages/security/dist/*"],
       "@sportcomplex/features-booking": ["../../packages/features/booking/dist"],
-      "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"]
+      "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"],
+      "@sportcomplex/features-scanner": ["../../packages/features/scanner/src", "../../packages/features/scanner/dist"],
+      "@sportcomplex/features-scanner/*": ["../../packages/features/scanner/src/*", "../../packages/features/scanner/dist/*"]
     },
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": false,

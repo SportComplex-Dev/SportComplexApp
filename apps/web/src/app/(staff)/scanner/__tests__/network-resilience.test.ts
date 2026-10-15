@@ -20,8 +20,7 @@ import {
   CACHE_TTL_MS,
   type TicketConsultationData,
 } from "@/hooks/use-network-resilience";
-import { ConsultationResultCard } from "@/components/scanner/consultation-result-card";
-import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
+import { ConsultationResultCard, TicketValidationModal } from "@sportcomplex/features-scanner";
 import ScannerPage from "@/app/(staff)/scanner/page";
 
 // Mock de localStorage en memoria para pruebas aisladas

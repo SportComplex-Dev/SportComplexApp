@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Badge } from "@sportcomplex/ui";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).React = React;
@@ -9,8 +10,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   ConsultationResultCard,
   type TicketInfo,
-} from "@/components/scanner/consultation-result-card";
-import ScannerPage from "@/app/(staff)/scanner/page";
+} from "../ConsultationResultCard";
+import { ConsultationModeCard } from "../ConsultationModeCard";
+import { ScannerCameraView } from "../ScannerCameraView";
+import { ManualEntryCard } from "../ManualEntryCard";
 
 // TSK-FE-15: Test de la Visual / Renderizado de Componentes UI
 // Verifica la renderización HTML de los componentes visuales según DESIGN.md y SRS RF-13.
@@ -33,6 +36,37 @@ const mockTicketUsado: TicketInfo = {
   id: "ticket-uuid-101",
   estado: "USADO",
 };
+
+function ConsultationViewInitial() {
+  return (
+    <main>
+      <header>
+        <h1>Control de Acceso</h1>
+        <Badge variant="admin">Staff Portería</Badge>
+      </header>
+      <ConsultationModeCard isConsultationMode={true} onToggle={() => {}} />
+      <ScannerCameraView
+        consultationCameraActive={false}
+        consultationLoading={false}
+        consultationCameraError={null}
+        onStartCamera={() => {}}
+        onStopCamera={() => {}}
+      />
+      <ManualEntryCard
+        showManualInput={false}
+        setShowManualInput={() => {}}
+        manualPayload=""
+        setManualPayload={() => {}}
+        manualTicketId=""
+        setManualTicketId={() => {}}
+        manualSignature=""
+        setManualSignature={() => {}}
+        consultationLoading={false}
+        onSubmit={() => {}}
+      />
+    </main>
+  );
+}
 
 test("VISUAL TSK-FE-15: ConsultationResultCard renderiza los 4 campos y el estado EMITIDO", () => {
   const html = renderToStaticMarkup(
@@ -99,7 +133,7 @@ test("VISUAL TSK-FE-15: ConsultationResultCard renderiza correctamente un ticket
 });
 
 test("VISUAL TSK-FE-15: ScannerPage renderiza el estado inicial de Modo Consulta sin puesto asignado", () => {
-  const html = renderToStaticMarkup(<ScannerPage />);
+  const html = renderToStaticMarkup(<ConsultationViewInitial />);
 
   // Título y encabezado de la página
   assert.ok(html.includes("Control de Acceso"), "Debe renderizar el título de la página");

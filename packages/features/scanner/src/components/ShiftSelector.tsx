@@ -3,9 +3,9 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, ChevronRight, TimerReset } from "lucide-react";
 
-import type { ShiftOption } from "@/components/scanner/scanner.service";
+import type { ShiftOption } from "../types";
 
-type ShiftSelectorProps = {
+export type ShiftSelectorProps = {
   options: ShiftOption[];
   selectedId: string | null;
   isLoading: boolean;
@@ -92,3 +92,5 @@ export function ShiftSelector({ options, selectedId, isLoading, loadError, onSel
     </div>
   );
 }
+
+export default ShiftSelector;

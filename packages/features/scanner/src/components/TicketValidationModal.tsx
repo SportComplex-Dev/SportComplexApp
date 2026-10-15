@@ -8,9 +8,9 @@ import type {
   RedeemTicketResponse,
   ScannerFlowState,
   ScannedTicket,
-} from "@/components/scanner/scanner.service";
+} from "../types";
 
-type TicketValidationModalProps = {
+export type TicketValidationModalProps = {
   isOpen: boolean;
   state: ScannerFlowState;
   ticket: ScannedTicket | null;
@@ -261,3 +261,5 @@ export function TicketValidationModal({
     </AnimatePresence>
   );
 }
+
+export default TicketValidationModal;

@@ -3,9 +3,9 @@
 import { motion } from "framer-motion";
 import { CameraOff, MicOff, Moon, RefreshCcw, Sun, Volume2 } from "lucide-react";
 
-import type { ShiftOption } from "@/components/scanner/scanner.service";
+import type { ShiftOption } from "../types";
 
-type ScannerHeaderProps = {
+export type ScannerHeaderProps = {
   activeShift: ShiftOption | null;
   audioEnabled: boolean;
   theme: "dark" | "light";
@@ -14,7 +14,14 @@ type ScannerHeaderProps = {
   onChangeShift: () => void;
 };
 
-export function ScannerHeader({ activeShift, audioEnabled, theme, onToggleAudio, onToggleTheme, onChangeShift }: ScannerHeaderProps) {
+export function ScannerHeader({
+  activeShift,
+  audioEnabled,
+  theme,
+  onToggleAudio,
+  onToggleTheme,
+  onChangeShift,
+}: ScannerHeaderProps) {
   return (
     <motion.header
       initial={{ y: -16, opacity: 0 }}
@@ -69,3 +76,5 @@ export function ScannerHeader({ activeShift, audioEnabled, theme, onToggleAudio,
     </motion.header>
   );
 }
+
+export default ScannerHeader;

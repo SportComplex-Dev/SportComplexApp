@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { AlertTriangle, Eye, Info, ToggleLeft, ToggleRight, WifiOff } from "lucide-react";
 import {
   Card,
@@ -10,7 +9,7 @@ import {
   CardTitle,
 } from "@sportcomplex/ui";
 
-interface ConsultationModeCardProps {
+export interface ConsultationModeCardProps {
   isConsultationMode: boolean;
   onToggle: () => void;
 }
@@ -96,3 +95,5 @@ export function OfflineBanner() {
     </div>
   );
 }
+
+export default ConsultationModeCard;

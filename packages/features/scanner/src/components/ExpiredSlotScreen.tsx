@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { Clock3, Ticket } from "lucide-react";
 import { ACCESS_WINDOW_EXPIRED_MESSAGE, TIMEZONE } from "@sportcomplex/core";
-import type { ExpiredSlotDetails } from "@/components/scanner/scanner.service";
+import type { ExpiredSlotDetails } from "../types";
 
-interface ExpiredSlotScreenProps {
+export interface ExpiredSlotScreenProps {
   userName: string;
   ticketId: string;
   reservationId: string;
@@ -26,7 +25,7 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-export default function ExpiredSlotScreen({
+export function ExpiredSlotScreen({
   userName,
   ticketId,
   reservationId,
@@ -133,14 +132,16 @@ export default function ExpiredSlotScreen({
           >
             Entendido / Continuar Escaneando
           </button>
-          <Link
-            className="min-h-12 rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:border-white/20 dark:text-slate-200 dark:hover:bg-white/5"
+          <a
+            className="min-h-12 rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:border-white/20 dark:text-slate-200 dark:hover:bg-white/5 inline-flex items-center justify-center"
             href="/pos"
           >
             Derivar a Taquilla / POS
-          </Link>
+          </a>
         </div>
       </div>
     </section>
   );
 }
+
+export default ExpiredSlotScreen;

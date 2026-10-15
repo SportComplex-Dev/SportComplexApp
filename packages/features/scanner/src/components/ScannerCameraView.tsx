@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Camera, CameraOff, QrCode, RefreshCw } from "lucide-react";
 import {
   Button,
@@ -11,7 +10,7 @@ import {
   CardTitle,
 } from "@sportcomplex/ui";
 
-interface ScannerCameraViewProps {
+export interface ScannerCameraViewProps {
   consultationCameraActive: boolean;
   consultationLoading: boolean;
   consultationCameraError: string | null;
@@ -97,3 +96,5 @@ export function ScannerCameraView({
     </Card>
   );
 }
+
+export default ScannerCameraView;
