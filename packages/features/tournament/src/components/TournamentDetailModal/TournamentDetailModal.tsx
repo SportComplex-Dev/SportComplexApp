@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Users,
   Ticket,
@@ -8,50 +8,21 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { Modal } from '@/components/modal'
-import { ActionButton } from '@/components/action-button'
+import { Modal } from '@sportcomplex/ui'
+import { ActionButton } from '@sportcomplex/ui'
 import {
   TournamentStatusBadge,
   InscriptionStatusBadge,
-} from '@/components/admin/tournaments/tournament-status-badge'
+} from '../TournamentStatusBadge'
+import type {
+  BloqueoDetailItem,
+  InscripcionDetailItem,
+  TournamentDetailData,
+} from '../../types'
 
-export interface BloqueoDetailItem {
-  id?: number
-  servicioId: number
-  servicio?: { nombre: string }
-  horaInicio?: string
-  horaFin?: string
-}
+export type { BloqueoDetailItem, InscripcionDetailItem, TournamentDetailData }
 
-export interface InscripcionDetailItem {
-  id: string
-  estado: string
-  nombrePareja?: string | null
-  ticketEstado?: string
-  creadoEn?: string
-  usuario?: {
-    nombre?: string
-    correo?: string
-  }
-}
-
-export interface TournamentDetailData {
-  id: string
-  titulo: string
-  descripcion?: string | null
-  nivel: string
-  categoria?: { nombre: string }
-  fechaInicio: string
-  fechaFin: string
-  cuposTotales: number
-  cuposOcupados: number
-  precioInscripcion: number | string
-  estado: string
-  bloqueos?: BloqueoDetailItem[]
-  inscripciones?: InscripcionDetailItem[]
-}
-
-interface TournamentDetailModalProps {
+export interface TournamentDetailModalProps {
   isOpen: boolean
   onClose: () => void
   tournamentId: string | null

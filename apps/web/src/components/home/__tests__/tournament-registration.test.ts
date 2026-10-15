@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import type { TournamentRegisterTarget } from '@/components/home/tournament-registration-modal'
+import type { TournamentRegisterTarget } from '@sportcomplex/features-tournament'
 
 // TSK-FE-26 (SCRUM-169): Suite de pruebas unitarias robusta para flujo de inscripción a torneos en la landing y portal
 

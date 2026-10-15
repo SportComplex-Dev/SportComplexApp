@@ -22,13 +22,16 @@
       "@sportcomplex/security": ["../../packages/security/dist"],
       "@sportcomplex/security/*": ["../../packages/security/dist/*"],
       "@sportcomplex/features-booking": ["../../packages/features/booking/dist"],
-      "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"]
+      "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"],
+      "@sportcomplex/features-tournament": ["../../packages/features/tournament/dist", "../../packages/features/tournament/src"],
+      "@sportcomplex/features-tournament/*": ["../../packages/features/tournament/dist/*", "../../packages/features/tournament/src/*"]
     },
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": false,
     "noImplicitReturns": false,
     "noUnusedParameters": false,
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    "noImplicitAny": false
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]

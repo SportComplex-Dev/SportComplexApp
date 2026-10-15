@@ -2,49 +2,18 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { Plus, Trash2, AlertCircle, ShieldAlert } from 'lucide-react'
-import { Modal } from '@/components/modal'
-import { ActionButton } from '@/components/action-button'
+import { Modal } from '@sportcomplex/ui'
+import { ActionButton } from '@sportcomplex/ui'
 import { createTournamentSchema } from '@sportcomplex/validation'
+import type {
+  BloqueoFormItem,
+  TournamentFormData,
+  TournamentEditInput,
+} from '../../types'
 
-export interface BloqueoFormItem {
-  servicioId: number
-  horaInicio: string
-  horaFin: string
-}
+export type { BloqueoFormItem, TournamentFormData, TournamentEditInput }
 
-export interface TournamentFormData {
-  id?: string
-  titulo: string
-  descripcion: string
-  categoriaId: number
-  nivel: string
-  fechaInicio: string
-  fechaFin: string
-  cuposTotales: number
-  precioInscripcion: number
-  estado: 'BORRADOR' | 'INSCRIPCIONES_ABIERTAS' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO'
-  bloqueos: BloqueoFormItem[]
-}
-
-export interface TournamentEditInput {
-  id?: string
-  titulo?: string
-  descripcion?: string | null
-  categoriaId?: number
-  nivel?: string
-  fechaInicio?: string | Date
-  fechaFin?: string | Date
-  cuposTotales?: number
-  precioInscripcion?: number | string
-  estado?: 'BORRADOR' | 'INSCRIPCIONES_ABIERTAS' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO'
-  bloqueos?: Array<{
-    servicioId: number
-    horaInicio?: string | Date
-    horaFin?: string | Date
-  }>
-}
-
-interface TournamentFormModalProps {
+export interface TournamentFormModalProps {
   isOpen: boolean
   onClose: () => void
   tournamentToEdit?: TournamentEditInput | null
@@ -54,7 +23,7 @@ interface TournamentFormModalProps {
   notify: (msg: string, kind?: 'success' | 'error' | 'info') => void
 }
 
-const NIVELES_SUGERIDOS = [
+export const NIVELES_SUGERIDOS = [
   'Primera Categoría (Avanzado)',
   'Segunda Categoría (Intermedio Alto)',
   'Tercera Categoría (Intermedio)',
@@ -63,59 +32,16 @@ const NIVELES_SUGERIDOS = [
   'Mixto Recreativo',
 ]
 
-export const TIMEZONE_BOGOTA = 'America/Bogota'
+import {
+  toDatetimeLocal,
+  parseDatetimeLocalToUtcIso,
+  mapTournamentApiError,
+} from '../../services/tournamentAdmin'
 
-/**
- * Convierte un objeto Date o ISO string a formato local 'YYYY-MM-DDTHH:mm'
- * forzando estrictamente la zona horaria legal de Colombia (America/Bogota, UTC-5).
- */
-export function toDatetimeLocal(isoOrDate: string | Date | undefined): string {
-  if (!isoOrDate) return ''
-  const d = new Date(isoOrDate)
-  if (isNaN(d.getTime())) return ''
-
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE_BOGOTA,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-
-  const parts = formatter.formatToParts(d)
-  const map: Record<string, string> = {}
-  for (const p of parts) {
-    map[p.type] = p.value
-  }
-  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`
-}
-
-/**
- * Convierte un string de input 'YYYY-MM-DDTHH:mm' a ISO UTC preservando el huso de Colombia (UTC-5).
- */
-export function parseDatetimeLocalToUtcIso(datetimeStr: string): string {
-  if (!datetimeStr) return ''
-  const trimmed = datetimeStr.trim()
-  if (trimmed.endsWith('Z') || trimmed.includes('+') || (trimmed.includes('-') && trimmed.length > 19)) {
-    return new Date(trimmed).toISOString()
-  }
-  const isoWithBogotaOffset = trimmed.length === 16 ? `${trimmed}:00-05:00` : `${trimmed}-05:00`
-  return new Date(isoWithBogotaOffset).toISOString()
-}
-
-/**
- * Mapea códigos de error conocidos de la API de torneos a mensajes legibles por el usuario (TEST-01).
- */
-export function mapTournamentApiError(code?: string, defaultMsg?: string): string {
-  if (code === 'COURT_SLOT_CONFLICT') {
-    return 'Conflicto de disponibilidad: Una de las pistas seleccionadas ya tiene reservas activas en ese horario.'
-  }
-  if (code === 'ALREADY_REGISTERED') {
-    return 'Ya te encuentras formalmente inscrito en este torneo deportivo.'
-  }
-  return defaultMsg || 'Error al guardar el torneo en el servidor.'
+export {
+  toDatetimeLocal,
+  parseDatetimeLocalToUtcIso,
+  mapTournamentApiError,
 }
 
 export function TournamentFormModal({
@@ -133,7 +59,7 @@ export function TournamentFormModal({
     titulo: '',
     descripcion: '',
     categoriaId: categories[0]?.id ?? -1,
-    nivel: NIVELES_SUGERIDOS[1],
+    nivel: NIVELES_SUGERIDOS[1] ?? 'Segunda Categoría (Intermedio Alto)',
     fechaInicio: '',
     fechaFin: '',
     cuposTotales: 16,
@@ -158,7 +84,7 @@ export function TournamentFormModal({
         titulo: tournamentToEdit.titulo ?? '',
         descripcion: tournamentToEdit.descripcion ?? '',
         categoriaId: tournamentToEdit.categoriaId ?? categories[0]?.id ?? -1,
-        nivel: tournamentToEdit.nivel ?? NIVELES_SUGERIDOS[1],
+        nivel: tournamentToEdit.nivel ?? NIVELES_SUGERIDOS[1] ?? 'Segunda Categoría (Intermedio Alto)',
         fechaInicio: toDatetimeLocal(tournamentToEdit.fechaInicio),
         fechaFin: toDatetimeLocal(tournamentToEdit.fechaFin),
         cuposTotales: tournamentToEdit.cuposTotales ?? 16,
@@ -181,7 +107,7 @@ export function TournamentFormModal({
         titulo: '',
         descripcion: '',
         categoriaId: categories[0]?.id ?? -1,
-        nivel: NIVELES_SUGERIDOS[1],
+        nivel: NIVELES_SUGERIDOS[1] ?? 'Segunda Categoría (Intermedio Alto)',
         fechaInicio: toDatetimeLocal(nextMonth),
         fechaFin: toDatetimeLocal(finMonth),
         cuposTotales: 16,
@@ -229,7 +155,10 @@ export function TournamentFormModal({
   ) => {
     setFormData((prev) => {
       const updated = [...prev.bloqueos]
-      updated[index] = { ...updated[index], [field]: value }
+      const current = updated[index]
+      if (current) {
+        updated[index] = { ...current, [field]: value }
+      }
       return { ...prev, bloqueos: updated }
     })
   }
@@ -270,8 +199,10 @@ export function TournamentFormModal({
     const validationResult = createTournamentSchema.safeParse(payload)
     if (!validationResult.success) {
       const flattened = validationResult.error.flatten()
+      const fieldErrorsMap = flattened.fieldErrors as Record<string, string[] | undefined>
       setFieldErrors(flattened.fieldErrors as Record<string, string[]>)
-      const firstError = Object.values(flattened.fieldErrors)[0]?.[0]
+      const firstErrorArr = Object.values(fieldErrorsMap)[0]
+      const firstError = Array.isArray(firstErrorArr) ? firstErrorArr[0] : undefined
       setErrorMsg(firstError || 'Por favor verifica los campos del formulario.')
       return
     }

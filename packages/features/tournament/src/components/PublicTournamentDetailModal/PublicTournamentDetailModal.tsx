@@ -1,7 +1,5 @@
 'use client'
 
-import React from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Trophy,
   Calendar,
@@ -16,26 +14,18 @@ import {
   ArrowRight,
   Ticket,
 } from 'lucide-react'
-import { Modal } from '@/components/modal'
-import { ActionButton } from '@/components/action-button'
-import type { TournamentRegisterTarget } from '@/components/home/tournament-registration-modal'
+import { Modal } from '@sportcomplex/ui'
+import { ActionButton } from '@sportcomplex/ui'
+import type { PublicTournamentDetailData } from '../../types'
 
-export interface PublicTournamentDetailData extends TournamentRegisterTarget {
-  court?: string
-  sede?: string
-  tone?: 'lime' | 'blue' | 'orange' | 'purple'
-  bloqueos?: Array<{
-    servicio?: { nombre: string }
-    horaInicio?: string
-    horaFin?: string
-  }>
-}
+export type { PublicTournamentDetailData }
 
-interface PublicTournamentDetailModalProps {
+export interface PublicTournamentDetailModalProps {
   isOpen: boolean
   onClose: () => void
   tournament: PublicTournamentDetailData | null
   onRegisterClick: (tournament: PublicTournamentDetailData) => void
+  onNavigateToTickets?: () => void
 }
 
 export function PublicTournamentDetailModal({
@@ -43,9 +33,8 @@ export function PublicTournamentDetailModal({
   onClose,
   tournament,
   onRegisterClick,
+  onNavigateToTickets,
 }: PublicTournamentDetailModalProps) {
-  const router = useRouter()
-
   if (!isOpen || !tournament) return null
 
   const precio = Number(tournament.precioInscripcion ?? 0)
@@ -82,6 +71,15 @@ export function PublicTournamentDetailModal({
     'Pistas Oficiales Asignadas'
 
   const sedeName = tournament.sede || 'Sede Principal SportComplex'
+
+  const navigateToTickets = () => {
+    onClose()
+    if (onNavigateToTickets) {
+      onNavigateToTickets()
+    } else if (typeof window !== 'undefined') {
+      window.location.assign('/portal/tickets')
+    }
+  }
 
   return (
     <Modal
@@ -229,10 +227,7 @@ export function PublicTournamentDetailModal({
 
           {tournament.yaInscrito ? (
             <ActionButton
-              onClick={() => {
-                onClose()
-                router.push('/portal/tickets')
-              }}
+              onClick={navigateToTickets}
               className="w-full sm:w-auto"
             >
               <Ticket size={14} /> Ver mi Entrada en el Portal
