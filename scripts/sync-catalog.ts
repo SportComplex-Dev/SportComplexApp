@@ -3,12 +3,12 @@
  * Sincroniza catálogo semilla -> BD (CI / entornos frescos).
  * Usa @sportcomplex/seed + @sportcomplex/db para poblar servicios con tarifa > 0 y estado ACTIVO.
  */
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma } from "@sportcomplex/db";
 import { catalogoSemilla, mapaIdServicio } from "@sportcomplex/seed/catalogo";
 import { traducirSemillaARegistroDb } from "@sportcomplex/seed/sincronizar";
 import { getCategorias } from "@sportcomplex/db";
 
-const prisma = new PrismaClient();
+const prisma = crearClientePrisma();
 
 async function main() {
   console.log("🌱 Sincronizando catálogo semilla -> BD...");
