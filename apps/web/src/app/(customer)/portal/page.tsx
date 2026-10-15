@@ -6,7 +6,7 @@ import { formatDate } from '@sportcomplex/core'
 import { useApp } from '@/components/app-provider'
 import { useLastCode } from '@/lib/stores'
 import { useToday } from '@/lib/persistent-state'
-import { usePublicCatalog } from '@/hooks/use-public-catalog'
+import { usePublicCatalog } from '@sportcomplex/features-booking'
 import { PrintableReceipt } from '@/components/portal/printable-receipt'
 
 import { useCustomerPortal } from '@/app/(customer)/portal/hooks/use-customer-portal'

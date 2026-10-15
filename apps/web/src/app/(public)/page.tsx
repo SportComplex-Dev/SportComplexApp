@@ -13,7 +13,7 @@ import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital
 import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 import { HeroCarousel } from "@/components/home/hero-carousel";
-import { usePublicCatalog } from "@/hooks/use-public-catalog";
+import { usePublicCatalog } from "@sportcomplex/features-booking";
 
 const categoryMeta: Record<string, {
   name: string;

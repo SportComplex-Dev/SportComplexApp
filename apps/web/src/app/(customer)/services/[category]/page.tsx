@@ -9,7 +9,7 @@ import { categoryIcons } from '@/components/category-icons'
 import { CategoryFilters } from '@/components/category-filters'
 import { IconBox } from '@/components/icon-box'
 import { LiveConditions } from '@/components/live-conditions'
-import { usePublicCatalog } from '@/hooks/use-public-catalog'
+import { usePublicCatalog } from '@sportcomplex/features-booking'
 
 export default function CategoryCatalogPage() {
   const { category: slug } = useParams<{ category: string }>()

@@ -1,8 +1,18 @@
 'use client'
 
 import { ArrowRight, CalendarCheck, X } from 'lucide-react'
-import { formatDate, formatMoney, type CatalogItem } from '@sportcomplex/core'
-import { ActionButton } from '@/components/action-button'
+import { formatDate, type CatalogItem } from '@sportcomplex/core'
+import { Button, cn } from '@sportcomplex/ui'
+import { formatMoney } from '../../utils/formatters'
+
+export interface ReservationModalProps {
+  close: () => void
+  proceed: () => void
+  item: CatalogItem
+  date: string
+  time: string
+  attendees: number
+}
 
 export function ReservationModal({
   close,
@@ -11,14 +21,7 @@ export function ReservationModal({
   date,
   time,
   attendees,
-}: {
-  close: () => void
-  proceed: () => void
-  item: CatalogItem
-  date: string
-  time: string
-  attendees: number
-}) {
+}: ReservationModalProps) {
   const isCourt = item.category === 'canchas'
   const isPrivatePool = item.category === 'piscinas' && item.poolType === 'PRIVADA'
   const total = isCourt || isPrivatePool ? item.price : item.price * attendees
@@ -56,10 +59,14 @@ export function ReservationModal({
             {formatMoney(total)} <small>COP</small>
           </b>
         </div>
-        <ActionButton onClick={proceed} className="w-full justify-center">
+        <Button
+          type="button"
+          onClick={proceed}
+          className={cn('action-button w-full justify-center')}
+        >
           Continuar al pago <ArrowRight size={16} />
-        </ActionButton>
-        <button onClick={close} className="modal-cancel">
+        </Button>
+        <button type="button" onClick={close} className="modal-cancel">
           Seguir explorando
         </button>
       </div>

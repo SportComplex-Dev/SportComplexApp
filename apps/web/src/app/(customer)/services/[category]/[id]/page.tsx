@@ -9,11 +9,9 @@ import { Badge } from '@sportcomplex/ui'
 import { categoryIcons } from '@/components/category-icons'
 import { IconBox } from '@/components/icon-box'
 import { SportsSpecsGrid } from '@/components/sports-specs-grid'
-import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
-import { ReservationModal } from '@/components/reservation-modal'
+import { AvailabilityCalendar, ReservationModal, usePublicCatalog } from '@sportcomplex/features-booking'
 import { useApp } from '@/components/app-provider'
 import { useDraft } from '@/lib/stores'
-import { usePublicCatalog } from '@/hooks/use-public-catalog'
 
 export default function ServiceBookingPage() {
   const router = useRouter()
