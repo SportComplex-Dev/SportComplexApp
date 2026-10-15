@@ -3,72 +3,16 @@ import {
   parseTicketQrPayload,
   TIMEZONE,
 } from "@sportcomplex/core";
+import type {
+  ExpiredSlotDetails,
+  RedeemTicketResponse,
+  ScannedTicket,
+  ShiftOption,
+  TicketValidationResponse,
+  ZoneMismatch,
+} from "../types";
 
-export type ScannerFlowState =
-  | "idle"
-  | "configuring-shift"
-  | "starting-camera"
-  | "scanning"
-  | "ticket-valid"
-  | "ticket-invalid"
-  | "access-granted"
-  | "access-denied"
-  | "redeeming"
-  | "redeem-error"
-  | "camera-error";
-
-export interface ShiftOption {
-  id: string;
-  postServiceId: number;
-  label: string;
-  courtName: string;
-}
-
-export interface ScannedTicket {
-  ticketId: string;
-  signature: string;
-  result?: RedeemTicketResponse;
-}
-
-export interface RedeemTicketResponse {
-  access: "GRANTED" | "DENIED";
-  resultado?: "CONCEDIDO" | "DENEGADO_USADO" | "DENEGADO_SERVICIO" | "DENEGADO_HORARIO";
-  code?: "ALREADY_USED" | "SERVICE_MISMATCH" | "WINDOW_EXPIRED" | "INVALID_STATE";
-  message?: string;
-  timestamp?: string;
-  ticket?: {
-    id: string;
-    reservaId: string;
-    estado: "EMITIDO" | "USADO";
-    servicioId: number;
-    servicioNombre: string;
-    fecha: string;
-    horaInicio: string;
-    horaFin: string;
-    titularId: string;
-    titularNombre: string;
-  };
-}
-
-export interface ExpiredSlotDetails {
-  slotStart: string;
-  slotEnd: string;
-  scannedAt: string;
-  windowPosition: "BEFORE" | "AFTER";
-  ticketStatus: "EMITIDO";
-  minutesFromBoundary: number;
-}
-
-export interface TicketValidationResponse {
-  isValid: boolean;
-  ticketId?: string;
-  reservationId?: string;
-  userName?: string;
-  targetCourtName?: string;
-  status: "VALID" | "WRONG_COURT" | "EXPIRED" | "ALREADY_USED" | "INVALID";
-  message: string;
-  expiredDetails?: ExpiredSlotDetails;
-}
+export type * from "../types";
 
 interface AccessApiResponse {
   success: boolean;
@@ -116,8 +60,8 @@ export function parseTicketQr(value: string): { ticketId: string; signature: str
 }
 
 export function toBogotaDate(fecha: string, hora: string): Date {
-  const [year, month, day] = fecha.slice(0, 10).split("-").map(Number);
-  const [hours, minutes, seconds = 0] = hora.split(":").map(Number);
+  const [year = 0, month = 1, day = 1] = fecha.slice(0, 10).split("-").map(Number);
+  const [hours = 0, minutes = 0, seconds = 0] = hora.split(":").map(Number);
   const localAsUtc = Date.UTC(year, month - 1, day, hours, minutes, seconds);
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIMEZONE,
@@ -145,13 +89,6 @@ export function hhmm(value: string): string {
   return value.slice(0, 5);
 }
 
-export interface ZoneMismatch {
-  /** Servicio al que pertenece el tiquete: zona a la que se debe dirigir al usuario. */
-  ticketService: string;
-  /** Servicio del puesto actual donde se realizó la lectura. */
-  postService: string;
-}
-
 const ZONE_MISMATCH_PATTERN = /pertenece a (.+?) y se encuentra en (.+?)\s*$/i;
 
 /**
@@ -163,8 +100,8 @@ const ZONE_MISMATCH_PATTERN = /pertenece a (.+?) y se encuentra en (.+?)\s*$/i;
 export function parseZoneMismatch(message: string): ZoneMismatch | null {
   const match = ZONE_MISMATCH_PATTERN.exec(message.trim());
   if (!match) return null;
-  const ticketService = match[1].trim();
-  const postService = match[2].trim();
+  const ticketService = match[1]?.trim() ?? "";
+  const postService = match[2]?.trim() ?? "";
   if (ticketService.length === 0 || postService.length === 0) return null;
   return { ticketService, postService };
 }

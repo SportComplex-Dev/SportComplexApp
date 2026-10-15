@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import type React from "react";
 import { Sparkles } from "lucide-react";
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   Input,
 } from "@sportcomplex/ui";
 
-interface ManualEntryCardProps {
+export interface ManualEntryCardProps {
   showManualInput: boolean;
   setShowManualInput: React.Dispatch<React.SetStateAction<boolean>>;
   manualPayload: string;
@@ -62,7 +62,7 @@ export function ManualEntryCard({
               <Input
                 placeholder="SC1:9f0d6f4e-0000-4000-8000-0000000000ff:..."
                 value={manualPayload}
-                onChange={(e) => setManualPayload(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualPayload(e.target.value)}
                 className="text-xs font-mono"
               />
             </div>
@@ -83,7 +83,7 @@ export function ManualEntryCard({
                 <Input
                   placeholder="9f0d6f4e-0000-4000-8000-0000000000ff"
                   value={manualTicketId}
-                  onChange={(e) => setManualTicketId(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualTicketId(e.target.value)}
                   className="text-xs font-mono"
                 />
               </div>
@@ -95,7 +95,7 @@ export function ManualEntryCard({
                 <Input
                   placeholder="64 caracteres hexadecimales"
                   value={manualSignature}
-                  onChange={(e) => setManualSignature(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualSignature(e.target.value)}
                   className="text-xs font-mono"
                 />
               </div>
@@ -116,3 +116,5 @@ export function ManualEntryCard({
     </Card>
   );
 }
+
+export default ManualEntryCard;

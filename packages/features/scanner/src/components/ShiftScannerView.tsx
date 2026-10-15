@@ -1,13 +1,12 @@
 "use client";
 
-import React from "react";
 import { CheckCircle2, ShieldAlert } from "lucide-react";
 import { motion } from "framer-motion";
-import type { ShiftOption, ScannerFlowState } from "@/components/scanner/scanner.service";
-import { QrCameraViewport } from "@/components/scanner/qr-camera-viewport";
-import { ShiftSelector } from "@/components/scanner/shift-selector";
+import type { ShiftOption, ScannerFlowState } from "../types";
+import { QrCameraViewport } from "./QrCameraViewport";
+import { ShiftSelector } from "./ShiftSelector";
 
-interface ShiftScannerViewProps {
+export interface ShiftScannerViewProps {
   activeShift: ShiftOption | null;
   shiftOptions: ShiftOption[];
   selectedShiftId: string | null;
@@ -164,3 +163,5 @@ export function ShiftScannerView({
     </section>
   );
 }
+
+export default ShiftScannerView;
