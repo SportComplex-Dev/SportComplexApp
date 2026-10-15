@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Download, Printer, QrCode, ShieldCheck, X } from 'lucide-react'
 import { formatDate, type Booking } from '@sportcomplex/core'
-import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from '@/components/portal/portal-utils'
+import { fetchReceiptData, generarQRDataUrl, sanitizeFilename } from '../utils/portal-utils'
 
 interface QrModalProps {
   ticket: Booking | null
@@ -20,7 +20,7 @@ export function QRGraphicHD({
   dataUrl: initialDataUrl,
 }: {
   code: string
-  dataUrl?: string | null
+  dataUrl?: string | null | undefined
 }) {
   const [dataUrl, setDataUrl] = useState<string | null>(initialDataUrl ?? null)
   const [error, setError] = useState(false)
@@ -69,7 +69,7 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
 
   useEffect(() => {
     setCurrentTicket(ticket)
-    if (!ticket) return
+    if (!ticket) return undefined
 
     // Si el ticket no posee payload firmado y tiene ID, obtener comprobante oficial (SEC-01 / NEW-02)
     if (!ticket.qrPayload && ticket.id) {
@@ -90,6 +90,7 @@ export function QrModal({ ticket, onClose, onPrint }: QrModalProps) {
         isCurrent = false
       }
     }
+    return undefined
   }, [ticket])
 
   if (!currentTicket) return null

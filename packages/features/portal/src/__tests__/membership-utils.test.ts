@@ -6,7 +6,7 @@ import {
   iniciarSuscripcionStripe,
   BENEFICIOS_POR_PERIODICIDAD,
   type PlanMembresiaDTO,
-} from "@/components/portal/membership-utils";
+} from "../utils/membership-utils";
 
 // TSK-FE-20 (HU-20 / RF-16): Pruebas unitarias de la lógica de vista del portal de membresías
 

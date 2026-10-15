@@ -22,7 +22,7 @@ import {
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useDraft, useLastCode } from '@/lib/stores'
-import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
+import { fetchReceiptData, fetchCustomerBookingHistory } from '@sportcomplex/features-portal'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
   try {

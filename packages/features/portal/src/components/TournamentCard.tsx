@@ -3,8 +3,8 @@
 import { Download, QrCode } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import type { UserTournamentItem } from '@/app/(customer)/portal/tickets/types'
-import type { PortalTicket } from '@/components/portal/portal-utils'
+import type { UserTournamentItem } from '../types/portal'
+import type { PortalTicket } from '../utils/portal-utils'
 
 interface TournamentCardProps {
   tournament: UserTournamentItem
@@ -27,23 +27,28 @@ export function TournamentCard({
   const inscripcionId = ins?.id || tournament.id
   const precioNum = Number(tournament.precioInscripcion ?? 0)
 
-  const makeFakeBooking = (): PortalTicket => ({
-    id: inscripcionId,
-    code: ticketCode,
-    qrPayload: qrPayload ?? undefined,
-    service: `Torneo: ${tournament.titulo}`,
-    category: tournament.categoria?.nombre || 'Torneo',
-    sede: 'Sede Principal',
-    date: tournament.fechaInicio.split('T')[0],
-    time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    attendees: ins?.nombrePareja ? 2 : 1,
-    amount: precioNum,
-    status: isConfirmed ? 'Confirmada' : 'Pendiente',
-    client: sessionName || 'Socio',
-  })
+  const makeFakeBooking = (): PortalTicket => {
+    const booking: PortalTicket = {
+      id: inscripcionId,
+      code: ticketCode,
+      service: `Torneo: ${tournament.titulo}`,
+      category: tournament.categoria?.nombre || 'Torneo',
+      sede: 'Sede Principal',
+      date: tournament.fechaInicio.split('T')[0] ?? tournament.fechaInicio,
+      time: new Date(tournament.fechaInicio).toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      attendees: ins?.nombrePareja ? 2 : 1,
+      amount: precioNum,
+      status: isConfirmed ? 'Confirmada' : 'Pendiente',
+      client: sessionName || 'Socio',
+    }
+    if (qrPayload) {
+      booking.qrPayload = qrPayload
+    }
+    return booking
+  }
 
   return (
     <div className="portal-ticket-item">

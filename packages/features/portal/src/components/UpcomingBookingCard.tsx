@@ -1,11 +1,25 @@
 'use client'
 
-import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { ArrowRight, CalendarCheck, CalendarDays, QrCode } from 'lucide-react'
 import { formatDate, formatMoney } from '@sportcomplex/core'
-import type { PortalTicket } from '@/components/portal/portal-utils'
+import type { PortalTicket } from '../utils/portal-utils'
 
-interface UpcomingBookingCardProps {
+function Link({
+  href,
+  children,
+  className,
+  onClick,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} className={className} onClick={onClick} {...props}>
+      {children}
+    </a>
+  )
+}
+
+export interface UpcomingBookingCardProps {
   booking: PortalTicket | null
   onOpenQR: (booking: PortalTicket) => void
 }

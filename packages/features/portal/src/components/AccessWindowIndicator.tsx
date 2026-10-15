@@ -5,13 +5,13 @@ import type { Booking } from '@sportcomplex/core'
 import {
   getAccessWindowLabel,
   getAccessWindowStatus,
-  type PortalTicket,
-} from '@/components/portal/portal-utils'
+} from '../utils/portal-utils'
 
-type AccessWindowIndicatorProps = Pick<Booking, 'date' | 'time'> &
-  Partial<Pick<PortalTicket, 'accessWindowStart' | 'accessWindowEnd'>> & {
-    compact?: boolean
-  }
+export type AccessWindowIndicatorProps = Pick<Booking, 'date' | 'time'> & {
+  accessWindowStart?: string | undefined
+  accessWindowEnd?: string | undefined
+  compact?: boolean | undefined
+}
 
 const statusPresentation = {
   UPCOMING: {

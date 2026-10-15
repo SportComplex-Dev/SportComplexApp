@@ -6,7 +6,7 @@ import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { ActionButton } from '@/components/action-button'
 import { useLastCode } from '@/lib/stores'
-import { fetchCustomerBookingHistory, type PortalTicket } from '@/components/portal/portal-utils'
+import { fetchCustomerBookingHistory, type PortalTicket } from '@sportcomplex/features-portal'
 
 function QRGraphic() {
   const blocks = Array.from({ length: 441 }, (_, i) => {

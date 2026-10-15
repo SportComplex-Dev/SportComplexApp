@@ -10,7 +10,7 @@ import {
   generarQRDataUrl,
   obtenerSaludoContextual,
   formatSlotTime,
-} from "@/components/portal/portal-utils";
+} from "../utils/portal-utils";
 
 // TSK-FE-13: Suite de Pruebas de Componentes y Lógica de UI del Portal de Autogestión (SCRUM-123 / HU-13 / RF-12)
 
@@ -314,9 +314,8 @@ test("TSK-FE-19: Integración de comprobante 58mm con respuesta oficial del back
 });
 
 test("TSK-FE-11: Sanitización de nombres de archivo de descarga de tiquete (DOM-01)", async () => {
-  const { sanitizeFilename } = await import("@/components/portal/portal-utils");
+  const { sanitizeFilename } = await import("../utils/portal-utils");
   assert.equal(sanitizeFilename("ALT:1234/5678"), "ALT_1234_5678");
   assert.equal(sanitizeFilename("ticket-123.png"), "ticket-123_png");
   assert.equal(sanitizeFilename("VALID_CODE-123"), "VALID_CODE-123");
 });
-

@@ -6,13 +6,14 @@ import { ArrowLeft, ArrowRight, Ticket, Trophy } from 'lucide-react'
 import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
 import { useLastCode } from '@/lib/stores'
-import { PrintableReceipt } from '@/components/portal/printable-receipt'
-
-import { usePortalTickets } from '@/app/(customer)/portal/tickets/hooks/use-portal-tickets'
-import { TicketQrModal } from '@/app/(customer)/portal/tickets/components/ticket-qr-modal'
-import { TournamentCard } from '@/app/(customer)/portal/tickets/components/tournament-card'
-import { TicketListItem } from '@/app/(customer)/portal/tickets/components/ticket-list-item'
-import type { TabType } from '@/app/(customer)/portal/tickets/types'
+import {
+  PrintableReceipt,
+  usePortalTickets,
+  TicketQrModal,
+  TournamentCard,
+  TicketListItem,
+  type TabType,
+} from '@sportcomplex/features-portal'
 
 export default function TicketsPage() {
   const { session, notify } = useApp()

@@ -7,13 +7,14 @@ import { useApp } from '@/components/app-provider'
 import { useLastCode } from '@/lib/stores'
 import { useToday } from '@/lib/persistent-state'
 import { usePublicCatalog } from '@sportcomplex/features-booking'
-import { PrintableReceipt } from '@/components/portal/printable-receipt'
-
-import { useCustomerPortal } from '@/app/(customer)/portal/hooks/use-customer-portal'
-import { UpcomingBookingCard } from '@/app/(customer)/portal/components/upcoming-booking-card'
-import { PortalBookingsList } from '@/app/(customer)/portal/components/portal-bookings-list'
-import { CategoryShowcase } from '@/app/(customer)/portal/components/category-showcase'
-import { PortalQrModal } from '@/app/(customer)/portal/components/portal-qr-modal'
+import {
+  PrintableReceipt,
+  useCustomerPortal,
+  UpcomingBookingCard,
+  PortalBookingsList,
+  CategoryShowcase,
+  PortalQrModal,
+} from '@sportcomplex/features-portal'
 
 export default function CustomerDashboardPage() {
   const { session } = useApp()

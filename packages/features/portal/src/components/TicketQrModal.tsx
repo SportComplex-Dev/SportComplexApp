@@ -1,10 +1,10 @@
 'use client'
 
-import { Download, QrCode, ShieldCheck, Printer, X } from 'lucide-react'
+import { Download, ShieldCheck, Printer, X } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
-import { QRGraphicHD } from '@/components/portal/qr-modal'
-import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
-import type { PortalTicket } from '@/components/portal/portal-utils'
+import { QRGraphicHD } from './QrModal'
+import { AccessWindowIndicator } from './AccessWindowIndicator'
+import type { PortalTicket } from '../utils/portal-utils'
 
 interface TicketQrModalProps {
   selectedTicket: PortalTicket | null

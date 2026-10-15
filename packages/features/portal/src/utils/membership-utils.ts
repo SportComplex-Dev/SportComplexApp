@@ -38,9 +38,9 @@ export interface PlanDisplayBreakdown {
   montoDescuentoFormateado: string;
   precioConDescuento: number;
   precioConDescuentoFormateado: string;
-  ahorroAnualLabel?: string;
+  ahorroAnualLabel?: string | undefined;
   beneficios: string[];
-  popular?: boolean;
+  popular?: boolean | undefined;
 }
 
 /**
