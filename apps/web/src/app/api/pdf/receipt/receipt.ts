@@ -2,6 +2,7 @@ import { buildTicketQrPayload, signTicket } from "@sportcomplex/core";
 import {
   getReceiptReserva,
   ReceiptError,
+  type ClienteDb,
   type ReceiptData,
 } from "@sportcomplex/db";
 import { type CanonicalRole } from "@/lib/auth/session";
@@ -93,8 +94,7 @@ export interface ComprobanteOptions {
   qrSecret: string;
   membrete?: MembreteComprobante;
   now?: Date;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db?: any;
+  db?: ClienteDb;
   /** Inyectable para pruebas; por defecto `qrcode` → PNG en el servidor. */
   generarQrDataUrl?: (payload: string) => Promise<string>;
 }

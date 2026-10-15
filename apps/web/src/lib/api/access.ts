@@ -11,6 +11,7 @@ import {
   getAsignacionVigente,
   getServicioParaAccesoById,
   getTicketForScan,
+  type ClienteDb,
   type ModoLecturaValor,
   type ResultadoLecturaValor,
 } from "@sportcomplex/db";
@@ -53,8 +54,7 @@ export interface EscaneoOptions {
   empleadoId: string;
   qrSecret: string;
   now?: Date;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db?: any;
+  db?: ClienteDb;
 }
 
 export interface EscaneoResultado {

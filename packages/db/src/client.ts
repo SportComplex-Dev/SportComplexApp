@@ -16,8 +16,9 @@ export function crearClientePrisma(cadenaConexion?: string): PrismaClient {
     connectionString?.includes("localhost") || connectionString?.includes("127.0.0.1");
   const sslConfig = isLocal ? false : { rejectUnauthorized: false };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pool = new pg.Pool({ connectionString, family: 4, ssl: sslConfig } as any);
+  // `family: 4` no existe en `pg.PoolConfig` pero el pooler de Supabase lo
+  // requiere para forzar IPv4; el cast evita `any` sin cambiar runtime.
+  const pool = new pg.Pool({ connectionString, family: 4, ssl: sslConfig } as pg.PoolConfig);
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });

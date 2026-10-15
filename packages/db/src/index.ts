@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./repositories/tipos-db";
 export * from "./repositories/reservations/bookings";
 export * from "./repositories/reservations/availability";
 export * from "./repositories/reservations/checkout";
