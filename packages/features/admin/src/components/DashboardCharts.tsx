@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { Activity, BarChart3 } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
 

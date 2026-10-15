@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { Mail, Shield, ShieldCheck, UserCheck, UserX } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
 

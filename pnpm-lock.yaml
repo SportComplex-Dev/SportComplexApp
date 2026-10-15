@@ -217,6 +217,9 @@ importers:
       '@sportcomplex/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@sportcomplex/features-admin':
+        specifier: workspace:*
+        version: link:../../packages/features/admin
       '@sportcomplex/features-booking':
         specifier: workspace:*
         version: link:../../packages/features/booking
@@ -454,6 +457,49 @@ importers:
       '@types/node':
         specifier: 22.13.10
         version: 22.13.10
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/features/admin:
+    dependencies:
+      '@sportcomplex/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@sportcomplex/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      lucide-react:
+        specifier: ^1.52.0
+        version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
+      motion:
+        specifier: ^14.1.0
+        version: 14.1.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/react':
+        specifier: 19.0.10
+        version: 19.0.10
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-dom:
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: 5.7.3
         version: 5.7.3

@@ -1,8 +1,7 @@
 'use client'
 
-import React from 'react'
 import { AlertTriangle, Loader2, ShieldAlert, UserX } from 'lucide-react'
-import type { Employee } from '@/components/admin/employees/employee-table'
+import type { Employee } from './EmployeeTable'
 
 interface EmployeeDeactivateModalProps {
   employee: Employee | null

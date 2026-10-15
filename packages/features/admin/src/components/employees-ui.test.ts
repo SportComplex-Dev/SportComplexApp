@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import type { Employee } from '@/components/admin/employees/employee-table'
+import type { Employee } from './EmployeeTable'
 
 const mockEmployees: Employee[] = [
   {
@@ -108,7 +108,7 @@ test('TSK-FE-21 / UI: EmployeeTable renderiza filas y emite interacción de baja
 
   const { render, fireEvent } = await import('@testing-library/react')
   const React = await import('react')
-  const { EmployeeTable } = await import('@/components/admin/employees/employee-table')
+  const { EmployeeTable } = await import('./EmployeeTable')
 
   let clickedEmp: { id?: string; nombre?: string } | null = null
   const { container } = render(
@@ -147,7 +147,7 @@ test('TSK-FE-21 / UI: EmployeeCreateModal gestiona inputs y submit', async () =>
   const { render, fireEvent } = await import('@testing-library/react')
   const React = await import('react')
   ;(globalThis as unknown as { React: unknown }).React = React
-  const { EmployeeCreateModal } = await import('@/components/admin/employees/employee-create-modal')
+  const { EmployeeCreateModal } = await import('./EmployeeCreateModal')
 
   let submitted = false
   const formState = {
@@ -187,7 +187,7 @@ test('TSK-FE-21 / UI: EmployeeDeactivateModal emite confirmación de baja lógic
 
   const { render, fireEvent } = await import('@testing-library/react')
   const React = await import('react')
-  const { EmployeeDeactivateModal } = await import('@/components/admin/employees/employee-deactivate-modal')
+  const { EmployeeDeactivateModal } = await import('./EmployeeDeactivateModal')
 
   let confirmed = false
   const { container } = render(

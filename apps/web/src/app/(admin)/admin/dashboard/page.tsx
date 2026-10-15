@@ -8,9 +8,9 @@ import {
 } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { useApp } from '@/components/app-provider'
-import { DashboardKPIs } from '@/components/admin/dashboard/dashboard-kpis'
-import { DashboardCharts } from '@/components/admin/dashboard/dashboard-charts'
-import { DashboardTables } from '@/components/admin/dashboard/dashboard-tables'
+import { DashboardKPIs } from '@sportcomplex/features-admin'
+import { DashboardCharts } from '@sportcomplex/features-admin'
+import { DashboardTables } from '@sportcomplex/features-admin'
 
 function getBogotaDateString(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d)

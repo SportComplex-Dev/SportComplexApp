@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { Users, UserCheck, UserX, Shield } from 'lucide-react'
 
 export interface EmployeeStatsCounts {

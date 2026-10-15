@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { DollarSign, UserCheck, Ticket, Layers, TrendingUp } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
 

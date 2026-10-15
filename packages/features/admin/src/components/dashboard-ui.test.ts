@@ -75,7 +75,7 @@ test('TSK-FE-23 / UI: DashboardKPIs renderiza métricas y categoría líder', as
   const { render } = await import('@testing-library/react')
   const React = await import('react')
   ;(globalThis as unknown as { React: unknown }).React = React
-  const { DashboardKPIs } = await import('@/components/admin/dashboard/dashboard-kpis')
+  const { DashboardKPIs } = await import('./DashboardKpis')
 
   const summary = {
     totalRevenue: 6850000,
@@ -120,7 +120,7 @@ test('TSK-FE-23 / UI: DashboardTables renderiza tabla de servicios y botón expo
   const { render, fireEvent } = await import('@testing-library/react')
   const React = await import('react')
   ;(globalThis as unknown as { React: unknown }).React = React
-  const { DashboardTables } = await import('@/components/admin/dashboard/dashboard-tables')
+  const { DashboardTables } = await import('./DashboardTables')
 
   let exportTriggered = false
   const servicesComparison = [

@@ -7,7 +7,7 @@ import { ActionButton } from '@sportcomplex/ui'
 import { ConfirmDialog } from '@sportcomplex/ui'
 import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
-import { SlotCapacityEditor } from '@/components/admin/slot-capacity-editor'
+import { SlotCapacityEditor } from '@sportcomplex/features-admin'
 
 import { blankCatalogItem } from '@/app/(admin)/admin/catalog/types'
 import { useAdminCatalog } from '@/app/(admin)/admin/catalog/hooks/use-admin-catalog'

@@ -25,6 +25,8 @@
       "@sportcomplex/shared/*": ["../../packages/shared/dist/*"],
       "@sportcomplex/features-booking": ["../../packages/features/booking/dist"],
       "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"],
+      "@sportcomplex/features-admin": ["../../packages/features/admin/dist"],
+      "@sportcomplex/features-admin/*": ["../../packages/features/admin/dist/*"],
       "@sportcomplex/features-portal": ["../../packages/features/portal/dist"],
       "@sportcomplex/features-portal/*": ["../../packages/features/portal/dist/*"],
       "@sportcomplex/features-scanner": ["../../packages/features/scanner/dist"],
