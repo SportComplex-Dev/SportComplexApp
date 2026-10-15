@@ -177,7 +177,7 @@
 
 ### Schemas de Validación
 ```typescript
-// packages/validation/src/automation.schema.ts
+// packages/validation/src/business/automation.schema.ts
 export const SendVerificationCodeSchema
 export const SendVerificationCodeResponseSchema
 export function validateSendVerificationCode()

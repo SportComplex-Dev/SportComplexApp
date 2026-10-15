@@ -385,7 +385,7 @@ it("debería registrar usuario y enviar código", async () => {
 
 - 📄 [N8N_WORKFLOWS.md](./workflows.md) - Documentación completa del workflow
 - 📄 [AUTOMATION.md](./overview.md) - Arquitectura completa
-- 📝 [automation.schema.ts](../../packages/validation/src/automation.schema.ts) - Schemas Zod
+- 📝 [automation.schema.ts](../../packages/validation/src/business/automation.schema.ts) - Schemas Zod
 - 🔧 [n8n.ts](../../packages/core/src/integrations/n8n.ts) - Implementación
 - 💻 [Ejemplo Completo](#3-ejemplo-completo-endpoint-de-registro) - Ejemplos de implementación en código
 

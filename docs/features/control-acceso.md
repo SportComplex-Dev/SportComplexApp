@@ -99,7 +99,7 @@ sequenceDiagram
    - Función centralizada: `getTicketAccessWindow(disponibilidad)` con soporte polimórfico para instancias `Date` y cadenas ISO en zona horaria legal de Colombia (`America/Bogota`, UTC-5).
    - Motor puro `decideAccess`: incluye el campo descriptivo `message` al denegar el acceso.
 
-2. **`apps/web/src/lib/access.ts`:**
+2. **`apps/web/src/lib/api/access.ts`:**
    - Re-exporta `getTicketAccessWindow` y `ACCESS_WINDOW_EXPIRED_MESSAGE` desde `@sportcomplex/core`.
    - `EscaneoResultado` extiende su contrato con `message?: string`.
    - `procesarEscaneo` propaga el mensaje explicativo contractual en todas las salidas denegadas (`access === "DENIED"`).
@@ -184,13 +184,13 @@ cumplimiento de las políticas de autoplay del navegador.
 ## Componentes
 
 - `apps/web/src/app/(staff)/scanner/page.tsx`: coordina puesto, cámara, canje y estados.
-- `apps/web/src/components/scanner/scanner.service.ts`: parser QR y cliente de los endpoints de servicios y canje.
-- `apps/web/src/components/scanner/shift-selector.tsx`: selección del puesto antes de iniciar la lectura.
-- `apps/web/src/components/scanner/scanner-header.tsx`: muestra el turno y controles de audio/tema.
-- `apps/web/src/components/scanner/qr-camera-viewport.tsx`: ciclo de vida de la cámara y lectura QR.
-- `apps/web/src/components/scanner/ticket-validation-modal.tsx`: estados de validación, denegación y confirmación.
-- `apps/web/src/components/scanner/use-audio-feedback.ts`: tonos opcionales de éxito y error.
-- `apps/web/src/components/scanner/__tests__/scanner.service.test.ts`: pruebas de parsing, listado de servicios y respuestas del canje.
+- `packages/features/scanner/src/services/scannerService.ts`: parser QR y cliente de los endpoints de servicios y canje.
+- `packages/features/scanner/src/components/session/ShiftSelector.tsx`: selección del puesto antes de iniciar la lectura.
+- `packages/features/scanner/src/components/session/ScannerHeader.tsx`: muestra el turno y controles de audio/tema.
+- `packages/features/scanner/src/components/capture/QrCameraViewport.tsx`: ciclo de vida de la cámara y lectura QR.
+- `packages/features/scanner/src/components/response/TicketValidationModal.tsx`: estados de validación, denegación y confirmación.
+- `packages/features/scanner/src/hooks/useAudioFeedback.ts`: tonos opcionales de éxito y error.
+- `packages/features/scanner/src/services/__tests__/scanner.service.test.ts`: pruebas de parsing, listado de servicios y respuestas del canje.
 
 ## Verificación
 
@@ -235,8 +235,8 @@ Anteriormente, la ruta `/scanner` era solo un placeholder básico (`apps/web/src
 | # | Componente / Archivo | Qué hace |
 |---|----------------------|----------|
 | 1 | `apps/web/src/app/(staff)/scanner/page.tsx` | Pantalla del escáner con toggle de Modo Consulta (sin puesto asignado), decodificador de cámara (`html5-qrcode`), vista de detalle del boleto y formulario alternativo para simulación/QA. **Sin botón de canje.** |
-| 2 | `apps/web/src/components/scanner/consultation-result-card.tsx` | Componente modular de presentación del resultado de la consulta. Renderiza servicio, fecha, franja, titular y badge de estado con garantías de no consumo. |
-| 3 | `apps/web/src/lib/qr-client.ts` | Parser cliente seguro y desacoplado de `node:crypto` para deserializar el payload estándar `SC1:<uuid>:<firma>`, JSON alternativo o pares delimitados. |
+| 2 | `packages/features/scanner/src/components/response/ConsultationResultCard.tsx` | Componente modular de presentación del resultado de la consulta. Renderiza servicio, fecha, franja, titular y badge de estado con garantías de no consumo. |
+| 3 | `packages/shared/src/lib/qr-client.ts` | Parser cliente seguro y desacoplado de `node:crypto` para deserializar el payload estándar `SC1:<uuid>:<firma>`, JSON alternativo o pares delimitados. |
 | 4 | `apps/web/src/lib/__tests__/qr-client.test.ts` | Suite de 4 pruebas unitarias para el parser de códigos QR en el cliente. |
 | 5 | `apps/web/src/app/(staff)/scanner/__tests__/scanner-modo-consulta.test.ts` | Suite de 4 pruebas unitarias certificando contrato de datos, los 4 campos obligatorios y el criterio de aceptación. |
 | 6 | `apps/web/src/app/(staff)/scanner/__tests__/visual-consultation-render.test.tsx` | Suite de 4 pruebas visuales de renderizado UI (`react-dom/server`) certificando la presencia visual de los campos, estados `EMITIDO`/`USADO` y ausencia total de botones de canje en el DOM. |
@@ -391,11 +391,11 @@ Con esta tarea, el estado `access-denied` con `code = SERVICE_MISMATCH` presenta
 
 | # | Componente / Archivo | Qué hace |
 |---|----------------------|----------|
-| 1 | `apps/web/src/components/scanner/scanner.service.ts` | Nuevo helper `parseZoneMismatch(message)` (+ tipo `ZoneMismatch`) que extrae `{ ticketService, postService }` del literal del 403. Devuelve `null` si el mensaje no sigue el formato. |
-| 2 | `apps/web/src/components/scanner/ZoneMismatchScreen.tsx` | Nueva pantalla bloqueante (`role="alertdialog"`, cierre con Escape): texto literal del 403, tarjeta gigante **DIRIJA AL USUARIO A: {servicio}**, puesto actual, nota de que el boleto permanece `EMITIDO` y botón *Entendido / Continuar escaneando*. **Sin acciones de canje.** |
+| 1 | `packages/features/scanner/src/services/scannerService.ts` | Nuevo helper `parseZoneMismatch(message)` (+ tipo `ZoneMismatch`) que extrae `{ ticketService, postService }` del literal del 403. Devuelve `null` si el mensaje no sigue el formato. |
+| 2 | `packages/features/scanner/src/components/response/ZoneMismatchScreen.tsx` | Nueva pantalla bloqueante (`role="alertdialog"`, cierre con Escape): texto literal del 403, tarjeta gigante **DIRIJA AL USUARIO A: {servicio}**, puesto actual, nota de que el boleto permanece `EMITIDO` y botón *Entendido / Continuar escaneando*. **Sin acciones de canje.** |
 | 3 | `apps/web/src/app/(staff)/scanner/page.tsx` | En modo turno, `SERVICE_MISMATCH` cierra el modal y muestra la pantalla (nuevo estado `zoneMismatch`); al continuar se reanuda el escaneo (`handleScanNextTurno`). Los demás códigos conservan el modal genérico. |
-| 4 | `apps/web/src/components/scanner/__tests__/zone-mismatch.test.ts` | 3 pruebas unitarias del parser (formato estándar, nombres con espacios/tildes, mensajes inválidos → `null`). |
-| 5 | `apps/web/src/components/scanner/__tests__/zone-mismatch-screen.test.ts` | 3 pruebas de renderizado (`react-dom/server`): literal + destino destacado, invariante crítico sin canje, y fallback robusto sin inventar zona. |
+| 4 | `packages/features/scanner/src/components/response/__tests__/zone-mismatch.test.ts` | 3 pruebas unitarias del parser (formato estándar, nombres con espacios/tildes, mensajes inválidos → `null`). |
+| 5 | `packages/features/scanner/src/components/response/__tests__/zone-mismatch-screen.test.ts` | 3 pruebas de renderizado (`react-dom/server`): literal + destino destacado, invariante crítico sin canje, y fallback robusto sin inventar zona. |
 
 ---
 
@@ -428,7 +428,7 @@ POST /api/access/redeem
 
 ```bash
 # Tests del parser + renderizado TSK-FE-16
-pnpm --filter web exec tsx --test "src/components/scanner/__tests__/zone-mismatch.test.ts" "src/components/scanner/__tests__/zone-mismatch-screen.test.ts"
+pnpm --filter web exec tsx --test "packages/features/scanner/src/components/response/__tests__/zone-mismatch.test.ts" "packages/features/scanner/src/components/response/__tests__/zone-mismatch-screen.test.ts"
 
 # Verificación completa (igual que CI)
 pnpm install --frozen-lockfile
@@ -461,22 +461,22 @@ el backend deniega el acceso sin consumir el boleto.
 
 ## Componentes intervenidos
 
-- `apps/web/src/components/portal/portal-utils.ts`: normaliza las horas y
+- `packages/features/portal/src/utils/portal-utils.ts`: normaliza las horas y
   calcula el estado de la ventana usando `TIMEZONE` de `@sportcomplex/core`.
-- `apps/web/src/components/portal/access-window-indicator.tsx`: muestra el
+- `packages/features/portal/src/components/passes/AccessWindowIndicator.tsx`: muestra el
   rango horario y el badge dinámico `Franja Próxima`, `Acceso Abierto` o
   `Franja Vencida`; actualiza su estado mientras el portal está abierto.
 - `apps/web/src/app/(customer)/portal/page.tsx` y
   `apps/web/src/app/(customer)/portal/tickets/page.tsx`: incorporan el indicador
   en los pases confirmados y en la visualización del QR.
-- `apps/web/src/components/scanner/scanner.service.ts` y
-  `apps/web/src/components/scanner/ExpiredSlotScreen.tsx`: mapean
+- `packages/features/scanner/src/services/scannerService.ts` y
+  `packages/features/scanner/src/components/response/ExpiredSlotScreen.tsx`: mapean
   `WINDOW_EXPIRED`, priorizan el mensaje de la API y exponen la franja, el
   instante del intento y el estado `EMITIDO`.
 - `apps/web/src/app/(staff)/scanner/page.tsx`: pasa a la alerta el mensaje
   devuelto por la validación.
 - `apps/web/src/app/(customer)/portal/__tests__/portal.test.ts` y
-  `apps/web/src/components/scanner/__tests__/scanner.service.test.ts`: verifican
+  `packages/features/scanner/src/services/__tests__/scanner.service.test.ts`: verifican
   los límites y el contrato visual de expiración.
 
 ## RN-06, hora legal de Colombia y mensaje contractual
@@ -556,12 +556,12 @@ TSK-BE-17 amplíe el contrato y la regla de negocio.
 
 ## Archivos
 
-- `apps/web/src/components/scanner/scanner.service.ts`: contrato tipado,
+- `packages/features/scanner/src/services/scannerService.ts`: contrato tipado,
   parsing del QR y adaptación de respuesta de `/api/access`.
-- `apps/web/src/components/scanner/ExpiredSlotScreen.tsx`: vista de denegación.
+- `packages/features/scanner/src/components/response/ExpiredSlotScreen.tsx`: vista de denegación.
 - `apps/web/src/app/(staff)/scanner/page.tsx`: flujo de cámara, validación y
   reactivación del escáner.
-- `apps/web/src/components/scanner/__tests__/scanner.service.test.ts`: pruebas
+- `packages/features/scanner/src/services/__tests__/scanner.service.test.ts`: pruebas
   de parsing y normalización de respuestas expiradas.
 
 ## Validación ejecutada
@@ -606,7 +606,7 @@ La tarea **TSK-FE-24** dota a la vista `/scanner` del escáner de control de acc
                                      v
                   +--------------------------------------+
                   |        useNetworkResilience          |
-                  | (hooks/use-network-resilience.ts)    |
+                  | (packages/shared/src/hooks/use-network-resilience.ts)    |
                   +------------------+-------------------+
                                      |
          +---------------------------+---------------------------+
@@ -630,7 +630,7 @@ La tarea **TSK-FE-24** dota a la vista `/scanner` del escáner de control de acc
 
 ### Componentes y Módulos Clave
 
-1. **`apps/web/src/hooks/use-network-resilience.ts`**:
+1. **`packages/shared/src/hooks/use-network-resilience.ts`**:
    Hook central desacoplado que encapsula:
    - Estado reactivo `isOnline` con inicialización segura compatible con SSR (`typeof window === 'undefined' ? true : navigator.onLine`).
    - Listeners de eventos de ventana `online` y `offline` con limpieza en el ciclo de desmontaje.
@@ -645,12 +645,12 @@ La tarea **TSK-FE-24** dota a la vista `/scanner` del escáner de control de acc
    - Protección en `handleRedeem` y propagación de `isOnline` a `TicketValidationModal`.
    - Consulta con reintentos y recuperación desde caché cuando la red no está disponible.
 
-3. **`apps/web/src/components/scanner/ticket-validation-modal.tsx`**:
+3. **`packages/features/scanner/src/components/response/TicketValidationModal.tsx`**:
    Modal de confirmación de canje con prop `isOnline`:
    - Botón «Dar Acceso» deshabilitado con etiqueta «Canje suspendido (Sin conexión)».
    - Alerta visible explicativa sobre la suspensión temporal del servicio por seguridad.
 
-4. **`apps/web/src/components/scanner/consultation-result-card.tsx`**:
+4. **`packages/features/scanner/src/components/response/ConsultationResultCard.tsx`**:
    Tarjeta informativa del boleto con soporte para `isCached`:
    - Distintivo obligatorio: `[Datos locales en caché - Sin conexión]`.
    - Banner de advertencia que explicita que la información puede estar desactualizada y no autoriza el acceso ni altera el estado del boleto.
@@ -753,7 +753,7 @@ La suite automatizada se ubica en:
 Cuando un servicio queda fuera de operación (mantenimiento imprevisto, fuerza mayor), el admin lo inhabilita desde `apps/web/src/app/(admin)/admin/incident/page.tsx`. La acción cancela reservas activas y dispara el aviso a los afectados vía n8n.
 
 ### Cómo funciona
-1. **Preview antes de actuar** (`getContingencyPreview` en `packages/db/src/repositories/contingencies.ts`): muestra reservas `PENDIENTE_PAGO`/`CONFIRMADA` afectadas, total de cupos y clientes únicos. Nada se modifica.
+1. **Preview antes de actuar** (`getContingencyPreview` en `packages/db/src/repositories/payments/contingencies.ts`): muestra reservas `PENDIENTE_PAGO`/`CONFIRMADA` afectadas, total de cupos y clientes únicos. Nada se modifica.
 2. **Inhabilitación transaccional** (`disableServiceForContingency`): en una sola transacción con `FOR UPDATE` sobre `servicio` + `disponibilidad` (evita doble inhabilitación concurrente):
    - Crea `inhabilitacionServicio` (servicio, admin, motivo, inicio).
    - Marca el servicio `INHABILITADO` (reintento → `409 ALREADY_INACTIVE`; inexistente → `404 NOT_FOUND` vía `ContingencyError`).

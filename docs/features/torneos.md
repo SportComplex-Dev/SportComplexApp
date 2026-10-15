@@ -19,8 +19,8 @@
    - Garantizar compatibilidad con las 16 tablas existentes sin pérdida de datos ni regresiones.
    - Definir claves foráneas con reglas de integridad referencial (`ON DELETE RESTRICT` / `ON UPDATE CASCADE` en usuarios y servicios, `ON DELETE CASCADE` en bloqueos de torneo eliminados).
 3. **Repositorio y Pruebas Unitarias:**
-   - Crear `packages/db/src/repositories/tournaments.ts` con funciones para creación, listado, obtención, actualización, inscripción y canje de tickets.
-   - Proveer tests unitarios completos en `packages/db/src/repositories/tournaments.test.ts`.
+   - Crear `packages/db/src/repositories/catalog/tournaments.ts` con funciones para creación, listado, obtención, actualización, inscripción y canje de tickets.
+   - Proveer tests unitarios completos en `packages/db/src/repositories/catalog/tournaments.test.ts`.
 
 ---
 

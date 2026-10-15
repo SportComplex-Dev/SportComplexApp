@@ -22,9 +22,13 @@
     "db:migrate": "turbo run db:migrate",
     "bootstrap:prod": "pnpm --filter @sportcomplex/db bootstrap:prod",
     "smoke:be24": "node --experimental-strip-types scripts/smoke-be24.mts",
+    "docs:api": "typedoc --options typedoc.json",
+    "docs:openapi": "tsx scripts/generate-openapi.ts",
+    "docs:check": "tsx scripts/check-docs.ts",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@playwright/test": "^1.64.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
@@ -32,9 +36,12 @@
     "eslint": "10.11.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "jsdom": "^30.1.2",
+    "ts-morph": "^28.0.0",
     "tsx": "^4.23.15",
     "turbo": "2.11.4",
+    "typedoc": "^0.28.20",
     "typescript": "5.7.3",
-    "typescript-eslint": "8.71.0"
+    "typescript-eslint": "8.71.0",
+    "zod-to-json-schema": "^3.25.2"
   }
 }

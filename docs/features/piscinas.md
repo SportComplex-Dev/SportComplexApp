@@ -17,7 +17,7 @@ No existía lógica de negocio para evaluar cierres por mantenimiento ni integra
 | 1 | Motor puro `isPoolMaintenanceDay()` con reglas RN-02/RF-06/HU-07 | `packages/core/src/services/pool-policy.ts` |
 | 2 | Orquestadora `checkPoolMaintenanceWithCache()` con Cache-Aside a tabla `festivo` | `packages/core/src/services/pool-policy.ts` |
 | 3 | Cliente Nager.Date con timeout estricto 2.5s + fallback a caché local | `packages/core/src/integrations/nager-date.ts` |
-| 4 | Repositorio `festivos` (CRUD + upsert idempotente) | `packages/db/src/repositories/festivos.ts` |
+| 4 | Repositorio `festivos` (CRUD + upsert idempotente) | `packages/db/src/repositories/reservations/festivos.ts` |
 | 5 | Tests de aceptación 40+ casos cubriendo 4 escenarios + compatibilidad | `packages/core/src/services/pool-policy.test.ts`, `nager-date.test.ts`, `festivos.test.ts` |
 
 ### Reglas de negocio implementadas
@@ -114,7 +114,7 @@ interface PoolMaintenanceResult {
 ### 2.2. Integración en middleware de reservas
 
 ```ts
-// apps/web/src/middleware.ts (ejemplo)
+// apps/web/src/proxy.ts (ejemplo)
 import { checkPoolMaintenanceWithCache } from "@sportcomplex/core";
 
 export async function validatePoolAvailability(date: string) {

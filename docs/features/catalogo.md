@@ -84,7 +84,7 @@ model Disponibilidad {
 
 ---
 
-## 3. Repositorio (`packages/db/src/repositories/services.ts`)
+## 3. Repositorio (`packages/db/src/repositories/catalog/services.ts`)
 
 ### Operaciones de Categoría
 
@@ -118,7 +118,7 @@ generateDisponibilidadesForServicio(servicioId, windowDays = 15, db = prisma)
 
 ---
 
-## 4. Validaciones Zod (`packages/validation/src/service.schema.ts`)
+## 4. Validaciones Zod (`packages/validation/src/business/service.schema.ts`)
 
 | Schema | Validaciones clave |
 |--------|-------------------|

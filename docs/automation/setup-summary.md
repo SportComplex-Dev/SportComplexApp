@@ -43,7 +43,7 @@
 
 ### Código en `packages/`
 
-5. **`packages/validation/src/automation.schema.ts`** (280+ líneas)
+5. **`packages/validation/src/business/automation.schema.ts`** (280+ líneas)
    - Schema Zod completo para validación
    - `SendVerificationCodeSchema` - Valida payload de entrada
    - `SendVerificationCodeResponseSchema` - Valida respuesta

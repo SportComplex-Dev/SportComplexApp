@@ -50,11 +50,24 @@ sport-complex/
 │       │   │   ├── (admin)/           # Consola de Administración (/admin/dashboard, services, employees, incident)
 │       │   │   ├── api/               # API Routes REST y Webhooks (Stripe, access, pdf)
 │       │   │   └── layout.tsx         # Root Layout con fuentes y proveedores globales
-│       │   ├── middleware.ts          # Control de acceso perimetral RBAC
+│       │   ├── proxy.ts               # Control de acceso perimetral RBAC (Next 16 proxy.ts)
 │       │   └── styles/
 │       │       └── globals.css        # Configuración base y tokens de Tailwind CSS v4
 ├── packages/
 │   ├── core/                          # Dominio puro, cálculo tarifario, festivos Nager.Date y seguridad QR
+│   ├── domain/                        # Tipos de dominio puros (0 dependencias)
+│   ├── application/                   # Casos de uso por área (reserva, torneo, membresía)
+│   ├── security/                      # HMAC QR, tokens, correo, festivos, rate-limit
+│   ├── seed/                          # Catálogo semilla + mapa de slugs
+│   ├── automation/                    # Contratos de automatización n8n
+│   ├── shared/                        # Utilidades genéricas (@sportcomplex/shared)
+│   ├── features/                      # Features de UI por dominio (@sportcomplex/features-*)
+│   │   ├── booking/                   # Reservas: catalog/cart/checkout
+│   │   ├── tournament/                # Torneos: detail/registration/manage
+│   │   ├── pos/                       # Taquilla: sale/billing
+│   │   ├── scanner/                   # Acceso: capture/session/response
+│   │   ├── portal/                    # Cliente: tickets/dashboard/passes
+│   │   └── admin/                     # Admin: catalog/dashboard/staff
 │   ├── db/                            # Prisma ORM 7.10.0, schema relacional y migraciones Supabase
 │   ├── ui/                            # Biblioteca de componentes atómicos (@sportcomplex/ui)
 │   ├── validation/                    # Contratos de validación con esquemas Zod 4
@@ -96,6 +109,91 @@ La identidad visual está diseñada bajo **Tailwind CSS v4**, con soporte comple
 ### 3.3 Tipografía
 - **Familia Primaria:** `Plus Jakarta Sans` (Google Fonts), cargada con `next/font/google` con subsets `latin`, pesos 400, 500, 600, 700 y 800.
 - **Tipografía Monoespaciada:** `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas` para códigos de tiquete (`TKT-AKR-XXXX`) y marcas de tiempo.
+
+### 3.4 Tokens de Movimiento y Microinteracciones (WCAG 2.2)
+
+Definidos en `:root` de `apps/web/src/styles/globals.css` y expuestos a Tailwind v4 vía `@theme inline`:
+
+```css
+:root {
+  /* Duraciones */
+  --motion-duration-fast: 150ms;      /* Microinteracciones rápidas: botones, badges */
+  --motion-duration-normal: 200ms;    /* Transiciones estándar: cards, vistas */
+  --motion-duration-slow: 250ms;      /* Transiciones extendidas: modales grandes */
+
+  /* Curvas */
+  --motion-ease-out: cubic-bezier(0.2, 0, 0, 1);       /* Desaceleración suave */
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);  /* Balanceado */
+  --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1); /* Elástica amortiguada */
+
+  /* Sombras dinámicas de elevación */
+  --shadow-card-hover: 0 16px 40px rgba(18, 38, 29, 0.10);
+  --shadow-button-active: 0 2px 6px rgba(18, 38, 29, 0.08);
+}
+```
+
+**Clases semánticas globales:**
+| Clase | Comportamiento |
+| :--- | :--- |
+| `.interactive-button` | Transición fast ease-out; hover `translateY(-1px)`, active `scale(0.98)`, foco anillo doble |
+| `.interactive-card` | Transición normal ease-out; hover `translateY(-2px)` + sombra, active aplanado |
+| `.interactive-badge` | Transición fast; hover `translateY(-1px)` + opacidad 0.92, active `scale(0.96)` |
+| `.motion-interactive` | `transition: all normal ease-out` genérico |
+| `.page-transition` | `animation: page-fade-in normal ease-out both` |
+
+**Primitivas interactivas vs informativas** (`@sportcomplex/ui`):
+- `Button` (`components/forms/Button.tsx`): spring físico `whileHover={{ scale: 1.025 }}` / `whileTap={{ scale: 0.96 }}` (stiffness 450, damping 17); variante `link` omite escala; anillo de foco `focus-visible:ring-2`; `disabled` y `motion-reduce` respetados.
+- `Card` (`components/display/Card.tsx`): prop `interactive` — informativa (default) sin hover falso; interactiva con elevación `whileHover={{ y: -5 }}` y `data-interactive="true"`.
+- `Badge` (`components/display/Badge.tsx`): prop `interactive` — informativa estática (sin hover de botón); interactiva con `active:scale-95` + foco accesible.
+
+| Criterio | Informativo (`interactive={false}`) | Interactivo (`interactive={true}`) |
+| :--- | :--- | :--- |
+| Cursor | `default` | `pointer` |
+| Hover | Sin traslación/sombra | `translateY(-1/-2px)` + sombra |
+| Active | Sin escalado | `scale-[0.98]` |
+| Foco | Sin anillo | `focus-visible:ring-2 ring-offset-2` |
+
+**Movimiento reducido (WCAG 2.2 — 2.3.3 AAA, 2.4.11 AA, 2.2.2):**
+`globals.css` anula todas las transformaciones/animaciones bajo `@media (prefers-reduced-motion: reduce)`, preservando cambios de color/borde para que el estado siga siendo perceptible. `useReducedMotion()` de `motion/react` conmuta a opacidad instantánea.
+
+### 3.5 Transiciones entre Rutas y Vistas (Next.js App Router)
+
+- **Plantilla raíz** (`app/template.tsx`): `motion.div` con `key={pathname}`, fundido de opacidad pura `0→1` en 200ms con curva `[0.22, 1, 0.36, 1]` — sin blur ni desplazamientos verticales (evita colisionar con subplantillas de grupo y sobrecargar compositores móviles).
+- **`<PageTransition>`** (`apps/web/src/components/layout/page-transition.tsx`) orquesta `.page-transition` en cada grupo: `(public)`, `(customer)`, `(admin)`, `(auth)`, `(staff)`.
+- **Layouts persistentes** (`TopBar`, sidebar admin, shell POS) nunca se desmontan ni parpadean; solo transiciona el contenido interior.
+- **Modales** vía `tailwindcss-animate`: backdrops `animate-in fade-in-0 duration-200`, diálogos `fade-in-0 zoom-in-95`. Aplicado a Modal/ConfirmDialog (`@sportcomplex/ui`), BookingSummaryModal, TicketQrModal, ReservationModal, PosAltLinkModal, PosVoucherModal.
+- **Pestañas internas**: fundidos cruzados `AnimatePresence mode="wait"` en Portal (`layoutId="activePortalTab"`), Billetera (`activeTicketsTab`), selector de servicios (`activeCategoryFilter`), POS (`activeBillingCycle`) y catálogo admin.
+
+### 3.6 Auditoría de Microinteracciones Componente por Componente
+
+| # | Componente / Vista | Ruta | Animación |
+| :-: | :--- | :--- | :--- |
+| 1 | Instalaciones (Home) | `components/home/facility-showcase.tsx` | Tab deslizante `layoutId="activeServiceTab"` (spring 450/32); tarjeta con fade+y 250ms |
+| 2 | Button | `packages/ui/src/components/forms/Button.tsx` | hover 1.025/tap 0.96 spring 450/17, foco ring-2 |
+| 3 | Card interactiva | `packages/ui/src/components/display/Card.tsx` | hover y:-5 + shadow-xl, tap 0.98 |
+| 4 | Badge interactivo | `packages/ui/src/components/display/Badge.tsx` | hover 1.06/tap 0.95; `isLive` con `animate-pulse` |
+| 5 | FAQ (acordeón) | `components/home/faq-section.tsx` | Píldoras 1.04/0.96; altura `auto` fluida con AnimatePresence |
+| 6 | Menú de usuario | `components/layout/user-menu.tsx` | Dropdown fade+scale+y; trigger 1.02/0.98 |
+| 7 | Barra navegación | `components/layout/top-bar.tsx` | Hamburguesa tap 0.92; cajón móvil altura fluida |
+| 8 | Portal reservas | `app/(customer)/portal/page.tsx` | Tab `activePortalTab`; tickets hover y:-3; modal QR fade+zoom |
+| 9 | Billetera digital | `app/(customer)/portal/tickets/page.tsx` | 4 pestañas `activeTicketsTab`, fundido cruzado |
+| 10 | Selector de servicios | `packages/features/booking/src/components/catalog/ServiceSelector.tsx` | Turnos 1.03/0.96; filtro `activeCategoryFilter`; tarjetas y:-3 |
+| 11 | Carrito multi-servicio | `packages/features/booking/src/components/cart/Cart.tsx` | Items AnimatePresence height:auto; eliminar hover 1.15 |
+| 12 | Calendario | `packages/features/booking/src/components/catalog/AvailabilityCalendar.tsx` | Días 1.05/0.95; ranuras 1.03/0.96 |
+| 13 | Validación tickets | `packages/features/scanner/src/components/response/TicketValidationModal.tsx` | Backdrop fade; diálogo scale 0.96→1, y:18→0 |
+| 14 | Plantilla raíz | `app/template.tsx` | `key={pathname}`, opacidad 200ms |
+
+**Ecosistema:** `motion` (^14.1.0) + `tailwindcss-animate` (^1.0.7) en `apps/web` y `packages/ui` (`@plugin 'tailwindcss-animate'`). Patrones React Bits: resortes naturales 320–450/17–32, `layoutId` para tabs, acordeones `overflow-hidden` con `AnimatePresence`, fundidos de 200ms sin desenfoques GPU.
+
+### 3.7 Página 404 "Kinetic Apex" (`app/not-found.tsx`)
+
+Experiencia de error como interacción deportiva — metáfora **"Saque de Fondo • Fuera de Límites"**: fondo con trazado SVG de cancha multideportiva, `404` en `font-black` como marcador de estadio, narrativa "Esta jugada quedó fuera de la cancha".
+
+- **Arquitectura:** `not-found.tsx` se invoca en rutas inexistentes y en `notFound()` programático. No monta TopBar/Footer redundantes (los provee `RootLayout`); es Client Component por `useReducedMotion`.
+- **Rescate en 3 niveles:** acciones principales (Inicio `/` primario lima `#c9ef75`; Explorar Canchas `/portal/book` secundario), 3 rutas rápidas (reservas, tickets, reglamentos `/rules` — cierra el bucle con `docs/features/reglamentos.md`) y concierge WhatsApp.
+- **Microinteracciones:** tarjetas con `group-hover` desplazando `ArrowRight`, borde lima al hover, `whileHover={{ scale: 1.02 }}` / `whileTap={{ scale: 0.98 }}`.
+- **Tokens:** marcador `#123e30` (claro) / gradiente `#d9f29f→#425248` (oscuro); contrastes 4.6:1–15.8:1 (AA/AAA); anillo de foco `#123e30` / `#c9ef75` cumple WCAG 2.4.7/2.4.11.
+- **Motion reducido:** `useReducedMotion()` conmuta a entrada sin desplazamiento (solo opacidad 150ms).
 
 ---
 
@@ -160,7 +258,7 @@ Conforme a `ARCHITECTURE.md` §6.2 y `SRS.md`, el sistema implementa una matriz 
 | Escáner Móvil (`/scanner`) | Redirección 307 a `/login` | Denegado (403) | Denegado (403) | Validar QR | Validar QR |
 | Consola Admin (`/admin/*`) | Redirección 307 a `/login` | Denegado (403) | Denegado (403) | Denegado (403) | Control Total |
 
-*El control perimetral se evalúa en `apps/web/src/middleware.ts` en el Edge. Los usuarios autenticados que acceden a `/` son redirigidos de inmediato a su portal correspondiente.*
+*El control perimetral se evalúa en `apps/web/src/proxy.ts` en el Edge. Los usuarios autenticados que acceden a `/` son redirigidos de inmediato a su portal correspondiente.*
 
 ---
 

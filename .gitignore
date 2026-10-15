@@ -35,3 +35,7 @@ CODE_REVIEW_*.md
 # Datos locales de contenedores Docker
 docker/data/
 docker/dev_data/
+
+# Salida generada de Typedoc (artefacto de build, vive en CI artifacts)
+docs/api/*
+!docs/api/openapi.json

@@ -16,7 +16,7 @@ ninguna parte del sistema escribía en la tabla `PAGO` ni pasaba una reserva a
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments.ts` |
+| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments/payments.ts` |
 | 2 | Export del repositorio en el paquete | `packages/db/src/index.ts` |
 | 3 | Webhook Stripe real: verificación de firma + procesamiento idempotente | `apps/web/src/app/api/payments/route.ts` |
 | 4 | Helpers de contrato de metadatos y monto | `packages/core/src/integrations/stripe.ts` (+ export en `packages/core/src/index.ts`) |
@@ -290,13 +290,13 @@ vuelve a `EMITIDO` (RN-05) y el modo CONSULTA no lo altera nunca.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments.ts` |
-| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/tickets.ts` |
+| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/access/tickets.ts` |
 | 3 | Export de ambos repositorios | `packages/db/src/index.ts` |
 | 4 | Webhook Stripe real | `apps/web/src/app/api/payments/route.ts` |
-| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/access.ts` |
+| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/api/access.ts` |
 | 6 | Endpoint de escaneo (reemplaza stub 501) | `apps/web/src/app/api/access/route.ts` |
-| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/access.schema.ts` |
+| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/platform/access.schema.ts` |
 | 8 | Helpers de metadatos/monto Stripe | `packages/core/src/integrations/stripe.ts` |
 | 9 | Tests: 7 BD-09 + 5 BD-10 (repo), 4 webhook, 8 escáner, 3 schema | ver §6 |
 
@@ -313,7 +313,7 @@ Escáner QR (content = ticket_qr.codigo_uuid) + firma HMAC + puesto (o null)
 POST /api/access ──► sesión + rol Administrador | Empleado_Lector  (401/403)
         │
         ▼
-procesarEscaneo()  (apps/web/src/lib/access.ts)
+procesarEscaneo()  (apps/web/src/lib/api/access.ts)
         │
         ├─ 1) verifyTicketSignature()  ← ANTES de la BD; mal QR → 400, 0 escrituras
         ├─ 2) getTicketForScan()       ← carga reserva + titular + servicio + franja
@@ -425,7 +425,7 @@ const salida = await ejecutarLectura({
 ```
 
 La decisión de negocio **no** vive en el repositorio: firma (`verifyTicketSignature`),
-ventana y servicio (`decideAccess`) van en el orquestador `lib/access.ts`.
+ventana y servicio (`decideAccess`) van en el orquestador `apps/web/src/lib/api/access.ts`.
 
 ### 3.4. Firmar un QR (contexto TSK-BD-06 / emisión de tickets)
 
@@ -475,7 +475,7 @@ El `404 TICKET_NOT_FOUND` y el `400 INVALID_SIGNATURE` son QRs inválidos/adulte
 ### 4.3. Roles (middleware)
 
 `/scanner/*` y `/api/access/*` ya exigen `Administrador | Empleado_Lector`
-(normalizados en `apps/web/src/lib/session.ts`); el endpoint además re-valida
+(normalizados en `apps/web/src/lib/auth/session.ts`); el endpoint además re-valida
 sesión y rol por capa propia (defensa en profundidad).
 
 ## 5. Variables de entorno y arranque
@@ -612,12 +612,12 @@ siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments.ts` |
-| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments.ts` |
+| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments/payments.ts` |
 | 3 | Nuevo estado de reserva `CANCELADA_PAGO` | `packages/db/prisma/schema.prisma` + migración `20261009120000_reserva_cancelada_pago_enum` |
 | 4 | Alerta de pago fallido (n8n, *fire-and-forget*) | `apps/web/src/app/api/payments/route.ts` |
 | 5 | Alias de ruta `/api/webhooks/stripe` (reexporta el handler canónico) | `apps/web/src/app/api/webhooks/stripe/route.ts` |
-| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments.ts` |
+| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments/payments.ts` |
 
 Garantías de idempotencia (se conservan): `UNIQUE(stripe_payment_intent_id)` en
 `PAGO`, updates condicionales de estado y emisión del QR protegida por
@@ -1154,7 +1154,7 @@ servidor deriva el total de `RESERVA.total`.
 ## Persistencia y base de datos
 
 Esta tarea **sí modifica explícitamente la lógica de persistencia** en
-`packages/db/src/repositories/payments.ts`: cuando el webhook acepta el pago,
+`packages/db/src/repositories/payments/payments.ts`: cuando el webhook acepta el pago,
 actualiza `RESERVA.vendedor_id` con el empleado del POS y `RESERVA.canal` con
 `TAQUILLA`, además de confirmar la reserva y asociar el pago.
 
@@ -1181,8 +1181,8 @@ Devuelve la **estructura de datos** del comprobante (membrete, reserva, servicio
 
 Todo se arma en el servidor, incluida la firma HMAC del QR y la imagen PNG:
 
-- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
-- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/lib/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
+- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/payments/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
+- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/app/api/pdf/receipt/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
 - El membrete viene de variables de entorno (`RECEIPT_*`), no de la base de datos ni de cabeceras del navegador.
 - La respuesta se marca `Cache-Control: no-store` (el estado del boleto puede cambiar).
 - La prueba `TSK-BE-19 (CRITERIO)` serializa la respuesta y falla si aparece el secreto QR, una clave `sk_test/sk_live`, un `postgresql://`, un `service role` o cualquier `pagoId`.
