@@ -9,14 +9,14 @@ import { renderToString } from "react-dom/server";
 
 import { applyMembershipDiscount, type CatalogItem, type Booking } from "@sportcomplex/core";
 import { posCheckoutSchema } from "@sportcomplex/validation";
-import { calcularDesgloseComprobante } from "@/components/portal/portal-utils";
 import QRCode from "qrcode";
 
-import { PosCatalogSelector } from "@/app/(staff)/pos/components/pos-catalog-selector";
-import { PosClientForm } from "@/app/(staff)/pos/components/pos-client-form";
-import { PosPaymentStripe } from "@/app/(staff)/pos/components/pos-payment-stripe";
-import { PosVoucherModal } from "@/app/(staff)/pos/components/pos-voucher-modal";
-import { PosAltLinkModal } from "@/app/(staff)/pos/components/pos-alt-link-modal";
+import { PosCatalogSelector } from "../components/PosCatalogSelector";
+import { PosClientForm } from "../components/PosClientForm";
+import { PosPaymentStripe } from "../components/PosPaymentStripe";
+import { PosVoucherModal } from "../components/PosVoucherModal";
+import { PosAltLinkModal } from "../components/PosAltLinkModal";
+import { calcularDesgloseComprobante } from "../services/receipt";
 
 // TSK-FE-18: Suite de Pruebas de la Interfaz y Componentes POS 100% Cashless (HU-18 / RF-17 / RN-13)
 

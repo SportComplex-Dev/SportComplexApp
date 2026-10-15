@@ -2,13 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createMockPrisma } = await import("@db-test/mock-prisma"
-);
+const { createMockPrisma } = await import("@db-test/mock-prisma");
 const mock = createMockPrisma();
 Reflect.set(process.env, "NODE_ENV", "test");
 (globalThis as any).__scPrisma = mock;
 
-const { createPosCheckoutPostHandler } = await import("@/app/api/pos/checkout/route");
+const { createPosCheckoutPostHandler } = await import("../services/posCheckout");
 
 const VENDEDOR_ID = "00000000-0000-4000-8000-000000000020";
 const CLIENTE_ID = "00000000-0000-4000-8000-000000000001";

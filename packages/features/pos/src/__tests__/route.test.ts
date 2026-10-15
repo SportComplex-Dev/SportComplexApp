@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createMockPrisma } from "@db-test/mock-prisma";
-import { createPosCheckoutPostHandler } from "@/app/api/pos/checkout/route";
+import { createPosCheckoutPostHandler } from "../services/posCheckout";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 

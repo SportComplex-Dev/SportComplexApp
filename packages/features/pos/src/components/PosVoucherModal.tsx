@@ -1,11 +1,10 @@
 'use client'
 
-import React from 'react'
 import { Badge, Button } from '@sportcomplex/ui'
 import { CheckCircle2, Printer, RotateCcw } from 'lucide-react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 
-interface PosVoucherModalProps {
+export interface PosVoucherModalProps {
   booking: Booking
   sellerName?: string
   receiptQrUrl: string | null

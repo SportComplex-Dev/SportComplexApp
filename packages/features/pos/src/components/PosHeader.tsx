@@ -2,7 +2,7 @@
 
 import { AlertCircle, ShieldCheck, Store, User } from 'lucide-react'
 
-interface PosHeaderProps {
+export interface PosHeaderProps {
   sellerName?: string
 }
 
