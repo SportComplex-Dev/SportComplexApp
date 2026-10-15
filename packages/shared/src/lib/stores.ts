@@ -1,7 +1,7 @@
 'use client'
 
 import type { Booking } from '@sportcomplex/core'
-import { usePersistentState } from '@/lib/persistent-state'
+import { usePersistentState } from './persistent-state'
 
 export type { Booking }
 

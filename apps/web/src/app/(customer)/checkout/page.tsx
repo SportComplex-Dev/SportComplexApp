@@ -21,7 +21,7 @@ import {
 } from '@sportcomplex/features-booking'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
-import { useDraft, useLastCode } from '@/lib/stores'
+import { useDraft, useLastCode } from '@sportcomplex/shared/lib'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@sportcomplex/features-portal'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {

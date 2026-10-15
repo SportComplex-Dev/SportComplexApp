@@ -751,6 +751,10 @@ importers:
         version: 5.7.3
 
   packages/shared:
+    dependencies:
+      '@sportcomplex/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@sportcomplex/config':
         specifier: workspace:*

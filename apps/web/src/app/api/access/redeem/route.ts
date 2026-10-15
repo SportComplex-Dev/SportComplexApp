@@ -3,7 +3,7 @@ import { AccessError, procesarEscaneo } from "@/lib/access";
 import { accessResultResponse } from "@/lib/access-response";
 import { accessRedeemSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
-import { fail } from "@/lib/api-response";
+import { fail } from '@sportcomplex/shared/lib';
 
 type SessionLike = { user?: { id?: string | null; role?: string | null } | null } | null;
 

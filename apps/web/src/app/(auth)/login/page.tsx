@@ -10,7 +10,7 @@ import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
 import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
-import { ActionButton } from '@/components/action-button'
+import { ActionButton } from '@sportcomplex/ui'
 import { GoogleMark } from '@/components/google-mark'
 import { useApp } from '@/components/app-provider'
 

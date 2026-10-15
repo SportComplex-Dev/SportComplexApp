@@ -1,7 +1,7 @@
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
-import { created, fail, ok } from "@/lib/api-response";
+import { created, fail, ok } from '@sportcomplex/shared/lib';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

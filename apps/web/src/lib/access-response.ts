@@ -1,5 +1,5 @@
 import { ACCESS_SERVICE_MISMATCH_MESSAGE } from "@sportcomplex/core";
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import type { EscaneoResultado } from "@/lib/access";
 
 /** Respuesta HTTP compartida para los endpoints de escaneo y canje. */

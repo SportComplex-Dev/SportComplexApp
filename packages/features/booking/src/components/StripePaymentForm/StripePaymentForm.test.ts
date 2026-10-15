@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getPaymentErrorMessage } from "./StripePaymentForm";
+import { getPaymentErrorMessage } from "@sportcomplex/features-booking";
 
 test("getPaymentErrorMessage - mapea insuficientes fondos de manera accionable", () => {
   const msg = getPaymentErrorMessage("card_declined", "insufficient_funds");

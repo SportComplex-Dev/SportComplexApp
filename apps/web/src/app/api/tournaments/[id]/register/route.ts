@@ -1,4 +1,4 @@
-import { created, fail } from "@/lib/api-response";
+import { created, fail } from '@sportcomplex/shared/lib';
 import { authorizeApiRequest } from "@/lib/api-auth";
 import {
   registerTournamentSchema,

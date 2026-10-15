@@ -1,5 +1,5 @@
 import { BookingError, getBookableAvailability, getServicios } from "@sportcomplex/db";
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 
 export const dynamic = "force-dynamic";
 

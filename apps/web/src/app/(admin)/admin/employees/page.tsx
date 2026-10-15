@@ -8,7 +8,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
+import { ActionButton } from '@sportcomplex/ui'
 import { useApp } from '@/components/app-provider'
 import {
   EmployeeStats,

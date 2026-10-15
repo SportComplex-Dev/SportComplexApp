@@ -1,7 +1,7 @@
 import { validateBotTicket, verifyTicketSignature } from "@sportcomplex/core";
 import { getTicketForScan, TicketError } from "@sportcomplex/db";
 import { botTicketQuerySchema } from "@sportcomplex/validation";
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { authorizeBotApiKey } from "@/lib/bot-api-auth";
 import { getTicketAccessWindow } from "@/lib/access";
 

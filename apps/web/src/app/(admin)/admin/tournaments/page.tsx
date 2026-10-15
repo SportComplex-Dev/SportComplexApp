@@ -15,8 +15,8 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { PageHeading } from '@/components/page-heading'
-import { ActionButton } from '@/components/action-button'
-import { ConfirmDialog } from '@/components/modal'
+import { ActionButton } from '@sportcomplex/ui'
+import { ConfirmDialog } from '@sportcomplex/ui'
 import { useApp } from '@/components/app-provider'
 import {
   TournamentStatusBadge,

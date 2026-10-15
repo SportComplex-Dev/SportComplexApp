@@ -1,4 +1,4 @@
-import { fail } from "@/lib/api-response";
+import { fail } from '@sportcomplex/shared/lib';
 
 // RF-19/RF-20 — n8n no bloqueante (RN-12), chatbot
 export async function POST() {

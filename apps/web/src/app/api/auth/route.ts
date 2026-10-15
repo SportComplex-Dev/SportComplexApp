@@ -1,4 +1,4 @@
-import { ok, fail } from '@/lib/api-response'
+import { ok, fail } from '@sportcomplex/shared/lib'
 import { prisma } from '@sportcomplex/db'
 import { loginSchema } from '@sportcomplex/validation'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'

@@ -3,7 +3,7 @@
 import React from 'react'
 import { Check, Loader2, UserPlus, X } from 'lucide-react'
 import { Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
+import { ActionButton } from '@sportcomplex/ui'
 
 export interface CreateEmployeeFormData {
   nombre: string

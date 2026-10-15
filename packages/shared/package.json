@@ -30,7 +30,9 @@
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@sportcomplex/core": "workspace:*"
+  },
   "devDependencies": {
     "@sportcomplex/config": "workspace:*",
     "@types/node": "22.13.10",

@@ -1,4 +1,4 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { resendSchema } from "@sportcomplex/validation";
 import {
   hashSecret,

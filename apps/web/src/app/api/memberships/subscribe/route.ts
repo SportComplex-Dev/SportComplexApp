@@ -1,7 +1,7 @@
 import { authorizeApiRequest } from "@/lib/api-auth";
 import { prisma, findActiveMembership } from "@sportcomplex/db";
 import { createStripeSubscriptionCheckoutSession, type StripeCheckoutClient } from "@sportcomplex/core";
-import { created, fail } from "@/lib/api-response";
+import { created, fail } from '@sportcomplex/shared/lib';
 import { z } from "zod";
 
 const subscribeSchema = z.object({

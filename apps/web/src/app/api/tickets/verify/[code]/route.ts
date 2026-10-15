@@ -1,5 +1,5 @@
 import { AccessError, procesarEscaneo } from "@/lib/access";
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { TicketError } from "@sportcomplex/db";
 import { accessScanSchema } from "@sportcomplex/validation";
 import { authorizeApiRequest } from "@/lib/api-auth";

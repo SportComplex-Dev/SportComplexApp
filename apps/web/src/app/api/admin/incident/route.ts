@@ -7,9 +7,9 @@ import {
 } from "@sportcomplex/db";
 import { disableServiceForContingencySchema } from "@sportcomplex/validation";
 import { auth } from "@/auth";
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { authorizeApiRequest } from "@/lib/api-auth";
-import { sendContingencyWebhook } from "@/lib/contingency-webhook";
+import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 
 interface IncidentSession {
   user?: { id?: string | null } | null;

@@ -6,7 +6,7 @@ import {
 } from "@sportcomplex/db";
 import { createStripeCheckoutSession } from "@sportcomplex/core";
 import { cartCheckoutSchema } from "@sportcomplex/validation";
-import { fail, created } from "@/lib/api-response";
+import { fail, created } from '@sportcomplex/shared/lib';
 
 /**
  * SCRUM-163 / TSK-BE-12b — POST /api/bookings/lock-cart (HU-12 / RF-11 / RN-07).

@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { sedes, type CatalogItem } from '@sportcomplex/core'
 import { Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
-import { Modal } from '@/components/modal'
+import { ActionButton } from '@sportcomplex/ui'
+import { Modal } from '@sportcomplex/ui'
 import { type CustomCategory } from '@/app/(admin)/admin/catalog/types'
 
 export function CatalogFormModal({

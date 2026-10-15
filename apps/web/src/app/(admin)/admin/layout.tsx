@@ -25,7 +25,7 @@ import { Badge } from '@sportcomplex/ui'
 import { Brand } from '@/components/brand'
 import { UserMenu } from '@/components/user-menu'
 import { useApp } from '@/components/app-provider'
-import { useToday } from '@/lib/persistent-state'
+import { useToday } from '@sportcomplex/shared/lib'
 import { ToastMessage } from '@/components/toast-message'
 
 const navigation: { name: string; icon: LucideIcon; href: string }[] = [

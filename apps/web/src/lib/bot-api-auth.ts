@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { fail } from "@/lib/api-response";
+import { fail } from '@sportcomplex/shared/lib';
 
 export function authorizeBotApiKey(request: Request): Response | null {
   const expectedKey = process.env.BOT_API_KEY;

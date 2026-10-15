@@ -3,7 +3,7 @@ import { AccessError, procesarEscaneo } from "@/lib/access";
 import { accessResultResponse } from "@/lib/access-response";
 import { accessScanSchema } from "@sportcomplex/validation";
 import { TicketError } from "@sportcomplex/db";
-import { fail } from "@/lib/api-response";
+import { fail } from '@sportcomplex/shared/lib';
 
 // RF-13 / RF-14 / RF-15 — canje de ticket + auditoría (TSK-BD-10).
 // Firma HMAC → decideAccess → transacción única (UPDATE WHERE estado='EMITIDO'

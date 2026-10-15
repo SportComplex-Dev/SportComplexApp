@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SessionProvider, useSession, signOut } from 'next-auth/react'
-import { usePersistentState, useHydrated } from '@/lib/persistent-state'
-import { type Session } from '@/lib/stores'
+import { usePersistentState, useHydrated } from '@sportcomplex/shared/lib'
+import { type Session } from '@sportcomplex/shared/lib'
 import { normalizeRole } from '@/lib/session'
 import type { ToastKind } from '@/components/toast-message'
 

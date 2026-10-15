@@ -1,5 +1,5 @@
 import { getServicios, getCategorias } from "@sportcomplex/db";
-import { ok, fail } from "@/lib/api-response";
+import { ok, fail } from '@sportcomplex/shared/lib';
 
 export const revalidate = 60;
 

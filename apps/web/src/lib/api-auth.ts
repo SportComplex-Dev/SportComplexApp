@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { fail } from "@/lib/api-response";
+import { fail } from '@sportcomplex/shared/lib';
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from "@/lib/supabase/server";
 import { prisma } from "@sportcomplex/db";
 import { normalizeRole, type CanonicalRole } from "@/lib/session";

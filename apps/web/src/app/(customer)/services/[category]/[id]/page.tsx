@@ -11,7 +11,7 @@ import { IconBox } from '@/components/icon-box'
 import { SportsSpecsGrid } from '@/components/sports-specs-grid'
 import { AvailabilityCalendar, ReservationModal, usePublicCatalog } from '@sportcomplex/features-booking'
 import { useApp } from '@/components/app-provider'
-import { useDraft } from '@/lib/stores'
+import { useDraft } from '@sportcomplex/shared/lib'
 
 export default function ServiceBookingPage() {
   const router = useRouter()

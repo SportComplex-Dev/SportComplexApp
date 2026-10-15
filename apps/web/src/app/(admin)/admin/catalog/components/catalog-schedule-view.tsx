@@ -8,7 +8,7 @@ import {
   type GeneratedOperatingSlot,
   type OperatingScheduleConfig,
 } from '@sportcomplex/core'
-import { ActionButton } from '@/components/action-button'
+import { ActionButton } from '@sportcomplex/ui'
 
 interface CatalogScheduleViewProps {
   selectedService: CatalogItem

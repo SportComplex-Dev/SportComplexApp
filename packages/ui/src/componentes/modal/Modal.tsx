@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { ActionButton } from '../action-button/ActionButton'
 
 export interface ModalProps {
   title: string
@@ -55,5 +56,34 @@ export function Modal({
         {children}
       </div>
     </div>
+  )
+}
+
+export interface ConfirmDialogProps {
+  title: string
+  message: string
+  confirmLabel?: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel = 'Eliminar',
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
+  return (
+    <Modal title={title} description={message} onClose={onCancel}>
+      <div className="form-actions">
+        <ActionButton secondary onClick={onCancel}>
+          Cancelar
+        </ActionButton>
+        <ActionButton danger onClick={onConfirm}>
+          {confirmLabel}
+        </ActionButton>
+      </div>
+    </Modal>
   )
 }

@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowLeft, ArrowRight, Ticket, Trophy } from 'lucide-react'
 import { PageHeading } from '@/components/page-heading'
 import { useApp } from '@/components/app-provider'
-import { useLastCode } from '@/lib/stores'
+import { useLastCode } from '@sportcomplex/shared/lib'
 import {
   PrintableReceipt,
   usePortalTickets,

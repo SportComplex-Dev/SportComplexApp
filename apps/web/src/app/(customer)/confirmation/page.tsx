@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { ArrowRight, BadgeCheck, Check, CheckCircle2, CreditCard, MapPin, Loader2 } from 'lucide-react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
-import { useLastCode } from '@/lib/stores'
+import { ActionButton } from '@sportcomplex/ui'
+import { useLastCode } from '@sportcomplex/shared/lib'
 import { fetchCustomerBookingHistory, type PortalTicket } from '@sportcomplex/features-portal'
 
 function QRGraphic() {
