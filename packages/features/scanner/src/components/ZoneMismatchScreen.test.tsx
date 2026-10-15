@@ -39,3 +39,18 @@ test('ZoneMismatchScreen: renders continue action and no redeem actions', () => 
   assert.ok(html.includes('EMITIDO'), 'Debe aclarar que el boleto permanece emitido')
   assert.ok(!html.includes('Dar Acceso'), 'No debe incluir acciones de canje')
 })
+
+test('ZoneMismatchScreen: fallback robusto si el mensaje no sigue el formato', () => {
+  const html = renderToStaticMarkup(
+    <ZoneMismatchScreen message="El ticket pertenece a otro escenario deportivo." onContinue={() => {}} />
+  )
+
+  assert.ok(
+    html.includes('El ticket pertenece a otro escenario deportivo.'),
+    'Debe mostrar el literal aunque no sea parseable'
+  )
+  assert.ok(
+    !html.includes('DIRIJA AL USUARIO A'),
+    'Sin formato válido no debe inventar una zona destino'
+  )
+})

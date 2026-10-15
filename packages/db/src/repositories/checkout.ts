@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../client";
 import type { ClienteDb, TxDb } from "../tipos-db";
-import { BookingError } from "./bookings";
+import { BookingError } from "./bookings/errores";
 
 /**
  * TSK-BE-09 / RF-09 — liberación y asociación de pagos del checkout.

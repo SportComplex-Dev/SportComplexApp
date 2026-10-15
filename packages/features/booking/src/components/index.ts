@@ -1,5 +1,6 @@
 export * from './AvailabilityCalendar';
 export * from './CheckoutTimer';
+export * from './checkout-timer-utils';
 export * from './ServiceSelector';
 export * from './Cart';
 export * from './BookingSummaryModal';

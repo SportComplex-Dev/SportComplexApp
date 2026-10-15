@@ -20,6 +20,23 @@ DAG: `ui` ← `shared` ← `booking` ← `pos`; `tournament` ← `portal` (+`boo
 
 ## Reglas que rigen estos paquetes
 
+## Estándar de layout (unificado 2026-10-15)
+
+```
+packages/<pkg>/src/<categoria>/
+  Foo.ts(x)            # implementación, archivo plano
+  Foo.test.ts(x)       # test co-locado junto a su sujeto
+  index.ts             # barrel de categoría (exigido por el exports map)
+```
+
+1. Archivos planos en el dir de categoría. Prohibidas carpetas de un solo
+   archivo (`X/X.tsx`) y directorios `__tests__/`.
+2. Tests siempre co-locados; se corren desde el dir del paquete.
+3. Prohibidos archivos proxy de re-export (`export * from "./X/index"` puentes).
+4. Los barrels solo re-exportan; el `index.ts` raíz re-exporta categorías.
+5. Excepción: carpetas de contexto acotado con varios archivos reales
+   (`domain/*`, `application/*`, `security/*`) se quedan como categorías.
+
 1. **Sin imports relativos a `apps/web`**: todo consumo cruzado va por `@sportcomplex/*`.
    Verificado: `grep apps/web/src packages/features → solo 1 comentario`.
 2. **Chrome genérico vive en `ui`**: `Modal`/`ActionButton` se movieron de `tournament` a `ui`.
