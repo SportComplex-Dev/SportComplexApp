@@ -13,9 +13,8 @@ import {
   TournamentDetailModal,
   TournamentRegistrationModal,
   PublicTournamentDetailModal,
-  Modal,
-  ActionButton,
 } from '../index'
+import { Modal, ActionButton } from '@sportcomplex/ui'
 
 import * as ComponentExports from '../index'
 
