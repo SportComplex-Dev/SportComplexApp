@@ -1,14 +1,28 @@
 'use client'
 
-import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, Download, Printer, QrCode, Ticket } from 'lucide-react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
-import type { PortalTicket } from '@/components/portal/portal-utils'
+import { AccessWindowIndicator } from './AccessWindowIndicator'
+import type { PortalTicket } from '../utils/portal-utils'
 
-interface PortalBookingsListProps {
+function Link({
+  href,
+  children,
+  className,
+  onClick,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} className={className} onClick={onClick} {...props}>
+      {children}
+    </a>
+  )
+}
+
+export interface PortalBookingsListProps {
   activeTab: 'activas' | 'historial' | 'canceladas'
   setActiveTab: (tab: 'activas' | 'historial' | 'canceladas') => void
   activeBookings: PortalTicket[]
@@ -45,8 +59,7 @@ export function PortalBookingsList({
             type="button"
             role="tab"
             aria-selected={activeTab === 'activas'}
-            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            {...(!shouldReduceMotion ? { whileHover: { scale: 1.02 }, whileTap: { scale: 0.98 } } : {})}
             className={`portal-tab-btn relative overflow-hidden ${activeTab === 'activas' ? 'active' : ''}`}
             onClick={() => setActiveTab('activas')}
           >
@@ -66,8 +79,7 @@ export function PortalBookingsList({
             type="button"
             role="tab"
             aria-selected={activeTab === 'historial'}
-            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            {...(!shouldReduceMotion ? { whileHover: { scale: 1.02 }, whileTap: { scale: 0.98 } } : {})}
             className={`portal-tab-btn relative overflow-hidden ${activeTab === 'historial' ? 'active' : ''}`}
             onClick={() => setActiveTab('historial')}
           >
@@ -87,8 +99,7 @@ export function PortalBookingsList({
             type="button"
             role="tab"
             aria-selected={activeTab === 'canceladas'}
-            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            {...(!shouldReduceMotion ? { whileHover: { scale: 1.02 }, whileTap: { scale: 0.98 } } : {})}
             className={`portal-tab-btn relative overflow-hidden ${activeTab === 'canceladas' ? 'active' : ''}`}
             onClick={() => setActiveTab('canceladas')}
           >
@@ -137,7 +148,7 @@ export function PortalBookingsList({
                 return (
                   <motion.div
                     key={booking.id}
-                    whileHover={shouldReduceMotion ? undefined : { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } }}
+                    {...(!shouldReduceMotion ? { whileHover: { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } } } : {})}
                     className="portal-ticket-item transition-colors"
                   >
                     <div className="portal-ticket-info">

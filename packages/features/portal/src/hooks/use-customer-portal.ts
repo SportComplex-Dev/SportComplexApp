@@ -7,13 +7,13 @@ import {
   generarQRDataUrl,
   obtenerProximaReserva,
   type PortalTicket,
-} from '@/components/portal/portal-utils'
+} from '../utils/portal-utils'
 import type { Booking } from '@sportcomplex/core'
 
-export type TabType = 'activas' | 'historial' | 'canceladas'
+export type CustomerPortalTabType = 'activas' | 'historial' | 'canceladas'
 
 export function useCustomerPortal(sessionName?: string, todayDate?: string) {
-  const [activeTab, setActiveTab] = useState<TabType>('activas')
+  const [activeTab, setActiveTab] = useState<CustomerPortalTabType>('activas')
   const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
   const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
   const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)

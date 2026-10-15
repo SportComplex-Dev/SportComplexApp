@@ -23,6 +23,8 @@
       "@sportcomplex/security/*": ["../../packages/security/dist/*"],
       "@sportcomplex/features-booking": ["../../packages/features/booking/dist"],
       "@sportcomplex/features-booking/*": ["../../packages/features/booking/dist/*"],
+      "@sportcomplex/features-portal": ["../../packages/features/portal/dist", "../../packages/features/portal/src"],
+      "@sportcomplex/features-portal/*": ["../../packages/features/portal/dist/*", "../../packages/features/portal/src/*"],
       "@sportcomplex/features-scanner": ["../../packages/features/scanner/src", "../../packages/features/scanner/dist"],
       "@sportcomplex/features-scanner/*": ["../../packages/features/scanner/src/*", "../../packages/features/scanner/dist/*"],
       "@sportcomplex/features-tournament": ["../../packages/features/tournament/dist", "../../packages/features/tournament/src"],

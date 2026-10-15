@@ -1,11 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { ArrowRight, Download, Printer, QrCode } from 'lucide-react'
 import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { AccessWindowIndicator } from '@/components/portal/access-window-indicator'
-import type { PortalTicket } from '@/components/portal/portal-utils'
+import { AccessWindowIndicator } from './AccessWindowIndicator'
+import type { PortalTicket } from '../utils/portal-utils'
 
 interface TicketListItemProps {
   booking: PortalTicket
@@ -98,13 +97,13 @@ export function TicketListItem({
             >
               <Printer size={14} /> Imprimir Recibo (58mm)
             </button>
-            <Link
+            <a
               href="/confirmation"
               onClick={() => onSelectCode(booking.code)}
-              className="calendar-shortcut text-xs py-2 px-3"
+              className="calendar-shortcut text-xs py-2 px-3 inline-flex items-center gap-1"
             >
               Pase Digital <ArrowRight size={13} />
-            </Link>
+            </a>
           </>
         ) : (
           <>
@@ -116,9 +115,12 @@ export function TicketListItem({
             >
               <Printer size={14} /> Imprimir Recibo (58mm)
             </button>
-            <Link href="/services" className="calendar-shortcut text-xs py-2 px-3">
+            <a
+              href="/services"
+              className="calendar-shortcut text-xs py-2 px-3 inline-flex items-center gap-1"
+            >
               Reservar de nuevo <ArrowRight size={13} />
-            </Link>
+            </a>
           </>
         )}
       </div>

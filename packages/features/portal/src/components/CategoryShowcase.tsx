@@ -1,12 +1,48 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowRight, ShieldCheck } from 'lucide-react'
-import { formatMoney, minPrice, serviceCategories, type CatalogItem } from '@sportcomplex/core'
-import { categoryIcons } from '@/components/category-icons'
-import { IconBox } from '@/components/icon-box'
+import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { ArrowRight, Dumbbell, Footprints, ShieldCheck, Sparkles, Waves } from 'lucide-react'
+import { formatMoney, minPrice, serviceCategories, type CatalogItem, type CategoryIcon } from '@sportcomplex/core'
 
-interface CategoryShowcaseProps {
+export const categoryIcons: Record<CategoryIcon, LucideIcon> = {
+  court: Footprints,
+  pool: Waves,
+  gym: Dumbbell,
+  wellness: Sparkles,
+}
+
+export function IconBox({
+  icon: Icon,
+  tone = 'lime',
+  className = '',
+}: {
+  icon: LucideIcon
+  tone?: string
+  className?: string
+}) {
+  return (
+    <span className={`icon-box tone-${tone} ${className}`}>
+      <Icon size={20} strokeWidth={1.8} />
+    </span>
+  )
+}
+
+function Link({
+  href,
+  children,
+  className,
+  onClick,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} className={className} onClick={onClick} {...props}>
+      {children}
+    </a>
+  )
+}
+
+export interface CategoryShowcaseProps {
   catalog: CatalogItem[]
 }
 

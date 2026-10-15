@@ -9,9 +9,8 @@ import {
   sanitizeFilename,
   type PortalTicket,
   type ReceiptApiResponse,
-} from '@/components/portal/portal-utils'
-import type { ToastKind } from '@/components/toast-message'
-import type { TabType, UserTournamentItem } from '@/app/(customer)/portal/tickets/types'
+} from '../utils/portal-utils'
+import type { TabType, UserTournamentItem, ToastKind } from '../types/portal'
 
 export function usePortalTickets(
   sessionName: string | undefined,
@@ -80,7 +79,7 @@ export function usePortalTickets(
         const receipt = await fetchReceiptData(ticket.id)
         const qr = receipt?.qr
         if (qr?.payload) {
-          setSelectedTicket((prev) =>
+          setSelectedTicket((prev: PortalTicket | null) =>
             prev && prev.id === ticket.id
               ? { ...prev, qrPayload: qr.payload, qrDataUrl: qr.dataUrl }
               : prev

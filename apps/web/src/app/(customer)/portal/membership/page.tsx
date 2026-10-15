@@ -29,7 +29,7 @@ import {
   type MembresiaActivaDTO,
   type PlanDisplayBreakdown,
   type PlanMembresiaDTO,
-} from '@/components/portal/membership-utils'
+} from '@sportcomplex/features-portal'
 
 function MembershipPortalContent() {
   const { session, ready, notify } = useApp()

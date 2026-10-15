@@ -2,9 +2,9 @@ import QRCode from 'qrcode'
 import { formatMoney, TIMEZONE, type Booking } from '@sportcomplex/core'
 
 export type PortalTicket = Booking & {
-  accessWindowStart?: string
-  accessWindowEnd?: string
-  ticketIssued?: boolean
+  accessWindowStart?: string | undefined
+  accessWindowEnd?: string | undefined
+  ticketIssued?: boolean | undefined
 }
 
 export type AccessWindowStatus = 'UPCOMING' | 'OPEN' | 'EXPIRED'
@@ -32,9 +32,9 @@ export function formatSlotTime(raw: string | undefined): string {
     const timePart = raw.split('T')[1]?.slice(0, 5)
     if (timePart) {
       const [h, m] = timePart.split(':').map(Number)
-      const period = h >= 12 ? 'p. m.' : 'a. m.'
-      const hour12 = h % 12 || 12
-      return `${hour12}:${String(m).padStart(2, '0')} ${period}`
+      const period = (h ?? 0) >= 12 ? 'p. m.' : 'a. m.'
+      const hour12 = (h ?? 0) % 12 || 12
+      return `${hour12}:${String(m ?? 0).padStart(2, '0')} ${period}`
     }
     return raw
   }
@@ -137,7 +137,7 @@ export function obtenerProximaReserva(reservas: Booking[], today?: string): Book
 
   if (candidatas.length === 0) return null
 
-  return [...candidatas].sort((a, b) => a.date.localeCompare(b.date))[0]
+  return [...candidatas].sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
 }
 
 /**
@@ -279,7 +279,7 @@ export async function fetchCustomerBookingHistory(
               : 45000
         const safeTotal = isNaN(rawTotal) ? 45000 : rawTotal
 
-        merged.push({
+        const ticket: PortalTicket = {
           id: item.id,
           ticketIssued: Boolean(item.ticketQr?.codigoUuid),
           code: item.ticketQr?.codigoUuid
@@ -293,21 +293,21 @@ export async function fetchCustomerBookingHistory(
             ? String(item.disponibilidad.fecha).slice(0, 10)
             : '2026-10-09',
           time: item.disponibilidad?.franja ? `${inicio} — ${fin}` : '07:00 a. m.',
-          accessWindowStart: item.disponibilidad?.franja?.horaInicio
-            ? normalizeAccessTime(item.disponibilidad.franja.horaInicio)
-            : undefined,
-          accessWindowEnd: item.disponibilidad?.franja?.horaFin
-            ? normalizeAccessTime(item.disponibilidad.franja.horaFin)
-            : undefined,
           attendees: item.cantidadCupos ?? 1,
           amount: safeTotal,
-          status: statusMap[item.estado] ?? 'Confirmada',
+          status: (item.estado in statusMap ? statusMap[item.estado] : undefined) ?? 'Confirmada',
           paymentMethod: item.pago?.metodo ?? 'card',
-          transactionRef: item.pago?.referenciaExterna ?? undefined,
-          // No inventar una firma inválida que rompa parseTicketQrPayload;
-          // al no haber firma HMAC en el historial, se deja undefined para consultar el recibo oficial
-          qrPayload: undefined,
-        })
+        }
+        if (item.disponibilidad?.franja?.horaInicio) {
+          ticket.accessWindowStart = normalizeAccessTime(item.disponibilidad.franja.horaInicio)
+        }
+        if (item.disponibilidad?.franja?.horaFin) {
+          ticket.accessWindowEnd = normalizeAccessTime(item.disponibilidad.franja.horaFin)
+        }
+        if (item.pago?.referenciaExterna) {
+          ticket.transactionRef = item.pago.referenciaExterna
+        }
+        merged.push(ticket)
       })
     }
   })
