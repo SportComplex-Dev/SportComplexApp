@@ -5,8 +5,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, Download, Printer, QrCode, Ticket } from 'lucide-react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { AccessWindowIndicator } from './AccessWindowIndicator'
-import type { PortalTicket } from '../utils/portal-utils'
+import { AccessWindowIndicator } from '../AccessWindowIndicator'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 function Link({
   href,

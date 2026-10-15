@@ -3,19 +3,27 @@
 import { Printer, ShieldCheck, X } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { formatDate, type Booking } from '@sportcomplex/core'
-import { QRGraphicHD } from './QrModal'
-import { AccessWindowIndicator } from './AccessWindowIndicator'
-import type { PortalTicket } from '../utils/portal-utils'
+import { QRGraphicHD } from '../QrModal'
+import { AccessWindowIndicator } from '../AccessWindowIndicator'
+import type { PortalTicket } from '../../utils/portal-utils'
 
 export interface PortalQrModalProps {
   ticket: PortalTicket | null
   onClose: () => void
   onPrint: (ticket: Booking) => void
+  open?: boolean
+  isOpen?: boolean
 }
 
-export function PortalQrModal({ ticket, onClose, onPrint }: PortalQrModalProps) {
+export function PortalQrModal({
+  ticket,
+  onClose,
+  onPrint,
+  open = true,
+  isOpen = true,
+}: PortalQrModalProps) {
   const shouldReduceMotion = useReducedMotion()
-  if (!ticket) return null
+  if (!open || !isOpen || !ticket) return null
 
   return (
     <AnimatePresence>

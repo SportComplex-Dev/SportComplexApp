@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
-import { calcularDesgloseComprobante, generarQRDataUrl, type ReceiptApiResponse } from '../utils/portal-utils'
+import { calcularDesgloseComprobante, generarQRDataUrl, type ReceiptApiResponse } from '../../utils/portal-utils'
 
-interface PrintableReceiptProps {
+export interface PrintableReceiptProps {
   ticket: Booking | null
   qrDataUrl?: string | null
   receiptData?: ReceiptApiResponse | null
@@ -87,6 +87,12 @@ export function PrintableReceipt({
         <div><span className="font-bold">SEDE:</span> Sede {ticket.sede}</div>
         <div><span className="font-bold">CUPOS:</span> {ticket.attendees} {ticket.attendees === 1 ? 'persona' : 'personas'}</div>
         <div><span className="font-bold">ESTADO:</span> {ticket.status.toUpperCase()}</div>
+        {ticket.paymentMethod && (
+          <div><span className="font-bold">MÉTODO DE PAGO:</span> {ticket.paymentMethod.toUpperCase()}</div>
+        )}
+        {ticket.transactionRef && (
+          <div><span className="font-bold">REF TRANSACCIÓN:</span> {ticket.transactionRef}</div>
+        )}
       </div>
 
       <div className="mb-2 border-b border-black pb-2 text-[10px] text-black">
