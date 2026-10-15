@@ -8,13 +8,13 @@ real en `cells-mailbox/*/inbox/001-contrato.json` (v1-corrected-2026-10-14).
 
 | Paquete | Contenido | Consume | Tests |
 |---|---|---|---|
-| `@sportcomplex/features-booking` | 8 componentes (AvailabilityCalendar, CheckoutTimer, ServiceSelector, Cart, BookingSummaryModal, PaymentMethodSelector, StripePaymentForm, ReservationModal), `usePublicCatalog`, `cartUtils`, `checkoutFlow`, types+Zod | `ui`, `core` | 39 |
-| `@sportcomplex/features-tournament` | 5 componentes (StatusBadge, FormModal, DetailModal, RegistrationModal, PublicDetailModal), `tournamentAdmin` (KPIs puros), types incl. `UserTournamentItem` | `ui`, `validation` | 17 |
-| `@sportcomplex/features-pos` | 6 componentes (`Pos*`), `usePosSession`, `posCheckout` (handler puro con deps inyectadas), `receipt`, types | `ui`, `booking`, `core` | 20 |
-| `@sportcomplex/features-scanner` | 11 componentes, `useScannerController`, `useAudioFeedback`, `scannerService`, types | `ui`, `core`, `shared` | 25 |
-| `@sportcomplex/features-portal` | 12 componentes, `useCustomerPortal`, `usePortalTickets`, `portal-utils`, `membership-utils`, types (re-exporta `UserTournamentItem` y `CartItem`, no duplica) | `ui`, `booking`, `tournament` | 59 |
-| `@sportcomplex/shared` | `qr-client` (parse QR + guards estrictos), `use-network-resilience` (retry+cache genérico) | — (peer `react`) | 4 |
-| `@sportcomplex/ui` | Primitivas: Button, Card, Dialog, Badge, Input, Modal, ActionButton, TicketReceipt, `cn` | `lucide-react`, `motion` | 13 |
+| `@sportcomplex/features-booking` | 8 componentes planos + colocados, `usePublicCatalog`, `cartUtils`, `checkoutFlow`, types (bookingRequest de validation) | `ui`, `core`, `validation` | 45 |
+| `@sportcomplex/features-tournament` | 5 componentes planos, `tournamentAdmin`, types incl. `UserTournamentItem` | `ui`, `validation` | 36 |
+| `@sportcomplex/features-pos` | 6 componentes, `usePosSession`, `posCheckout` (deps inyectadas), `receipt`, types | `ui`, `booking`, `core` | 41 |
+| `@sportcomplex/features-scanner` | 11 componentes planos, `useScannerController`, `useAudioFeedback`, `scannerService`, types | `ui`, `core`, `shared` | 60 |
+| `@sportcomplex/features-portal` | 10 componentes (TicketQrModal único + QrGraphic), 2 hooks, utils, types sin duplicar | `ui`, `booking`, `tournament` | 57 |
+| `@sportcomplex/shared` | `qr-client`, `use-network-resilience`, `api-response`, `contingency-webhook`, `persistent-state`, `stores` | `core` (solo tipos) | 6 |
+| `@sportcomplex/ui` | Primitivas planas: Button, Card, Dialog, Badge, Input, Modal, ActionButton, ConfirmDialog, TicketReceipt, `cn` | `lucide-react`, `motion` | 17 |
 
 DAG: `ui` ← `shared` ← `booking` ← `pos`; `tournament` ← `portal` (+`booking`).
 
@@ -52,13 +52,13 @@ packages/<pkg>/src/<categoria>/
 6. **Prohibido debilitar strictness global** para callar errores de worktree
    (`noImplicitAny: false`, anotaciones `: any` en handlers — rechazado en gate).
 
-## Evidencia Integration Gate (2026-10-15, `6aab760`)
+## Evidencia Integration Gate final (2026-10-15)
 
 - `pnpm build`: **16/16**
 - `pnpm typecheck`: exit 0
 - `pnpm verificar:limites`: **0 infracciones**
-- `pnpm test`: ui 13, tournament 17, security 6, application 22, db 109, core 77,
-  scanner 25, booking 39, pos 20, portal 59, shared 4, web 278 — **0 fail**
+- `pnpm test`: ui 17, tournament 36, security 6, application 22, db 109, core 77,
+  scanner 60, booking 45, pos 41, portal 57, shared 6, web 261 — **0 fail**
 
 ## Pendiente (no bloquea el Gate)
 
