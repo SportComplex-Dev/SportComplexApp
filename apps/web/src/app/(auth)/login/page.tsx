@@ -8,11 +8,11 @@ import { getSession, signIn } from 'next-auth/react'
 import { roleHome, type Role } from '@sportcomplex/domain'
 import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
-import { Brand } from '@/components/brand'
-import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
+import { Brand } from '@/components/brand/brand'
+import { ThemeToggle, useThemeToggle } from '@/components/layout/theme-toggle'
 import { ActionButton } from '@sportcomplex/ui'
-import { GoogleMark } from '@/components/google-mark'
-import { useApp } from '@/components/app-provider'
+import { GoogleMark } from '@/components/brand/google-mark'
+import { useApp } from '@/components/layout/app-provider'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 

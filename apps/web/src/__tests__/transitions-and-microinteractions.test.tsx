@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).React = React
 
-import { PageTransition } from '@/components/page-transition'
+import { PageTransition } from '@/components/layout/page-transition'
 import PublicTemplate from '@/app/(public)/template'
 import CustomerTemplate from '@/app/(customer)/template'
 import AdminTemplate from '@/app/(admin)/admin/template'

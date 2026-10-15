@@ -15,7 +15,7 @@ import {
   ManualEntryCard,
   ShiftScannerView,
 } from "@sportcomplex/features-scanner";
-import { useOptionalApp } from "@/components/app-provider";
+import { useOptionalApp } from "@/components/layout/app-provider";
 
 export default function ScannerPage() {
   const c = useScannerController();

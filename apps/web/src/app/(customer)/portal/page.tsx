@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { CalendarDays, Sparkles } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import { useLastCode } from '@sportcomplex/shared/lib'
 import { useToday } from '@sportcomplex/shared/lib'
 import { usePublicCatalog } from '@sportcomplex/features-booking'

@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { prisma, findActiveMembership } from "@sportcomplex/db";
 import { createStripeSubscriptionCheckoutSession, type StripeCheckoutClient } from "@sportcomplex/core";
 import { created, fail } from '@sportcomplex/shared/lib';

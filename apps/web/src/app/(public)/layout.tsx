@@ -1,4 +1,4 @@
-import { TopBar } from '@/components/top-bar'
+import { TopBar } from '@/components/layout/top-bar'
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (

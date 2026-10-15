@@ -1,6 +1,6 @@
 'use client'
 
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   PosCatalogSelector,
   PosClientForm,

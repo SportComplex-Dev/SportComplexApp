@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowLeft, ArrowRight, Ticket, Trophy } from 'lucide-react'
-import { PageHeading } from '@/components/page-heading'
-import { useApp } from '@/components/app-provider'
+import { PageHeading } from '@/components/layout/page-heading'
+import { useApp } from '@/components/layout/app-provider'
 import { useLastCode } from '@sportcomplex/shared/lib'
 import {
   PrintableReceipt,

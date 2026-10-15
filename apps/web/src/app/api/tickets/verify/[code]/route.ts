@@ -1,8 +1,8 @@
-import { AccessError, procesarEscaneo } from "@/lib/access";
+import { AccessError, procesarEscaneo } from "@/lib/api/access";
 import { fail, ok } from '@sportcomplex/shared/lib';
 import { TicketError } from "@sportcomplex/db";
 import { accessScanSchema } from "@sportcomplex/validation";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 interface RouteContext {
   params: Promise<{ code: string }>;

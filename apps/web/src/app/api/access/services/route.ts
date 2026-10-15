@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { fail, ok } from '@sportcomplex/shared/lib';
 import { getServicios } from "@sportcomplex/db";
 

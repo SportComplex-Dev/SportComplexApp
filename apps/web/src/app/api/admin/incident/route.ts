@@ -6,9 +6,9 @@ import {
   prisma,
 } from "@sportcomplex/db";
 import { disableServiceForContingencySchema } from "@sportcomplex/validation";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth/auth";
 import { fail, ok } from '@sportcomplex/shared/lib';
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 
 interface IncidentSession {

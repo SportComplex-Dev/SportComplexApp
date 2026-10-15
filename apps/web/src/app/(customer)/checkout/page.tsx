@@ -19,8 +19,8 @@ import {
   pollPaymentConfirmation,
   resolvePaymentOutcome,
 } from '@sportcomplex/features-booking'
-import { categoryIcons } from '@/components/category-icons'
-import { useApp } from '@/components/app-provider'
+import { categoryIcons } from '@/components/brand/category-icons'
+import { useApp } from '@/components/layout/app-provider'
 import { useDraft, useLastCode } from '@sportcomplex/shared/lib'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@sportcomplex/features-portal'
 

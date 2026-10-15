@@ -11,7 +11,7 @@ const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Importar el orquestador DESPUÉS de inyectar el mock de Prisma.
-const { procesarEscaneo, AccessError } = await import("@/lib/access");
+const { procesarEscaneo, AccessError } = await import("@/lib/api/access");
 const { handleAccess } = await import("@/app/api/access/route");
 const { TicketError } = await import("@sportcomplex/db");
 const { signTicket } = await import("@sportcomplex/core");

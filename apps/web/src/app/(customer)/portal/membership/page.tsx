@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   calcularDesglosePlan,
   evaluateMembershipPurchaseAccess,

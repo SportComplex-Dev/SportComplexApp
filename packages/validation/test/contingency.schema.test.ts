@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { disableServiceForContingencySchema } from "../src/contingency.schema.ts";
+import { disableServiceForContingencySchema } from "../src/plataforma/contingency.schema.ts";
 
 test("TSK-BE-22: valida servicio y motivo de contingencia", () => {
   assert.equal(

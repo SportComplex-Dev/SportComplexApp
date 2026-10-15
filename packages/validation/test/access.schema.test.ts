@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accessRedeemSchema, accessScanSchema } from "../src/access.schema.ts";
+import { accessRedeemSchema, accessScanSchema } from "../src/plataforma/access.schema.ts";
 
 const UUID = "9f0d6f4e-0000-4000-8000-0000000000ff";
 

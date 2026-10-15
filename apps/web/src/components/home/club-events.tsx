@@ -19,7 +19,7 @@ import {
   type TournamentRegisterTarget,
   type PublicTournamentDetailData,
 } from '@sportcomplex/features-tournament'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 
 interface ClubEventView {
   id: string

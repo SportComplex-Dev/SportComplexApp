@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Mail, RotateCw, CheckCircle2 } from 'lucide-react'
-import { Brand } from '@/components/brand'
+import { Brand } from '@/components/brand/brand'
 
 type VerificationTiming = {
   expiresAt: string

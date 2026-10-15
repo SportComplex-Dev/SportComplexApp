@@ -2,7 +2,7 @@ import {
   createPosCheckoutPostHandler,
   type PosCheckoutHandlerDependencies,
 } from "@sportcomplex/features-pos";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { fail, ok } from '@sportcomplex/shared/lib';
 import { prisma } from "@sportcomplex/db";
 

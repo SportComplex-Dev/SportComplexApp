@@ -19,8 +19,8 @@ import {
 import { Badge } from '@sportcomplex/ui'
 import { ActionButton } from '@sportcomplex/ui'
 import { Modal } from '@sportcomplex/ui'
-import { PageHeading } from '@/components/page-heading'
-import { useApp } from '@/components/app-provider'
+import { PageHeading } from '@/components/layout/page-heading'
+import { useApp } from '@/components/layout/app-provider'
 import {
   formatIncidentDate,
   formatIncidentHour,

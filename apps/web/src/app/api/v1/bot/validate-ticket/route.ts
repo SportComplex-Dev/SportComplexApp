@@ -2,8 +2,8 @@ import { validateBotTicket, verifyTicketSignature } from "@sportcomplex/core";
 import { getTicketForScan, TicketError } from "@sportcomplex/db";
 import { botTicketQuerySchema } from "@sportcomplex/validation";
 import { fail, ok } from '@sportcomplex/shared/lib';
-import { authorizeBotApiKey } from "@/lib/bot-api-auth";
-import { getTicketAccessWindow } from "@/lib/access";
+import { authorizeBotApiKey } from "@/lib/api/bot-api-auth";
+import { getTicketAccessWindow } from "@/lib/api/access";
 
 export async function handleBotTicketValidation(request: Request, now = new Date()) {
   const unauthorized = authorizeBotApiKey(request);

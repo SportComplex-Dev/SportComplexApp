@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { formatMoney, minPrice, serviceCategories } from '@sportcomplex/core'
-import { categoryIcons } from '@/components/category-icons'
-import { IconBox } from '@/components/icon-box'
-import { PageHeading } from '@/components/page-heading'
+import { categoryIcons } from '@/components/brand/category-icons'
+import { IconBox } from '@/components/brand/icon-box'
+import { PageHeading } from '@/components/layout/page-heading'
 import { usePublicCatalog } from '@sportcomplex/features-booking'
 
 export default function ServicesPage() {

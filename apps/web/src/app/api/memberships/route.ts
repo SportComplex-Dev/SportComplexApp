@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { findActiveMembership, listMembershipPlans } from "@sportcomplex/db";
 import { ok, fail } from '@sportcomplex/shared/lib';
 

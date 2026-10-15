@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { registerSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
-import { Brand } from '@/components/brand'
+import { Brand } from '@/components/brand/brand'
 import { ActionButton } from '@sportcomplex/ui'
-import { GoogleMark } from '@/components/google-mark'
-import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
+import { GoogleMark } from '@/components/brand/google-mark'
+import { ThemeToggle, useThemeToggle } from '@/components/layout/theme-toggle'
 import { signIn } from 'next-auth/react'
 
 function getSafeNextPath() {

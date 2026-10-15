@@ -2,9 +2,9 @@ import { fail, ok } from '@sportcomplex/shared/lib';
 import {
   construirComprobante,
   validarSolicitudComprobante,
-} from "@/lib/receipt";
+} from "@/app/api/pdf/receipt/receipt";
 import { ReceiptError } from "@sportcomplex/db";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 // TSK-BE-19 — GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS
 // RNF-05 · RF-17 · HU-19.

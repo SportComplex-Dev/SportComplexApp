@@ -1,7 +1,7 @@
 import { BookingError, getReadOnlyBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema } from "@sportcomplex/validation";
 import { fail, ok } from '@sportcomplex/shared/lib';
-import { authorizeBotApiKey } from "@/lib/bot-api-auth";
+import { authorizeBotApiKey } from "@/lib/api/bot-api-auth";
 
 export async function GET(request: Request) {
   const unauthorized = authorizeBotApiKey(request);

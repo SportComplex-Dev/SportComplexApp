@@ -1,4 +1,4 @@
-import { TopBar } from '@/components/top-bar'
+import { TopBar } from '@/components/layout/top-bar'
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
   return (

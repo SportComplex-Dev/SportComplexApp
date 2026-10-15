@@ -14,10 +14,10 @@ import {
   Loader2,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeading } from '@/components/page-heading'
+import { PageHeading } from '@/components/layout/page-heading'
 import { ActionButton } from '@sportcomplex/ui'
 import { ConfirmDialog } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   TournamentStatusBadge,
   TournamentFormModal,

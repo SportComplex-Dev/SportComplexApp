@@ -4,7 +4,7 @@ import {
   normalizeAnalyticsQuery,
 } from "@sportcomplex/validation";
 import { getAnalytics } from "@sportcomplex/db";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 /**
  * GET /api/admin/analytics

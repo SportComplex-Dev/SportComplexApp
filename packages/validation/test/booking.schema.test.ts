@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { availabilityQuerySchema, bookingRequestSchema, posCheckoutSchema } from "../src/booking.schema.ts";
+import { availabilityQuerySchema, bookingRequestSchema, posCheckoutSchema } from "../src/negocio/booking.schema.ts";
 
 test("bookingRequestSchema accepts integer service IDs and defaults to one seat", () => {
   const parsed = bookingRequestSchema.safeParse({

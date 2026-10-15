@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { Input } from '@sportcomplex/ui'
 import { ActionButton } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   EmployeeStats,
 } from '@sportcomplex/features-admin'

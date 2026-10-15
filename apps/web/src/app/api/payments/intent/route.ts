@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { created, fail } from '@sportcomplex/shared/lib';
 import { createPosPaymentIntent } from "@sportcomplex/core";
 import { prisma } from "@sportcomplex/db";

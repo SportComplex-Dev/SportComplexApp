@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { z } from "zod";
-import { auth } from "@/auth";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { auth } from "@/lib/auth/auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { fail, ok } from '@sportcomplex/shared/lib';
 import { buildPaymentMetadata, STRIPE_CURRENCY } from "@sportcomplex/core";
 import { prisma } from "@sportcomplex/db";

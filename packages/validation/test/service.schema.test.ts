@@ -8,7 +8,7 @@ import {
   franjaHorariaSchema,
   normalizeServicePayload,
   serviceSchema,
-} from "../src/service.schema.ts";
+} from "../src/negocio/service.schema.ts";
 
 test("createCategoriaSchema valida categorías válidas e inválidas", () => {
   // Categoría válida

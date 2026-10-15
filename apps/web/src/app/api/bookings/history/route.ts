@@ -4,7 +4,7 @@ import {
   type BookingHistoryState,
 } from "@sportcomplex/db";
 import { fail, ok } from '@sportcomplex/shared/lib';
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 const historyStates = new Set<BookingHistoryState>([
   "CONFIRMADA",

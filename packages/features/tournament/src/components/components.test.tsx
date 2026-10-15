@@ -46,20 +46,20 @@ test('packages/features/tournament/components exports all 5 core tournament comp
 })
 
 test('verifies individual component module exports', async () => {
-  const badgeModule = await import('./TournamentStatusBadge')
+  const badgeModule = await import('./gestion/TournamentStatusBadge')
   assert.equal(typeof badgeModule.TournamentStatusBadge, 'function')
   assert.equal(typeof badgeModule.InscriptionStatusBadge, 'function')
 
-  const formModalModule = await import('./TournamentFormModal')
+  const formModalModule = await import('./gestion/TournamentFormModal')
   assert.equal(typeof formModalModule.TournamentFormModal, 'function')
 
-  const detailModalModule = await import('./TournamentDetailModal')
+  const detailModalModule = await import('./detalle/TournamentDetailModal')
   assert.equal(typeof detailModalModule.TournamentDetailModal, 'function')
 
-  const regModalModule = await import('./TournamentRegistrationModal')
+  const regModalModule = await import('./inscripcion/TournamentRegistrationModal')
   assert.equal(typeof regModalModule.TournamentRegistrationModal, 'function')
 
-  const publicDetailModalModule = await import('./PublicTournamentDetailModal')
+  const publicDetailModalModule = await import('./detalle/PublicTournamentDetailModal')
   assert.equal(typeof publicDetailModalModule.PublicTournamentDetailModal, 'function')
 })
 

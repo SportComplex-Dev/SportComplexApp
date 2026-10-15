@@ -22,11 +22,11 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { Brand } from '@/components/brand'
-import { UserMenu } from '@/components/user-menu'
-import { useApp } from '@/components/app-provider'
+import { Brand } from '@/components/brand/brand'
+import { UserMenu } from '@/components/layout/user-menu'
+import { useApp } from '@/components/layout/app-provider'
 import { useToday } from '@sportcomplex/shared/lib'
-import { ToastMessage } from '@/components/toast-message'
+import { ToastMessage } from '@/components/feedback/toast-message'
 
 const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Resumen', icon: Home, href: '/admin' },

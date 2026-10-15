@@ -1,5 +1,5 @@
 import { prisma } from "@sportcomplex/db";
-import { normalizeRole, type CanonicalRole } from "@/lib/session";
+import { normalizeRole, type CanonicalRole } from "@/lib/auth/session";
 
 export interface ResolvedAppUser {
   id: string;

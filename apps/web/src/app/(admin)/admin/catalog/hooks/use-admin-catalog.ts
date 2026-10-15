@@ -6,7 +6,7 @@ import {
   type CatalogItem,
   type OperatingScheduleConfig,
 } from '@sportcomplex/core'
-import type { ToastKind } from '@/components/toast-message'
+import type { ToastKind } from '@/components/feedback/toast-message'
 import {
   type CustomCategory,
   type DbCategory,

@@ -6,7 +6,7 @@ Reflect.set(process.env, "NODE_ENV", "test");
 const mock = createMockPrisma();
 (globalThis as typeof globalThis & { __scPrisma: unknown }).__scPrisma = mock;
 
-const { authorizeApiRequest } = await import("@/lib/api-auth");
+const { authorizeApiRequest } = await import("@/lib/api/api-auth");
 const { createPaymentIntentPostHandler } = await import("@/app/api/payments/intent/route");
 const reservaId = "c8a2a831-5d31-4bb2-a169-1e2d1bb8261a";
 const vendedorId = "vendedor-pos-test";

@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth/auth";
 import {
   BookingError,
   compensateFailedCheckout,

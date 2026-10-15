@@ -7,7 +7,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import { DashboardKPIs } from '@sportcomplex/features-admin'
 import { DashboardCharts } from '@sportcomplex/features-admin'
 import { DashboardTables } from '@sportcomplex/features-admin'

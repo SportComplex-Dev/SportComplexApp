@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import NextAuth from "next-auth";
 import { createSupabaseRestClient } from "@/lib/supabase/admin";
-import { authConfig } from "@/auth.config";
+import { authConfig } from "@/lib/auth/auth.config";
 import {
   extractSupabaseAccessToken,
   extractSession,
@@ -11,8 +11,8 @@ import {
   normalizeRole,
   ROLE_HOME,
   type SessionUser,
-} from "@/lib/session";
-import { isRoleAllowedForPath } from "@/lib/route-access";
+} from "@/lib/auth/session";
+import { isRoleAllowedForPath } from "@/lib/auth/route-access";
 
 interface SupabasePrincipal {
   id: string;

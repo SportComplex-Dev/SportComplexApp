@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
 import { created, fail, ok } from '@sportcomplex/shared/lib';
