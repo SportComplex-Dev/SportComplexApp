@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import type { CatalogItem } from '@sportcomplex/core'
-import { mapaIdServicio } from '@sportcomplex/seed/catalogo'
 
 export interface PublicCategory {
   id: number
@@ -20,12 +19,6 @@ export interface PublicCatalogData {
 }
 
 let cachedData: { catalog: CatalogItem[]; categories: PublicCategory[] } | null = null
-
-// Mapa reverso: idBd (numérico DB) -> slug original de la semilla
-const idBdToSlug = new Map<number, string>()
-for (const [slug, info] of Object.entries(mapaIdServicio)) {
-  idBdToSlug.set(info.idBd, slug)
-}
 
 export function resetPublicCatalogCache(): void {
   cachedData = null
@@ -57,6 +50,7 @@ export function usePublicCatalog(): PublicCatalogData {
             estado: string
             tipoPiscina?: string | null
             description?: string
+            slug?: string
           }>
         }
       }) => {
@@ -79,7 +73,7 @@ export function usePublicCatalog(): PublicCatalogData {
           const mappedServices: CatalogItem[] = rawServices.map((s) => {
             const cat = mappedCats.find((c) => c.id === s.categoriaId)
             const catSlug = (cat?.slug ?? 'canchas') as CatalogItem['category']
-            const serviceSlug = idBdToSlug.get(s.id) ?? s.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
+            const serviceSlug = s.slug ?? s.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
             const item: CatalogItem = {
               id: serviceSlug,
               name: s.nombre,

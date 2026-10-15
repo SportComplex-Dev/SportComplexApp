@@ -1,5 +1,6 @@
 import { getServicios, getCategorias } from "@sportcomplex/db";
 import { ok, fail } from '@sportcomplex/shared/lib';
+import { obtenerSlug } from '@sportcomplex/seed';
 
 export const revalidate = 60;
 
@@ -15,7 +16,13 @@ export async function GET() {
     ]);
 
     return ok(
-      { servicios, categorias },
+      {
+        servicios: servicios.map((s: { id: number } & Record<string, unknown>) => ({
+          ...s,
+          slug: obtenerSlug(s.id) ?? undefined,
+        })),
+        categorias,
+      },
       {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       }

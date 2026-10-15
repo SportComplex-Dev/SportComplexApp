@@ -250,6 +250,9 @@ importers:
       '@sportcomplex/security':
         specifier: workspace:*
         version: link:../../packages/security
+      '@sportcomplex/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
       '@sportcomplex/shared':
         specifier: workspace:*
         version: link:../../packages/shared

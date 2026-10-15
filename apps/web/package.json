@@ -45,7 +45,8 @@
     "stripe": "22.6.2",
     "tailwindcss-animate": "^1.0.7",
     "zod": "4.6.5",
-    "@sportcomplex/features-admin": "workspace:*"
+    "@sportcomplex/features-admin": "workspace:*",
+    "@sportcomplex/seed": "workspace:*"
   },
   "devDependencies": {
     "@sportcomplex/config": "workspace:*",
