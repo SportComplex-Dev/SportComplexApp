@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { POST, expiredCookieHeader } from "../route";
+import { POST, expiredCookieHeader } from "@/app/api/auth/logout/route";
 
 test("API: POST /api/auth/logout responde 200 y expira cookies de sesión", async () => {
   const res = await POST();

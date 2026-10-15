@@ -1,7 +1,6 @@
-# TSK-BD-09 — Idempotencia de pagos con Stripe (HU-10 / RF-09)
+# Pagos y POS
+> Estado: vigente 2026-10-15
 
-> Rama de trabajo: `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe`
-> Responsable: Milton Ortega · 3 pts · Fase F2 · Componente: Database & Analytics · Depende de `TSK-BD-06`
 > Sprint: SP1 - Core & Reservas Cashless · Fecha de implementación: 2026-10-08
 
 ## 1. Qué se hizo y por qué
@@ -16,7 +15,7 @@ ninguna parte del sistema escribía en la tabla `PAGO` ni pasaba una reserva a
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments.ts` |
+| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments/payments.ts` |
 | 2 | Export del repositorio en el paquete | `packages/db/src/index.ts` |
 | 3 | Webhook Stripe real: verificación de firma + procesamiento idempotente | `apps/web/src/app/api/payments/route.ts` |
 | 4 | Helpers de contrato de metadatos y monto | `packages/core/src/integrations/stripe.ts` (+ export en `packages/core/src/index.ts`) |
@@ -203,14 +202,14 @@ Flujo previsto:
 ## 5. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test        # 7 tests TSK-BD-09
 pnpm --filter web test                     # 4 tests TSK-BD-09 (webhook firmado)
 
-# End-to-end local con Stripe CLI
+## End-to-end local con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
 pnpm --filter web dev
-# ... crear un pago y reenviar el evento 2 veces desde el dashboard de Stripe
+## ... crear un pago y reenviar el evento 2 veces desde el dashboard de Stripe
 ```
 
 **Criterio de aceptación cubierto por:**
@@ -264,9 +263,9 @@ Contrato de respuesta extendido (200 procesado):
 
 > Nota: los conteos de pruebas de la §5 quedan actualizados a **8 tests** en
 > `@sportcomplex/db` y **6 tests** en `web` tras este anexo.
-# TSK-BD-09 + TSK-BD-10 — Idempotencia de pagos (Stripe) y canje de ticket con auditoría
+## TSK-BD-09 + TSK-BD-10 — Idempotencia de pagos (Stripe) y canje de ticket con auditoría
 
-> Rama de trabajo: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (hacia `develop`)
+> Ref histórica: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (hacia `develop`)
 > Tasks: **TSK-BD-09** (Idempotencia de pagos con Stripe · HU-10 / RF-09 · 3 pts)
 > y **TSK-BD-10** (Canje de ticket + auditoría de accesos · HU-14..17 / RF-13·14·15 / RN-05)
 > Sprint: SP1 - Core & Reservas Cashless · Fecha: 2026-10-08
@@ -290,13 +289,13 @@ vuelve a `EMITIDO` (RN-05) y el modo CONSULTA no lo altera nunca.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments.ts` |
-| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/tickets.ts` |
+| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/access/tickets.ts` |
 | 3 | Export de ambos repositorios | `packages/db/src/index.ts` |
 | 4 | Webhook Stripe real | `apps/web/src/app/api/payments/route.ts` |
-| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/access.ts` |
+| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/api/access.ts` |
 | 6 | Endpoint de escaneo (reemplaza stub 501) | `apps/web/src/app/api/access/route.ts` |
-| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/access.schema.ts` |
+| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/platform/access.schema.ts` |
 | 8 | Helpers de metadatos/monto Stripe | `packages/core/src/integrations/stripe.ts` |
 | 9 | Tests: 7 BD-09 + 5 BD-10 (repo), 4 webhook, 8 escáner, 3 schema | ver §6 |
 
@@ -313,7 +312,7 @@ Escáner QR (content = ticket_qr.codigo_uuid) + firma HMAC + puesto (o null)
 POST /api/access ──► sesión + rol Administrador | Empleado_Lector  (401/403)
         │
         ▼
-procesarEscaneo()  (apps/web/src/lib/access.ts)
+procesarEscaneo()  (apps/web/src/lib/api/access.ts)
         │
         ├─ 1) verifyTicketSignature()  ← ANTES de la BD; mal QR → 400, 0 escrituras
         ├─ 2) getTicketForScan()       ← carga reserva + titular + servicio + franja
@@ -425,7 +424,7 @@ const salida = await ejecutarLectura({
 ```
 
 La decisión de negocio **no** vive en el repositorio: firma (`verifyTicketSignature`),
-ventana y servicio (`decideAccess`) van en el orquestador `lib/access.ts`.
+ventana y servicio (`decideAccess`) van en el orquestador `apps/web/src/lib/api/access.ts`.
 
 ### 3.4. Firmar un QR (contexto TSK-BD-06 / emisión de tickets)
 
@@ -475,7 +474,7 @@ El `404 TICKET_NOT_FOUND` y el `400 INVALID_SIGNATURE` son QRs inválidos/adulte
 ### 4.3. Roles (middleware)
 
 `/scanner/*` y `/api/access/*` ya exigen `Administrador | Empleado_Lector`
-(normalizados en `apps/web/src/lib/session.ts`); el endpoint además re-valida
+(normalizados en `apps/web/src/lib/auth/session.ts`); el endpoint además re-valida
 sesión y rol por capa propia (defensa en profundidad).
 
 ## 5. Variables de entorno y arranque
@@ -489,39 +488,39 @@ pnpm --filter web dev
 ## 6. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test        # 32 tests → 5 TSK-BD-10 + 7 TSK-BD-09
 pnpm --filter @sportcomplex/validation test # 13 tests → 3 access.schema
 pnpm --filter web test                     # 17 tests → 8 TSK-BD-10 + 4 webhook BD-09
 
-# Typecheck + lint
+## Typecheck + lint
 pnpm --filter @sportcomplex/db typecheck && pnpm --filter @sportcomplex/db lint
 pnpm --filter @sportcomplex/validation typecheck && pnpm --filter @sportcomplex/validation lint
 pnpm --filter @sportcomplex/core typecheck && pnpm --filter @sportcomplex/core lint
 pnpm --filter web typecheck && pnpm --filter web lint
 
-# BD-09 end-to-end con Stripe CLI
+## BD-09 end-to-end con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
-# ... y reenviar el mismo evento 2 veces: no duplica PAGO ni reservas
+## ... y reenviar el mismo evento 2 veces: no duplica PAGO ni reservas
 ```
 
 QA manual del escáner (con sesión de lector y `QR_HMAC_SECRET` definido):
 
 ```bash
-# firma de prueba
+## firma de prueba
 node -e "const{createHmac}=require('crypto');const id='9f0d6f4e-0000-4000-8000-0000000000ff';console.log(createHmac('sha256','change-me-64-hex').update(id).digest('hex'))"
 
 curl -X POST http://localhost:3000/api/access -H "Content-Type: application/json" \
   --cookie <sesión-del-lector> \
   -d '{"ticketId":"<codigo_uuid>","signature":"<hmac>","postServiceId":3}'
-# 1.ª vez: access=GRANTED/CONCEDIDO · 2.ª: DENIED/ALREADY_USED · sin puesto: modo CONSULTA
+## 1.ª vez: access=GRANTED/CONCEDIDO · 2.ª: DENIED/ALREADY_USED · sin puesto: modo CONSULTA
 ```
 
 ## 7. Para quien docketice en Jira (copiar/pegar)
 
 **Campos de las dos tasks:**
 
-- **Rama:** `feature/tsk-bd-09-10-pagos-y-canje-ticket` (reemplaza a
+> Ref histórica — Rama: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (reemplaza a
   `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe`; PR #22 se cierra)
 - **Estado:** En Desarrollo → Resuelto al merge (revisar el flujo del equipo)
 - **Commits:** `fa6e25c` (feat: TSK-BD-09 idempotencia de pagos con Stripe),
@@ -595,7 +594,7 @@ siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
   hoy; en TURNO la auditoría queda con `asignacion_id = NULL` sin bloquear el
   canje. Si el negocio lo pide, es una task aparte.
 - Notificación al usuario al confirmar pago o al denegar acceso.
-# TSK-BE-10 — Webhook de Stripe firmado e idempotente + guía de integración Frontend
+## TSK-BE-10 — Webhook de Stripe firmado e idempotente + guía de integración Frontend
 
 - **Ticket:** [SCRUM-114] TSK-BE-10 · **Historia:** HU-10 (RF-09)
 - **Microcelda:** Backend / Frontend
@@ -612,12 +611,12 @@ siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments.ts` |
-| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments.ts` |
+| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments/payments.ts` |
 | 3 | Nuevo estado de reserva `CANCELADA_PAGO` | `packages/db/prisma/schema.prisma` + migración `20261009120000_reserva_cancelada_pago_enum` |
 | 4 | Alerta de pago fallido (n8n, *fire-and-forget*) | `apps/web/src/app/api/payments/route.ts` |
 | 5 | Alias de ruta `/api/webhooks/stripe` (reexporta el handler canónico) | `apps/web/src/app/api/webhooks/stripe/route.ts` |
-| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments.ts` |
+| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments/payments.ts` |
 
 Garantías de idempotencia (se conservan): `UNIQUE(stripe_payment_intent_id)` en
 `PAGO`, updates condicionales de estado y emisión del QR protegida por
@@ -878,16 +877,16 @@ Al obtener `CONFIRMADA`, el comprobante ya trae `ticket` y `qr`:
 ## 5. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test     # incluye: emisión de QR y cancelación+restitución (TSK-BE-10)
 pnpm --filter web test                  # webhook firmado + alias /api/webhooks/stripe
 
-# End-to-end local con Stripe CLI
+## End-to-end local con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
 pnpm --filter web dev
 stripe trigger payment_intent.succeeded          # reserva → CONFIRMADA + QR
 stripe trigger payment_intent.payment_failed     # reserva → CANCELADA_PAGO + franja liberada
-# Reenviar el mismo evento 2 veces: duplicado=true, sin duplicar pago/ticket.
+## Reenviar el mismo evento 2 veces: duplicado=true, sin duplicar pago/ticket.
 ```
 
 ---
@@ -915,7 +914,7 @@ Sin `STRIPE_SECRET_KEY` o `STRIPE_WEBHOOK_SECRET`, el webhook responde
 - **UI de checkout/POS con Stripe Elements**: tarea FE pendiente
   (`portal/book/page.tsx` y `(staff)/pos/page.tsx`).
 - **Notificación al usuario** (email/push) al confirmar: flujo aparte (n8n).
-# TSK-BE-14 — Endpoint de canje en modo turno
+## TSK-BE-14 — Endpoint de canje en modo turno
 
 `POST /api/access/redeem`
 
@@ -1067,7 +1066,7 @@ Content-Type: application/json
   - Control de acceso por rol y estado de usuario (401 / 403).
   - Ticket inexistente (404) y falta de variable de entorno (503).
   - Canje sin turno asignado previo (best-effort, audita `asignacionId = null`).
-# TSK-BE-18: Cobro desde el POS con Stripe en tiempo real
+## TSK-BE-18: Cobro desde el POS con Stripe en tiempo real
 
 - **Historia:** HU-18 (RF-17)
 - **Fase:** F3
@@ -1154,7 +1153,7 @@ servidor deriva el total de `RESERVA.total`.
 ## Persistencia y base de datos
 
 Esta tarea **sí modifica explícitamente la lógica de persistencia** en
-`packages/db/src/repositories/payments.ts`: cuando el webhook acepta el pago,
+`packages/db/src/repositories/payments/payments.ts`: cuando el webhook acepta el pago,
 actualiza `RESERVA.vendedor_id` con el empleado del POS y `RESERVA.canal` con
 `TAQUILLA`, además de confirmar la reserva y asociar el pago.
 
@@ -1169,7 +1168,7 @@ Se reutilizan `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET`, ya descritas en
 frontend. La confirmación, el QR y la idempotencia del webhook se apoyan en
 [`TSK-BE-10`](#tsk-be-10--webhook-de-stripe-firmado-e-idempotente--guía-de-integración-frontend) y
 [`TSK-BD-09`](#tsk-bd-09--idempotencia-de-pagos-con-stripe-hu-10--rf-09).
-# TSK-BE-19 — Endpoint de datos del comprobante
+## TSK-BE-19 — Endpoint de datos del comprobante
 
 `GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS`
 
@@ -1181,8 +1180,8 @@ Devuelve la **estructura de datos** del comprobante (membrete, reserva, servicio
 
 Todo se arma en el servidor, incluida la firma HMAC del QR y la imagen PNG:
 
-- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
-- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/lib/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
+- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/payments/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
+- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/app/api/pdf/receipt/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
 - El membrete viene de variables de entorno (`RECEIPT_*`), no de la base de datos ni de cabeceras del navegador.
 - La respuesta se marca `Cache-Control: no-store` (el estado del boleto puede cambiar).
 - La prueba `TSK-BE-19 (CRITERIO)` serializa la respuesta y falla si aparece el secreto QR, una clave `sk_test/sk_live`, un `postgresql://`, un `service role` o cualquier `pagoId`.
@@ -1261,7 +1260,7 @@ Checklist:
 
 ## Para quien docketice en Jira (copiar/pegar)
 
-- **Rama:** `feature/tsk-be-19-endpoint-de-datos-del-comprobante` → `develop`
+> Ref histórica — Rama: `feature/tsk-be-19-endpoint-de-datos-del-comprobante` → `develop`
 - **Estado:** En Desarrollo → Resuelto al merge
 - **Task:** TSK-BE-19 (Endpoint de datos del comprobante · HU-19 / RF-17 / RNF-05 · 1 pt) — depende de TSK-BE-13
 - **Jira:** SCRUM-135
@@ -1351,3 +1350,7 @@ Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en sm
 - El cobro presencial en `pos/page.tsx` confirma el `PaymentIntent` con el método sintético `pm_card_visa`, válido **únicamente con claves de prueba de Stripe (`pk_test_...`)**.
 - Con claves de producción (`pk_live_...`) la aplicación **rechaza el cargo mock** y mantiene la reserva en `PENDIENTE_PAGO`; el operador debe completar el cobro mediante el enlace de Stripe Checkout de contingencia.
 - La captura de tarjetas físicas reales en producción requiere integrar Stripe Terminal SDK o Stripe Elements (fuera del alcance de TSK-FE-18).
+
+## Trazabilidad
+
+> Ref histórica: HU-10 (RF-09) · rama `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe` · depende de esquema base de pagos

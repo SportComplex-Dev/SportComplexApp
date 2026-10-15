@@ -1,4 +1,5 @@
 # MER y DER — SportComplex
+> Estado: vigente 2026-10-15
 
 Modelo derivado del SRS v1.2.0 (RF-00 a RF-21, RNF-01 a RNF-06, RN-01 a RN-14). Motor relacional (p. ej. PostgreSQL), zona horaria `America/Bogota`.
 

@@ -1,4 +1,5 @@
-# TSK-BE-23 — Endpoints de consulta para el chatbot
+# Chatbot y analítica
+> Estado: vigente 2026-10-15
 
 ## Autenticación
 
@@ -32,11 +33,11 @@ del ticket. El canje permanece exclusivo del flujo de escaneo autorizado.
 
 Las respuestas usan el formato canónico `{ success, data, timestamp }`; los
 errores siguen `{ success: false, error, timestamp }`.
-# TSK-BE-24 — Endpoint de agregaciones analíticas
+## TSK-BE-24 — Endpoint de agregaciones analíticas
 
 > Historia de Usuario: `HU-24` (RF-21) · Fase: F4 · Microcelda / Componente: Backend  
-> Jira: `SCRUM-149` · Depende de: `TSK-BD-02`, `TSK-BD-05`, `TSK-BD-03`  
-> Responsable: Jose Romero · Rama: `feature/tsk-be-24-endpoint-de-agregaciones-analíticas`
+> Ref histórica: `SCRUM-149` · Depende de: `TSK-BD-02`, `TSK-BD-05`, `TSK-BD-03`  
+> Ref histórica: Jose Romero · Rama: `feature/tsk-be-24-endpoint-de-agregaciones-analíticas`
 
 ---
 
@@ -49,7 +50,7 @@ GET /api/admin/analytics
 ```
 
 ### 1.1. Seguridad y RBAC Perimetral
-- Protegido a nivel perimetral en `apps/web/src/middleware.ts` para rutas `/api/admin/*`.
+- Protegido a nivel perimetral en `apps/web/src/proxy.ts` para rutas `/api/admin/*`.
 - Exige sesión activa y rol canónico `Administrador`. Peticiones no autenticadas devuelven `HTTP 401 (UNAUTHORIZED)` y peticiones de otros roles devuelven `HTTP 403 (FORBIDDEN)`.
 
 ### 1.2. Parámetros de Consulta Soportados
@@ -97,7 +98,7 @@ Cuando se aplican filtros de fecha, las consultas se ejecutan con parámetros ti
 - Cumple holgadamente el criterio de `< 2.0 s` exigido en SCRUM-149.
 
 ### 3.2. Verificación de Consistencia contra Tablas Transaccionales
-Validado matemáticamente en `packages/db/src/repositories/analytics.test.ts`:
+Validado matemáticamente en `packages/db/src/repositories/catalog/analytics.test.ts`:
 
 | Métrica | Valor Agregado por Endpoint | `COUNT` / `SUM` Directo Transaccional | Estado |
 | --- | :---: | :---: | :---: |
@@ -186,21 +187,21 @@ Validado matemáticamente en `packages/db/src/repositories/analytics.test.ts`:
 
 ## 5. Archivos Creados y Modificados
 
-1. **`packages/validation/src/analytics.schema.ts`**: Esquema Zod de validación y normalización de parámetros para analytics.
+1. **`packages/validation/src/business/analytics.schema.ts`**: Esquema Zod de validación y normalización de parámetros para analytics.
 2. **`packages/validation/src/index.ts`**: Re-export de esquemas analíticos.
 3. **`packages/validation/test/analytics.schema.test.ts`**: Pruebas unitarias de esquemas y validaciones de fechas/periodos.
 4. **`packages/core/src/domain/analytics.ts`**: Definición agnóstica de tipos e interfaces de dominio para analítica.
 5. **`packages/core/src/domain/index.ts`**: Re-export de los tipos de dominio analítico.
-6. **`packages/db/src/repositories/analytics.ts`**: Repositorio `getAnalytics` con soporte para consultas PostgreSQL sobre las 4 vistas analíticas y fallback/mocking en memoria para pruebas.
+6. **`packages/db/src/repositories/catalog/analytics.ts`**: Repositorio `getAnalytics` con soporte para consultas PostgreSQL sobre las 4 vistas analíticas y fallback/mocking en memoria para pruebas.
 7. **`packages/db/src/index.ts`**: Exportación pública del repositorio analítico en `@sportcomplex/db`.
-8. **`packages/db/src/repositories/analytics.test.ts`**: Pruebas unitarias y prueba de integración sobre BD real validando el criterio clave (< 2 s y cuadre contra `COUNT` directo).
+8. **`packages/db/src/repositories/catalog/analytics.test.ts`**: Pruebas unitarias y prueba de integración sobre BD real validando el criterio clave (< 2 s y cuadre contra `COUNT` directo).
 9. **`apps/web/src/app/api/admin/analytics/route.ts`**: Ruta API `GET /api/admin/analytics` de Next.js App Router con manejo seguro de errores y respuestas estandarizadas.
 10. **`apps/web/src/app/api/admin/analytics/__tests__/route.test.ts`**: Pruebas de integración de la ruta API comprobando validaciones 400 y formato 200.
 
 
 ---
 
-# TSK-FE-23: Dashboard Gerencial y Analítica de Alta Densidad
+## TSK-FE-23: Dashboard Gerencial y Analítica de Alta Densidad
 
 ## 1. Identificación y Alcance
 - **Ticket Jira:** TSK-FE-23 / SCRUM-148 (Requerimientos RNF-04 / RF-18)
@@ -210,7 +211,7 @@ Validado matemáticamente en `packages/db/src/repositories/analytics.test.ts`:
 ---
 
 ## 2. Arquitectura de Componentes (Modularización ARC-01)
-El panel fue descompuesto modularmente en subcomponentes especializados bajo `apps/web/src/components/admin/dashboard/`:
+El panel fue descompuesto modularmente en subcomponentes especializados bajo `packages/features/admin/src/components/dashboard/`:
 
 1. **`AdminDashboardPage` (`apps/web/src/app/(admin)/admin/dashboard/page.tsx`):**
    - Controlador de estado del dashboard (filtros de temporalidad diaria/semanal, rangos predefinidos de 7d / 30d / personalizado).
@@ -241,3 +242,7 @@ El panel fue descompuesto modularmente en subcomponentes especializados bajo `ap
 
 ## 4. Pruebas y Validación
 - Pruebas frontend de cálculo de KPIs, formateo de métricas y exportación CSV en `apps/web/src/app/(admin)/admin/dashboard/__tests__/dashboard-ui.test.ts`.
+
+## Trazabilidad
+
+> Ref histórica: HU-24 (RF-21) · SCRUM-148/149 · ramas de chatbot y agregaciones analíticas

@@ -1,5 +1,6 @@
-## Goal Description
-Guía interna para **crear, inicializar y mantener** nuestra instancia de n8n en el VPS compartido. Todo corre dentro de `~/SportComplexApp` en la red privada `sportcomplex-net`; el tráfico externo entra por Caddy (`n8n.akros.lat`).
+# n8n en VPS
+> Estado: vigente 2026-10-15
+Guía interna para **crear, inicializar y mantener** nuestra instancia de n8n en el VPS dedicado. Todo corre dentro de `~/SportComplexApp` en la red privada `sportcomplex-net`; el tráfico externo entra por Caddy (`n8n.akros.lat`).
 
 ## 0. Cómo viajan los workflows
 Los flujos n8n viven versionados en el repo:
@@ -59,7 +60,8 @@ El import por CLI no sobrescribe workflows cuyo `id` ya existe (falla con "alrea
 ## 3. Operación del día a día
 
 ```bash
-# Ver estado y logs
+# n8n en VPS
+> Estado: vigente 2026-10-15
 cd ~/SportComplexApp/docker
 sudo docker compose ps
 sudo docker compose logs -f n8n

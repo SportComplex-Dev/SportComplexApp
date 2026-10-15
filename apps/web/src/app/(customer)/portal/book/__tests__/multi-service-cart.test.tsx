@@ -13,11 +13,11 @@ import {
   generateDynamicTimeSlots,
   getNumericServiceId,
   resolveCheckoutRedirection,
+  Cart,
+  BookingSummaryModal,
+  ServiceSelector,
   type CartItem,
-} from '../cart-utils';
-import { Cart } from '../components/cart';
-import { BookingSummaryModal } from '../components/booking-summary-modal';
-import { ServiceSelector } from '../components/service-selector';
+} from '@sportcomplex/features-booking';
 
 /**
  * TSK-FE-12 / HU-12 / RF-11 / RN-07:

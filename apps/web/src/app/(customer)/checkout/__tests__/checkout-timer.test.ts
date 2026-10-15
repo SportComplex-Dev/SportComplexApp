@@ -8,7 +8,7 @@ import {
   getTimerStatus,
   isPaymentBlocked,
   calculateProgressPercentage,
-} from '../../../../components/booking/checkout-timer-utils'
+} from '@sportcomplex/features-booking'
 
 // TSK-FE-09: Suite de Pruebas Unitarias para Checkout con Temporizador Regresivo (SCRUM-117 / HU-09 / RF-08)
 

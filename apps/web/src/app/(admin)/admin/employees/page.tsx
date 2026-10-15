@@ -8,21 +8,21 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { Input } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
-import { useApp } from '@/components/app-provider'
+import { ActionButton } from '@sportcomplex/ui'
+import { useApp } from '@/components/layout/app-provider'
 import {
   EmployeeStats,
-} from '@/components/admin/employees/employee-stats'
+} from '@sportcomplex/features-admin'
 import {
   EmployeeTable,
   type Employee,
-} from '@/components/admin/employees/employee-table'
+} from '@sportcomplex/features-admin'
 import {
   EmployeeCreateModal,
-} from '@/components/admin/employees/employee-create-modal'
+} from '@sportcomplex/features-admin'
 import {
   EmployeeDeactivateModal,
-} from '@/components/admin/employees/employee-deactivate-modal'
+} from '@sportcomplex/features-admin'
 
 export default function AdminEmployeesPage() {
   const { notify } = useApp()

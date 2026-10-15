@@ -8,13 +8,12 @@ const LECTOR = "lector-1";
 
 process.env.QR_HMAC_SECRET = SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
-const { handleTicketVerification } = await import("../route");
+const { handleTicketVerification } = await import("@/app/api/tickets/verify/[code]/route");
 const { signTicket } = await import("@sportcomplex/core");
 
 function seedTicket() {

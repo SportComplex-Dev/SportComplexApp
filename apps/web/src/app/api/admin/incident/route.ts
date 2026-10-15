@@ -6,10 +6,10 @@ import {
   prisma,
 } from "@sportcomplex/db";
 import { disableServiceForContingencySchema } from "@sportcomplex/validation";
-import { auth } from "@/auth";
-import { fail, ok } from "@/lib/api-response";
-import { authorizeApiRequest } from "@/lib/api-auth";
-import { sendContingencyWebhook } from "@/lib/contingency-webhook";
+import { auth } from "@/lib/auth/auth";
+import { fail, ok } from '@sportcomplex/shared/lib';
+import { authorizeApiRequest } from "@/lib/api/api-auth";
+import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 
 interface IncidentSession {
   user?: { id?: string | null } | null;

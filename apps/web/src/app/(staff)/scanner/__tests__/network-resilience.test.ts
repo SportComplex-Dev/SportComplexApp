@@ -19,10 +19,9 @@ import {
   SCANNER_TICKET_CACHE_KEY,
   CACHE_TTL_MS,
   type TicketConsultationData,
-} from "@/hooks/use-network-resilience";
-import { ConsultationResultCard } from "@/components/scanner/consultation-result-card";
-import { TicketValidationModal } from "@/components/scanner/ticket-validation-modal";
-import ScannerPage from "../page";
+} from "@sportcomplex/shared/hooks";
+import { ConsultationResultCard, TicketValidationModal } from "@sportcomplex/features-scanner";
+import ScannerPage from "@/app/(staff)/scanner/page";
 
 // Mock de localStorage en memoria para pruebas aisladas
 function createMockStorage(initialData: Record<string, string> = {}): Storage {

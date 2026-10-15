@@ -1,21 +1,59 @@
-// RF-00 Landing institucional estática (SSG) conforme a ARCHITECTURE §4. LCP < 1.5s.
-export const dynamic = 'force-static';
+'use client';
 
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, MapPin } from "lucide-react";
-import { formatMoney, minPrice, serviceCategories, initialCatalog } from "@sportcomplex/core";
-import { categoryIcons } from "@/components/category-icons";
-import { IconBox } from "@/components/icon-box";
-import { SplashScreen } from "@/components/splash-screen";
+import { formatMoney, minPrice, type CategorySlug } from "@sportcomplex/core";
+import { categoryIcons } from "@/components/brand/category-icons";
+import { IconBox } from "@/components/brand/icon-box";
+import { SplashScreen } from "@/components/feedback/splash-screen";
 import { FacilityShowcase } from "@/components/home/facility-showcase";
 import { ClubEvents } from "@/components/home/club-events";
 import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital-pass";
 import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 import { HeroCarousel } from "@/components/home/hero-carousel";
+import { usePublicCatalog } from "@sportcomplex/features-booking";
+
+const categoryMeta: Record<string, {
+  name: string;
+  description: string;
+  icon: 'court' | 'pool' | 'gym' | 'wellness';
+  tone: string;
+  image: string;
+}> = {
+  canchas: {
+    name: "Canchas",
+    description: "Fútbol, pádel y tenis",
+    icon: "court",
+    tone: "lime",
+    image: "/images/catalogo/categoria-canchas.webp",
+  },
+  piscinas: {
+    name: "Piscinas",
+    description: "Carriles y nado libre",
+    icon: "pool",
+    tone: "blue",
+    image: "/images/catalogo/categoria-piscinas.webp",
+  },
+  gimnasio: {
+    name: "Gimnasio",
+    description: "Entrena a tu ritmo",
+    icon: "gym",
+    tone: "orange",
+    image: "/images/catalogo/categoria-gimnasio.webp",
+  },
+  "zona-humeda": {
+    name: "Zona húmeda",
+    description: "Sauna, turco y jacuzzi",
+    icon: "wellness",
+    tone: "purple",
+    image: "/images/catalogo/categoria-zona-humeda.webp",
+  },
+};
 
 export default function HomePage() {
+  const { catalog, categories } = usePublicCatalog();
   return (
     <>
       <SplashScreen />
@@ -70,15 +108,22 @@ export default function HomePage() {
         </div>
 
         <div className="category-grid">
-          {serviceCategories.map(({ slug, name, description, icon, tone, image }, index) => {
-            const from = minPrice(initialCatalog, slug);
+          {categories.map(({ slug, nombre }, index) => {
+            const meta = categoryMeta[slug] || {
+              name: nombre,
+              description: `Servicios de ${nombre.toLowerCase()}`,
+              icon: "court" as const,
+              tone: "lime",
+              image: "/images/catalogo/categoria-canchas.webp",
+            };
+            const from = minPrice(catalog, slug as CategorySlug);
             return (
               <Link className="category-card" key={slug} href={`/services/${slug}`}>
                 <div className="category-media">
-                  {image && (
+                  {meta.image && (
                     <Image
-                      src={image}
-                      alt={name}
+                      src={meta.image}
+                      alt={nombre}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       className="category-img"
@@ -86,13 +131,13 @@ export default function HomePage() {
                   )}
                   <div className="category-media-overlay" />
                   <div className="category-badge-floating">
-                    <IconBox icon={categoryIcons[icon]} tone={tone} />
+                    <IconBox icon={categoryIcons[meta.icon]} tone={meta.tone} />
                   </div>
                   <span className="category-index-badge">0{index + 1}</span>
                 </div>
                 <div className="category-body">
-                  <h3>{name}</h3>
-                  <p>{description}</p>
+                  <h3>{nombre}</h3>
+                  <p>{meta.description}</p>
                   <div className="category-bottom">
                     <span>{from ? `Desde ${formatMoney(from)}` : "Próximamente"}</span>
                     <span className="round-arrow">

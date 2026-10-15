@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { HERO_SLIDES, SLIDE_DURATION_MS } from '../hero-carousel'
+import { HERO_SLIDES, SLIDE_DURATION_MS } from '@/components/home/hero-carousel'
 
 test('HeroCarousel: Configuración de exactamente 5 imágenes para el carrusel', () => {
   assert.equal(HERO_SLIDES.length, 5, 'El carrusel debe contener exactamente 5 imágenes')

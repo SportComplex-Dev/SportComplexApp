@@ -1,0 +1,70 @@
+{
+  "name": "@sportcomplex/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./catalogo": {
+      "types": "./dist/catalogo/index.d.ts",
+      "import": "./dist/catalogo/index.js",
+      "default": "./src/catalogo/index.ts"
+    },
+    "./reserva": {
+      "types": "./dist/reserva/index.d.ts",
+      "import": "./dist/reserva/index.js",
+      "default": "./src/reserva/index.ts"
+    },
+    "./membresia": {
+      "types": "./dist/membresia/index.d.ts",
+      "import": "./dist/membresia/index.js",
+      "default": "./src/membresia/index.ts"
+    },
+    "./usuario": {
+      "types": "./dist/usuario/index.d.ts",
+      "import": "./dist/usuario/index.js",
+      "default": "./src/usuario/index.ts"
+    },
+    "./precio": {
+      "types": "./dist/precio/index.d.ts",
+      "import": "./dist/precio/index.js",
+      "default": "./src/precio/index.ts"
+    },
+    "./torneo": {
+      "types": "./dist/torneo/index.d.ts",
+      "import": "./dist/torneo/index.js",
+      "default": "./src/torneo/index.ts"
+    },
+    "./analitica": {
+      "types": "./dist/analitica/index.d.ts",
+      "import": "./dist/analitica/index.js",
+      "default": "./src/analitica/index.ts"
+    },
+    "./acceso": {
+      "types": "./dist/acceso/index.d.ts",
+      "import": "./dist/acceso/index.js",
+      "default": "./src/acceso/index.ts"
+    },
+    "./constantes": {
+      "types": "./dist/constantes.d.ts",
+      "import": "./dist/constantes.js",
+      "default": "./src/constantes.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "typescript": "5.7.3"
+  }
+}

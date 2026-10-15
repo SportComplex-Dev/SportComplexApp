@@ -9,14 +9,13 @@ const STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
 process.env.STRIPE_SECRET_KEY = STRIPE_SECRET_KEY;
 process.env.STRIPE_WEBHOOK_SECRET = STRIPE_WEBHOOK_SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Import route handler DESPUÉS de inyectar el mock de Prisma.
-const paymentsRoute = await import("../route");
+const paymentsRoute = await import("@/app/api/payments/route");
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -206,7 +205,7 @@ test("TSK-BE-10 API: pago fallido cancela la reserva y restituye la franja", asy
 });
 
 test("TSK-BE-10 API: /api/webhooks/stripe expone el mismo handler POST", async () => {
-  const alias = await import("../../webhooks/stripe/route");
+  const alias = await import("@/app/api/webhooks/stripe/route");
   assert.equal(typeof alias.POST, "function");
 });
 

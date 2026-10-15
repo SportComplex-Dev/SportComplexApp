@@ -11,13 +11,12 @@ const INACTIVO = "inactivo-1";
 
 process.env.QR_HMAC_SECRET = SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
-const { handleAccessRedeem } = await import("../route");
+const { handleAccessRedeem } = await import("@/app/api/access/redeem/route");
 const { signTicket } = await import("@sportcomplex/core");
 
 // Ventana: 2026-10-10 10:00–11:00 (Bogotá) = 15:00Z–16:00Z.

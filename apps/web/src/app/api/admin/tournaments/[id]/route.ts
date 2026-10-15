@@ -1,5 +1,5 @@
-import { fail, ok } from "@/lib/api-response";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { fail, ok } from '@sportcomplex/shared/lib';
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import {
   tournamentIdParamSchema,
   updateTournamentSchema,

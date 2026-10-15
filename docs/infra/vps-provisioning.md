@@ -1,23 +1,16 @@
-## Goal Description
-Este documento detalla la configuración inicial directamente en nuestro VPS **compartido**. Todo el aprovisionamiento y los archivos de orquestación (Docker Compose, Caddyfile) viven en `~/SportComplexApp` (home del usuario `ubuntu`). El otro equipo trabaja en `~/OtiumProyect` con sus propias llaves. Nunca se comparten `.env` ni SSH keys.
+# Aprovisionamiento VPS
+> Estado: vigente 2026-10-15
+Este documento detalla la configuración inicial directamente en nuestro VPS **dedicado**. Todo el aprovisionamiento y los archivos de orquestación (Docker Compose, Caddyfile) viven en `~/SportComplexApp` (home del usuario `ubuntu`).
 
 Caddy es el **único edge** en `80/443`. Dos proxies no pueden bindear los mismos puertos (`bind: address already in use`).
 
-**Acuerdo confirmado con el otro equipo (2026-10-12):** no tienen Nginx ni Certbot. Solo Docker con su Next.js (`jorge-web`, interno `3002`, escucha en `0.0.0.0`). Todo su tráfico va por nuestro Caddy.
+> VPS dedicado (2026-10-15): se retiró el esquema compartido con el equipo otium (`jorge-web`, red `edge-shared`, dominio `otium.coderhivex.com`). El historial queda en git; no recrear `edge-shared` ni bloques de terceros en el Caddyfile.
 
 ## 1. Configuración de Dominios (DNS)
 Nuestros registros **A** apuntando a la IP del VPS:
 * `A` -> `@`
 * `A` -> `www`
 * `A` -> `n8n`
-
-El otro equipo gestiona su propio DNS: `A otium.coderhivex.com -> misma IP del VPS` (requisito previo: sin ese `A`, Let's Encrypt no emite su certificado). No tocamos su zona.
-
-Checklist pre-despliegue del otro equipo (confirmado por ellos antes de montar):
-- [ ] `A otium.coderhivex.com` resuelve a la IP del VPS (`dig +short otium.coderhivex.com`).
-- [ ] Su Next.js escucha en `0.0.0.0:3002` (`HOSTNAME=0.0.0.0`, `PORT=3002`), no en `localhost`.
-- [ ] Servicio `jorge-web` con `expose: ["3002"]` (sin `ports: 80/443`), en redes `jorge-net` + `edge-shared` externa.
-- [ ] Directorio `~/OtiumProyect`, compose con `name:` propio.
 
 ## 2. Preparación del Entorno y Aprovisionamiento
 Nos conectamos por SSH al VPS (usuario `ubuntu`) y usamos como base el home, igual que los otros proyectos en el servidor:
@@ -28,7 +21,7 @@ git clone https://github.com/<org>/SportComplexApp.git SportComplexApp
 cd SportComplexApp
 ```
 
-La convención real del VPS (home de `ubuntu`): `~/OtiumProyect` (Jorge), `~/SportComplexApp` (nosotros). El acuerdo original de `/opt/<proyecto>` con usuarios dedicados quedó descartado: el aislamiento real lo dan el `name:` de compose y las redes Docker separadas.
+La convención del VPS (home de `ubuntu`): `~/SportComplexApp` (proyecto único). Sin otros equipos en el host.
 
 Creamos el script de aprovisionamiento:
 
@@ -39,7 +32,8 @@ set -e
 
 echo "=== Iniciando Aprovisionamiento del VPS ==="
 
-# 0. Limpieza de conflictos (estado real del VPS Ubuntu 26.04)
+# Aprovisionamiento VPS
+> Estado: vigente 2026-10-15
 # - nginx 1.28 venía preinstalado → removido
 # - docker-compose-v2 (ubuntu) choca con docker-compose-plugin (docker.com) → removerlo ANTES
 # - caddy instalado vía apt toma 80/443 como servicio systemd y choca con nuestro Caddy Docker
@@ -50,10 +44,9 @@ apt autoremove -y
 # 1. Actualizar sistema
 apt update && apt upgrade -y
 
-# 1.5. Llave de despliegue para GitHub Actions (usuario ubuntu, convención real del VPS).
+# 1.5. Llave de despliegue para GitHub Actions (usuario ubuntu).
 # Generar par dedicado localmente con `ssh-keygen -t ed25519` y pegar aquí la PÚBLICA:
 # echo "ssh-ed25519 AAAA... github-actions-sportcomplex" | sudo tee -a /home/ubuntu/.ssh/authorized_keys
-# El equipo de otium genera y registra la suya por su cuenta.
 
 # 2. Configurar Firewall (UFW) — solo SSH + HTTP/S
 echo "Configurando Firewall..."
@@ -77,20 +70,16 @@ mkdir -p ./caddy_config
 # 5. Fix de permisos para n8n (Vital: UID 1000)
 chown -R 1000:1000 ./n8n_data
 
-# 6. Red externa compartida con el otro equipo (solo para el edge)
-docker network create edge-shared || true
+# 6. Red privada del proyecto
+docker network create sportcomplex-net || true
 
 echo "=== Aprovisionamiento Completado ==="
 ```
 Ejecutamos el script: `bash provision.sh`
 
-> El otro equipo trabaja en `~/OtiumProyect` con su propio compose (`name:` propio) y sus propias llaves. No corre proxy ni publica `80/443`. Lo demás lo montan ellos.
-
-### Orden de encendido (evita 502 / fallo ACME)
-1. `docker network create edge-shared` (una sola vez, compartida).
-2. Ellos: `docker compose up -d` en `~/OtiumProyect` (`jorge-web` resoluble en `edge-shared`).
-3. Nosotros: `docker compose up -d` en `~/SportComplexApp` + `docker exec caddy caddy reload`.
-4. Verificar: `curl -Ik https://otium.coderhivex.com` → `200`, cert válido.
+### Orden de encendido
+1. `docker compose up -d` en `~/SportComplexApp` + `docker exec caddy caddy reload`.
+2. Verificar: `curl -Ik https://akros.lat` → `200`, cert válido.
 
 ## 3. Clonado de la App y Orquestación
 
@@ -142,7 +131,6 @@ services:
       - caddy_config:/config
     networks:
       - sportcomplex-net
-      - edge-shared
     restart: unless-stopped
     deploy:
       resources:
@@ -153,27 +141,15 @@ services:
 networks:
   sportcomplex-net:
     driver: bridge
-  edge-shared:
-    external: true
 
 volumes:
   caddy_data:
   caddy_config:
 ```
 
-Reglas de convivencia:
-- Nuestros servicios usan `expose`, nunca `ports` (salvo Caddy con `80/443`). Así los puertos internos (`3000`, `5678`) pueden repetirse en el otro equipo sin chocar.
-- `name:` y red `sportcomplex-net` son solo nuestros. El otro equipo usa su propio `name:` y su red.
-- Solo `caddy` toca `edge-shared`. web, n8n y demás quedan en `sportcomplex-net`.
-
-El otro equipo, en `~/OtiumProyect` (configuración confirmada por ellos, sin proxy propio):
-```yaml
-services:
-  jorge-web:
-    image: su-app
-    expose: ["3002"]
-    networks: [jorge-net, edge-shared]
-```
+Reglas:
+- Los servicios usan `expose`, nunca `ports` (salvo Caddy con `80/443`).
+- Todo corre en `sportcomplex-net`; sin redes externas.
 
 ---
 
@@ -193,19 +169,11 @@ services:
 {$DOMAIN_N8N:n8n.akros.lat} {
   reverse_proxy n8n:5678
 }
-
-# Otro equipo (su DNS lo gestionan ellos; requiere red edge-shared)
-# OJO: dentro de edge-shared hay que apuntar al puerto INTERNO del contenedor,
-# no al publicado en el host. Su compose publica 3002 host -> 3000 contenedor.
-# Estado verificado (2026-10-12): jorge-web:3000 responde 200 vía edge-shared.
-{$JORGE_DOMAIN:otium.coderhivex.com} {
-  reverse_proxy jorge-web:3000
-}
 ```
 
 Notas:
 - Sintaxis Caddy es `reverse_proxy`, no `proxy_pass` (eso es Nginx).
-- `localhost:3002` **no** funciona desde dentro del contenedor Caddy (`localhost` es el propio Caddy → `502`). Por eso se usa el nombre de servicio `jorge-web:3000` sobre la red `edge-shared`.
+- `localhost` **no** funciona desde dentro del contenedor Caddy (`localhost` es el propio Caddy → `502`). Por eso se usan nombres de servicio (`web:3000`, `n8n:5678`) en `sportcomplex-net`.
 - Recargar sin downtime tras editar: `docker compose up -d caddy && docker exec caddy caddy reload`.
 
 ---
@@ -219,7 +187,6 @@ Notas:
 ACME_EMAIL=official@akros.lat
 DOMAIN_APEX=akros.lat
 DOMAIN_N8N=n8n.akros.lat
-JORGE_DOMAIN=otium.coderhivex.com
 
 # App Next.js (Supabase externo: DB + Auth + Storage)
 DATABASE_URL=...

@@ -1,6 +1,7 @@
-## Goal Description
+# Storage (Supabase)
+> Estado: vigente 2026-10-15
 
-> **2026-10-12: MinIO eliminado.** No corremos MinIO en el VPS compartido (ahorra 2 contenedores, 1 volumen y 3 subdominios `s3/cdn/minio-admin`). Storage en **Supabase Storage** (mismo proyecto que DB/Auth). Este archivo reemplaza la guía anterior de MinIO.
+> **2026-10-12: MinIO eliminado.** No corremos MinIO en el VPS dedicado (ahorra 2 contenedores, 1 volumen y 3 subdominios `s3/cdn/minio-admin`). Storage en **Supabase Storage** (mismo proyecto que DB/Auth). Este archivo reemplaza la guía anterior de MinIO.
 
 ## 1. Buckets (consola Supabase)
 
@@ -44,4 +45,3 @@ Variables ya definidas en `.env` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_
 
 1. Subir una imagen a `public-assets` y abrir su URL pública (`https://<proyecto>.supabase.co/storage/v1/object/public/public-assets/...`). Debe verse sin auth.
 2. Subir un archivo a `private-assets` y confirmar que su URL pública devuelve `403`; solo funciona `createSignedUrl`.
-

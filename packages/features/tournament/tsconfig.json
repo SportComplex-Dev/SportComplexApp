@@ -1,0 +1,26 @@
+{
+  "extends": "../../config/typescript/base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "noEmit": false,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@sportcomplex/ui": ["../../ui/dist"],
+      "@sportcomplex/ui/*": ["../../ui/dist/*"],
+      "@sportcomplex/validation": ["../../validation/dist"],
+      "@sportcomplex/validation/*": ["../../validation/dist/*"]
+    },
+    "typeRoots": [
+      "../../../node_modules/.pnpm/node_modules/@types",
+      "../../../node_modules/@types"
+    ]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/__tests__/**"]
+}

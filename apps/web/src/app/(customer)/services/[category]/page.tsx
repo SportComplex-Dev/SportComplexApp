@@ -5,16 +5,16 @@ import Link from 'next/link'
 import { notFound, useParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, MapPin, Sparkles, Users } from 'lucide-react'
 import { categoryBySlug, formatMoney } from '@sportcomplex/core'
-import { categoryIcons } from '@/components/category-icons'
-import { CategoryFilters } from '@/components/category-filters'
-import { IconBox } from '@/components/icon-box'
-import { LiveConditions } from '@/components/live-conditions'
-import { useCatalog } from '@/lib/stores'
+import { categoryIcons } from '@/components/brand/category-icons'
+import { CategoryFilters } from '@/components/discovery/category-filters'
+import { IconBox } from '@/components/brand/icon-box'
+import { LiveConditions } from '@/components/discovery/live-conditions'
+import { usePublicCatalog } from '@sportcomplex/features-booking'
 
 export default function CategoryCatalogPage() {
   const { category: slug } = useParams<{ category: string }>()
   const category = categoryBySlug(slug)
-  const [catalog] = useCatalog()
+  const { catalog } = usePublicCatalog()
   const [activeFilter, setActiveFilter] = useState('all')
 
   if (!category) notFound()

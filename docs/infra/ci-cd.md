@@ -1,5 +1,6 @@
-## Goal Description
-Guía del **CI/CD** de GitHub Actions: CI en cada push/PR y CD hacia el VPS compartido al mergear en `main`.
+# CI/CD
+> Estado: vigente 2026-10-15
+Guía del **CI/CD** de GitHub Actions: CI en cada push/PR y CD hacia el VPS dedicado al mergear en `main`.
 
 ## 1. Workflows
 
@@ -22,7 +23,8 @@ cd ~/SportComplexApp/docker
 sudo docker compose pull
 sudo docker compose up migrate        # prisma migrate deploy (sale solo)
 sudo docker compose up -d web caddy   # n8n se levanta tras el import (paso 7)
-# 7. run --rm n8n import --separate + publish por --id + up -d n8n
+# CI/CD
+> Estado: vigente 2026-10-15
 ```
 La imagen ya viene construida desde GitHub (`ghcr.io/sportcomplex-dev/sportcomplex-web:<sha>` y `:latest`); el VPS no compila.
 
@@ -78,8 +80,7 @@ Contenido mínimo de ese secret = `apps/web/.env.example` con valores reales de 
 1. Clonar el repo en `~/SportComplexApp` (ver `vps-provisioning.md`).
 2. Registrar los 6 secrets de la tabla anterior en GitHub (`gh secret set ...`).
 3. `mkdir -p ~/SportComplexApp/docker/data/n8n && sudo chown -R 1000:1000 ~/SportComplexApp/docker/data/n8n`.
-4. `docker network create edge-shared` (si no existe).
-5. Primer deploy: correr el workflow `deploy` (botón **Run workflow** en Actions) — él mismo escribe el `.env` desde `APPS_WEB_ENV`.
-6. Verificar: `curl -Ik https://akros.lat` y `curl -Ik https://n8n.akros.lat`.
+4. Primer deploy: correr el workflow `deploy` (botón **Run workflow** en Actions) — él mismo escribe el `.env` desde `APPS_WEB_ENV`.
+5. Verificar: `curl -Ik https://akros.lat` y `curl -Ik https://n8n.akros.lat`.
 
 A partir de ahí, cada `git push` a `main` despliega solo. El rolback es `IMAGE_TAG=<sha_anterior> sudo docker compose up -d --no-deps web`.

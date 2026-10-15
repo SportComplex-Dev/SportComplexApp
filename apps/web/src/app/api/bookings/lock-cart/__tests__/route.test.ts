@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 const mock = createMockPrisma();
 (globalThis as unknown as { __scPrisma: unknown }).__scPrisma = mock;
 
-const { handleLockCart } = await import("../route");
+const { handleLockCart } = await import("@/app/api/bookings/lock-cart/route");
 
 function tomorrowBogota(): string {
   const now = new Date();

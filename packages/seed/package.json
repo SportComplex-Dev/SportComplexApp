@@ -1,0 +1,38 @@
+{
+  "name": "@sportcomplex/seed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./catalogo": {
+      "types": "./dist/catalogo/index.d.ts",
+      "import": "./dist/catalogo/index.js",
+      "default": "./src/catalogo/index.ts"
+    },
+    "./sincronizar": {
+      "types": "./dist/sincronizar/index.d.ts",
+      "import": "./dist/sincronizar/index.js",
+      "default": "./src/sincronizar/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sportcomplex/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "typescript": "5.7.3"
+  }
+}

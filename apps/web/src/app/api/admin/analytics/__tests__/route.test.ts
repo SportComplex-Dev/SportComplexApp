@@ -2,8 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createMockPrisma } = await import(
-  "../../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
@@ -20,7 +19,7 @@ mock._state.usuarios.push({
 (globalThis as any).__scAuthSession = { user: { id: adminId } };
 
 // Import route handler after mocking prisma
-const analyticsRoute = await import("../route");
+const analyticsRoute = await import("@/app/api/admin/analytics/route");
 
 test("API: GET /api/admin/analytics rechaza rol sin permiso y cuentas inactivas", async () => {
   const admin = mock._state.usuarios.find((user: { id: string }) => user.id === adminId)!;

@@ -1,13 +1,14 @@
 # Módulo de Base de Datos (`packages/db`)
+> Estado: vigente 2026-10-15
 
 Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM** y **PostgreSQL** para todo el sistema SportComplex.
 
 ---
 
-## 🛠️ Lo que se ha implementado en este módulo (TSK-BD-06)
+## Esquema y semillas
 
 1. **Definición del Esquema (`prisma/schema.prisma`)**:
-   - Modelado relacional completo con las **16 tablas** del DER: `ROL`, `USUARIO`, `TOKEN_VERIFICACION`, `CATEGORIA_SERVICIO`, `SERVICIO`, `FRANJA_HORARIA`, `DISPONIBILIDAD`, `FESTIVO`, `RESERVA`, `PAGO`, `TICKET_QR`, `ASIGNACION_PUESTO`, `LECTURA_ACCESO`, `PLAN_MEMBRESIA`, `MEMBRESIA`, `INHABILITACION_SERVICIO`.
+   - Modelado relacional completo con las **16 tablas** del DER (nota: verificar el conteo tras Torneos — el esquema suma `Torneo`, `TorneoBloqueo` e `InscripcionTorneo`): `ROL`, `USUARIO`, `TOKEN_VERIFICACION`, `CATEGORIA_SERVICIO`, `SERVICIO`, `FRANJA_HORARIA`, `DISPONIBILIDAD`, `FESTIVO`, `RESERVA`, `PAGO`, `TICKET_QR`, `ASIGNACION_PUESTO`, `LECTURA_ACCESO`, `PLAN_MEMBRESIA`, `MEMBRESIA`, `INHABILITACION_SERVICIO`.
    - Enums de dominio robustos (Estados de usuario, categorías de servicio, modalidades de reserva, pagos, membresías, control de accesos, etc.).
 
 2. **Constraints de Integridad y Validación (`CHECK` & `UNIQUE`)**:
@@ -26,9 +27,9 @@ Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM*
 
 ---
 
-## 🔁 Idempotencia de pagos (TSK-BD-09)
+## Pagos idempotentes
 
-El repositorio `src/repositories/payments.ts` exporta `procesarPagoWebhook`,
+El repositorio `src/repositories/payments/payments.ts` exporta `procesarPagoWebhook`,
 punto de entrada único del webhook de Stripe (`POST /api/payments`):
 
 - Upsert de `PAGO` por `stripe_payment_intent_id` (UNIQUE desde `TSK-BD-06`);
@@ -42,9 +43,9 @@ Guía completa para backend y frontend: [`docs/features/pagos-pos.md`](../../doc
 
 ---
 
-## 🎫 Canje de ticket y auditoría de accesos (TSK-BD-10)
+## 🎫 Canje de ticket y auditoría de accesos 
 
-El repositorio `src/repositories/tickets.ts` exporta `getTicketForScan`,
+El repositorio `src/repositories/access/tickets.ts` exporta `getTicketForScan`,
 `getAsignacionVigente` y `ejecutarLectura`, el único punto de escritura de
 `ticket_qr` + `lectura_acceso` (`POST /api/access`):
 
@@ -213,7 +214,7 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
 
 ### 8. Reserva transaccional TSK-BD-07 (Overbooking = 0)
 
-  - **Qué:** `src/repositories/availability.ts` expone `reserveDisponibilidad()` — reserva atómica con `SELECT ... FOR UPDATE`, ventana `[hoy, hoy+15]` en `America/Bogota` y `reserva` en `PENDIENTE_PAGO` (`expira_en = now + 30 min`, RN-04 rev.).
+  - **Qué:** `src/repositories/reservations/availability.ts` expone `reserveDisponibilidad()` — reserva atómica con `SELECT ... FOR UPDATE`, ventana `[hoy, hoy+15]` en `America/Bogota` y `reserva` en `PENDIENTE_PAGO` (`expira_en = now + 30 min`, RN-04 rev.).
 - **Backend:** llamar siempre a `reserveDisponibilidad()` desde la API route; mapear con `isAvailabilityError(err) → err.httpStatus` (`404` not found, `409` sin cupo/bloqueada, `422` fuera de ventana, `400` cantidad inválida).
 - **Frontend:** ante `409` mostrar "cupo agotado" y refrescar slots (no reintentar a ciegas); ante `422` "fuera de ventana 15 días"; con `201` iniciar checkout con countdown de `expiraEn`.
 - **Regla de oro:** ningún código que ocupe cupos (`cupos_ocupados`) puede bypasear este repo. Detalle, ejemplos y auditoría: `src/repositories/README.md`.
@@ -222,7 +223,7 @@ Existen estas cuentas en la tabla `usuario` (verificadas el 2026-10-05):
 
 ### 9. Checkout con bloqueo temporal TSK-BE-09 (HU-09 / RF-08 / RN-04 rev.)
 
-- **Qué:** `src/repositories/checkout.ts` contiene:
+- **Qué:** `src/repositories/reservations/checkout.ts` contiene:
   - `compensateFailedCheckout(reservaId, db?)` — si Stripe falla tras TX1,
     ejecuta `PENDIENTE_PAGO → EXPIRADA` + `cupos_ocupados = GREATEST(0, -N)`
     con las mismas guardas idempotentes que `expirations.ts`. Nunca degrada

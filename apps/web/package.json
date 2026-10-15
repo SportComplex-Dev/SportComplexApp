@@ -16,6 +16,14 @@
     "@prisma/client": "7.10.0",
     "@sportcomplex/core": "workspace:*",
     "@sportcomplex/db": "workspace:*",
+    "@sportcomplex/domain": "workspace:*",
+    "@sportcomplex/features-booking": "workspace:*",
+    "@sportcomplex/features-portal": "workspace:*",
+    "@sportcomplex/features-scanner": "workspace:*",
+    "@sportcomplex/features-tournament": "workspace:*",
+    "@sportcomplex/features-pos": "workspace:*",
+    "@sportcomplex/security": "workspace:*",
+    "@sportcomplex/shared": "workspace:*",
     "@sportcomplex/ui": "workspace:*",
     "@sportcomplex/validation": "workspace:*",
     "@stripe/react-stripe-js": "3.1.1",
@@ -36,7 +44,9 @@
     "react-dom": "19.0.0",
     "stripe": "22.6.2",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@sportcomplex/features-admin": "workspace:*",
+    "@sportcomplex/seed": "workspace:*"
   },
   "devDependencies": {
     "@sportcomplex/config": "workspace:*",

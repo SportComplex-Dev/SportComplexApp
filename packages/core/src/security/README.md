@@ -1,9 +1,10 @@
 # Utilidades de Seguridad
+> Estado: vigente 2026-10-15
 
 ## `token.ts` — Hashing de Códigos de Verificación y Rate Limiting
 
 ### Propósito
-Implementa TSK-BE-03: hashing Argon2id de códigos de 6 dígitos, TTL de 15 minutos y rate limiting de reenvío a 60 segundos.
+Ref. histórica TSK-BE-03: hashing Argon2id de códigos de 6 dígitos, TTL de 15 minutos y rate limiting de reenvío a 60 segundos.
 
 ### Exportaciones
 

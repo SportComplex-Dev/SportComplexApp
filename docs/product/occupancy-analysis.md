@@ -1,13 +1,7 @@
 # Análisis de Ocupación, Demanda y Recomendaciones Tarifarias
+> Estado: vigente 2026-10-15
 
-- **Tarea ID:** TSK-BD-04
-- **Historias de Usuario:** HU-05, HU-24 (RF-04, RF-21)
-- **Fase:** F4
-- **Story Points:** 5 pts
-- **Responsable:** Leonardo
-- **Microcelda / Componente:** Database & Analytics
-- **Depende de:** TSK-BD-03
-- **Destino:** Parámetros de configuración para `TSK-BE-05`
+> Ref histórica: TSK-BD-04 · HU-05, HU-24 (RF-04, RF-21) · Fase F4 · 5 pts · depende de TSK-BD-03 · destino: parámetros para bloqueo de franjas · responsable: Leonardo
 - **Zona Horaria:** `America/Bogota` (UTC-5)
 
 ---

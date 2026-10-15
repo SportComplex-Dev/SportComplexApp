@@ -1,10 +1,10 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { resendSchema, verifySchema } from "@sportcomplex/validation";
 import {
   verifySecret,
   isTokenExpired,
   RESEND_COOLDOWN_MS,
-} from "@sportcomplex/core/src/security/token";
+} from "@sportcomplex/security";
 import {
   consumeRateLimit,
   resetRateLimit,

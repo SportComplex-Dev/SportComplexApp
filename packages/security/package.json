@@ -1,0 +1,62 @@
+{
+  "name": "@sportcomplex/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./qr": {
+      "types": "./dist/qr/index.d.ts",
+      "import": "./dist/qr/index.js",
+      "default": "./src/qr/index.ts"
+    },
+    "./token": {
+      "types": "./dist/token/index.d.ts",
+      "import": "./dist/token/index.js",
+      "default": "./src/token/index.ts"
+    },
+    "./limite-tasa": {
+      "types": "./dist/limite-tasa/index.d.ts",
+      "import": "./dist/limite-tasa/index.js",
+      "default": "./src/limite-tasa/index.ts"
+    },
+    "./stripe": {
+      "types": "./dist/stripe/index.d.ts",
+      "import": "./dist/stripe/index.js",
+      "default": "./src/stripe/index.ts"
+    },
+    "./correo": {
+      "types": "./dist/correo/index.d.ts",
+      "import": "./dist/correo/index.js",
+      "default": "./src/correo/index.ts"
+    },
+    "./festivos": {
+      "types": "./dist/festivos/index.d.ts",
+      "import": "./dist/festivos/index.js",
+      "default": "./src/festivos/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@sportcomplex/domain": "workspace:*",
+    "ky": "1.7.5",
+    "stripe": "22.6.2"
+  },
+  "devDependencies": {
+    "@sportcomplex/config": "workspace:*",
+    "@types/node": "22.13.10",
+    "typescript": "5.7.3"
+  }
+}

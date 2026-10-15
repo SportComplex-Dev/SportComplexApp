@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 import { parseTicketQrPayload, verifyTicketSignature } from "@sportcomplex/core";
 
 Reflect.set(process.env, "NODE_ENV", "test");
@@ -60,9 +60,9 @@ mock._state.categorias.push({
 });
 
 // Import route handlers
-const listRoute = await import("../route");
-const detailRoute = await import("../[id]/route");
-const registerRoute = await import("../[id]/register/route");
+const listRoute = await import("@/app/api/tournaments/route");
+const detailRoute = await import("@/app/api/tournaments/[id]/route");
+const registerRoute = await import("@/app/api/tournaments/[id]/register/route");
 
 // IDs constantes para torneos de prueba
 const TORNEO_ABIERTO_ID = "11111111-1111-4111-8111-111111111111";
@@ -87,6 +87,7 @@ mock._state.torneos.push(
     estado: "INSCRIPCIONES_ABIERTAS",
     creadoEn: new Date(),
     actualizadoEn: new Date(),
+    eliminadoEn: null,
   },
   {
     id: TORNEO_LLENO_ID,
@@ -103,6 +104,7 @@ mock._state.torneos.push(
     estado: "INSCRIPCIONES_ABIERTAS",
     creadoEn: new Date(),
     actualizadoEn: new Date(),
+    eliminadoEn: null,
   },
   {
     id: TORNEO_BORRADOR_ID,
@@ -119,6 +121,7 @@ mock._state.torneos.push(
     estado: "BORRADOR",
     creadoEn: new Date(),
     actualizadoEn: new Date(),
+    eliminadoEn: null,
   },
   {
     id: TORNEO_PAGO_ID,
@@ -135,6 +138,7 @@ mock._state.torneos.push(
     estado: "INSCRIPCIONES_ABIERTAS",
     creadoEn: new Date(),
     actualizadoEn: new Date(),
+    eliminadoEn: null,
   },
 );
 

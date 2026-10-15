@@ -1,11 +1,11 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { registerSchema } from "@sportcomplex/validation";
 import {
   hashSecret,
   generateVerificationCode,
   TOKEN_TTL_MS,
-} from "@sportcomplex/core/src/security/token";
-import { sendVerificationCodeEmail } from "@sportcomplex/core";
+} from "@sportcomplex/security";
+import { sendVerificationCodeEmail } from "@sportcomplex/security";
 import { prisma, createToken } from "@sportcomplex/db";
 import {
   createSupabaseAuthUser,

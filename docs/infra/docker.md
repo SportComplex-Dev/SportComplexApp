@@ -1,4 +1,5 @@
 # Docker — imágenes y orquestación
+> Estado: vigente 2026-10-15
 
 ## Estrategia
 
@@ -22,13 +23,12 @@ VPS · docker compose up -d
 | `docker/Caddyfile` | Edge (ver `./caddy.md`) |
 | `docker/docker-compose.dev.yml` | Local: solo `n8n` en `localhost:5678` |
 
-## Reglas de convivencia en el VPS compartido
+## Reglas en el VPS dedicado
 
-- `name: sportcomplex-prod` y red propia `sportcomplex-net`. Otros proyectos usan su propio `name:` y red.
+- `name: sportcomplex-prod` y red propia `sportcomplex-net`.
 - Solo `caddy` publica puertos (`80/443`). Todo lo demás usa `expose` (interno por red Docker).
 - La imagen se referencia como `ghcr.io/sportcomplex-dev/sportcomplex-web:${IMAGE_TAG:-latest}` — el deploy fija `IMAGE_TAG=<sha>`.
-- Límites de recursos en `web` (1 CPU / 1 GB) para no ahogar al otro proyecto.
-- Red externa compartida `edge-shared` conecta Caddy con el contenedor del otro equipo (`jorge-web`); n8n y web quedan fuera de ella.
+- Límites de recursos en `web` (1 CPU / 1 GB) y `n8n` (0.5 CPU / 512 MB) como guardarraíl base; al ser VPS dedicado pueden subirse sin coordinar con terceros.
 
 ## Comandos diarios
 

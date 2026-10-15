@@ -3,16 +3,12 @@ import assert from 'node:assert/strict'
 import {
   tournamentConfig,
   inscripcionConfig,
-} from '@/components/admin/tournaments/tournament-status-badge'
-import {
   toDatetimeLocal,
   parseDatetimeLocalToUtcIso,
   mapTournamentApiError,
-} from '@/components/admin/tournaments/tournament-form-modal'
-import {
   calculateTournamentKPIs,
   type TorneoAdminItem,
-} from '@/app/(admin)/admin/tournaments/page'
+} from '@sportcomplex/features-tournament'
 import { createTournamentSchema } from '@sportcomplex/validation'
 
 // TSK-FE-25 (SCRUM-168): Suite de pruebas unitarias robusta para Panel de Torneos Admin

@@ -1,14 +1,8 @@
-
 # Tuning de Consultas con EXPLAIN ANALYZE y Evaluación Técnica de GiST
+> Estado: vigente 2026-10-15
 
-- **Tarea ID:** TSK-BD-05
-- **Historia de Usuario:** HU-24 (RF-21 / RNF-01)
-- **Fase:** F4
-- **Story Points:** 5 pts
-- **Responsable:** Leonardo
-- **Componente:** Database & Analytics
-- **Depende de:** TSK-BD-04
-- **Rama:** `feature/tsk-bd-05-tuning-de-consultas-con-explain`
+> Ref histórica: TSK-BD-05 · HU-24 (RF-21 / RNF-01) · Fase F4 · 5 pts · rama `feature/tsk-bd-05-tuning-de-consultas-con-explain` · depende de TSK-BD-04 · responsable: Leonardo · componente: Database & Analytics
+
 - **Motor:** PostgreSQL (Supabase)
 - **Zona Horaria:** `America/Bogota` (UTC-5)
 

@@ -1,4 +1,5 @@
 # ARQUITECTURA OBJETIVO DEL SISTEMA: SPORTCOMPLEX
+> Estado: vigente 2026-10-15
 
 ## 1. Control del Documento y Trazabilidad de Artefactos
 
@@ -7,9 +8,9 @@
 * **Entorno de Despliegue Objetivo:** Virtual Private Server (VPS) basado en Contenedores Docker
 * **Zona Horaria Canónica:** Colombia (`America/Bogota`, UTC-5)
 * **Documentos Vinculados:**
-  * **`SRS.md`**: Especificación Formal de Requisitos del Sistema. Establece las directrices funcionales (RF-00 a RF-21), restricciones no funcionales de concurrencia y seguridad (RNF-01 a RNF-06), e invariantes de negocio (RN-01 a RN-14).
-  * **`DESIGN.md`**: Sistema de diseño unificado, tokens de color, componentes atómicos (`@sportcomplex/ui`), microinteracciones y lineamientos visuales diferenciados por perfil (Cliente, Taquilla POS, Escáner Móvil, Administración). La selección final de iconografía, utilitarios de clases y librerías atómicas complementarias se define en este documento.
-  * **`MER_&_DER.md`**: Modelo Entidad-Relación y Diagrama Entidad-Relación relacional físico para PostgreSQL/Supabase, definición de constraints de exclusión temporal, índices B-Tree/GiST y normalización transaccional.
+  * [srs.md](../product/srs.md): Especificación Formal de Requisitos del Sistema. Establece las directrices funcionales (RF-00 a RF-21), restricciones no funcionales de concurrencia y seguridad (RNF-01 a RNF-06), e invariantes de negocio (RN-01 a RN-14).
+  * [design-system.md](./design-system.md): Sistema de diseño unificado, tokens de color, componentes atómicos (`@sportcomplex/ui`), microinteracciones y lineamientos visuales diferenciados por perfil (Cliente, Taquilla POS, Escáner Móvil, Administración). La selección final de iconografía, utilitarios de clases y librerías atómicas complementarias se define en este documento.
+  * [data-model.md](./data-model.md): Modelo Entidad-Relación y Diagrama Entidad-Relación relacional físico para PostgreSQL/Supabase, definición de constraints de exclusión temporal, índices B-Tree/GiST y normalización transaccional.
 
 ---
 
@@ -43,7 +44,7 @@ Para eliminar discrepancias de compilación y fijar la línea base del proyecto,
 * **Supabase SSR Helper (`@supabase/ssr`):** `0.5.2`
 
 ### 3.3. Interfaz de Usuario y Estilos (Línea Base Confirmada)
-> **Nota de Alcance:** La suite detallada de utilidades atómicas, paquete de iconografía (ej. Lucide, Phosphor, Tabler u otros) y librerías auxiliares de animación/accesibilidad se encuentra abierta y pendiente de ratificación en el documento `DESIGN.md`. La base tecnológica ratificada para fast UI/UX shipping se limita a:
+> **Nota de Alcance:** La suite detallada de utilidades atómicas, paquete de iconografía (ej. Lucide, Phosphor, Tabler u otros) y librerías auxiliares de animación/accesibilidad se encuentra abierta y pendiente de ratificación en el documento `design-system.md`. La base tecnológica ratificada para fast UI/UX shipping se limita a:
 * **Tailwind CSS (`tailwindcss`):** `4.3.3`
 * **Shadcn UI CLI (`shadcn`):** Latest CLI de inicialización de componentes sobre Tailwind v4
 
@@ -68,7 +69,7 @@ El rendimiento de la plataforma y el aprovechamiento de recursos exigen la delim
 * **Comportamiento:**
   * Compilación estática pura (`export const dynamic = 'force-static'`) sin consumo de CPU por petición para garantizar LCP < 1.5 segundos.
   * Exposición de catálogo fotográfico de instalaciones, horarios generales y reglamentos institucionales.
-  * **Intercepción Perimetral en `middleware.ts`:** El middleware inspecciona los tokens de sesión en el borde previo al despacho del HTML estático. Si el usuario cuenta con una sesión autenticada activa, ejecuta de forma inmediata una redirección 307 al portal web correspondiente según su rol (`/portal` para clientes, `/pos` para vendedores, `/scanner` para lectores, `/admin` para administradores). Los visitantes anónimos reciben de inmediato el HTML estático de la landing page.
+  * **Intercepción Perimetral en `proxy.ts`:** El proxy (Next 16) inspecciona los tokens de sesión en el borde previo al despacho del HTML estático. Si el usuario cuenta con una sesión autenticada activa, ejecuta de forma inmediata una redirección 307 al portal web correspondiente según su rol (`/portal` para clientes, `/pos` para vendedores, `/scanner` para lectores, `/admin` para administradores). Los visitantes anónimos reciben de inmediato el HTML estático de la landing page.
 
 ### 4.2. Server-Side Rendering (SSR)
 * **Alcance:** Vistas autenticadas que requieren datos frescos y seguros:
@@ -134,7 +135,7 @@ sport-complex/
 │       │   │   │   │   ├── services/  # Configuración de categorías y aforos (RF-03, RF-04)
 │       │   │   │   │   ├── employees/ # Gestión de personal y borrado lógico (RF-18)
 │       │   │   │   │   └── incident/  # Inhabilitación y webhook n8n (RF-19)
-│       │   │   ├── api/               # API Routes (Backend REST)
+│       │   │   ├── api/               # API Routes (Backend REST) — handlers delgados
 │       │   │   │   ├── auth/          # Callbacks OAuth y verificación
 │       │   │   │   ├── bookings/      # Bloqueo temporal 30 min y confirmaciones
 │       │   │   │   ├── payments/      # Webhook de Stripe y sesiones de pago
@@ -142,7 +143,17 @@ sport-complex/
 │       │   │   │   ├── pdf/           # Endpoint para emisión de comprobante en PDF
 │       │   │   │   └── webhooks/      # Receptores y disparadores (n8n, contingencia)
 │       │   │   └── layout.tsx         # Layout raíz con proveedores globales
-│       │   ├── middleware.ts          # Control RBAC y redirección perimetral de Landing
+│       │   ├── components/            # Chrome de la app (el resto vive en packages/features/*)
+│       │   │   ├── layout/            # app-provider, top-bar, user-menu, theme-toggle, page-*
+│       │   │   ├── brand/             # brand, iconos, google-mark, athletic-marquee
+│       │   │   ├── discovery/         # category-filters, live-conditions, sports-specs-grid
+│       │   │   ├── feedback/          # splash-screen, toast-message
+│       │   │   └── home/              # Secciones de la landing (hero, showcase, faq, etc.)
+│       │   ├── lib/                   # Sólo lo Next-specific; lo genérico vive en @sportcomplex/shared
+│       │   │   ├── auth/              # session.ts, route-access.ts, auth.config.ts
+│       │   │   ├── api/               # api-auth.ts (authorización), access.ts, bot-api-auth.ts
+│       │   │   └── supabase/          # server.ts, admin.ts (clientes Supabase)
+│       │   ├── proxy.ts               # Control RBAC y redirección perimetral de Landing (Next 16 proxy.ts)
 │       │   └── styles/
 │       │       └── globals.css        # Configuración base de Tailwind CSS v4
 │       ├── next.config.ts             # Configuración de Next.js (output: 'standalone')
@@ -152,41 +163,59 @@ sport-complex/
 │   ├── core/                          # Reglas de negocio e integraciones de dominio
 │   │   ├── src/
 │   │   │   ├── domain/                # Modelos de dominio y tipos abstractos
-│   │   │   ├── services/              # Orquestadores de lógica pura
-│   │   │   │   ├── pricing.ts         # Cálculo tarifario y descuento del 30% (RN-08)
-│   │   │   │   ├── availability.ts    # Ventana 15 días y multirreserva (RN-01, RN-07)
-│   │   │   │   ├── pool-policy.ts     # Mantenimiento y festivos Nager.Date (RN-02)
-│   │   │   │   └── access-control.ts  # Validación de servicio y vigencia horaria (RN-06)
-│   │   │   ├── integrations/          # Conectores desacoplados para servicios externos
-│   │   │   │   ├── nager-date.ts      # Cliente de festivos nacionales de Colombia
-│   │   │   │   ├── stripe.ts          # Integración con pasarela 100% cashless
-│   │   │   │   └── n8n.ts             # Cliente de eventos para flujos de contingencia
+│   │   │   ├── services/              # Orquestadores de lógica pura (pricing, availability, pool-policy, access-control)
+│   │   │   ├── integrations/          # Conectores externos (nager-date, stripe, n8n)
 │   │   │   └── security/              # Generación de tokens y firmado HMAC de QR
 │   │   ├── package.json
 │   │   └── tsconfig.json
+│   ├── domain/                        # Tipos puros de dominio (0 dependencias)
+│   ├── application/                   # Casos de uso por área (reserva, torneo, membresía, precio, acceso)
+│   ├── security/                      # qr, token, stripe, correo, festivos, rate-limit
+│   ├── seed/                          # Datos semilla + mapa de slugs (catálogo, sincronizar)
+│   ├── automation/                    # Contratos de automatización (n8n)
+│   ├── shared/                        # Utilidades genéricas sin lógica de dominio (@sportcomplex/shared)
+│   │   ├── src/
+│   │   │   ├── lib/                   # api-response, contingency-webhook, persistent-state, qr-client, stores
+│   │   │   └── hooks/                 # use-network-resilience (retry + caché offline)
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── features/                      # Features de UI migradas desde apps/web (@sportcomplex/features-*)
+│   │   ├── booking/                   # Reservas: components/{catalog,cart,checkout}, hooks, services, types
+│   │   ├── tournament/               # Torneos: components/{detail,registration,manage}, services, types
+│   │   ├── pos/                       # Punto de venta: components/{sale,billing}, hooks, services
+│   │   ├── scanner/                   # Escáner: components/{capture,session,response}, hooks, services
+│   │   ├── portal/                    # Portal cliente: components/{tickets,dashboard,passes}, hooks, utils
+│   │   └── admin/                     # Consola admin: components/{catalog,dashboard,staff}
 │   ├── db/                            # Capa de datos con Prisma ORM sobre Supabase
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma          # Definición del esquema relacional
+│   │   │   ├── seed.ts                # Seed idempotente (roles, planes, torneos con bloqueos)
 │   │   │   └── migrations/            # Historial de migraciones SQL versionadas
 │   │   ├── src/
 │   │   │   ├── client.ts              # Instancia singleton de Prisma Client
+│   │   │   ├── jobs/                  # Tareas programadas (expire)
 │   │   │   └── repositories/          # Consultas transaccionales y SELECT FOR UPDATE
+│   │   │       ├── reservations/       # bookings/ (multi-archivo), availability, checkout, expirations, festivos
+│   │   │       ├── payments/          # payments, receipts, contingencies
+│   │   │       ├── people/             # employees, memberships
+│   │   │       ├── access/            # tickets, verification-tokens
+│   │   │       ├── catalog/           # services, tournaments, analytics
+│   │   │       └── tipos-db.ts        # Alias de cliente/transacción Prisma
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   ├── ui/                            # Sistema de componentes compartidos (@sportcomplex/ui)
 │   │   ├── src/
-│   │   │   ├── components/            # Componentes base Shadcn (Button, Dialog, Card, etc.)
-│   │   │   ├── templates/             # Plantillas de Simulación de Impresión PDF
-│   │   │   │   └── ticket-receipt.tsx # Comprobante optimizado para exportación/impresión
-│   │   │   └── lib/                   # Funciones utilitarias
+│   │   │   ├── components/            # Primitivas: forms/ (Button, Input, ActionButton),
+│   │   │   │                          # dialogs/ (Modal, ConfirmDialog, Dialog),
+│   │   │   │                          # display/ (Card, Badge)
+│   │   │   ├── templates/             # ticket-receipt (comprobante para impresión PDF)
+│   │   │   └── lib/                   # cn (classnames)
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   ├── validation/                    # Esquemas Zod y Contratos de Validación
 │   │   ├── src/
-│   │   │   ├── auth.schema.ts         # Validación de credenciales y activación
-│   │   │   ├── booking.schema.ts      # Validación de solicitudes de reserva
-│   │   │   ├── access.schema.ts       # Validación de lectura de QR y turnos
-│   │   │   └── service.schema.ts      # Validación de parámetros del catálogo
+│   │   │   ├── platform/              # auth, access, contingency, bot (contratos de plataforma)
+│   │   │   └── business/              # booking, tournament, service, payment, analytics, automation
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   └── config/                        # Configuraciones de compilación y linter
@@ -238,7 +267,7 @@ sport-complex/
 
 ### 6.4. Workspace de Interfaz y Emisión PDF (`packages/ui`)
 
-* **Propósito:** Provee la biblioteca de componentes basada en Shadcn UI y Tailwind CSS v4, estructurada según las pautas de `DESIGN.md`.
+* **Propósito:** Provee la biblioteca de componentes basada en Shadcn UI y Tailwind CSS v4, estructurada según las pautas de `design-system.md`.
 * **Motor de Simulación PDF (RNF-05):** Contiene la maqueta estructurada del comprobante digital (con código QR centralizado e información del servicio y titular) preparada para descarga virtual e invocación del diálogo nativo de impresión del navegador sin requerir impresoras de hardware.
 
 
@@ -246,6 +275,39 @@ sport-complex/
 ### 6.5. Workspace de Validación de Contratos (`packages/validation`)
 
 * **Propósito:** Define los esquemas Zod consumidos bidireccionalmente por el backend y el frontend. Exporta los esquemas de parseo de datos y los tipos TypeScript inferidos automáticamente.
+* **Organización:** `src/platform/` (auth, access, contingency, bot) y `src/business/` (booking, tournament, service, payment, analytics, automation).
+
+### 6.6. Workspace de Utilidades Genéricas (`packages/shared`)
+
+* **Propósito:** Aloja utilidades sin lógica de dominio reutilizadas por features y web: `lib/` (api-response, contingency-webhook, persistent-state, qr-client, stores) y `hooks/` (use-network-resilience con retry y caché offline).
+* **Límites de Dominio:** Cero imports de features. Consumido por `features-scanner` y `apps/web`.
+
+### 6.7. Workspaces de Features (`packages/features/*`)
+
+Cada feature es un paquete workspace independiente con components/hooks/services/types y tests co-locados. Exportan vía barrel `@sportcomplex/features-<name>`.
+
+| Paquete | Contenido | Consume |
+|---|---|---|
+| `features-booking` | 8 componentes (catalog/cart/checkout), usePublicCatalog, cartUtils, checkoutFlow | `ui`, `core`, `validation` |
+| `features-tournament` | 5 componentes (detail/registration/manage), tournamentAdmin (KPIs) | `ui`, `validation` |
+| `features-pos` | 6 componentes (sale/billing), usePosSession, posCheckout (deps inyectadas) | `ui`, `booking`, `core` |
+| `features-scanner` | 11 componentes (capture/session/response), useScannerController, scannerService | `ui`, `core`, `shared` |
+| `features-portal` | 10 componentes (tickets/dashboard/passes), useCustomerPortal, usePortalTickets | `ui`, `booking`, `tournament` |
+| `features-admin` | 8 componentes (catalog/dashboard/staff) | `ui`, `core` |
+
+* **Regla:** sin imports relativos a `apps/web`; todo consumo cruzado va por `@sportcomplex/*`. El detalle completo vive en `docs/architecture/packages-features.md`.
+
+### 6.8. Dominio y Casos de Uso (`packages/domain`, `packages/application`)
+
+* **Propósito:** `domain` aloja tipos puros sin dependencias; `application` los casos de uso por área (reserva, torneo, membresía, precio, acceso, política de piscina).
+
+### 6.9. Seguridad (`packages/security`)
+
+* **Propósito:** Firmado HMAC de QR, tokens, correo, festivos y rate-limit. Consumido por web y n8n.
+
+### 6.10. Semilla (`packages/seed`)
+
+* **Propósito:** Datos semilla del catálogo (12 slugs con `mapa-ids`) y sincronización bidireccional BD ↔ semilla.
 
 ---
 

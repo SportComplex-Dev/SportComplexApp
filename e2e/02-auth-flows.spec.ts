@@ -60,7 +60,7 @@ test.describe("Flujo 2: Autenticación, Registro y Validaciones de Entrada", () 
     // Enlace legal hacia política de privacidad en pestaña nueva
     const legalLink = page.getByRole("link", { name: /Política de Tratamiento/i });
     await expect(legalLink).toBeVisible();
-    await expect(legalLink).toHaveAttribute("href", "/legal");
+    await expect(legalLink).toHaveAttribute("href", "/rules");
     await expect(legalLink).toHaveAttribute("target", "_blank");
 
     // Enlace a login existente

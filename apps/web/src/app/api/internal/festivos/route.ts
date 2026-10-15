@@ -1,4 +1,4 @@
-import { ok, fail } from "@/lib/api-response";
+import { ok, fail } from '@sportcomplex/shared/lib';
 import { upsertManyFestivos } from "@sportcomplex/db";
 import { FestivosBatchSchema } from "@sportcomplex/validation";
 

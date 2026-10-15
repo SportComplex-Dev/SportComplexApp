@@ -6,19 +6,18 @@ import { useState } from 'react'
 import { ArrowLeft, ArrowRight, CalendarDays, Clock3, MapPin, ShieldCheck, Users } from 'lucide-react'
 import { categoryBySlug, formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { categoryIcons } from '@/components/category-icons'
-import { IconBox } from '@/components/icon-box'
-import { SportsSpecsGrid } from '@/components/sports-specs-grid'
-import { AvailabilityCalendar } from '@/components/booking/availability-calendar'
-import { ReservationModal } from '@/components/reservation-modal'
-import { useApp } from '@/components/app-provider'
-import { useCatalog, useDraft } from '@/lib/stores'
+import { categoryIcons } from '@/components/brand/category-icons'
+import { IconBox } from '@/components/brand/icon-box'
+import { SportsSpecsGrid } from '@/components/discovery/sports-specs-grid'
+import { AvailabilityCalendar, ReservationModal, usePublicCatalog } from '@sportcomplex/features-booking'
+import { useApp } from '@/components/layout/app-provider'
+import { useDraft } from '@sportcomplex/shared/lib'
 
 export default function ServiceBookingPage() {
   const router = useRouter()
   const { category: slug, id } = useParams<{ category: string; id: string }>()
   const { notify, ready, session } = useApp()
-  const [catalog] = useCatalog()
+  const { catalog, loading } = usePublicCatalog()
   const [, setDraft] = useDraft()
   const category = categoryBySlug(slug)
   const item = catalog.find((entry) => entry.id === id && entry.category === slug)
@@ -28,8 +27,8 @@ export default function ServiceBookingPage() {
   const [attendees, setAttendees] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
+  if (!ready || loading) return <main className="section-shell booking-page" aria-busy="true" />
   if (!category || !item) notFound()
-  if (!ready) return <main className="section-shell booking-page" aria-busy="true" />
 
   const available = item.status === 'Disponible'
   const isCourt = item.category === 'canchas'

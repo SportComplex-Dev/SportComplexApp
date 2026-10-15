@@ -1,0 +1,6 @@
+export * from './sale/PosHeader'
+export * from './sale/PosClientForm'
+export * from './sale/PosCatalogSelector'
+export * from './billing/PosPaymentStripe'
+export * from './billing/PosVoucherModal'
+export * from './billing/PosAltLinkModal'

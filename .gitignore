@@ -26,7 +26,10 @@ SCRUM-*.xml
 # Git Worktrees locales
 .worktrees/
 
-.agents
+# Agentes locales (Antigravity/Orca) — pero SÍ versionar la suite de skills
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 AGENTS.md
 
 # Reportes locales de revisión
@@ -35,3 +38,7 @@ CODE_REVIEW_*.md
 # Datos locales de contenedores Docker
 docker/data/
 docker/dev_data/
+
+# Salida generada de Typedoc (artefacto de build, vive en CI artifacts)
+docs/api/*
+!docs/api/openapi.json

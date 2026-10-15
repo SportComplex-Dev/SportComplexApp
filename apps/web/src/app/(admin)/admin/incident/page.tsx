@@ -17,15 +17,15 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Badge } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
-import { Modal } from '@/components/modal'
-import { PageHeading } from '@/components/page-heading'
-import { useApp } from '@/components/app-provider'
+import { ActionButton } from '@sportcomplex/ui'
+import { Modal } from '@sportcomplex/ui'
+import { PageHeading } from '@/components/layout/page-heading'
+import { useApp } from '@/components/layout/app-provider'
 import {
   formatIncidentDate,
   formatIncidentHour,
   isIncidentReasonValid,
-} from './incident-utils'
+} from '@/app/(admin)/admin/incident/incident-utils'
 
 interface ServiceOption {
   id: number

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 const mock = createMockPrisma();
@@ -18,9 +18,9 @@ mock._state.usuarios.push({
 });
 
 // Import route handlers
-const servicesRoute = await import("../route");
-const serviceDetailRoute = await import("../[id]/route");
-const categoriesRoute = await import("../categories/route");
+const servicesRoute = await import("@/app/api/admin/services/route");
+const serviceDetailRoute = await import("@/app/api/admin/services/[id]/route");
+const categoriesRoute = await import("@/app/api/admin/services/categories/route");
 
 test("API: POST y GET /api/admin/services/categories", async () => {
   // 1. Alta de categoría vía sub-endpoint

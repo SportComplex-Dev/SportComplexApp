@@ -4,7 +4,7 @@ import {
   handleIncidentPreviewRequest,
   handleIncidentRequest,
   type IncidentDependencies,
-} from "../route";
+} from "@/app/api/admin/incident/route";
 
 const adminId = "00000000-0000-4000-8000-000000000031";
 const inhabilitation = {

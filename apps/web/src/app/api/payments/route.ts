@@ -6,8 +6,8 @@ import {
   parseInvoiceEventData,
   stripeAmountToMonto,
 } from "@sportcomplex/core";
-import { ok, fail } from "@/lib/api-response";
-import { sendContingencyWebhook } from "@/lib/contingency-webhook";
+import { ok, fail } from '@sportcomplex/shared/lib';
+import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 import { clearPendingSubscriptionCheckout } from "@/app/api/memberships/subscribe/route";
 
 // RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09 / TSK-BE-20).

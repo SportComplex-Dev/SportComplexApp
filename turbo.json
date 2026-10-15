@@ -6,6 +6,9 @@
       "dependsOn": ["^build", "db:generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
+    "verificar:limites": {
+      "cache": false
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

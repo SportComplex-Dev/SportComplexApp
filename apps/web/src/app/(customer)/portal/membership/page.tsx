@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   calcularDesglosePlan,
   evaluateMembershipPurchaseAccess,
@@ -29,7 +29,7 @@ import {
   type MembresiaActivaDTO,
   type PlanDisplayBreakdown,
   type PlanMembresiaDTO,
-} from '@/components/portal/membership-utils'
+} from '@sportcomplex/features-portal'
 
 function MembershipPortalContent() {
   const { session, ready, notify } = useApp()

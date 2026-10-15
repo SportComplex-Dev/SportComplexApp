@@ -15,12 +15,12 @@ import {
   getNumericServiceId,
   resolveCheckoutRedirection,
   validateCanAddToCart,
+  ServiceSelector,
+  Cart,
+  BookingSummaryModal,
   type CartItem,
   type DynamicTimeSlot,
-} from './cart-utils';
-import { ServiceSelector } from './components/service-selector';
-import { Cart } from './components/cart';
-import { BookingSummaryModal } from './components/booking-summary-modal';
+} from '@sportcomplex/features-booking';
 
 export default function BookPage() {
   const router = useRouter();

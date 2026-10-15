@@ -1,4 +1,5 @@
 # Documentación de Integración: Webhook de Pagos Fallidos con n8n y Resend
+> Estado: vigente 2026-10-15
 
 ## 1. Resumen Ejecutivo
 Se implementó y validó exitosamente una arquitectura de automatización de flujos de trabajo utilizando **n8n Cloud** para procesar notificaciones de eventos de cobro fallido (`invoice.payment_failed`) de Stripe. El flujo valida la estructura de la petición entrante, da formato a las variables de notificación, envía un correo transaccional estilizado en HTML mediante la API de **Resend** y responde con los códigos de estado HTTP pertinentes (`200 OK` para envíos exitosos o `400 Bad Request` para payloads inválidos).
@@ -123,7 +124,9 @@ curl -X POST "https://jafet123.app.n8n.cloud/webhook-test/billing/failed" \
 ## 6. Siguientes Pasos para Producción
 1. Confirmar el estado **Verified** del dominio `akros.lat` en la consola de Resend.
 2. Cambiar la URL del Webhook en Stripe/Backend de la ruta `/webhook-test/` a la ruta de producción `/webhook/`.
-3. Activar el interruptor **Active** en la parte superior derecha de n8n para mantener el flujo escuchando permanentemente en segundo plano.# Documentación Técnica: Sistema de Contingencia y Reintentos de Webhooks (TSK-AU-08)
+3. Activar el interruptor **Active** en la parte superior derecha de n8n para mantener el flujo escuchando permanentemente en segundo plano.
+
+## Sistema de contingencia y reintentos de webhooks Sistema de Contingencia y Reintentos de Webhooks (TSK-AU-08)
 
 ## 1. Objetivo General
 Garantizar la recepción, procesamiento y tolerancia a fallos de webhooks provenientes del backend, implementando un mecanismo de reintentos con backoff exponencial y un sistema de almacenamiento para mensajes fallidos (**Dead-Letter Queue - DLQ**) que asegure la integridad del payload original ante caídas de servicio.

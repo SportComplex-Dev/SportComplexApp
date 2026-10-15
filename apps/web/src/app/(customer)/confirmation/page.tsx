@@ -1,15 +1,15 @@
 'use client'
-
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, BadgeCheck, Check, CheckCircle2, CreditCard, MapPin } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, CheckCircle2, CreditCard, MapPin, Loader2 } from 'lucide-react'
 import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { ActionButton } from '@/components/action-button'
-import { useBookings, useLastCode } from '@/lib/stores'
+import { ActionButton } from '@sportcomplex/ui'
+import { useLastCode } from '@sportcomplex/shared/lib'
+import { fetchCustomerBookingHistory, type PortalTicket } from '@sportcomplex/features-portal'
 
 function QRGraphic() {
-  const blocks = useMemo(() => Array.from({ length: 441 }, (_, i) => {
+  const blocks = Array.from({ length: 441 }, (_, i) => {
     const x = i % 21; const y = Math.floor(i / 21)
     const inEye = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13)
     if (inEye) {
@@ -17,7 +17,7 @@ function QRGraphic() {
       return ax === 0 || ax === 6 || ay === 0 || ay === 6 || (ax >= 2 && ax <= 4 && ay >= 2 && ay <= 4)
     }
     return (x * 7 + y * 11 + x * y * 3) % 5 < 2
-  }), [])
+  })
   return <div className="qr-shell" aria-label="Código QR de acceso"><div className="qr-grid">{blocks.map((active, i) => <i key={i} className={active ? 'qr-on' : ''} />)}</div></div>
 }
 
@@ -29,9 +29,41 @@ const paymentLabels: Record<string, string> = {
 }
 
 export default function ReservationConfirmationPage() {
-  const [bookings] = useBookings()
   const [code] = useLastCode()
-  const booking = bookings.find((entry) => entry.code === code)
+  const [booking, setBooking] = useState<PortalTicket | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    fetchCustomerBookingHistory()
+      .then((items) => {
+        if (!mounted) return
+        const found = items.find((b) => b.code === code || b.id === code)
+        if (found) {
+          setBooking(found)
+        } else if (items.length > 0) {
+          setBooking(items[0] || null)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [code])
+
+  if (loading) {
+    return (
+      <main className="confirmation-page">
+        <div className="flex flex-col items-center justify-center p-12">
+          <Loader2 className="animate-spin text-primary size-8 mb-4" />
+          <p className="text-muted-foreground">Cargando comprobante de tu reserva...</p>
+        </div>
+      </main>
+    )
+  }
 
   if (!booking) {
     return (
