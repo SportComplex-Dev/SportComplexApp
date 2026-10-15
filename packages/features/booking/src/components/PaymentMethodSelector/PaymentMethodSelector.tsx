@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { CreditCard, Landmark, QrCode } from "lucide-react";
-import { StripePaymentForm } from "@/components/stripe-payment-form";
+import { StripePaymentForm } from "../StripePaymentForm";
 
-type PaymentMethod = "card" | "pse" | "nequi" | "onsite";
-type PaymentIntentState = {
+export type PaymentMethod = "card" | "pse" | "nequi" | "onsite";
+
+export interface PaymentIntentState {
   reservationId: string;
   retryCount: number;
   clientSecret?: string;
   status?: string;
   error?: string;
-};
+}
 
 function isPaymentIntentResponse(
   value: unknown,
@@ -39,28 +40,30 @@ function getApiErrorMessage(value: unknown): string | null {
   return typeof message === "string" ? message : null;
 }
 
-type ConfiguredPaymentMethod = {
+export interface ConfiguredPaymentMethod {
   id: PaymentMethod;
   label: string;
   Icon: typeof CreditCard;
   enabled: boolean;
-};
+}
 
 // Configuración extensible de métodos de pago.
 // Los métodos alternativos permanecen definidos pero inactivos hasta que se configure su backend.
-const paymentMethods: ConfiguredPaymentMethod[] = [
+export const paymentMethods: ConfiguredPaymentMethod[] = [
   { id: "card", label: "Tarjeta", Icon: CreditCard, enabled: true },
   { id: "pse", label: "PSE / Banco", Icon: Landmark, enabled: false },
   { id: "nequi", label: "Nequi / QR", Icon: QrCode, enabled: false },
 ];
 
+export interface PaymentMethodSelectorProps {
+  reservationId: string | null;
+  onPaymentSuccess?: (() => void) | undefined;
+}
+
 export function PaymentMethodSelector({
   reservationId,
   onPaymentSuccess,
-}: {
-  reservationId: string | null;
-  onPaymentSuccess?: () => void;
-}) {
+}: PaymentMethodSelectorProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntentState | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -93,12 +96,15 @@ export function PaymentMethodSelector({
           throw new Error("El servidor devolvió una respuesta de pago no válida.");
         }
 
-        setPaymentIntent({
+        const state: PaymentIntentState = {
           reservationId: activeReservationId,
           retryCount,
-          clientSecret: result.data.clientSecret ?? undefined,
           status: result.data.status,
-        });
+        };
+        if (result.data.clientSecret !== null) {
+          state.clientSecret = result.data.clientSecret;
+        }
+        setPaymentIntent(state);
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
         setPaymentIntent({
@@ -200,7 +206,7 @@ export function PaymentMethodSelector({
             ) : currentIntent?.clientSecret ? (
               <StripePaymentForm
                 clientSecret={currentIntent.clientSecret}
-                onSuccess={onPaymentSuccess}
+                {...(onPaymentSuccess ? { onSuccess: onPaymentSuccess } : {})}
               />
             ) : (
               <p role="status" className="rounded-xl border border-[#e1e6df] p-4 text-sm">

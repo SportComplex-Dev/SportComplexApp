@@ -1,22 +1,12 @@
-
-export interface CartItem {
-  serviceId: string;
-  numericServiceId: number;
-  serviceName: string;
-  serviceCategory: string;
-  date: string;
-  startTime: string; // Formato "HH:MM"
-  endTime: string;   // Formato "HH:MM"
-  price: number;
-}
-
-export interface DynamicTimeSlot {
-  startTime: string;
-  endTime: string;
-  label: string;
-  isAvailable: boolean;
-  disabledReason?: string;
-}
+import type {
+  CartItem,
+  DynamicTimeSlot,
+  AddToCartValidationResult,
+  CheckoutRedirection,
+} from '../types/cart';
+import type { LockCartPayload, SingleLockPayload } from '../types/booking';
+import { formatMoney } from '../utils/formatters';
+import { getBogotaDateAfter, getBogotaTodayISO } from '../utils/date';
 
 export const SERVICE_NUMERIC_ID_MAP: Record<string, number> = {
   'tenis-cancha-1': 1,
@@ -41,29 +31,8 @@ export function getNumericServiceId(serviceId: string): number {
   return numericId;
 }
 
-export function formatMoney(amount: number): string {
-  return `$${amount.toLocaleString('es-CO')}`;
-}
-
-export function getBogotaDateAfter(days: number, baseDate: Date = new Date()): string {
-  const bogotaDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(baseDate);
-  const [year, month, day] = bogotaDate.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(Date.UTC(year, month - 1, day + days, 12)));
-}
-
-export function getBogotaTodayISO(now: Date = new Date()): string {
-  return getBogotaDateAfter(0, now);
-}
+// Re-export utility functions for convenience and backwards compatibility
+export { formatMoney, getBogotaDateAfter, getBogotaTodayISO };
 
 /**
  * Genera dinámicamente las franjas horarias del complejo entre 06:00 y 22:00 (turnos continuos de 60 min).
@@ -105,11 +74,6 @@ export function generateDynamicTimeSlots(
   return slots;
 }
 
-export type AddToCartValidationResult =
-  | { valid: true }
-  | { valid: false; code: 'DUPLICATE_ITEM'; message: string }
-  | { valid: false; code: 'DIFFERENT_SLOT'; message: string };
-
 /**
  * RN-07 (Multirreserva concurrente):
  * El titular puede reservar múltiples servicios para la misma fecha y bloque horario [HoraInicio, HoraFin]
@@ -134,7 +98,7 @@ export function validateCanAddToCart(
   const isDuplicate = cart.some(
     (item) =>
       item.serviceId === newItem.serviceId ||
-      (newItem.numericServiceId && item.numericServiceId === newItem.numericServiceId),
+      (newItem.numericServiceId !== undefined && item.numericServiceId === newItem.numericServiceId),
   );
 
   if (isDuplicate) {
@@ -149,9 +113,10 @@ export function validateCanAddToCart(
   if (cart.length > 0) {
     const activeSlot = cart[0];
     if (
-      activeSlot.date !== newItem.date ||
-      activeSlot.startTime !== newItem.startTime ||
-      activeSlot.endTime !== newItem.endTime
+      activeSlot &&
+      (activeSlot.date !== newItem.date ||
+        activeSlot.startTime !== newItem.startTime ||
+        activeSlot.endTime !== newItem.endTime)
     ) {
       return {
         valid: false,
@@ -175,7 +140,7 @@ export function calculateCartTotal(cart: CartItem[]): number {
 /**
  * Construcción del payload multi-servicio para POST /api/bookings/lock-cart según esquema Zod (@sportcomplex/validation)
  */
-export function buildLockCartPayload(cart: CartItem[], defaultDate: string) {
+export function buildLockCartPayload(cart: CartItem[], defaultDate: string): LockCartPayload {
   return {
     items: cart.map((item) => {
       const itemDate = item.date || defaultDate;
@@ -193,7 +158,7 @@ export function buildLockCartPayload(cart: CartItem[], defaultDate: string) {
 /**
  * Construcción del payload individual para POST /api/bookings/lock
  */
-export function buildSingleLockPayload(item: CartItem, defaultDate: string) {
+export function buildSingleLockPayload(item: CartItem, defaultDate: string): SingleLockPayload {
   const itemDate = item.date || defaultDate;
   return {
     serviceId: item.numericServiceId,
@@ -202,11 +167,6 @@ export function buildSingleLockPayload(item: CartItem, defaultDate: string) {
     endTime: new Date(`${itemDate}T${item.endTime}:00-05:00`).toISOString(),
     cantidadCupos: 1,
   };
-}
-
-export interface CheckoutRedirection {
-  type: 'external' | 'internal';
-  url: string;
 }
 
 /**
@@ -231,5 +191,3 @@ export function resolveCheckoutRedirection(
     url: checkoutUrl || `/checkout${query}`,
   };
 }
-
-

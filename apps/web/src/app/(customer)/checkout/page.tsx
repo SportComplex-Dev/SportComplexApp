@@ -10,18 +10,19 @@ import {
 import {
   calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
 } from '@sportcomplex/core'
-import { CheckoutTimer } from '@/components/booking/checkout-timer'
 import {
+  CheckoutTimer,
   isPaymentBlocked,
   calculateRemainingSeconds,
-} from '@/components/booking/checkout-timer-utils'
+  usePublicCatalog,
+  PaymentMethodSelector,
+  pollPaymentConfirmation,
+  resolvePaymentOutcome,
+} from '@sportcomplex/features-booking'
 import { categoryIcons } from '@/components/category-icons'
 import { useApp } from '@/components/app-provider'
 import { useDraft, useLastCode } from '@/lib/stores'
-import { usePublicCatalog } from '@/hooks/use-public-catalog'
-import { PaymentMethodSelector } from '@/components/payment-method-selector'
 import { fetchReceiptData, fetchCustomerBookingHistory } from '@/components/portal/portal-utils'
-import { pollPaymentConfirmation, resolvePaymentOutcome } from '@/app/(customer)/checkout/checkout-flow'
 
 function parseSlotInterval(dateStr: string, timeStr: string): { startTime: string; endTime: string } | null {
   try {

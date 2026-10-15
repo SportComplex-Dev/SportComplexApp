@@ -6,8 +6,8 @@ import { Badge, Button } from '@sportcomplex/ui';
 import {
   calculateCartTotal,
   formatMoney,
-  type CartItem,
-} from '@/app/(customer)/portal/book/cart-utils';
+} from '../../services/cartUtils';
+import type { CartItem } from '../../types/cart';
 
 export interface CartProps {
   cart: CartItem[];
@@ -113,8 +113,7 @@ export function Cart({
                         </span>
                         <motion.button
                           type="button"
-                          whileHover={shouldReduceMotion ? undefined : { scale: 1.15 }}
-                          whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                          {...(!shouldReduceMotion ? { whileHover: { scale: 1.15 }, whileTap: { scale: 0.9 } } : {})}
                           onClick={() => onRemoveService(item.serviceId)}
                           aria-label={`Quitar ${item.serviceName} del carrito`}
                           className="rounded-md p-1.5 text-[#9a6962] transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-[#3a2927]"
@@ -170,4 +169,3 @@ export function Cart({
     </aside>
   );
 }
-

@@ -6,7 +6,7 @@ import { formatMoney, minPrice, serviceCategories } from '@sportcomplex/core'
 import { categoryIcons } from '@/components/category-icons'
 import { IconBox } from '@/components/icon-box'
 import { PageHeading } from '@/components/page-heading'
-import { usePublicCatalog } from '@/hooks/use-public-catalog'
+import { usePublicCatalog } from '@sportcomplex/features-booking'
 
 export default function ServicesPage() {
   const { catalog } = usePublicCatalog()

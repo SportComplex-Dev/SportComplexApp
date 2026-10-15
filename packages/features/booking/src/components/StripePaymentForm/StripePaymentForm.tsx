@@ -8,7 +8,7 @@ import { Button } from "@sportcomplex/ui";
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
 
-type PaymentErrorCode = StripeError["code"];
+export type PaymentErrorCode = StripeError["code"];
 
 export function getPaymentErrorMessage(
   code: PaymentErrorCode | undefined,
@@ -63,7 +63,7 @@ export function getPaymentErrorMessage(
   return "No se pudo completar el pago. Revisa los datos ingresados o intenta con otra tarjeta.";
 }
 
-function PaymentForm({ onSuccess }: { onSuccess?: () => void }) {
+export function PaymentForm({ onSuccess }: { onSuccess?: (() => void) | undefined }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -153,13 +153,15 @@ function PaymentForm({ onSuccess }: { onSuccess?: () => void }) {
   );
 }
 
+export interface StripePaymentFormProps {
+  clientSecret: string | null;
+  onSuccess?: (() => void) | undefined;
+}
+
 export function StripePaymentForm({
   clientSecret,
   onSuccess,
-}: {
-  clientSecret: string | null;
-  onSuccess?: () => void;
-}) {
+}: StripePaymentFormProps) {
   if (!publishableKey || !stripePromise) {
     return (
       <div className="space-y-4">

@@ -5,8 +5,8 @@ import { Badge, Button } from '@sportcomplex/ui';
 import {
   calculateCartTotal,
   formatMoney,
-  type CartItem,
-} from '@/app/(customer)/portal/book/cart-utils';
+} from '../../services/cartUtils';
+import type { CartItem } from '../../types/cart';
 
 export interface BookingSummaryModalProps {
   isOpen: boolean;
@@ -159,4 +159,3 @@ export function BookingSummaryModal({
     </div>
   );
 }
-

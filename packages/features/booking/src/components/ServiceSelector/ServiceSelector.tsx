@@ -11,9 +11,9 @@ import { Badge } from '@sportcomplex/ui';
 import {
   formatMoney,
   getBogotaDateAfter,
-  type DynamicTimeSlot,
-} from '@/app/(customer)/portal/book/cart-utils';
-import { usePublicCatalog } from '@/hooks/use-public-catalog';
+} from '../../services/cartUtils';
+import type { DynamicTimeSlot } from '../../types/cart';
+import { usePublicCatalog } from '../../hooks/usePublicCatalog';
 
 export interface ServiceSelectorProps {
   date: string;
@@ -55,24 +55,31 @@ export function ServiceSelector({
         if (!res.ok) throw new Error('Error al consultar disponibilidad');
         return res.json();
       })
-      .then((json) => {
+      .then((json: { success?: boolean; data?: unknown }) => {
         if (!active) return;
         // json.data es un array de servicios con slots, o array directo de slots
         if (json.success && json.data) {
-          // Si es array de servicios con slots, recopilar disponibilidad o verificar
-          // Si alguno tiene slots disponibles o mapear las franjas
           const raw = json.data;
           if (Array.isArray(raw)) {
-            // Recopilamos todas las franjas devueltas
             const slotMap = new Map<string, boolean>();
             for (const item of raw) {
-              const slots = Array.isArray(item.slots) ? item.slots : (Array.isArray(item) ? item : []);
+              const itemObj = item as { slots?: unknown[] } | unknown[];
+              const slots: unknown[] = Array.isArray(itemObj)
+                ? itemObj
+                : Array.isArray((itemObj as { slots?: unknown[] }).slots)
+                  ? ((itemObj as { slots: unknown[] }).slots)
+                  : [];
               for (const s of slots) {
-                if (s.franja?.horaInicio && s.franja?.horaFin) {
-                  const startStr = typeof s.franja.horaInicio === 'string'
-                    ? s.franja.horaInicio.slice(11, 16)
-                    : new Date(s.franja.horaInicio).toISOString().slice(11, 16);
-                  const available = !s.bloqueadaMantenimiento && (s.cuposDisponibles > 0);
+                const slotRecord = s as {
+                  franja?: { horaInicio?: string | Date; horaFin?: string | Date };
+                  bloqueadaMantenimiento?: boolean;
+                  cuposDisponibles?: number;
+                };
+                if (slotRecord.franja?.horaInicio && slotRecord.franja?.horaFin) {
+                  const startStr = typeof slotRecord.franja.horaInicio === 'string'
+                    ? slotRecord.franja.horaInicio.slice(11, 16)
+                    : new Date(slotRecord.franja.horaInicio).toISOString().slice(11, 16);
+                  const available = !slotRecord.bloqueadaMantenimiento && ((slotRecord.cuposDisponibles ?? 0) > 0);
                   if (available) {
                     slotMap.set(startStr, true);
                   } else if (!slotMap.has(startStr)) {
@@ -85,11 +92,14 @@ export function ServiceSelector({
               const updatedSlots = initialTimeSlots.map((slot) => {
                 const hasAvail = slotMap.get(slot.startTime);
                 if (hasAvail !== undefined) {
-                  return {
+                  const updated: DynamicTimeSlot = {
                     ...slot,
                     isAvailable: slot.isAvailable && hasAvail,
-                    disabledReason: !hasAvail ? 'Sin cupos disponibles' : slot.disabledReason,
                   };
+                  if (!hasAvail) {
+                    updated.disabledReason = 'Sin cupos disponibles';
+                  }
+                  return updated;
                 }
                 return slot;
               });
@@ -159,8 +169,7 @@ export function ServiceSelector({
                 aria-pressed={isActive}
                 disabled={isBlocked}
                 onClick={() => onSelectSlot(slot)}
-                whileHover={isBlocked || shouldReduceMotion ? undefined : { scale: 1.03 }}
-                whileTap={isBlocked || shouldReduceMotion ? undefined : { scale: 0.96 }}
+                {...(!isBlocked && !shouldReduceMotion ? { whileHover: { scale: 1.03 }, whileTap: { scale: 0.96 } } : {})}
                 title={slot.disabledReason || `${slot.label} (${slot.isAvailable ? 'Disponible' : 'No disponible'})`}
                 className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${
                   isActive
@@ -199,8 +208,7 @@ export function ServiceSelector({
       >
         <motion.button
           type="button"
-          whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
-          whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+          {...(!shouldReduceMotion ? { whileHover: { scale: 1.04 }, whileTap: { scale: 0.96 } } : {})}
           aria-pressed={selectedCategory === 'todos'}
           onClick={() => onCategoryChange('todos')}
           className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
@@ -222,8 +230,7 @@ export function ServiceSelector({
           <motion.button
             key={category.slug}
             type="button"
-            whileHover={shouldReduceMotion ? undefined : { scale: 1.04 }}
-            whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+            {...(!shouldReduceMotion ? { whileHover: { scale: 1.04 }, whileTap: { scale: 0.96 } } : {})}
             aria-pressed={selectedCategory === category.slug}
             onClick={() => onCategoryChange(category.slug as CategorySlug)}
             className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
@@ -264,7 +271,7 @@ export function ServiceSelector({
               <motion.article
                 key={service.id}
                 title={service.description}
-                whileHover={shouldReduceMotion ? undefined : { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } }}
+                {...(!shouldReduceMotion ? { whileHover: { y: -3, transition: { type: 'spring', stiffness: 350, damping: 25 } } } : {})}
                 className={`flex items-center gap-3 rounded-xl border bg-white p-2.5 shadow-sm transition hover:shadow-md dark:bg-[#19231d] ${
                   inCart ? 'border-[#7ca657]' : 'border-[#e5e9e2] dark:border-[#2b3730]'
                 }`}
@@ -289,8 +296,7 @@ export function ServiceSelector({
                 <motion.button
                   type="button"
                   disabled={isAddDisabled}
-                  whileHover={isAddDisabled || shouldReduceMotion ? undefined : { scale: 1.06 }}
-                  whileTap={isAddDisabled || shouldReduceMotion ? undefined : { scale: 0.94 }}
+                  {...(!isAddDisabled && !shouldReduceMotion ? { whileHover: { scale: 1.06 }, whileTap: { scale: 0.94 } } : {})}
                   onClick={() => onAddService(service)}
                   aria-label={inCart ? `${service.name} ya está en el carrito` : `Agregar ${service.name} al carrito`}
                   className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#edf5e2] px-2.5 py-2 text-xs font-bold text-[#31563a] transition hover:bg-[#e1efce] disabled:cursor-not-allowed disabled:bg-[#f1f3ef] disabled:text-[#9aa49c] dark:bg-[#2b3b2a] dark:text-[#d8efb3] dark:hover:bg-[#354a32] dark:disabled:bg-[#252d27] dark:disabled:text-[#758078]"
@@ -305,4 +311,3 @@ export function ServiceSelector({
     </section>
   );
 }
-

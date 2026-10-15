@@ -17,6 +17,7 @@
     "@sportcomplex/core": "workspace:*",
     "@sportcomplex/db": "workspace:*",
     "@sportcomplex/domain": "workspace:*",
+    "@sportcomplex/features-booking": "workspace:*",
     "@sportcomplex/security": "workspace:*",
     "@sportcomplex/ui": "workspace:*",
     "@sportcomplex/validation": "workspace:*",

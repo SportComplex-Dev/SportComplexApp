@@ -23,7 +23,7 @@ import {
 } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 
-interface AvailabilityCalendarProps {
+export interface AvailabilityCalendarProps {
   service: CatalogItem
   scheduleConfig?: OperatingScheduleConfig
   selectedDate: string
@@ -32,7 +32,7 @@ interface AvailabilityCalendarProps {
   onSelectSlot: (slot: GeneratedOperatingSlot) => void
 }
 
-interface HolidayItem {
+export interface HolidayItem {
   date: string
   name: string
   localName?: string
@@ -93,7 +93,7 @@ export function AvailabilityCalendar({
       yearsToFetch.map((y) =>
         fetch(`/api/holidays?year=${y}`)
           .then((res) => (res.ok ? res.json() : null))
-          .then((data) => (Array.isArray(data?.holidays) ? (data.holidays as HolidayItem[]) : []))
+          .then((data: { holidays?: HolidayItem[] } | null) => (Array.isArray(data?.holidays) ? (data.holidays as HolidayItem[]) : []))
           .catch(() => [] as HolidayItem[])
       )
     )
@@ -161,7 +161,7 @@ export function AvailabilityCalendar({
         disabledReason = 'Horario concluido'
       }
 
-      list.push({
+      const slot: GeneratedOperatingSlot = {
         time: timeStr,
         endTime: nextStr,
         label: `${timeStr} – ${nextStr}`,
@@ -170,8 +170,12 @@ export function AvailabilityCalendar({
         capacity,
         isShared,
         isAvailable,
-        disabledReason,
-      })
+      }
+      if (disabledReason !== undefined) {
+        slot.disabledReason = disabledReason
+      }
+
+      list.push(slot)
     }
 
     return list
@@ -219,8 +223,7 @@ export function AvailabilityCalendar({
                 type="button"
                 disabled={isDisabled}
                 onClick={() => !isDisabled && onSelectDate(day.dateISO)}
-                whileHover={isDisabled || shouldReduceMotion ? undefined : { scale: 1.05 }}
-                whileTap={isDisabled || shouldReduceMotion ? undefined : { scale: 0.95 }}
+                {...(!isDisabled && !shouldReduceMotion ? { whileHover: { scale: 1.05 }, whileTap: { scale: 0.95 } } : {})}
                 aria-pressed={isSelected}
                 aria-disabled={isDisabled}
                 title={
@@ -392,8 +395,7 @@ export function AvailabilityCalendar({
                 type="button"
                 disabled={isDisabled}
                 onClick={() => !isDisabled && onSelectSlot(slot)}
-                whileHover={isDisabled || shouldReduceMotion ? undefined : { scale: 1.03 }}
-                whileTap={isDisabled || shouldReduceMotion ? undefined : { scale: 0.96 }}
+                {...(!isDisabled && !shouldReduceMotion ? { whileHover: { scale: 1.03 }, whileTap: { scale: 0.96 } } : {})}
                 aria-pressed={isSelected}
                 aria-disabled={isDisabled}
                 className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[92px] ${
