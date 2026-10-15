@@ -17,8 +17,6 @@ import {
 
 import {
   formatSlotTime,
-  getAccessWindowStatus,
-  getAccessWindowLabel,
   clasificarReservas,
   obtenerProximaReserva,
   calcularDesgloseComprobante,

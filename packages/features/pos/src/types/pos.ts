@@ -61,8 +61,8 @@ export type PosAuthorizationResult =
   | { authorized: false; response: Response };
 
 export type PosAuthorizeFn = (
-  allowedRoles: readonly any[],
-  dependencies?: any,
+  allowedRoles: readonly string[],
+  dependencies?: unknown,
 ) => Promise<PosAuthorizationResult>;
 
 export interface PosDisponibilidadRecord {

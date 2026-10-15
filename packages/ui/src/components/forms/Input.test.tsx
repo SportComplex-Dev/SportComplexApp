@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Input } from './Input'
 
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 test('Input: renderiza con data-slot input y tipo correcto', () => {
   const html = renderToStaticMarkup(<Input type="email" placeholder="test@altura.co" />)

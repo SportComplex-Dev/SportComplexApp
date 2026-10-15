@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Badge } from './Badge'
 
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 test('Badge (SCRUM-172): Renderiza con variantes semánticas y soporte accesible', () => {
   const html = renderToStaticMarkup(<Badge variant="success">Disponible</Badge>)

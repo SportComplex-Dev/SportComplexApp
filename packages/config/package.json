@@ -11,13 +11,19 @@
   ],
   "exports": {
     "./eslint/base": "./eslint/base.js",
+    "./eslint/base.js": "./eslint/base.js",
     "./eslint/nextjs": "./eslint/nextjs.js",
+    "./eslint/nextjs.js": "./eslint/nextjs.js",
     "./eslint/react": "./eslint/react.js",
+    "./eslint/react.js": "./eslint/react.js",
     "./eslint/node": "./eslint/node.js",
+    "./eslint/node.js": "./eslint/node.js",
     "./typescript/base.json": "./typescript/base.json",
     "./typescript/nextjs.json": "./typescript/nextjs.json",
     "./typescript/node.json": "./typescript/node.json",
     "./prettier": "./prettier/index.js",
-    "./tailwind/preset": "./tailwind/preset.js"
+    "./prettier.js": "./prettier/index.js",
+    "./tailwind/preset": "./tailwind/preset.js",
+    "./tailwind/preset.js": "./tailwind/preset.js"
   }
 }

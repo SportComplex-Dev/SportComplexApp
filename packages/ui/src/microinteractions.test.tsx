@@ -5,8 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // Provide global React for jsx runtime if needed in Node test runner
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 import {
   Button,
@@ -30,16 +29,16 @@ test('Button (SCRUM-172): Renderiza con clase base interactive-button y microint
     </Button>
   )
 
-  // Debe incluir la clase sem+íntica global interactive-button
+  // Debe incluir la clase sem+ï¿½ntica global interactive-button
   assert.ok(html.includes('interactive-button'), 'Debe incluir interactive-button')
   // Debe incluir soporte accesible de foco visible WCAG 2.2
   assert.ok(html.includes('focus-visible:ring-2'), 'Debe incluir anillo de foco visible')
   assert.ok(html.includes('focus-visible:ring-primary'), 'Debe usar el anillo de foco del tema primario')
-  assert.ok(html.includes('focus-visible:ring-offset-2'), 'Debe incluir separaci+¦n ring-offset')
+  assert.ok(html.includes('focus-visible:ring-offset-2'), 'Debe incluir separaci+ï¿½n ring-offset')
   // Debe respetar movimiento reducido
   assert.ok(html.includes('motion-reduce:transform-none'), 'Debe respetar prefers-reduced-motion')
   // Debe preservar el contenido
-  assert.ok(html.includes('Reservar ahora'), 'Debe renderizar el texto del bot+¦n')
+  assert.ok(html.includes('Reservar ahora'), 'Debe renderizar el texto del bot+ï¿½n')
 })
 
 test('Button (SCRUM-172): Preserva variantes (brand, accent, secondary, destructive, link) y clases personalizadas', () => {
@@ -84,42 +83,42 @@ test('Button (SCRUM-172): Respeta estado disabled y estado isLoading con aria-di
 })
 
 test('Card (SCRUM-172): Distingue entre tarjeta informativa (default) y tarjeta interactiva', () => {
-  // 1. Tarjeta informativa est+ítica
+  // 1. Tarjeta informativa est+ï¿½tica
   const infoHtml = renderToStaticMarkup(
     <Card>
       <CardHeader>
-        <CardTitle>Horario de atenci+¦n</CardTitle>
+        <CardTitle>Horario de atenci+ï¿½n</CardTitle>
         <CardDescription>Lunes a Domingo 6:00 a 22:00</CardDescription>
       </CardHeader>
-      <CardContent>Informaci+¦n general</CardContent>
-      <CardFooter>Sede Medell+¡n</CardFooter>
+      <CardContent>Informaci+ï¿½n general</CardContent>
+      <CardFooter>Sede Medell+ï¿½n</CardFooter>
     </Card>
   )
 
   assert.ok(!infoHtml.includes('interactive-card'), 'Card informativa NO debe tener clase interactive-card')
   assert.ok(!infoHtml.includes('cursor-pointer'), 'Card informativa NO debe tener cursor-pointer')
-  assert.ok(!infoHtml.includes('role="button"'), 'Card informativa NO debe simular ser un bot+¦n')
+  assert.ok(!infoHtml.includes('role="button"'), 'Card informativa NO debe simular ser un bot+ï¿½n')
   assert.ok(!infoHtml.includes('data-interactive="true"'), 'Card informativa NO debe tener data-interactive')
-  assert.ok(infoHtml.includes('Horario de atenci+¦n'), 'Contenido preservado')
-  assert.ok(infoHtml.includes('data-slot="card"'), 'Estructura sem+íntica preservada')
+  assert.ok(infoHtml.includes('Horario de atenci+ï¿½n'), 'Contenido preservado')
+  assert.ok(infoHtml.includes('data-slot="card"'), 'Estructura sem+ï¿½ntica preservada')
 
   // 2. Tarjeta interactiva con interactive={true}
   const interactiveHtml = renderToStaticMarkup(
     <Card interactive>
       <CardHeader>
-        <CardTitle>Cancha de P+ídel 1</CardTitle>
+        <CardTitle>Cancha de P+ï¿½del 1</CardTitle>
       </CardHeader>
     </Card>
   )
 
   assert.ok(interactiveHtml.includes('interactive-card'), 'Card interactiva debe tener clase interactive-card')
   assert.ok(interactiveHtml.includes('cursor-pointer'), 'Card interactiva debe tener cursor-pointer')
-  assert.ok(interactiveHtml.includes('hover:shadow-xl'), 'Card interactiva debe tener elevaci+¦n envolvente shadow-xl')
+  assert.ok(interactiveHtml.includes('hover:shadow-xl'), 'Card interactiva debe tener elevaci+ï¿½n envolvente shadow-xl')
   assert.ok(interactiveHtml.includes('hover:border-primary/50'), 'Card interactiva debe tener realce de borde')
   assert.ok(interactiveHtml.includes('focus-visible:ring-2'), 'Card interactiva debe tener foco visible accesible')
   assert.ok(interactiveHtml.includes('role="button"'), 'Card interactiva debe exponer role="button"')
   assert.ok(interactiveHtml.includes('tabindex="0"'), 'Card interactiva debe ser navegable con teclado')
-  assert.ok(interactiveHtml.includes('data-interactive="true"'), 'Card interactiva marca atributo sem+íntico')
+  assert.ok(interactiveHtml.includes('data-interactive="true"'), 'Card interactiva marca atributo sem+ï¿½ntico')
 })
 
 test('Badge (SCRUM-172): Distingue entre badge informativo, interactivo y con estado en vivo (isLive / pulse)', () => {
@@ -130,7 +129,7 @@ test('Badge (SCRUM-172): Distingue entre badge informativo, interactivo y con es
   assert.ok(!infoBadge.includes('role="button"'), 'Badge informativo no debe tener role="button"')
   assert.ok(infoBadge.includes('CONFIRMADA'), 'Badge informativo renderiza texto')
 
-  // 2. Badge interactivo (interactive={true}) con selecci+¦n
+  // 2. Badge interactivo (interactive={true}) con selecci+ï¿½n
   const interactiveBadge = renderToStaticMarkup(
     <Badge variant="secondary" interactive isSelected={true}>
       Filtro Tenis
@@ -154,7 +153,7 @@ test('Badge (SCRUM-172): Distingue entre badge informativo, interactivo y con es
   assert.ok(liveBadge.includes('animate-pulse'), 'Badge en vivo debe incluir micro-pulso')
 })
 
-test('Badge (SCRUM-172): Preserva todas las variantes sem+ínticas existentes', () => {
+test('Badge (SCRUM-172): Preserva todas las variantes sem+ï¿½nticas existentes', () => {
   const variants = ['default', 'secondary', 'destructive', 'outline', 'success', 'warning', 'admin'] as const
 
   for (const variant of variants) {

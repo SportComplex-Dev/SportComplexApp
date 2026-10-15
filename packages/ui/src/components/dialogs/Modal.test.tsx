@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Modal, ConfirmDialog } from './Modal'
 
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 test('Modal: renderiza titulo y descripcion', () => {
   const html = renderToStaticMarkup(

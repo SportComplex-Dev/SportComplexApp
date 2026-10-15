@@ -23,7 +23,6 @@ import {
   TournamentFormModal,
   TournamentDetailModal,
   calculateTournamentKPIs,
-  type EstadoTorneoTipo,
   type TorneoAdminItem,
 } from '@sportcomplex/features-tournament'
 

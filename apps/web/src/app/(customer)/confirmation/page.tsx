@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, BadgeCheck, Check, CheckCircle2, CreditCard, MapPin, Loader2 } from 'lucide-react'
-import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
+import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { ActionButton } from '@sportcomplex/ui'
 import { useLastCode } from '@sportcomplex/shared/lib'

@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Button } from './Button'
 
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 test('Button (SCRUM-172): Renderiza con clase base interactive-button y microinteracciones accesibles de foco', () => {
   const html = renderToStaticMarkup(

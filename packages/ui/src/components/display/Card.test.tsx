@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Card, CardHeader, CardTitle, CardContent } from './Card'
 
-;(globalThis as any).React = React
+;(globalThis as unknown as { React: typeof React }).React = React
 
 test('Card (SCRUM-172): Distingue entre tarjeta informativa y tarjeta interactiva', () => {
   const staticHtml = renderToStaticMarkup(
