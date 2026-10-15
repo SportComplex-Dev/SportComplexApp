@@ -13,6 +13,7 @@ real en `cells-mailbox/*/inbox/001-contrato.json` (v1-corrected-2026-10-14).
 | `@sportcomplex/features-pos` | 6 componentes, `usePosSession`, `posCheckout` (deps inyectadas), `receipt`, types | `ui`, `booking`, `core` | 41 |
 | `@sportcomplex/features-scanner` | 11 componentes planos, `useScannerController`, `useAudioFeedback`, `scannerService`, types | `ui`, `core`, `shared` | 60 |
 | `@sportcomplex/features-portal` | 10 componentes (TicketQrModal único + QrGraphic), 2 hooks, utils, types sin duplicar | `ui`, `booking`, `tournament` | 57 |
+| `@sportcomplex/features-admin` | 8 componentes planos (SlotCapacityEditor, Dashboard*, Employee*), 2 suites migradas | `ui`, `core` | 12 |
 | `@sportcomplex/shared` | `qr-client`, `use-network-resilience`, `api-response`, `contingency-webhook`, `persistent-state`, `stores` | `core` (solo tipos) | 6 |
 | `@sportcomplex/ui` | Primitivas planas: Button, Card, Dialog, Badge, Input, Modal, ActionButton, ConfirmDialog, TicketReceipt, `cn` | `lucide-react`, `motion` | 17 |
 
