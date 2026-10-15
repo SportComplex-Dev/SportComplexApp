@@ -1,4 +1,5 @@
 # Packages `features/*` + `shared` — Migración modular L3 (2026-10-14/15)
+> Estado: vigente 2026-10-15
 
 Migración de código feature desde `apps/web/src` a paquetes workspace, ejecutada en
 células L3 sobre `refactor/hyper-plan-arquitectura`. Contratos corregidos contra código

@@ -5,7 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Serializa despliegues: nunca dos corriendo a la vez (VPS compartido)
+# Serializa despliegues: nunca dos corriendo a la vez (VPS dedicado)
 concurrency:
   group: deploy-production
   cancel-in-progress: false

@@ -1,4 +1,5 @@
 # Documentación de Automatización - Complejo Deportivo
+> Estado: vigente 2026-10-15
 
 ## Descripción General
 
@@ -71,9 +72,9 @@ Este documento describe el sistema de automatización del Complejo Deportivo imp
 
 **Estado**: ✅ Activo
 
-Véase [N8N_WORKFLOWS.md](./workflows.md) para detalles completos.
+Véase [workflows.md](./workflows.md) para detalles completos.
 
-### 2. **TSK-AU-02 - Sincronizacion de festivos Colombia**
+## 2. **TSK-AU-02 - Sincronizacion de festivos Colombia**
 
 **Objetivo:** consultar los festivos colombianos del año siguiente en Nager.Date y hacer upsert de cada fecha en `festivo` (conflictos por fecha actualizan nombre y año).
 
@@ -101,7 +102,7 @@ El objeto generado es validable con `ColombianHolidaySyncPayloadSchema`. Cada re
 
 **Resultado:** no hay respuesta HTTP `200 OK` ni schema de respuesta webhook: el flujo se ejecuta por horario. En caso de éxito, cada festivo validado se inserta o actualiza en PostgreSQL. Si la API no devuelve festivos o falla una validación, la ejecución falla; el workflow de gestión de errores envía la alerta descrita a continuación.
 
-### 3. **TSK-AU-02 - Gestion de errores**
+## 3. **TSK-AU-02 - Gestion de errores**
 
 **Objetivo:** capturar fallos de ejecución de workflows en n8n y enviar por Resend un email de alerta a `official@akros.lat` con el workflow, ejecución, último nodo, mensaje y fecha.
 
@@ -209,7 +210,7 @@ En **apps/web/.env.local** o **.env.production**:
 
 ```env
 # n8n Configuration
-N8N_WEBHOOK_BASE_URL=https://n8n.tudominio.com
+N8N_WEBHOOK_BASE_URL=https://n8n.akros.lat
 N8N_WEBHOOK_TOKEN=tu-token-opcional (si está configurado)
 
 # Resend API
@@ -362,8 +363,8 @@ Output: Actualizar cache, notificar clientes
 
 4. **Configurar URL**
    ```
-   Backend: N8N_WEBHOOK_BASE_URL=https://n8n.prod.tudominio.com
-   Webhook: https://n8n.prod.tudominio.com/webhook/auth/enviar-codigo
+   Backend: N8N_WEBHOOK_BASE_URL=https://n8n.akros.lat
+   Webhook: https://n8n.akros.lat/webhook/auth/enviar-codigo
    ```
 
 ### Testing Local

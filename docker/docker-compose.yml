@@ -70,7 +70,6 @@ services:
       - web
     networks:
       - sportcomplex-net
-      - edge-shared
     restart: unless-stopped
     deploy:
       resources:
@@ -81,8 +80,6 @@ services:
 networks:
   sportcomplex-net:
     driver: bridge
-  edge-shared:
-    external: true
 
 volumes:
   caddy_data:

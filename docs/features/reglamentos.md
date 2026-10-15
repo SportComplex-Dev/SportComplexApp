@@ -1,7 +1,8 @@
 # Reglamentos y Marco Normativo (`/rules`)
+> Estado: vigente 2026-10-15
 
 - **Ruta:** `apps/web/src/app/(public)/rules/page.tsx` — vista pública SSG
-- **Trazabilidad:** SCRUM-185/186/187; leyes colombianas aplicadas al club AKROS
+> Ref histórica: SCRUM-185/186/187; leyes colombianas aplicadas al club AKROS
 - **Stack:** Next.js 16 (App Router), React 19, Tailwind CSS, Framer Motion
 
 ## 1. Justificación de Producto
@@ -10,7 +11,7 @@ Decisión: **permanencia formal** de la ruta canónica `/rules` por tres fundame
 
 1. **Respaldo jurídico:** la ley colombiana exige publicidad clara de reglamentos de uso, riesgos inherentes y condiciones de salubridad en complejos deportivos.
 2. **Erradicación de enlaces huérfanos:** `/rules` consolida en un único punto autoritativo todos los términos del club (sustituye al placeholder `/legal`).
-3. **Cierre del bucle de rescate 404:** la página 404 ("Kinetic Apex", ver `docs/NOT-FOUND-404-kinetic-apex.md`) enlaza "Reglamentos y Normativa" → `/rules`; el usuario rescatado aterriza en una experiencia funcional.
+3. **Cierre del bucle de rescate 404:** la página 404 ("Kinetic Apex", ver `/rules`) enlaza "Reglamentos y Normativa" → `/rules`; el usuario rescatado aterriza en una experiencia funcional.
 
 ## 2. Marco Legal Colombiano Aplicado
 
@@ -59,3 +60,7 @@ flowchart LR
 ## 5. Accesibilidad y Estándares UI (WCAG 2.2 & W3C APG)
 
 La vista cumple WCAG 2.2 con navegación por teclado completa, jerarquía semántica de encabezados (un `<h1>` por módulo), foco visible en todos los interactivos y `prefers-reduced-motion` respetado en las microinteracciones (ver tokens de movimiento en `docs/architecture/design-system.md` §3.4).
+
+## Trazabilidad
+
+> Ref histórica: SCRUM-185/186/187 · ruta canónica `/rules` (sustituye `/legal`)

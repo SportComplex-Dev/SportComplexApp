@@ -1,8 +1,5 @@
-# TSK-BD-11 — Persistencia de membresías y catálogo de planes (HU-20 / RF-16)
-
-> Rama de trabajo: `feature/tsk-bd-11-persistencia-membresias-catalogo`
-> Responsable: Milton Ortega · 3 pts · Fase F0 · Depende de `TSK-BD-06`
-> Fecha de implementación: 2026-10-05
+# Membresías
+> Estado: vigente 2026-10-15
 
 ## 1. Qué se hizo y por qué
 
@@ -139,19 +136,19 @@ await prisma.planMembresia.create({
 ## 3. Comandos (desde la raíz del monorepo)
 
 ```bash
-# Regenerar el cliente tras tocar schema.prisma (obligatorio tras el @map nuevo)
+## Regenerar el cliente tras tocar schema.prisma (obligatorio tras el @map nuevo)
 pnpm --filter @sportcomplex/db db:generate
 
-# Aplicar migraciones pendientes (desarrollo local)
+## Aplicar migraciones pendientes (desarrollo local)
 pnpm --filter @sportcomplex/db db:migrate
 
-# Desplegar en CI / VPS (sin reset, solo aplica lo pendiente)
+## Desplegar en CI / VPS (sin reset, solo aplica lo pendiente)
 pnpm --filter @sportcomplex/db db:migrate:deploy
 
-# Seeds: roles + catálogo SEMANAL/MENSUAL/ANUAL con 30 %
+## Seeds: roles + catálogo SEMANAL/MENSUAL/ANUAL con 30 %
 pnpm --filter @sportcomplex/db db:seed
 
-# Verificación rápida del índice y el CHECK
+## Verificación rápida del índice y el CHECK
 psql "$DATABASE_URL" -c "SELECT indexname FROM pg_indexes WHERE indexname = 'membresia_usuario_vigente_uniq';"
 psql "$DATABASE_URL" -c "SELECT conname FROM pg_constraint WHERE conname = 'plan_membresia_descuento_pct_check';"
 ```
@@ -175,7 +172,6 @@ transacciones con `ROLLBACK` (sin datos residuales):
 
 ## Portal de membresías con descuento en reservas (PR #71, HU-20 / RF-16)
 
-> Estado: vigente
 
 ### Contexto
 El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el socio ve planes, su membresía activa y se suscribe. El 30 % de descuento en reservas es el beneficio central que hay que transparentar antes del cobro.
@@ -192,3 +188,7 @@ El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el
 
 ### Testing
 `packages/features/portal/src/utils/__tests__/membership-utils.test.ts` (cálculo de desglose, formato, flujos de suscripción y errores).
+
+## Trazabilidad
+
+> Ref histórica: HU-20 (RF-16) · rama `feature/tsk-bd-11-persistencia-membresias-catalogo` · Fase F0

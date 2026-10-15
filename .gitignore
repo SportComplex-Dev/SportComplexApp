@@ -26,7 +26,10 @@ SCRUM-*.xml
 # Git Worktrees locales
 .worktrees/
 
-.agents
+# Agentes locales (Antigravity/Orca) — pero SÍ versionar la suite de skills
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 AGENTS.md
 
 # Reportes locales de revisión

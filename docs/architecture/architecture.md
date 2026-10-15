@@ -1,4 +1,5 @@
 # ARQUITECTURA OBJETIVO DEL SISTEMA: SPORTCOMPLEX
+> Estado: vigente 2026-10-15
 
 ## 1. Control del Documento y Trazabilidad de Artefactos
 
@@ -7,9 +8,9 @@
 * **Entorno de Despliegue Objetivo:** Virtual Private Server (VPS) basado en Contenedores Docker
 * **Zona Horaria Canónica:** Colombia (`America/Bogota`, UTC-5)
 * **Documentos Vinculados:**
-  * **`SRS.md`**: Especificación Formal de Requisitos del Sistema. Establece las directrices funcionales (RF-00 a RF-21), restricciones no funcionales de concurrencia y seguridad (RNF-01 a RNF-06), e invariantes de negocio (RN-01 a RN-14).
-  * **`DESIGN.md`**: Sistema de diseño unificado, tokens de color, componentes atómicos (`@sportcomplex/ui`), microinteracciones y lineamientos visuales diferenciados por perfil (Cliente, Taquilla POS, Escáner Móvil, Administración). La selección final de iconografía, utilitarios de clases y librerías atómicas complementarias se define en este documento.
-  * **`MER_&_DER.md`**: Modelo Entidad-Relación y Diagrama Entidad-Relación relacional físico para PostgreSQL/Supabase, definición de constraints de exclusión temporal, índices B-Tree/GiST y normalización transaccional.
+  * [srs.md](../product/srs.md): Especificación Formal de Requisitos del Sistema. Establece las directrices funcionales (RF-00 a RF-21), restricciones no funcionales de concurrencia y seguridad (RNF-01 a RNF-06), e invariantes de negocio (RN-01 a RN-14).
+  * [design-system.md](./design-system.md): Sistema de diseño unificado, tokens de color, componentes atómicos (`@sportcomplex/ui`), microinteracciones y lineamientos visuales diferenciados por perfil (Cliente, Taquilla POS, Escáner Móvil, Administración). La selección final de iconografía, utilitarios de clases y librerías atómicas complementarias se define en este documento.
+  * [data-model.md](./data-model.md): Modelo Entidad-Relación y Diagrama Entidad-Relación relacional físico para PostgreSQL/Supabase, definición de constraints de exclusión temporal, índices B-Tree/GiST y normalización transaccional.
 
 ---
 
@@ -43,7 +44,7 @@ Para eliminar discrepancias de compilación y fijar la línea base del proyecto,
 * **Supabase SSR Helper (`@supabase/ssr`):** `0.5.2`
 
 ### 3.3. Interfaz de Usuario y Estilos (Línea Base Confirmada)
-> **Nota de Alcance:** La suite detallada de utilidades atómicas, paquete de iconografía (ej. Lucide, Phosphor, Tabler u otros) y librerías auxiliares de animación/accesibilidad se encuentra abierta y pendiente de ratificación en el documento `DESIGN.md`. La base tecnológica ratificada para fast UI/UX shipping se limita a:
+> **Nota de Alcance:** La suite detallada de utilidades atómicas, paquete de iconografía (ej. Lucide, Phosphor, Tabler u otros) y librerías auxiliares de animación/accesibilidad se encuentra abierta y pendiente de ratificación en el documento `design-system.md`. La base tecnológica ratificada para fast UI/UX shipping se limita a:
 * **Tailwind CSS (`tailwindcss`):** `4.3.3`
 * **Shadcn UI CLI (`shadcn`):** Latest CLI de inicialización de componentes sobre Tailwind v4
 
@@ -266,7 +267,7 @@ sport-complex/
 
 ### 6.4. Workspace de Interfaz y Emisión PDF (`packages/ui`)
 
-* **Propósito:** Provee la biblioteca de componentes basada en Shadcn UI y Tailwind CSS v4, estructurada según las pautas de `DESIGN.md`.
+* **Propósito:** Provee la biblioteca de componentes basada en Shadcn UI y Tailwind CSS v4, estructurada según las pautas de `design-system.md`.
 * **Motor de Simulación PDF (RNF-05):** Contiene la maqueta estructurada del comprobante digital (con código QR centralizado e información del servicio y titular) preparada para descarga virtual e invocación del diálogo nativo de impresión del navegador sin requerir impresoras de hardware.
 
 

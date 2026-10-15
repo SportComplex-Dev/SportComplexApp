@@ -1,13 +1,14 @@
 # Módulo de Base de Datos (`packages/db`)
+> Estado: vigente 2026-10-15
 
 Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM** y **PostgreSQL** para todo el sistema SportComplex.
 
 ---
 
-## 🛠️ Lo que se ha implementado en este módulo (TSK-BD-06)
+## Esquema y semillas
 
 1. **Definición del Esquema (`prisma/schema.prisma`)**:
-   - Modelado relacional completo con las **16 tablas** del DER: `ROL`, `USUARIO`, `TOKEN_VERIFICACION`, `CATEGORIA_SERVICIO`, `SERVICIO`, `FRANJA_HORARIA`, `DISPONIBILIDAD`, `FESTIVO`, `RESERVA`, `PAGO`, `TICKET_QR`, `ASIGNACION_PUESTO`, `LECTURA_ACCESO`, `PLAN_MEMBRESIA`, `MEMBRESIA`, `INHABILITACION_SERVICIO`.
+   - Modelado relacional completo con las **16 tablas** del DER (nota: verificar el conteo tras Torneos — el esquema suma `Torneo`, `TorneoBloqueo` e `InscripcionTorneo`): `ROL`, `USUARIO`, `TOKEN_VERIFICACION`, `CATEGORIA_SERVICIO`, `SERVICIO`, `FRANJA_HORARIA`, `DISPONIBILIDAD`, `FESTIVO`, `RESERVA`, `PAGO`, `TICKET_QR`, `ASIGNACION_PUESTO`, `LECTURA_ACCESO`, `PLAN_MEMBRESIA`, `MEMBRESIA`, `INHABILITACION_SERVICIO`.
    - Enums de dominio robustos (Estados de usuario, categorías de servicio, modalidades de reserva, pagos, membresías, control de accesos, etc.).
 
 2. **Constraints de Integridad y Validación (`CHECK` & `UNIQUE`)**:
@@ -26,7 +27,7 @@ Este paquete centraliza la gestión de la base de datos utilizando **Prisma ORM*
 
 ---
 
-## 🔁 Idempotencia de pagos (TSK-BD-09)
+## Pagos idempotentes
 
 El repositorio `src/repositories/payments/payments.ts` exporta `procesarPagoWebhook`,
 punto de entrada único del webhook de Stripe (`POST /api/payments`):
@@ -42,7 +43,7 @@ Guía completa para backend y frontend: [`docs/features/pagos-pos.md`](../../doc
 
 ---
 
-## 🎫 Canje de ticket y auditoría de accesos (TSK-BD-10)
+## 🎫 Canje de ticket y auditoría de accesos 
 
 El repositorio `src/repositories/access/tickets.ts` exporta `getTicketForScan`,
 `getAsignacionVigente` y `ejecutarLectura`, el único punto de escritura de

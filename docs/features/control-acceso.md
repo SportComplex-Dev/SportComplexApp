@@ -1,4 +1,5 @@
-# TSK-BE-16 — Denegación explícita por discrepancia de zona
+# Control de acceso
+> Estado: vigente 2026-10-15
 
 ## Objetivo
 
@@ -27,7 +28,7 @@ No se modifica el esquema de Prisma ni se agrega una migración. Para construir 
 - `apps/web/src/app/api/access/redeem/__tests__/route.test.ts`: comprueba el HTTP `403`, el mensaje de aceptación, la auditoría de denegación y que el tiquete permanece `EMITIDO`.
 - `apps/web/src/app/api/access/redeem/__tests__/route.test.ts` y `apps/web/src/app/api/access/__tests__/access.test.ts`: cubren ambos contratos HTTP `403`, el servicio inhabilitado y el servicio de puesto inexistente.
 - Las pruebas existentes siguen cubriendo firma HMAC inválida antes de consultar la base de datos, autenticación, autorización, canje exitoso, doble escaneo y denegaciones por estado o franja horaria.
-# TSK-BE-17 — Validación de franja horaria de ingreso
+## TSK-BE-17 — Validación de franja horaria de ingreso
 
 > **Jira:** SCRUM-130  
 > **Tarea:** TSK-BE-17  
@@ -128,7 +129,7 @@ sequenceDiagram
 
 ---
 
-# TSK-FE-14 — Escáner QR con selección de puesto de turno
+## TSK-FE-14 — Escáner QR con selección de puesto de turno
 
 ## Objetivo y estado
 
@@ -213,7 +214,7 @@ respuesta autoritativa del backend.
 
 ---
 
-# TSK-FE-15 — Modo consulta informativo (HU-15 / RF-13)
+## TSK-FE-15 — Modo consulta informativo (HU-15 / RF-13)
 
 > **Tarea ID:** `TSK-FE-15`  
 > **Historia de Usuario:** `HU-15` (`RF-13`)  
@@ -311,7 +312,7 @@ x-ticket-signature: {signature}
 
 ## 4. Pantalla de Información del Tiquete
 
-La pantalla presenta de forma destacada y estructurada los cuatro datos obligatorios del alcance técnico, alineados con el sistema de diseño AKROS (`DESIGN.md`):
+La pantalla presenta de forma destacada y estructurada los cuatro datos obligatorios del alcance técnico, alineados con el sistema de diseño AKROS ([design-system.md](../architecture/design-system.md)):
 
 1. **Servicio:** Nombre de la instalación (`ticket.servicioNombre`), acompañado de icono de ubicación/instalación.
 2. **Fecha:** Fecha programada de la reserva (`ticket.fecha` en formato `YYYY-MM-DD`).
@@ -326,10 +327,10 @@ La pantalla presenta de forma destacada y estructurada los cuatro datos obligato
 ### 5.1. Pruebas Unitarias y Visuales Automatizadas
 
 ```bash
-# Ejecutar tests de cliente, contrato y renderizado visual TSK-FE-15
+## Ejecutar tests de cliente, contrato y renderizado visual TSK-FE-15
 pnpm --filter web exec tsx --test "src/lib/__tests__/qr-client.test.ts" "src/app/(staff)/scanner/__tests__/scanner-modo-consulta.test.ts" "src/app/(staff)/scanner/__tests__/visual-consultation-render.test.tsx"
 
-# Verificación de linter
+## Verificación de linter
 pnpm --filter web lint
 ```
 
@@ -370,7 +371,7 @@ Durante la revisión del PR se bloquearon los checks `ci / verificar (pull_reque
 
 ---
 
-# TSK-FE-16 — Alerta roja de discrepancia de zona (HU-16 / RF-14)
+## TSK-FE-16 — Alerta roja de discrepancia de zona (HU-16 / RF-14)
 
 > **Tarea ID:** `TSK-FE-16`
 > **Historia de Usuario:** `HU-16` (`RF-14`)
@@ -427,10 +428,10 @@ POST /api/access/redeem
 ## 4. Verificación y Pruebas
 
 ```bash
-# Tests del parser + renderizado TSK-FE-16
+## Tests del parser + renderizado TSK-FE-16
 pnpm --filter web exec tsx --test "packages/features/scanner/src/components/response/__tests__/zone-mismatch.test.ts" "packages/features/scanner/src/components/response/__tests__/zone-mismatch-screen.test.ts"
 
-# Verificación completa (igual que CI)
+## Verificación completa (igual que CI)
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm lint
@@ -449,7 +450,7 @@ pnpm --filter web build
 
 ---
 
-# TSK-FE-17 — Visualización de límites de franja horaria
+## TSK-FE-17 — Visualización de límites de franja horaria
 
 ## Objetivo y cambio
 
@@ -514,7 +515,7 @@ restricción horaria y que el boleto sigue `EMITIDO`; no se consumió.
 
 ---
 
-# TSK-FE-17 — Alerta de franja vencida
+## TSK-FE-17 — Alerta de franja vencida
 
 **Historia de usuario:** HU-17  
 **Requerimiento funcional:** RF-15  
@@ -574,7 +575,7 @@ TSK-BE-17 amplíe el contrato y la regla de negocio.
 
 ---
 
-# TSK-FE-24 — Resiliencia Offline del Escáner QR
+## TSK-FE-24 — Resiliencia Offline del Escáner QR
 
 **Proyecto:** SportComplex (AKROS Club)  
 **Componente:** `apps/web`  
@@ -747,7 +748,6 @@ La suite automatizada se ubica en:
 
 ## Pantalla de inhabilitación por contingencia (PR #72, RF-19)
 
-> Estado: vigente
 
 ### Contexto
 Cuando un servicio queda fuera de operación (mantenimiento imprevisto, fuerza mayor), el admin lo inhabilita desde `apps/web/src/app/(admin)/admin/incident/page.tsx`. La acción cancela reservas activas y dispara el aviso a los afectados vía n8n.
@@ -767,3 +767,7 @@ Cuando un servicio queda fuera de operación (mantenimiento imprevisto, fuerza m
 
 ### Testing
 `apps/web/src/app/(admin)/admin/incident/__tests__/incident-ui.test.ts` + `route.test.ts` (validación de motivo, preview, inhabilitación y errores 404/409).
+
+## Trazabilidad
+
+> Ref histórica: HU-15/16/17 (RF-13/14/15 / RN-05/06) · SCRUM-130 · ramas de escáner QR (puesto de turno, consulta, alertas)

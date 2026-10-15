@@ -1,11 +1,7 @@
 # Especificación del Modelo Analítico y KPIs (RF-21)
+> Estado: vigente 2026-10-15
 
-- **ID de Tarea:** TSK-BD-02
-- **Historia de Usuario:** HU-24 (RF-21)
-- **Fase:** F4
-- **Microcelda / Componente:** Database & Analytics
-- **Responsable:** Leonardo
-- **Depende de:** TSK-BD-06
+> Ref histórica: TSK-BD-02 · HU-24 (RF-21) · Fase F4 · depende de TSK-BD-06 · responsable: Leonardo
 - **Zona Horaria Estándar:** `America/Bogota` (UTC-5)
 - **Motor de Base de Datos:** PostgreSQL (Supabase)
 

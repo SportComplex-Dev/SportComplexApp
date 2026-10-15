@@ -1,10 +1,7 @@
-# TSK-BD-12 — Modelo Relacional y Migraciones de Torneos, Bloqueos e Inscripciones
+# Torneos
+> Estado: vigente 2026-10-15
 
-- **Tarea ID:** [SCRUM-165] TSK-BD-12
-- **Épica:** [SCRUM-164] [EPIC-10] Gestión de Torneos, Bloqueo de Pistas e Inscripciones
-- **Responsable:** Sebastián Mendoza Brieva
 - **Componente:** Database (`@sportcomplex/db`)
-- **Rama:** `feature/SCRUM-165-modelos-torneos`
 - **Motor:** PostgreSQL
 
 ---
@@ -119,10 +116,10 @@ CREATE INDEX IF NOT EXISTS "inscripcion_torneo_usuario_id_estado_idx" ON "inscri
 - `@sportcomplex/db`: 78 pruebas unitarias aprobadas (100% éxito).
 - `tsc --noEmit`: Tipado estricto sin errores.
 - `eslint .`: Cero errores de linting.
-# TSK-BE-25 — Endpoints Administrativos de Torneos y Motor de Bloqueo Preventivo
+## TSK-BE-25 — Endpoints Administrativos de Torneos y Motor de Bloqueo Preventivo
 
-- **Tarea ID:** [SCRUM-166] TSK-BE-25
-- **Épica:** [SCRUM-164] [EPIC-10] Gestión de Torneos, Bloqueo de Pistas e Inscripciones
+> Ref histórica — Tarea: [SCRUM-166] TSK-BE-25
+> Ref histórica — Épica: [SCRUM-164] [EPIC-10] Gestión de Torneos, Bloqueo de Pistas e Inscripciones
 - **Componentes:** `@sportcomplex/db`, `@sportcomplex/validation`, `apps/web`
 - **Ramas:** `feature/SCRUM-166-endpoints-admin-torneos-bloqueo` -> `develop`
 
@@ -238,3 +235,7 @@ Cancela o purga un torneo:
 
 ### 3.4. Transaccionalidad Atómica (ACID)
 Todas las operaciones que mutan torneos y disponibilidad (`crearTorneo`, `actualizarTorneo`, `actualizarEstadoTorneo`, `eliminarTorneo`) operan bajo una transacción `prisma.$transaction`.
+
+## Trazabilidad
+
+> Ref histórica: SCRUM-164/165/166 (EPIC-10) · ramas `feature/SCRUM-165-modelos-torneos`, `feature/SCRUM-166-endpoints-admin-torneos-bloqueo`

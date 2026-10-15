@@ -1,4 +1,5 @@
-# TSK-BE-02 — Google OAuth y vinculación de cuentas
+# Autenticación y cuentas
+> Estado: vigente 2026-10-15
 
 ## Requisitos y persistencia
 
@@ -56,7 +57,7 @@ SELECT id, correo, google_sub, nombre, avatar_url, estado, rol_id
 FROM usuario
 WHERE lower(correo) = lower('juan@example.com');
 ```
-# Plan de Auth — BACKEND
+## Plan de Auth — BACKEND
 
 > **Tipo:** Arreglo del flujo de autenticación existente (no es una user story nueva).
 > **Objetivo:** que el login con **Supabase Auth** funcione de punta a punta, usando la tabla
@@ -244,7 +245,7 @@ Arquitectura objetivo:
   inconsistencias en middleware. Preferir (a).
 - Cambiar el login toca el camino crítico: actualizar **ambos** formularios
   (`apps/web/src/app/(auth)/login/page.tsx` y `@sportcomplex/ui`).
-# Login — arreglo, validación y estado (RBAC + fallback local)
+## Login — arreglo, validación y estado (RBAC + fallback local)
 
 > Documento de cierre de la incidencia **"el login responde 200 pero el usuario se queda en `/login`"**
 > y de la habilitación de las cuentas con `password_hash` legacy (Argon2id/bcrypt) mediante un
@@ -395,9 +396,9 @@ Arquitectura objetivo:
 1. Migrar (o resetear) las **56 cuentas `CLIENTE`** restantes a Supabase Auth.
 2. Cuando no queden cuentas con `password_hash` activas → `AUTH_ALLOW_LOCAL_FALLBACK="false"`.
 3. Endurecer: rotación de `AUTH_SECRET`, expiración/refresh del `sc-token` y rate limiting en `/api/auth`.
-# HU-21.DB — Restricciones de integridad y reglas de borrado para empleados
+## HU-21.DB — Restricciones de integridad y reglas de borrado para empleados
 
-> Rama de trabajo: Backend · Responsable: Ingeniería de Datos y Backend · Fecha de implementación: 2026-10-09
+> Ref histórica: Backend · Responsable: Ingeniería de Datos y Backend · Fecha de implementación: 2026-10-09
 > Alcance: restricciones de integridad en `packages/db` y controles de acceso/baja lógica en API.
 
 ## 1. Qué se hizo y por qué
@@ -466,12 +467,12 @@ La tarea Backend complementa este blindaje con:
 ## 4. Verificación (cómo reproducir)
 
 ```bash
-# Desde packages/db
+## Desde packages/db
 npx prisma validate --schema prisma/schema.prisma   # schema válido
 npx tsx --test test/hu21-empleado-integridad.test.ts # 4/4 pass
 npm test        # 54/54 pass (suite completa)
 npm run typecheck  # limpio
-# CA-02 manual: rg "onDelete:" prisma/schema.prisma (ver tabla §2)
+## CA-02 manual: rg "onDelete:" prisma/schema.prisma (ver tabla §2)
 ```
 
 ## 5. Notas de despliegue (leer antes del merge)
@@ -491,7 +492,7 @@ npm run typecheck  # limpio
 
 ---
 
-# TSK-FE-21: Administración de Empleados y Roles Operativos
+## TSK-FE-21: Administración de Empleados y Roles Operativos
 
 ## 1. Identificación y Alcance
 - **Ticket Jira:** TSK-FE-21 / SCRUM-141 (Historia de Usuario HU-21 / Requerimiento RF-18 / RN-10)
@@ -537,3 +538,7 @@ El panel monolítico original fue refactorizado en subcomponentes especializados
 - Validación de esquemas con Zod (`createEmployeeSchema`).
 - Pruebas unitarias de repositorio en `packages/db/src/repositories/employees.test.ts`.
 - Pruebas de integración frontend en `apps/web/src/app/(admin)/admin/employees/__tests__/employees-ui.test.ts`.
+
+## Trazabilidad
+
+> Ref histórica: HU-21 (RF-18 / RN-10) · SCRUM-141 · ramas de auth (OAuth, verificación, empleados y roles)

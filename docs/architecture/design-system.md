@@ -1,4 +1,5 @@
 # AKROS Club · SportComplex: Sistema de Diseño & Especificación de Arquitectura de Producción
+> Estado: vigente 2026-10-15
 > **Versión:** 2.0.0-PROD  
 > **Identidad de Marca:** AKROS Athletic & Wellness Club (Medellín, Colombia)  
 > **Línea Base Tecnológica:** Next.js 16.3.7 (App Router, Server Actions, SSG/SSR/CSR), React 19, TypeScript 5.7.3, Tailwind CSS 4.3.3, Turborepo 2.11.4, pnpm 12.6.0, Prisma ORM 7.10.0 con Supabase / PostgreSQL 16, Stripe SDK (100% Cashless), Ed25519 / HMAC QR Access System, Lucide React 1.16+.
@@ -73,9 +74,9 @@ sport-complex/
 │   ├── validation/                    # Contratos de validación con esquemas Zod 4
 │   └── config/                        # Configuraciones compartidas de ESLint y TypeScript
 ├── docs/
-│   ├── ARCHITECTURE.md                # Arquitectura de referencia del sistema
-│   ├── SRS.md                         # Especificación formal de requisitos de software
-│   └── DESIGN.md                      # Sistema de diseño unificado, tokens y UI (este documento)
+│   ├── architecture.md                # Arquitectura de referencia del sistema
+│   ├── srs.md                         # Especificación formal de requisitos de software
+│   └── design-system.md                      # Sistema de diseño unificado, tokens y UI (este documento)
 ```
 
 ---
@@ -247,7 +248,7 @@ La vitrina institucional (`apps/web/src/app/(public)/page.tsx`) se compila como 
 
 ## 6. Seguridad, Roles (RBAC) y Matriz de Acceso
 
-Conforme a `ARCHITECTURE.md` §6.2 y `SRS.md`, el sistema implementa una matriz estricta de 4 roles de usuario:
+Conforme a `architecture.md` §6.2 y `srs.md`, el sistema implementa una matriz estricta de 4 roles de usuario:
 
 | Ruta / Superficie | Anónimo / Público | `Cliente` | `Empleado_Vendedor` | `Empleado_Lector` | `Administrador` |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -280,13 +281,13 @@ Conforme a `ARCHITECTURE.md` §6.2 y `SRS.md`, el sistema implementa una matriz 
 - [x] Responsive design verificado en móviles (375px), tablets (768px) y pantallas de escritorio (1280px+).
 - [x] Componentes atómicos base en `@sportcomplex/ui` compatibles con Tailwind CSS v4.
 - [x] Soporte nativo para modo oscuro y claro con preservación de contraste accesible.
-- [x] Documentación de diseño alineada con `ARCHITECTURE.md` y `SRS.md`.
-# AKROS Club · System Design & UI Architecture Specification
+- [x] Documentación de diseño alineada con `architecture.md` y `srs.md`.
+## System Design & UI Architecture Specification
 
 > **Documento Oficial de Diseño de Sistema y Arquitectura de Interfaz**  
 > **Proyecto:** Plataforma de Gestión de Reservas, Venta y Control de Acceso Deportivo (`SportComplex`)  
 > **Marca Institucional:** AKROS Active Lifestyle Club  
-> **Normativa de Referencia:** Vinculado a [DESIGN.md](design-system.md), [ARCHITECTURE.md](architecture.md) y [SRS.md](../product/srs.md).  
+> **Normativa de Referencia:** Vinculado a [design-system.md](design-system.md), [architecture.md](architecture.md) y [srs.md](../product/srs.md).  
 > **Zona Horaria Canónica:** Colombia (`America/Bogota`, UTC-5).
 
 ---

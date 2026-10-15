@@ -1,8 +1,5 @@
-# TSK-BE-04 — CRUD de Categorías e Instancias con Validación de Unicidad y Calendario Propio
-
-> Rama de trabajo: `feature/tsk-be-04-crud-de-categorías-e-instancias`
-> Responsable: Jose Romero · Fase F1 · Depende de `TSK-BD-06`
-> Fecha de implementación: 2026-10-06
+# Catálogo
+> Estado: vigente 2026-10-15
 
 ## 1. Qué se hizo y por qué
 
@@ -274,19 +271,19 @@ try {
 ## 10. Comandos (desde raíz del monorepo)
 
 ```bash
-# Regenerar cliente Prisma tras tocar schema
+## Regenerar cliente Prisma tras tocar schema
 pnpm --filter @sportcomplex/db db:generate
 
-# Aplicar migraciones (desarrollo)
+## Aplicar migraciones (desarrollo)
 pnpm --filter @sportcomplex/db db:migrate
 
-# Desplegar en CI/VPS
+## Desplegar en CI/VPS
 pnpm --filter @sportcomplex/db db:migrate:deploy
 
-# Seeds (roles + catálogo base)
+## Seeds (roles + catálogo base)
 pnpm --filter @sportcomplex/db db:seed
 
-# Tests
+## Tests
 pnpm --filter @sportcomplex/validation test
 pnpm --filter web test
 ```
@@ -300,3 +297,7 @@ pnpm --filter web test
 - Tests unitarios validación: 17/17 PASS ✓
 - Tests integración API: 6/6 PASS ✓
 - Sanitización errores verificada: no exponen rutas Windows, schema.prisma, ni stack traces ✓
+
+## Trazabilidad
+
+> Ref histórica: rama `feature/tsk-be-04-crud-de-categorías-e-instancias` · responsable: Jose Romero · Fase F1 · depende de TSK-BD-06

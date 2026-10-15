@@ -1,4 +1,5 @@
-# TSK-BE-23 — Endpoints de consulta para el chatbot
+# Chatbot y analítica
+> Estado: vigente 2026-10-15
 
 ## Autenticación
 
@@ -32,11 +33,11 @@ del ticket. El canje permanece exclusivo del flujo de escaneo autorizado.
 
 Las respuestas usan el formato canónico `{ success, data, timestamp }`; los
 errores siguen `{ success: false, error, timestamp }`.
-# TSK-BE-24 — Endpoint de agregaciones analíticas
+## TSK-BE-24 — Endpoint de agregaciones analíticas
 
 > Historia de Usuario: `HU-24` (RF-21) · Fase: F4 · Microcelda / Componente: Backend  
-> Jira: `SCRUM-149` · Depende de: `TSK-BD-02`, `TSK-BD-05`, `TSK-BD-03`  
-> Responsable: Jose Romero · Rama: `feature/tsk-be-24-endpoint-de-agregaciones-analíticas`
+> Ref histórica: `SCRUM-149` · Depende de: `TSK-BD-02`, `TSK-BD-05`, `TSK-BD-03`  
+> Ref histórica: Jose Romero · Rama: `feature/tsk-be-24-endpoint-de-agregaciones-analíticas`
 
 ---
 
@@ -200,7 +201,7 @@ Validado matemáticamente en `packages/db/src/repositories/catalog/analytics.tes
 
 ---
 
-# TSK-FE-23: Dashboard Gerencial y Analítica de Alta Densidad
+## TSK-FE-23: Dashboard Gerencial y Analítica de Alta Densidad
 
 ## 1. Identificación y Alcance
 - **Ticket Jira:** TSK-FE-23 / SCRUM-148 (Requerimientos RNF-04 / RF-18)
@@ -241,3 +242,7 @@ El panel fue descompuesto modularmente en subcomponentes especializados bajo `pa
 
 ## 4. Pruebas y Validación
 - Pruebas frontend de cálculo de KPIs, formateo de métricas y exportación CSV en `apps/web/src/app/(admin)/admin/dashboard/__tests__/dashboard-ui.test.ts`.
+
+## Trazabilidad
+
+> Ref histórica: HU-24 (RF-21) · SCRUM-148/149 · ramas de chatbot y agregaciones analíticas

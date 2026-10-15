@@ -17,6 +17,9 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [architecture/design-system.md](./architecture/design-system.md) | Tokens de diseño, UI, tipografía y especificación visual (DESIGN + system design fusionados) |
 | [architecture/data-model.md](./architecture/data-model.md) | MER y DER de la base de datos |
 | [architecture/performance-indexes.md](./architecture/performance-indexes.md) | Tuning de consultas con `EXPLAIN ANALYZE`, índices GiST |
+| [architecture/packages-features.md](./architecture/packages-features.md) | Mapa de paquetes `features/*` + `shared`, DAG y reglas de migración |
+| [architecture/api-contracts.md](./architecture/api-contracts.md) | Contratos REST + OpenAPI generado (`docs/api/openapi.json`) |
+| [architecture/adrs/](./architecture/adrs/) | Decisiones de arquitectura (7 ADRs) |
 
 ## Producto (qué construimos)
 
@@ -40,6 +43,24 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [features/membresias.md](./features/membresias.md) | Persistencia de membresías y catálogo de planes |
 | [features/torneos.md](./features/torneos.md) | Modelo de torneos, bloqueos, inscripciones, endpoints admin y bloqueo preventivo |
 | [features/chatbot-analitica.md](./features/chatbot-analitica.md) | Endpoints para chatbot y agregaciones analíticas |
+| [features/reglamentos.md](./features/reglamentos.md) | Reglamentos y marco normativo (`/rules`) |
+
+## Packages (código)
+
+| Paquete | Doc |
+|---|---|
+| `packages/application` | [packages/application/README.md](../packages/application/README.md) |
+| `packages/config` | [packages/config/README.md](../packages/config/README.md) |
+| `packages/core` | [packages/core/README.md](../packages/core/README.md) |
+| `packages/domain` | [packages/domain/README.md](../packages/domain/README.md) |
+| `packages/security` | [packages/security/README.md](../packages/security/README.md) |
+| `packages/seed` | [packages/seed/README.md](../packages/seed/README.md) |
+| `packages/shared` | [packages/shared/README.md](../packages/shared/README.md) |
+| `packages/ui` | [packages/ui/README.md](../packages/ui/README.md) |
+| `packages/validation` | [packages/validation/README.md](../packages/validation/README.md) |
+| `packages/automation` | [packages/automation/README.md](../packages/automation/README.md) |
+| `packages/features` | [packages/features/README.md](../packages/features/README.md) |
+| `packages/db` | [packages/db/README.md](../packages/db/README.md) |
 
 ## Automatización (n8n / webhooks)
 
@@ -49,12 +70,10 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [automation/workflows.md](./automation/workflows.md) | Workflows n8n por funcionalidad: OTP, QR, contingencia (con reintentos), reporte gerencial, festivos, cobro fallido, gestión de errores |
 | [automation/webhooks.md](./automation/webhooks.md) | Integración de webhooks Stripe/Resend y sistema de contingencia |
 | [automation/implementation-guide.md](./automation/implementation-guide.md) | Guía práctica de integración n8n en el backend |
-| [automation/index.md](./automation/index.md) | Índice original de automatización |
-| [automation/setup-summary.md](./automation/setup-summary.md) | Resumen de setup de n8n |
 
 ## Infraestructura y despliegue
 
-Ver [infra/README.md](./infra/README.md) — VPS compartido, Docker, Caddy, n8n, Storage y CI/CD.
+Ver [infra/README.md](./infra/README.md) — VPS dedicado, Docker, Caddy, n8n, Storage y CI/CD.
 
 ## Convenciones para añadir documentación nueva
 

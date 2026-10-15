@@ -1,4 +1,5 @@
 # Documentación de Workflows n8n - Complejo Deportivo
+> Estado: vigente 2026-10-15
 
 ## Descripción General
 
@@ -307,7 +308,7 @@ de Resend, incorporando reintentos automáticos para garantizar alta disponibili
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Código de Verificación OTP (TSK-AU-01)
+## Integración n8n - Código de Verificación OTP (TSK-AU-01)
 N8N_AUTH_CODE_WEBHOOK_URL="https://jafet123.app.n8n.cloud/webhook/auth/enviar-codigo"
 
 
@@ -416,7 +417,7 @@ despacha el correo electrónico mediante la API de Resend.
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Despacho de Código QR (TSK-AU-03)
+## Integración n8n - Despacho de Código QR (TSK-AU-03)
 N8N_RESERVATION_QR_WEBHOOK_URL="https://onebolivar.app.n8n.cloud/webhook/reservas/despacho-qr"
 NEXT_PUBLIC_APP_URL="https://akros.lat"
 
@@ -545,7 +546,7 @@ uno de los usuarios con reservas afectadas a través de la API de Resend.
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Contingencias Operativas (TSK-AU-05 / TSK-BE-22)
+## Integración n8n - Contingencias Operativas (TSK-AU-05 / TSK-BE-22)
 N8N_CONTINGENCY_WEBHOOK_URL="https://onebolivar.app.n8n.cloud/webhook/contingencias/servicio"
 N8N_CONTINGENCY_HMAC_SECRET="akros_super_secret_contingency_key_32chars_min"
 
@@ -669,10 +670,10 @@ de Resend.
 
 3. VARIABLES DE ENTORNO Y ENDPOINTS (BACKEND / N8N)
 --------------------------------------------------------------------------------
-# Endpoint real de analíticas expuesto por el backend y consumido por n8n:
+## Endpoint real de analíticas expuesto por el backend y consumido por n8n:
 BACKEND_ANALYTICS_API_URL="https://akros.lat/api/admin/analytics"
 
-# Destinatarios del reporte consolidado:
+## Destinatarios del reporte consolidado:
 ADMIN_REPORT_RECIPIENTS="gerencia@akros.lat,operaciones@akros.lat"
 
 
@@ -757,4 +758,3 @@ No se modificó el esquema ni se creó/aplicó una migración. `pnpm --filter we
 Para resolver la limitación de entrega cuando n8n se encuentra temporalmente inactivo o inaccesible (evitando que se pierda la notificación a los clientes afectados), se definió **TSK-BE-22b**:
 - **Alcance**: Cola persistente de salida (*Outbox pattern*) en base de datos basada en los registros de `inhabilitacion_servicio` con `webhook_enviado_en IS NULL` o cola dedicada.
 - **Worker/Job**: Proceso de reintentos periódicos con retroceso exponencial (*exponential backoff*), conservando la firma HMAC `X-SportComplex-Signature` hasta recibir HTTP 2xx de n8n o alcanzar el umbral de *dead-letter* (coordinado con TSK-AU-08 / SCRUM-147).
-

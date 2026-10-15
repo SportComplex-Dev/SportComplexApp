@@ -1,7 +1,6 @@
-# TSK-BE-05 — Aforo máximo y generación de franjas horarias
+# Reservas
+> Estado: vigente 2026-10-15
 
-> Historia: HU-05 (RF-04) · Fase F1 · Backend
-> Dependencia: TSK-BE-04
 
 ## Alcance implementado
 
@@ -48,10 +47,10 @@ Verificación realizada:
 - `pnpm --filter web typecheck`
 
 El script estándar de pruebas de `@sportcomplex/validation` usa `node --experimental-strip-types`; en un entorno cuyo Node no tenga soporte para esa opción, ejecutar las pruebas con `tsx`. El typecheck de `web` puede reportar imports de rutas antiguas ausentes en `.next/types/validator.ts`; esos diagnósticos son independientes de esta implementación.
-# TSK-BE-06 — Validación de la ventana máxima de 15 días en servidor
+## TSK-BE-06 — Validación de la ventana máxima de 15 días en servidor
 
-> Historia: HU-06 (RF-05) · Fase F1 · Backend · SCRUM-101
-> Dependencia: TSK-BD-07
+> Ref histórica: HU-06 (RF-05) · Fase F1 · Backend · SCRUM-101
+> Ref histórica: TSK-BD-07
 
 ## Alcance implementado
 
@@ -93,9 +92,9 @@ Verificación realizada:
 - `pnpm --filter @sportcomplex/core typecheck`
 - `pnpm --filter @sportcomplex/db typecheck`
 - `pnpm --filter @sportcomplex/validation test` (sin cambios, se mantiene verde)
-# TSK-BE-09 — Bloqueo temporal de franja en el checkout
+## TSK-BE-09 — Bloqueo temporal de franja en el checkout
 
-> Historia: HU-09 (RF-08 / RN-04, revisada: TTL 30 min) · Fase F2 · Backend · SCRUM-113
+> Ref histórica: HU-09 (RF-08 / RN-04, revisada: TTL 30 min) · Fase F2 · Backend · SCRUM-113
 > Dependencias: TSK-BD-07 (reserva transaccional), TSK-BD-08 (job de expiración TTL)
 
 ## Alcance implementado (opción C aprobada)
@@ -212,9 +211,9 @@ fallan con `amount_too_small` al crear la sesión.
 | Fecha fuera de la ventana de 15 días | 400 | `OUTSIDE_BOOKING_WINDOW` |
 | `STRIPE_SECRET_KEY` ausente | 503 | `STRIPE_NOT_CONFIGURED` |
 | Fallo creando la sesión de Stripe (hold compensado) | 502 | `CHECKOUT_STRIPE_FAILED` |
-# TSK-BE-12 — Regla de multirreserva concurrente
+## TSK-BE-12 — Regla de multirreserva concurrente
 
-> Historia: HU-12 (RF-11 / RN-07) · Fase F2 · Backend · SCRUM-120
+> Ref histórica: HU-12 (RF-11 / RN-07) · Fase F2 · Backend · SCRUM-120
 > Dependencias: `TSK-BE-09` (bloqueo temporal de franja)
 
 ## Regla implementada
@@ -275,7 +274,7 @@ Para completar el criterio de aceptación de frontend en **TSK-FE-12** (*"dos se
 - **Alcance**: Soporte transaccional en backend para recibir lotes de reservas (`items: Array<BookingRequest>`).
 - **Transacción Atómica**: Bloqueo atómico (*all-or-nothing*) de todas las franjas seleccionadas, validando aforos, mantenimiento y la regla de no-solapamiento (`assertNoTitularOverlap`) entre los ítems y las reservas previas.
 - **Stripe Checkout Consolidado**: Creación de una única sesión de Stripe Checkout con múltiples `line_items` y registro de los identificadores de reserva en los metadatos para confirmación conjunta en el webhook RF-09.
-# TSK-BE-13 — Historial de reservas con cursor
+## TSK-BE-13 — Historial de reservas con cursor
 
 ## Endpoint
 
@@ -295,7 +294,7 @@ El modelo `Reserva` declara el índice compuesto `@@index([titularId, estado, cr
 
 ---
 
-# TSK-FE-12: Selección Múltiple de Servicios en la Misma Franja
+## TSK-FE-12: Selección Múltiple de Servicios en la Misma Franja
 
 ## 1. Trazabilidad y Requerimientos de Negocio
 - **Identificador de Tarea:** `TSK-FE-12` (SCRUM Frontend / Monorepo `apps/web`)
@@ -395,7 +394,7 @@ La suite en `multi-service-cart.test.tsx` verifica:
 
 ---
 
-# Reporte Técnico: Diagnóstico de Error en Selección Múltiple y Checkout Conjunto (TSK-FE-12)
+## Reporte Técnico: Diagnóstico de Error en Selección Múltiple y Checkout Conjunto (TSK-FE-12)
 
 **Fecha:** 11 de octubre de 2026  
 **Módulos Afectados:** Frontend (`apps/web`), Backend (`packages/db`), Base de Datos (`PostgreSQL/Prisma`)  
@@ -484,3 +483,7 @@ Para solucionar el problema de raíz y dejar la funcionalidad operativa de extre
 
 ---
 *Reporte generado como artefacto de auditoría para el equipo de desarrollo SportComplex.*
+
+## Trazabilidad
+
+> Ref histórica: HU-05 (RF-04) · Fase F1 · dependencia: bloqueo temporal de franja y reserva transaccional

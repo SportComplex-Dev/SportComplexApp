@@ -6,7 +6,7 @@
 ### Control del Documento
 * **Proyecto:** Plataforma de Gestión de Reservas, Venta y Control de Acceso Deportivo
 * **Versión:** 1.2.0-AUDITED
-* **Estado:** Especificación Formal de Requisitos (Revisión Integral y Ajustes de Modelo Cashless / PDF)
+> Estado: vigente 2026-10-15
 * **Fecha:** 29 de Septiembre de 2026
 * **Zona Horaria del Sistema:** Colombia (`America/Bogota`, UTC-5)
 * **Stack Tecnológico Base:** Next.js (App Router, TypeScript), Base de Datos Relacional, Stripe (Cashless), Nager.Date API, n8n

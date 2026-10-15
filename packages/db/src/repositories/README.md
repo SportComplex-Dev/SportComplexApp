@@ -1,9 +1,10 @@
 # Repositorios `packages/db`
+> Estado: vigente 2026-10-15
 
 ## `access/verification-tokens.ts` — Acceso a Datos TokenVerificacion
 
 ### Propósito
-Provee CRUD tipado y mínimo para `TokenVerificacion` usado por flujos de auth (TSK-BE-03).
+Provee CRUD tipado y mínimo para `TokenVerificacion` usado por flujos de auth (ref. histórica TSK-BE-03).
 
 ### Referencia de Esquema (`prisma/schema.prisma`)
 ```prisma
@@ -63,7 +64,7 @@ await markUsed(token.id); // Soft delete — preserva rastro de auditoría
 - **Índice implícito en `(usuario_id, creado_en)`** — vía `orderBy: { creadoEn: 'desc' }` + `where: { usadoEn: null }`
 - **Cascade delete en Usuario** — tokens eliminados cuando se borra el usuario
 
-## `reservations/availability.ts` — TSK-BD-07 Reserva transaccional (Overbooking = 0)
+## `reservations/availability.ts` — reserva transaccional (Overbooking = 0)
 
 ### Propósito
 Único camino que **ocupa cupos** (`cupos_ocupados`) sobre `disponibilidad`.
@@ -170,7 +171,7 @@ Reglas frontend:
 
 ## Módulo: Torneos y Boletos de Entrada (`catalog/tournaments.ts`)
 
-Gestión de catálogo, inscripción atómica, verificación de pagos y control de acceso seguro para torneos deportivos (TSK-BD-12, TSK-BE-25, TSK-BE-26).
+Gestión de catálogo, inscripción atómica, verificación de pagos y control de acceso seguro para torneos deportivos (ref. histórica TSK-BD-12, TSK-BE-25, TSK-BE-26).
 
 ### Contratos de Repositorio
 

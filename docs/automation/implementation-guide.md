@@ -1,4 +1,5 @@
 # Guía Rápida de Implementación - n8n en el Backend
+> Estado: vigente 2026-10-15
 
 ## 1. Configuración Inicial
 
@@ -8,7 +9,7 @@
 
 ```env
 # n8n Configuration
-N8N_WEBHOOK_BASE_URL=https://n8n.tudominio.com
+N8N_WEBHOOK_BASE_URL=https://n8n.akros.lat
 N8N_WEBHOOK_TOKEN=tu-token-opcional
 
 # Resend Email API
@@ -383,8 +384,8 @@ it("debería registrar usuario y enviar código", async () => {
 
 ## 10. Recursos Útiles
 
-- 📄 [N8N_WORKFLOWS.md](./workflows.md) - Documentación completa del workflow
-- 📄 [AUTOMATION.md](./overview.md) - Arquitectura completa
+- 📄 [workflows.md](./workflows.md) - Documentación completa del workflow
+- 📄 [overview.md](./overview.md) - Arquitectura completa
 - 📝 [automation.schema.ts](../../packages/validation/src/business/automation.schema.ts) - Schemas Zod
 - 🔧 [n8n.ts](../../packages/core/src/integrations/n8n.ts) - Implementación
 - 💻 [Ejemplo Completo](#3-ejemplo-completo-endpoint-de-registro) - Ejemplos de implementación en código

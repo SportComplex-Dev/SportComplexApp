@@ -1,8 +1,5 @@
-# TSK-BE-07 — Motor de mantenimiento de piscinas (SCRUM-103 / HU-07 / RF-06 / RN-02)
-
-> Rama de trabajo: `feature/tsk-be-07-motor-de-mantenimiento-de-piscinas`
-> Responsable: Jose Romero · Fase F1 · Depende de `TSK-AU-02`
-> Fecha de implementación: 2026-10-06
+# Piscinas
+> Estado: vigente 2026-10-15
 
 ## 1. Qué se hizo y por qué
 
@@ -183,17 +180,17 @@ await upsertManyFestivos([
 ## 3. Comandos (desde la raíz del monorepo)
 
 ```bash
-# Regenerar cliente Prisma si tocaste schema (festivos ya existía en TSK-BD-06)
+## Regenerar cliente Prisma si tocaste schema (festivos ya existía en TSK-BD-06)
 pnpm --filter @sportcomplex/db db:generate
 
-# Tests del motor de piscina
+## Tests del motor de piscina
 pnpm --filter @sportcomplex/core test packages/core/src/services/pool-policy.test.ts
 pnpm --filter @sportcomplex/core test packages/core/src/integrations/nager-date.test.ts
 
-# Tests del repo festivos
+## Tests del repo festivos
 pnpm --filter @sportcomplex/db test packages/db/src/repositories/festivos.test.ts
 
-# Lint + typecheck completo
+## Lint + typecheck completo
 pnpm lint && pnpm typecheck
 ```
 
@@ -217,7 +214,7 @@ pnpm lint && pnpm typecheck
 ## 5. Variables de entorno
 
 ```env
-# Opcional — sobrescribe URL base de Nager.Date
+## Opcional — sobrescribe URL base de Nager.Date
 NAGER_DATE_BASE_URL=https://date.nager.at/api/v3
 ```
 
@@ -233,7 +230,7 @@ NAGER_DATE_BASE_URL=https://date.nager.at/api/v3
 
 ## 7. Referencias
 
-- **Jira**: SCRUM-103
+> Ref histórica: SCRUM-103 · HU-07 (RF-06 / RN-02) · depende de sincronización de festivos
 - **Task**: TSK-BE-07
 - **Arquitectura**: §9.4 (Cache-Aside / Resiliencia)
 - **Historias relacionadas**: HU-07, RF-06, RN-02
@@ -251,3 +248,7 @@ NAGER_DATE_BASE_URL=https://date.nager.at/api/v3
 Las pruebas cubren piscina pública con aforo 30 y reserva de 2 cupos (quedan 28), piscina privada con capacidad configurada 30 (la franja solo admite una reserva), cambios de tipo y validación de combinaciones incompatibles.
 
 No se modificó el esquema ni se creó/aplicó una migración.
+
+## Trazabilidad
+
+> Ref histórica: SCRUM-103 · HU-07 (RF-06 / RN-02) · rama `feature/tsk-be-07-motor-de-mantenimiento-de-piscinas` · depende de sincronización de festivos
