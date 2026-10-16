@@ -34,6 +34,9 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8).max(72),
 })
 
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+
 export const createEmployeeSchema = z.object({
   nombre: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres').max(120),
   correo: z.string().trim().email('Ingresa un correo electrónico válido'),
