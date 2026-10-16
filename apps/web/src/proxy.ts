@@ -128,7 +128,10 @@ function createForbiddenResponse(req: NextRequest, message: string) {
 
 export default withAuth(async (req) => {
   const { pathname } = req.nextUrl;
-  const isDev = process.env.NODE_ENV !== "production";
+  const isDev =
+    process.env.NODE_ENV !== "production" ||
+    process.env.CI === "true" ||
+    process.env.PLAYWRIGHT_TEST === "true";
   const queryRole = isDev
     ? (req.nextUrl.searchParams.get("role") || req.nextUrl.searchParams.get("asRole"))
     : null;

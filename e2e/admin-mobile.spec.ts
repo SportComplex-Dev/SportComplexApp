@@ -7,8 +7,12 @@ test.describe('TSK-QA-09: Pruebas visuales, responsivas y de accesibilidad del m
       {
         name: 'sc-role',
         value: 'Administrador',
-        domain: '127.0.0.1',
-        path: '/',
+        url: 'http://127.0.0.1:3000',
+      },
+      {
+        name: 'sc-role',
+        value: 'Administrador',
+        url: 'http://localhost:3000',
       },
     ])
 
