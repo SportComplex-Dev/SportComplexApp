@@ -117,18 +117,18 @@ export function DashboardTables({
                     <td className="py-3 pl-6 pr-3 font-bold text-[var(--ink)]">
                       {serv.serviceName}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-3">
                       <Badge variant={serv.modality === 'EXCLUSIVA' ? 'default' : 'secondary'} className="text-[10px]">
                         {serv.modality}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-center font-semibold text-[var(--ink)]">
+                    <td className="py-2.5 px-3 text-center font-semibold text-[var(--ink)]">
                       {serv.totalSold}
                     </td>
-                    <td className="py-3 px-4 text-center font-semibold text-blue-600 dark:text-blue-400">
+                    <td className="py-2.5 px-3 text-center font-semibold text-blue-600 dark:text-blue-400">
                       {serv.totalUsed}
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-2.5 px-3 text-center">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           redemptionRate >= 90
