@@ -31,3 +31,12 @@ test('TSK-FE-32 / Input: respeta showPasswordToggle=false cuando se desactiva ex
   assert.ok(html.includes('type="password"'), 'Debe ser type password')
   assert.ok(!html.includes('aria-label="Mostrar contraseña"'), 'No debe renderizar botón de toggle')
 })
+
+test('TSK-FE-32 / Input: propaga disabled={true} al input y al botón de alternar', () => {
+  const html = renderToStaticMarkup(
+    <Input type="password" disabled placeholder="Deshabilitado" />
+  )
+  assert.ok(html.includes('disabled'), 'El input debe incluir atributo disabled')
+  assert.ok(html.includes('disabled=""') || html.includes('disabled'), 'El botón debe estar deshabilitado')
+  assert.ok(html.includes('disabled:pointer-events-none'), 'El botón debe incluir clases para inhabilitación')
+})

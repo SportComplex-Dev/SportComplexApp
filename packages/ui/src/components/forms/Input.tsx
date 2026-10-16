@@ -38,9 +38,10 @@ export function Input({
         <button
           type="button"
           tabIndex={-1}
+          disabled={props.disabled}
           onClick={() => setShowPassword((prev) => !prev)}
           aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-          className="absolute right-3 p-1 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+          className="absolute right-3 p-1 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {showPassword ? (
             <EyeOff className="h-4 w-4" aria-hidden="true" />
