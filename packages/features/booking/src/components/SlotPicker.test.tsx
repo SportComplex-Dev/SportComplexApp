@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import React from 'react'
-;(globalThis as any).React = React
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SlotPicker } from './SlotPicker'
 import { validateContinuousSlots, calculateMultiSlotPricing } from '../services/cartUtils'
 import type { DynamicTimeSlot } from '../types/cart'
+
+;(globalThis as unknown as { React: typeof React }).React = React
 
 const mockSlots: DynamicTimeSlot[] = [
   { startTime: '07:00', endTime: '08:00', label: '07:00 – 08:00', isAvailable: true },

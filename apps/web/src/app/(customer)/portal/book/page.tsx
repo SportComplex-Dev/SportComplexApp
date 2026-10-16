@@ -254,6 +254,8 @@ export default function BookPage() {
             timeSlots={timeSlots}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSelectSlot}
+            selectedSlots={selectedSlots}
+            onSlotsChange={handleSlotsChange}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
             cartServiceIds={cartServiceIds}
