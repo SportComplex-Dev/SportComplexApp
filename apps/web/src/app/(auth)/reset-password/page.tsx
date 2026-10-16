@@ -53,6 +53,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [tokenExpired, setTokenExpired] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Medidor de robustez Zod
@@ -125,6 +126,17 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
       const data = await res.json().catch(() => null)
 
       if (!res.ok || (data && data.success === false)) {
+        if (
+          res.status === 401 ||
+          res.status === 404 ||
+          res.status === 410 ||
+          data?.error?.code === 'TOKEN_EXPIRED' ||
+          data?.error?.code === 'INVALID_TOKEN' ||
+          data?.error?.message?.toLowerCase().includes('expirado') ||
+          data?.error?.message?.toLowerCase().includes('inválido')
+        ) {
+          setTokenExpired(true)
+        }
         setError(data?.error?.message || 'No se pudo actualizar la contraseña. El enlace puede haber expirado.')
         return
       }
@@ -202,7 +214,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
               <ArrowLeft size={15} strokeWidth={1.75} aria-hidden="true" /> Volver al inicio de sesión
             </Link>
 
-            {!token ? (
+            {!token || tokenExpired ? (
               /* Enlace inválido o sin token */
               <div className="space-y-4" data-testid="invalid-token-alert">
                 <div className="inline-flex size-12 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
@@ -270,6 +282,12 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setShowPassword((prev) => !prev)
+                          }
+                        }}
                         aria-label={showPassword ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
                         className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
                       >
@@ -318,6 +336,12 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setShowConfirmPassword((prev) => !prev)
+                          }
+                        }}
                         aria-label={showConfirmPassword ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'}
                         className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
                       >

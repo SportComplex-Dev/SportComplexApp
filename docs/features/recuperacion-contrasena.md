@@ -182,28 +182,24 @@ El selector `.forgot-link` respeta las variables visuales institucionales declar
 
 ---
 
-## 6. Reporte de Pruebas Unitarias y Cobertura
+## 6. Reporte de Pruebas Automatizadas y Cobertura QA (TSK-QA-05 / TSK-FE-33)
 
-La suite de pruebas fue ejecutada con el runner nativo de Node.js v24 (`node:test`) y `@testing-library/react`.
+La suite completa de pruebas fue ejecutada con el runner nativo de Node.js v24 (`node:test`) y `@testing-library/react`. Para el informe técnico detallado, matrices de entradas y comportamiento accesible, consultar [Pruebas Automatizadas de Recuperación de Contraseña y Accesibilidad](./pruebas-recuperacion-contrasena.md).
 
 ```bash
 # Comando de ejecución
 pnpm --filter web exec tsx --import ./test-env.js --test "src/app/(auth)/**/__tests__/*.test.tsx"
 ```
 
-### Matriz de Pruebas Aprobadas (9/9 Pasadas)
+### Matriz Consolidada de Pruebas Aprobadas (25/25 Pasadas)
 
-| Archivo de Prueba | Caso de Prueba Verificado | Resultado |
+| Archivo / Dominio de Prueba | Casos de Prueba Verificados | Resultado |
 | :--- | :--- | :---: |
-| `forgot-password/__tests__/page.test.tsx` | Rechazo estricto de correos vacíos o malformados en Zod | ✅ PASS |
-| `forgot-password/__tests__/page.test.tsx` | Rechazo en UI con mensaje de alerta `role="alert"` | ✅ PASS |
-| `forgot-password/__tests__/page.test.tsx` | Confirmación visible *"Revisa tu bandeja de entrada"* tras POST | ✅ PASS |
-| `forgot-password/__tests__/page.test.tsx` | Enlace *"¿Olvidaste tu contraseña?"* apunta a `/forgot-password` | ✅ PASS |
-| `reset-password/__tests__/page.test.tsx` | Exigencia de mínimo 8 caracteres y caracteres alfanuméricos | ✅ PASS |
-| `reset-password/__tests__/page.test.tsx` | Detección en tiempo real de contraseñas no coincidentes (`.refine`) | ✅ PASS |
-| `reset-password/__tests__/page.test.tsx` | Alerta visual y enlace de rescate cuando falta el token en la URL | ✅ PASS |
-| `reset-password/__tests__/page.test.tsx` | Medidor de robustez y toggles de visibilidad `Eye`/`EyeOff` | ✅ PASS |
-| `reset-password/__tests__/page.test.tsx` | Envío exitoso, notificación toast y redirección a `/login` | ✅ PASS |
+| `reset-password/__tests__/token-security-expiration.test.tsx` | Validación TTL 15 min (900.000 ms), expiración en borde y >15 min, rechazo en manejador `TOKEN_EXPIRED`, activación de contingencia en UI, bloqueo ante token vacío o espacios, sanitización de token alterado o firma corrupta, y esquema Zod | ✅ 8/8 PASS |
+| `forgot-password/__tests__/enumeration-protection.test.tsx` | Protección contra enumeración (CWE-204 / OWASP WSTG-IDNT-04): respuesta genérica idéntica para correos existentes e inexistentes, tolerancia a fallos de red 500 silenciosos, detención de entradas malformadas | ✅ 3/3 PASS |
+| `reset-password/__tests__/password-visibility-wcag.test.tsx` | Accesibilidad WCAG 2.2: aria-label dinámico `Mostrar/Ocultar`, iconos con `aria-hidden="true"`, foco por teclado y activación por tecla `Enter` y `Space`, medidor de robustez Zod reactivo (4 niveles), alerta `role="alert"` en discrepancia | ✅ 5/5 PASS |
+| `forgot-password/__tests__/page.test.tsx` | Esquema Zod de recuperación, rechazo en UI con alerta, confirmación visible tras POST, enlace a login | ✅ 4/4 PASS |
+| `reset-password/__tests__/page.test.tsx` | Exigencia de 8+ caracteres, validación `.refine`, detección de falta de token en URL, medidor y toggles, redirección a login tras éxito | ✅ 5/5 PASS |
 
 ---
 
