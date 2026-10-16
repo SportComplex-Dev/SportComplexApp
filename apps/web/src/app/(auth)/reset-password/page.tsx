@@ -271,6 +271,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
                     <div className="relative">
                       <Input
                         type={showPassword ? 'text' : 'password'}
+                        showPasswordToggle={false}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         placeholder="Mínimo 8 caracteres"
@@ -325,6 +326,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
                     <div className="relative">
                       <Input
                         type={showConfirmPassword ? 'text' : 'password'}
+                        showPasswordToggle={false}
                         value={confirmPassword}
                         onChange={(event) => setConfirmPassword(event.target.value)}
                         placeholder="Repite la nueva contraseña"
