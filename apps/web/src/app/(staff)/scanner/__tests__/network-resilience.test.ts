@@ -270,12 +270,15 @@ test("TSK-FE-24 (6): NO reintenta errores HTTP de negocio, 400, 401, 403, 404 ni
 // ============================================================================
 test("TSK-FE-24 (7): Almacena y recupera datos informativos, filtrando secretos y firmas", () => {
   const storage = createMockStorage();
+  // Fecha dinámica: la política de caché invalida fechas pasadas (ver test 8),
+  // una fecha fija se pudre al día siguiente y rompe el CI pasada la medianoche UTC.
+  const today = new Date().toISOString().slice(0, 10);
 
   const ticketDataWithExtras = {
     ticketId: "9f0d6f4e-0000-4000-8000-0000000000ff",
     titularNombre: "Carlos Gómez",
     servicioNombre: "Cancha de Tenis 1",
-    fecha: "2026-10-15",
+    fecha: today,
     horaInicio: "14:00:00",
     horaFin: "15:00:00",
     // CAMPOS PROHIBIDOS que deben ser descartados:
@@ -290,7 +293,7 @@ test("TSK-FE-24 (7): Almacena y recupera datos informativos, filtrando secretos 
   assert.equal(sanitized?.ticketId, "9f0d6f4e-0000-4000-8000-0000000000ff");
   assert.equal(sanitized?.titularNombre, "Carlos Gómez");
   assert.equal(sanitized?.servicioNombre, "Cancha de Tenis 1");
-  assert.equal(sanitized?.fecha, "2026-10-15");
+  assert.equal(sanitized?.fecha, today);
   assert.equal(sanitized?.horaInicio, "14:00:00");
   assert.equal(sanitized?.horaFin, "15:00:00");
   // @ts-expect-error comprobación de ausencia
