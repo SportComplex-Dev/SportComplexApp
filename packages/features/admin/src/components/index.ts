@@ -8,3 +8,4 @@ export * from "./staff/EmployeeStats";
 export * from "./staff/EmployeeTable";
 export * from "./bookings/types";
 export * from "./bookings/AdminBookingsView";
+export * from "./bookings/AdminBookingCancelModal";

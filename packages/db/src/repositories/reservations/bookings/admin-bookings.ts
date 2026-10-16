@@ -362,3 +362,75 @@ export async function listAdminBookings(
     },
   };
 }
+
+
+export interface CancelAdminBookingInput {
+  bookingId: string;
+  motivo: string;
+  adminId?: string;
+}
+
+export async function cancelAdminBooking(input: CancelAdminBookingInput) {
+  return await prisma.$transaction(async (tx) => {
+    const reserva = await tx.reserva.findUnique({
+      where: { id: input.bookingId },
+      include: {
+        disponibilidad: {
+          include: {
+            servicio: true,
+            franja: true,
+          },
+        },
+        titular: {
+          select: {
+            id: true,
+            nombre: true,
+            correo: true,
+          },
+        },
+      },
+    });
+
+    if (!reserva) {
+      throw new Error("RESERVA_NOT_FOUND");
+    }
+
+    if (
+      reserva.estado === "CANCELADA_ADMINISTRATIVA" ||
+      reserva.estado === "CANCELADA_PAGO"
+    ) {
+      throw new Error("RESERVA_ALREADY_CANCELLED");
+    }
+
+    // Actualizar estado de la reserva
+    const updated = await tx.reserva.update({
+      where: { id: input.bookingId },
+      data: {
+        estado: "CANCELADA_ADMINISTRATIVA",
+      },
+    });
+
+    // Liberar cupos ocupados si la reserva estaba activa (CONFIRMADA o PENDIENTE_PAGO)
+    if (reserva.estado === "CONFIRMADA" || reserva.estado === "PENDIENTE_PAGO") {
+      await tx.disponibilidad.update({
+        where: { id: reserva.disponibilidadId },
+        data: {
+          cuposOcupados: {
+            decrement: reserva.cantidadCupos,
+          },
+        },
+      });
+    }
+
+    return {
+      id: updated.id,
+      estado: updated.estado,
+      motivo: input.motivo,
+      canceladoPor: input.adminId || null,
+      cantidadCuposLiberados: reserva.cantidadCupos,
+      servicio: reserva.disponibilidad?.servicio?.nombre || 'Servicio',
+      fecha: reserva.disponibilidad?.fecha,
+      titular: reserva.titular,
+    };
+  });
+}

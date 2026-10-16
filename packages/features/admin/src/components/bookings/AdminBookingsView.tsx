@@ -17,9 +17,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Ban,
 } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { Badge, Modal } from '@sportcomplex/ui'
+import { AdminBookingCancelModal } from './AdminBookingCancelModal'
 import type {
   AdminBookingItem,
   AdminBookingMetrics,
@@ -36,6 +38,7 @@ export interface AdminBookingsViewProps {
   availableServices?: Array<{ id: number; name: string }>
   onFiltersChange: (newFilters: Partial<AdminBookingFiltersState>) => void
   onRefresh: () => void
+  onCancelBooking?: (bookingId: string, motivo: string) => Promise<void>
 }
 
 function formatSlotTime(dateInput: string | Date): string {
@@ -111,14 +114,31 @@ export function AdminBookingsView({
   availableServices = [],
   onFiltersChange,
   onRefresh,
+  onCancelBooking,
 }: AdminBookingsViewProps) {
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingItem | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [bookingToCancel, setBookingToCancel] = useState<AdminBookingItem | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
   const searchInputId = useId()
   const statusSelectId = useId()
   const serviceSelectId = useId()
   const dateFromId = useId()
   const dateToId = useId()
+
+  const handleConfirmCancel = async (bookingId: string, motivo: string) => {
+    if (!onCancelBooking) return
+    setIsCancelling(true)
+    try {
+      await onCancelBooking(bookingId, motivo)
+      setBookingToCancel(null)
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(null)
+      }
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -550,6 +570,16 @@ export function AdminBookingsView({
                         >
                           <Eye size={13} />
                         </button>
+                        {(b.estado === 'CONFIRMADA' || b.estado === 'PENDIENTE_PAGO') && onCancelBooking && (
+                          <button
+                            type="button"
+                            onClick={() => setBookingToCancel(b)}
+                            className="p-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                            title="Cancelar reserva administrativamente"
+                          >
+                            <Ban size={13} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -650,6 +680,18 @@ export function AdminBookingsView({
               </div>
             </div>
 
+            {(selectedBooking.estado === 'CONFIRMADA' || selectedBooking.estado === 'PENDIENTE_PAGO') && onCancelBooking && (
+              <div className="pt-2 border-t border-[var(--line)] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBookingToCancel(selectedBooking)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all cursor-pointer"
+                >
+                  <Ban size={13} /> Anular Reserva Administrativamente
+                </button>
+              </div>
+            )}
+
             {/* Liquidación Monetaria */}
             <div className="pt-2 border-t border-[var(--line)]">
               <div className="flex justify-between py-1">
@@ -694,6 +736,15 @@ export function AdminBookingsView({
           </div>
         </Modal>
       )}
+
+      {/* 8. Modal de Cancelación Administrativa (TSK-FE-28) */}
+      <AdminBookingCancelModal
+        booking={bookingToCancel}
+        isOpen={Boolean(bookingToCancel)}
+        onClose={() => setBookingToCancel(null)}
+        onConfirm={handleConfirmCancel}
+        isLoading={isCancelling}
+      />
     </div>
   )
 }
