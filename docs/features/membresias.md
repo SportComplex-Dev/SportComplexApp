@@ -1,5 +1,19 @@
 # Membresías
-> Estado: vigente 2026-10-15
+> Estado: vigente 2026-10-16
+
+## Segmentación administrativa
+
+`GET /api/admin/memberships` requiere rol Administrador y devuelve tres grupos de
+clientes: `active` (membresía `VIGENTE` con renovación al día o futura en fecha
+Bogotá), `none` (sin historial) y `expired` (historial compuesto únicamente por
+estados `VENCIDA` o `CANCELADA`). Los objetos exponen solo `id`, `nombre` y, para
+miembros activos, fechas de inicio y fin; no se incluyen correo ni credenciales.
+
+La BD llama al modelo `Membresia` y almacena `proximaRenovacion` como fecha de
+fin; el endpoint usa ese campo porque el esquema vigente no tiene `fecha_fin` ni
+una tabla `usuario_membresia`. `newMembersLast30Days` cuenta clientes cuya
+primera membresía inició en los últimos 30 días. `renewalPercentage` es el
+porcentaje de clientes con historial que registran dos o más membresías.
 
 ## 1. Qué se hizo y por qué
 
