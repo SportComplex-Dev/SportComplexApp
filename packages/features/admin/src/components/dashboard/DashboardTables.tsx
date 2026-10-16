@@ -77,7 +77,7 @@ export function DashboardTables({
 
       {/* Tabla Comparativa: Servicios Más Usados vs Más Vendidos (RNF-04) */}
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-[var(--line)] flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between">
           <div>
             <h3 className="font-bold text-sm text-[var(--ink)] flex items-center gap-2">
               <BarChart3 size={16} className="text-[#557b53]" /> Comparativa: Servicios Más Usados vs. Más Vendidos
@@ -99,12 +99,12 @@ export function DashboardTables({
           <table className="w-full text-left text-xs sm:text-sm table-auto">
             <thead className="bg-[var(--surface-soft)] text-[var(--subtle)] font-bold uppercase text-[10px] tracking-wider border-b border-[var(--line)]">
               <tr>
-                <th className="py-2.5 px-3 sm:px-4 w-[28%]">Servicio / Escenario</th>
+                <th className="py-3 pl-6 pr-3 w-[28%]">Servicio / Escenario</th>
                 <th className="py-2.5 px-3 w-[14%]">Modalidad</th>
                 <th className="py-2.5 px-3 text-center w-[14%]">Cupos Vendidos</th>
                 <th className="py-2.5 px-3 text-center w-[16%]">Cupos Usados</th>
                 <th className="py-2.5 px-3 text-center w-[13%]">Redención</th>
-                <th className="py-2.5 px-3 sm:px-4 text-right w-[15%]">Recaudación</th>
+                <th className="py-3 pl-3 pr-6 text-right w-[15%]">Recaudación</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)]">
@@ -114,7 +114,7 @@ export function DashboardTables({
 
                 return (
                   <tr key={serv.serviceId} className="hover:bg-[var(--surface-soft)]/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-[var(--ink)]">
+                    <td className="py-3 pl-6 pr-3 font-bold text-[var(--ink)]">
                       {serv.serviceName}
                     </td>
                     <td className="py-3 px-4">
@@ -141,7 +141,7 @@ export function DashboardTables({
                         {redemptionRate}%
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-black text-emerald-700 dark:text-emerald-400">
+                    <td className="py-3 pl-3 pr-6 text-right font-black text-emerald-700 dark:text-emerald-400">
                       {formatMoney(serv.totalRevenue)}
                     </td>
                   </tr>
