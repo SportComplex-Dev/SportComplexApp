@@ -391,11 +391,12 @@ genera y vincula el código QR de acceso (o token criptográfico de boletería),
 construye una plantilla HTML responsiva con el enlace directo al portal y
 despacha el correo electrónico mediante la API de Resend.
 
-- Identificador Jira: TSK-AU-03 (SCRUM-116)
-- Historia de Usuario: HU-11 (RF-10)
-- Fase del Proyecto: F2
+- Identificador Jira: TSK-AU-03 (SCRUM-116) / Disparador Backend: TSK-BE-34 (SCRUM-239)
+- Historia de Usuario: HU-11 / HU-39 (RF-10)
+- Fase del Proyecto: F2 / F3
+- Disparador en Backend: `apps/web/src/app/api/payments/route.ts` (alias `POST /api/webhooks/stripe`) vía `dispatchReservationTicketsEmail` (fire-and-forget tras confirmar el pago).
 - Criterio de Aceptación / SLA: El comprador recibe el correo con el código QR en
-  menos de 60 segundos y puede acceder a su boleto digital en el portal.
+  menos de 60 segundos y puede acceder a su boleto digital en el portal. Webhook responde HTTP 200 en < 2s.
 
 
 2. ESPECIFICACIÓN DEL WEBHOOK (ENDPOINT)

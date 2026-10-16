@@ -9,6 +9,7 @@ import {
 import { ok, fail } from '@sportcomplex/shared/lib';
 import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 import { clearPendingSubscriptionCheckout } from "@/app/api/memberships/subscribe/route";
+import { dispatchReservationTicketsEmail } from "@/app/api/payments/email-dispatch";
 
 // RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09 / TSK-BE-20).
 // Endpoint a registrar en el dashboard de Stripe:
@@ -197,6 +198,25 @@ export async function POST(request: Request) {
           console.error("Error al despachar alerta de pago fallido a n8n:", err);
         });
     }
+
+    // TSK-BE-34 (HU-39 / RF-10): Disparo desacoplado de email con comprobante y QR tras confirmación.
+    // Fire-and-forget: fallos en n8n/correo no revierten la reserva ni retrasan el HTTP 200 a Stripe.
+    if (
+      resultado.estado === "APROBADO" &&
+      resultado.reservaConfirmada &&
+      !resultado.duplicado &&
+      resultado.reservasConfirmadas.length > 0
+    ) {
+      void dispatchReservationTicketsEmail(resultado.reservasConfirmadas).catch(
+        (err) => {
+          console.error(
+            "Error al despachar correo de comprobante y QR a n8n:",
+            err,
+          );
+        },
+      );
+    }
+
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
     return ok({ received: true, ...resultado });
   } catch (error: unknown) {

@@ -22,6 +22,7 @@ ninguna parte del sistema escribía en la tabla `PAGO` ni pasaba una reserva a
 | 5 | Test del criterio de aceptación a nivel repositorio (7 tests) | `packages/db/src/repositories/payments.test.ts` |
 | 6 | Test end-to-end del webhook con firma firmada (4 tests) | `apps/web/src/app/api/payments/__tests__/route.test.ts` |
 | 7 | Soporte de `pago`/`membresia` + `WHERE id` en el mock de Prisma | `packages/db/test/mock-prisma.ts` |
+| 8 | Disparo desacoplado de email con comprobante y QR en webhook Stripe (TSK-BE-34) | `apps/web/src/app/api/payments/email-dispatch.ts` |
 
 **No hubo migraciones nuevas**: el `UNIQUE (stripe_payment_intent_id)` ya vive
 en `migrations/20260930132534_init_sport_complex/migration.sql:270`
