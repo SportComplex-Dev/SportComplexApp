@@ -201,20 +201,20 @@ export async function POST(request: Request) {
 
     // TSK-BE-34 (HU-39 / RF-10): Disparo desacoplado de email con comprobante y QR tras confirmación.
     // Fire-and-forget: fallos en n8n/correo no revierten la reserva ni retrasan el HTTP 200 a Stripe.
+    const confirmadas = resultado.reservasConfirmadas;
     if (
       resultado.estado === "APROBADO" &&
       resultado.reservaConfirmada &&
       !resultado.duplicado &&
-      resultado.reservasConfirmadas.length > 0
+      confirmadas &&
+      confirmadas.length > 0
     ) {
-      void dispatchReservationTicketsEmail(resultado.reservasConfirmadas).catch(
-        (err) => {
-          console.error(
-            "Error al despachar correo de comprobante y QR a n8n:",
-            err,
-          );
-        },
-      );
+      void dispatchReservationTicketsEmail(confirmadas).catch((err) => {
+        console.error(
+          "Error al despachar correo de comprobante y QR a n8n:",
+          err,
+        );
+      });
     }
 
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
