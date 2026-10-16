@@ -95,16 +95,16 @@ export function DashboardTables({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+        <div className="overflow-x-auto no-scrollbar">
+          <table className="w-full text-left text-xs sm:text-sm table-auto">
             <thead className="bg-[var(--surface-soft)] text-[var(--subtle)] font-bold uppercase text-[10px] tracking-wider border-b border-[var(--line)]">
               <tr>
-                <th className="py-3 px-4">Servicio / Escenario</th>
-                <th className="py-3 px-4">Modalidad</th>
-                <th className="py-3 px-4 text-center">Cupos Vendidos</th>
-                <th className="py-3 px-4 text-center">Cupos Usados (Puerta)</th>
-                <th className="py-3 px-4 text-center">Tasa Redención</th>
-                <th className="py-3 px-4 text-right">Recaudación Total</th>
+                <th className="py-2.5 px-3 sm:px-4 w-[28%]">Servicio / Escenario</th>
+                <th className="py-2.5 px-3 w-[14%]">Modalidad</th>
+                <th className="py-2.5 px-3 text-center w-[14%]">Cupos Vendidos</th>
+                <th className="py-2.5 px-3 text-center w-[16%]">Cupos Usados</th>
+                <th className="py-2.5 px-3 text-center w-[13%]">Redención</th>
+                <th className="py-2.5 px-3 sm:px-4 text-right w-[15%]">Recaudación</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)]">
