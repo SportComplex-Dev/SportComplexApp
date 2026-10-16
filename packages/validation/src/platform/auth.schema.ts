@@ -42,8 +42,38 @@ export const createEmployeeSchema = z.object({
   password: z.string().min(8, 'La contraseña temporal debe contener al menos 8 caracteres').max(72),
 })
 
+// TSK-FE-33: Recuperación y restablecimiento de contraseña
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'El correo electrónico es requerido')
+    .email('Ingresa un correo electrónico válido'),
+})
+
+export const passwordStrengthRegex = /^(?=.*[a-zA-Z])(?=.*[\d\W]).{8,}$/
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().trim().min(1, 'El token es requerido').optional(),
+    password: z
+      .string()
+      .min(8, 'La contraseña debe contener al menos 8 caracteres')
+      .regex(/[a-zA-Z]/, 'La contraseña debe incluir al menos una letra')
+      .regex(/[\d\W]/, 'La contraseña debe incluir al menos un número o símbolo'),
+    confirmPassword: z
+      .string()
+      .min(1, 'Por favor confirma la nueva contraseña'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  })
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type ResendInput = z.infer<typeof resendSchema>
 export type VerifyInput = z.infer<typeof verifySchema>
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
