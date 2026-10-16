@@ -210,6 +210,28 @@
         }
       }
     },
+    "/api/admin/employees/{id}": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "PATCH /api/admin/employees/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
     "/api/admin/employees": {
       "get": {
         "tags": [
@@ -262,28 +284,6 @@
         }
       }
     },
-    "/api/admin/employees/{id}": {
-      "patch": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "PATCH /api/admin/employees/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
     "/api/admin/incident": {
       "get": {
         "tags": [
@@ -322,172 +322,6 @@
           },
           "403": {
             "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
-    "/api/admin/services/categories": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "GET /api/admin/services/categories",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "POST /api/admin/services/categories",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCategoriaInput"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/services/categories/{id}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "GET /api/admin/services/categories/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "PUT /api/admin/services/categories/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "DELETE /api/admin/services/categories/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
-    "/api/admin/services": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "GET /api/admin/services",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "POST /api/admin/services",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateServicioInput"
-              }
-            }
           }
         }
       }
@@ -574,6 +408,214 @@
         }
       }
     },
+    "/api/admin/services/categories/{id}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/services/categories/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "PUT /api/admin/services/categories/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "DELETE /api/admin/services/categories/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
+    "/api/admin/services/categories": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/services/categories",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "POST /api/admin/services/categories",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoriaInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/services": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/services",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "POST /api/admin/services",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServicioInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/tournaments/{id}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/tournaments/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "DELETE /api/admin/tournaments/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
     "/api/admin/tournaments": {
       "get": {
         "tags": [
@@ -622,48 +664,6 @@
                 "$ref": "#/components/schemas/CreateTournamentInput"
               }
             }
-          }
-        }
-      }
-    },
-    "/api/admin/tournaments/{id}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "GET /api/admin/tournaments/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "DELETE /api/admin/tournaments/{id}",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
           }
         }
       }
@@ -1252,28 +1252,6 @@
         }
       }
     },
-    "/api/tournaments": {
-      "get": {
-        "tags": [
-          "Public"
-        ],
-        "summary": "GET /api/tournaments",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
     "/api/tournaments/{id}/register": {
       "post": {
         "tags": [
@@ -1312,6 +1290,28 @@
           "Public"
         ],
         "summary": "GET /api/tournaments/{id}",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
+    "/api/tournaments": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "GET /api/tournaments",
         "responses": {
           "200": {
             "description": "OK"
