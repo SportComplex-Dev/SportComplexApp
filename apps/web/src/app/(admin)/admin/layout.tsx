@@ -36,7 +36,6 @@ const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Reservas', icon: CalendarDays, href: '/admin/bookings' },
   { name: 'Contingencias', icon: AlertTriangle, href: '/admin/incident' },
   { name: 'Membresías', icon: BadgeCheck, href: '/admin/memberships' },
-  { name: 'Configuración', icon: Activity, href: '/admin/settings' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
