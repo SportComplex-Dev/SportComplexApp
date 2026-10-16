@@ -83,6 +83,8 @@ const KNOWN_REQUEST_SCHEMAS: Record<string, string> = {
   "/api/admin/employees": "CreateEmployeeInput",
   "/api/auth/login": "LoginInput",
   "/api/auth/register": "RegisterInput",
+  "/api/auth/forgot-password": "ForgotPasswordInput",
+  "/api/auth/reset-password": "ResetPasswordInput",
 };
 
 // ---------- 2. Component schemas desde @sportcomplex/validation ----------
@@ -110,6 +112,8 @@ const SCHEMA_EXPORTS: Record<string, string> = {
   UpdateTournamentInput: "updateTournamentSchema",
   LoginInput: "loginSchema",
   RegisterInput: "registerSchema",
+  ForgotPasswordInput: "forgotPasswordSchema",
+  ResetPasswordInput: "resetPasswordSchema",
   CreateEmployeeInput: "createEmployeeSchema",
   CreateServicioInput: "createServicioSchema",
   UpdateServicioInput: "updateServicioSchema",
@@ -121,12 +125,30 @@ const SCHEMA_EXPORTS: Record<string, string> = {
   AnalyticsQueryInput: "analyticsQuerySchema",
 };
 
+const SCHEMA_OVERRIDES: Record<string, unknown> = {
+  ForgotPasswordInput: {
+    type: "object",
+    required: ["email"],
+    properties: { email: { type: "string", format: "email" } },
+    additionalProperties: false,
+  },
+  ResetPasswordInput: {
+    type: "object",
+    required: ["token", "password"],
+    properties: {
+      token: { type: "string", minLength: 1, maxLength: 2048 },
+      password: { type: "string", minLength: 8, maxLength: 72 },
+    },
+    additionalProperties: false,
+  },
+};
+
 function collectSchemas(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const exports = validation as unknown as Record<string, unknown>;
   for (const [name, exportName] of Object.entries(SCHEMA_EXPORTS)) {
     const s = exports[exportName];
-    if (s) out[name] = schemaToOpenApi(s);
+    if (s) out[name] = SCHEMA_OVERRIDES[name] ?? schemaToOpenApi(s);
   }
   return out;
 }

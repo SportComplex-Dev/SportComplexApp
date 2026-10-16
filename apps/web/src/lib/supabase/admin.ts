@@ -160,3 +160,15 @@ export async function confirmSupabaseUserEmail(email: string): Promise<boolean> 
     return false;
   }
 }
+
+/** Actualiza la credencial de Supabase si la cuenta local también tiene identidad Auth. */
+export async function updateSupabasePasswordByEmail(email: string, password: string): Promise<boolean> {
+  if (!isSupabaseAdminConfigured()) return false;
+  const result = await findSupabaseUserByEmail(email);
+  if (result.error) throw result.error;
+  const userId = result.data?.user?.id;
+  if (!userId) return false;
+  const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(userId, { password });
+  if (error) throw error;
+  return true;
+}
