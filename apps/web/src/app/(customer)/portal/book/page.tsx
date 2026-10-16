@@ -29,6 +29,7 @@ export default function BookPage() {
     generateDynamicTimeSlots(getBogotaDateAfter(1)),
   );
   const [selectedSlot, setSelectedSlot] = useState<DynamicTimeSlot | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<DynamicTimeSlot[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<CategorySlug | 'todos'>('todos');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [message, setMessage] = useState('');
@@ -51,6 +52,20 @@ export default function BookPage() {
         setSelectedSlot(null);
       }
     }
+    setMessage('');
+  }
+
+  function handleSlotsChange(slots: DynamicTimeSlot[]) {
+    if (cart.length > 0 && selectedSlots.length > 0) {
+      const firstOld = selectedSlots[0]?.startTime;
+      const firstNew = slots[0]?.startTime;
+      if (firstOld !== firstNew) {
+        setMessage('Vacía el carrito antes de cambiar de horario para mantener los servicios en la misma franja.');
+        return;
+      }
+    }
+    setSelectedSlots(slots);
+    setSelectedSlot(slots.length > 0 && slots[0] ? slots[0] : null);
     setMessage('');
   }
 
