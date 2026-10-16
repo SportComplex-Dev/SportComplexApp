@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -11,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  Menu,
   Moon,
   Search,
   ShieldCheck,
@@ -27,6 +29,7 @@ import { UserMenu } from '@/components/layout/user-menu'
 import { useApp } from '@/components/layout/app-provider'
 import { useToday } from '@sportcomplex/shared/lib'
 import { ToastMessage } from '@/components/feedback/toast-message'
+import { AdminMobileDrawer } from '@/components/layout/admin-mobile-drawer'
 
 const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Resumen', icon: Home, href: '/admin' },
@@ -43,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const { session, notify, toast, closeToast, dark, setDark } = useApp()
   const today = useToday()
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   const active =
     navigation.find((item) => pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href)))
@@ -52,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <main className={`admin-shell club-app ${dark ? 'dark' : ''}`}>
-      <aside className="admin-sidebar">
+      <aside className="admin-sidebar hidden md:flex">
         <div className="admin-brand">
           <Link href="/admin" aria-label="Ir al resumen">
             <Brand />
@@ -100,10 +104,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <section className="admin-main">
         <header className="admin-topbar">
-          <div className="admin-crumb">
-            <span>Altura Club</span>
-            <ChevronRight size={14} />
-            <b>{active}</b>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="admin-icon-button admin-menu-trigger md:hidden"
+              aria-label="Abrir menú de navegación"
+              aria-expanded={isDrawerOpen}
+              onClick={() => setIsDrawerOpen(true)}
+              data-testid="admin-mobile-menu-trigger"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="admin-crumb">
+              <span>Altura Club</span>
+              <ChevronRight size={14} />
+              <b>{active}</b>
+            </div>
           </div>
           <div className="admin-top-actions">
             <span className="admin-today">
@@ -140,6 +156,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
         <div className="admin-content">{children}</div>
       </section>
+
+      <AdminMobileDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        navigation={navigation}
+        pathname={pathname}
+        pending={pending}
+        onNotify={notify}
+      />
+
       <ToastMessage message={toast.message} kind={toast.kind} close={closeToast} />
     </main>
   )
