@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleForgotPassword } from "../route";
+import { handleForgotPassword } from "@/app/api/auth/forgot-password/route";
 
 const message = "Si el correo está registrado, recibirás instrucciones para restablecer tu contraseña.";
 const user = { id: "user-1", correo: "ana@example.com", nombre: "Ana", passwordHash: "argon-hash" };
