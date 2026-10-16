@@ -21,7 +21,7 @@ dom.window.cancelIdleCallback = ((id: any) => clearTimeout(id)) as any
 
 // Importar después de preparar globalThis
 const { render, fireEvent, cleanup } = await import('@testing-library/react')
-const { default: ForgotPasswordPage } = await import('../page')
+const { default: ForgotPasswordPage } = await import('@/app/(auth)/forgot-password/page')
 const { AuthForm } = await import('@/components/auth/auth-form')
 
 test.afterEach(() => {

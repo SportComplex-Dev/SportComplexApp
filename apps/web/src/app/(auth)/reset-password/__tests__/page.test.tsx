@@ -19,7 +19,7 @@ dom.window.requestIdleCallback = ((cb: any) => setTimeout(cb, 1) as unknown as n
 dom.window.cancelIdleCallback = ((id: any) => clearTimeout(id)) as any
 
 const { render, fireEvent, cleanup } = await import('@testing-library/react')
-const { default: ResetPasswordPage, ResetPasswordContent } = await import('../page')
+const { default: ResetPasswordPage, ResetPasswordContent } = await import('@/app/(auth)/reset-password/page')
 
 test.afterEach(() => {
   cleanup()
