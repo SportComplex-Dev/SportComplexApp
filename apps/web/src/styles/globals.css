@@ -5463,10 +5463,57 @@ button { cursor: pointer; }
 @media (max-width: 767px) {
   .admin-shell {
     grid-template-columns: 1fr !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-main {
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-topbar {
+    padding: 0 14px !important;
+    max-width: 100% !important;
+  }
+  .admin-top-actions {
+    gap: 8px !important;
+  }
+  .admin-content {
+    padding: 16px 12px 40px !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
   }
   .admin-sidebar:not(.admin-drawer-sidebar) {
     display: none !important;
   }
+}
+
+.admin-drawer {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+  z-index: 60 !important;
+}
+
+:is(.dark, .club-app.dark) .admin-drawer {
+  background-color: #17211c !important;
+  background: #17211c !important;
+  border-right: 1px solid #27352d !important;
+}
+
+.admin-drawer .admin-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  overflow-x: visible !important;
+  padding: 16px 0 !important;
+}
+
+.admin-drawer .admin-nav a {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  width: 100% !important;
 }
 
 .admin-menu-trigger {

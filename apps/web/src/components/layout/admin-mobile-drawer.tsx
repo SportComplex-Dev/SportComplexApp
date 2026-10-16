@@ -53,9 +53,14 @@ export function AdminMobileDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
+  const prevPathnameRef = useRef(pathname)
+
   // Cerrar automáticamente cuando cambia la ruta (pathname)
   useEffect(() => {
-    onClose()
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname
+      onClose()
+    }
   }, [pathname, onClose])
 
   // Bloquear scroll en el body mientras el drawer esté abierto
@@ -74,6 +79,7 @@ export function AdminMobileDrawer({
 
   return (
     <div
+      id="admin-mobile-drawer"
       className="admin-drawer-portal fixed inset-0 z-50 md:hidden"
       role="dialog"
       aria-modal="true"
@@ -140,7 +146,9 @@ export function AdminMobileDrawer({
           </span>
           {navigation.map(({ name, icon: Icon, href }) => {
             const isCurrent =
-              pathname === href || (href === '/admin/catalog' && pathname === '/admin/services')
+              pathname === href ||
+              (href === '/admin' && pathname === '/admin/dashboard') ||
+              (href === '/admin/catalog' && pathname === '/admin/services')
             return (
               <Link
                 key={href}
