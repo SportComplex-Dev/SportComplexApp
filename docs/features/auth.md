@@ -1,5 +1,28 @@
 # Autenticación y cuentas
-> Estado: vigente 2026-10-15
+> Estado: vigente 2026-10-16
+
+## Recuperación de contraseña
+
+`POST /api/auth/forgot-password` normaliza y valida el correo y responde siempre con
+HTTP 200 y el mismo mensaje. Para cuentas existentes genera un token firmado HMAC
+SHA-256 con vencimiento de 15 minutos y lo despacha al webhook configurado en
+`N8N_PASSWORD_RESET_WEBHOOK_URL`. El enlace se construye con `NEXT_PUBLIC_APP_URL`.
+La firma requiere `AUTH_RESET_TOKEN_SECRET` (mínimo 32 caracteres). El payload de
+correo contiene `tipo: password_reset`, `correo`, `nombre`, `enlaceRestablecimiento`
+y `expiraEnMinutos`.
+
+`POST /api/auth/reset-password` valida el token y la nueva contraseña, aplica Argon2id
+y actualiza `usuario.password_hash` con Argon2id. Si la cuenta tiene identidad en
+Supabase Auth, también actualiza allí la contraseña. El token queda invalidado tras
+el primer cambio al vincular su validez con la versión actual del hash local. No se
+requiere tabla adicional: el esquema actual ya contiene `password_hash`.
+
+```bash
+pnpm --filter web test src/app/api/auth/forgot-password
+```
+
+Los enlaces vencidos o adulterados se rechazan con HTTP 400. La respuesta de solicitud
+no revela si la cuenta existe.
 
 ## Requisitos y persistencia
 

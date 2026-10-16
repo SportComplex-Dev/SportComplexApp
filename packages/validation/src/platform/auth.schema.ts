@@ -28,6 +28,12 @@ export const verifySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
 })
 
+export const forgotPasswordSchema = z.object({ email: z.email() })
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1).max(2048),
+  password: z.string().min(8).max(72),
+})
+
 export const createEmployeeSchema = z.object({
   nombre: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres').max(120),
   correo: z.string().trim().email('Ingresa un correo electrónico válido'),

@@ -64,3 +64,17 @@ export async function sendVerificationCodeEmail(params: VerificationCodeEmailPar
     console.warn("[email] verification code dispatch failed (non-blocking):", error instanceof Error ? error.message : error);
   }
 }
+
+export async function sendPasswordResetEmail(params: { usuarioId: string; to: string; nombre: string; resetUrl: string }): Promise<void> {
+  const url = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+  if (!url) return;
+  try {
+    await ky.post(url, {
+      json: { tipo: "password_reset", usuarioId: params.usuarioId, correo: params.to, nombre: params.nombre, enlaceRestablecimiento: params.resetUrl, expiraEnMinutos: 15 },
+      timeout: 2500,
+      retry: 0,
+    });
+  } catch (error) {
+    console.warn("[email] password reset dispatch failed:", error instanceof Error ? error.message : error);
+  }
+}

@@ -19,6 +19,7 @@ import {
   RESEND_COOLDOWN_MS,
   VERIFICATION_CODE_LENGTH,
 } from "../dist/token/index.js";
+import { createPasswordResetToken, verifyPasswordResetToken, isPasswordResetTokenCurrent, PASSWORD_RESET_TTL_MS } from "../dist/token/index.js";
 import {
   consumeRateLimit,
   resetRateLimit,
@@ -87,6 +88,20 @@ test("Token: verification code, Argon2id hashing and expiration", async () => {
 
   assert.equal(isResendAllowed(recentlyCreated, now), false);
   assert.equal(isResendAllowed(oldEnough, now), true);
+});
+
+test("Password reset: firma, TTL de 15 minutos y rechazo de alteraciones", () => {
+  process.env.AUTH_RESET_TOKEN_SECRET = "test-reset-secret-with-at-least-32-chars";
+  const now = new Date("2026-10-15T12:00:00Z");
+  const token = createPasswordResetToken({ id: "user-id", email: "test@example.com", passwordHash: "$argon2id$old" }, now);
+  const claims = verifyPasswordResetToken(token, now);
+  assert.equal(claims?.userId, "user-id");
+  assert.equal(claims?.email, "test@example.com");
+  assert.ok(claims?.credentialVersion);
+  assert.equal(isPasswordResetTokenCurrent(claims!.credentialVersion, "$argon2id$old"), true);
+  assert.equal(isPasswordResetTokenCurrent(claims!.credentialVersion, "$argon2id$new"), false);
+  assert.equal(verifyPasswordResetToken(token, new Date(now.getTime() + PASSWORD_RESET_TTL_MS)), null);
+  assert.equal(verifyPasswordResetToken(`${token}x`, now), null);
 });
 
 test("Limite Tasa: consume and reset", () => {
