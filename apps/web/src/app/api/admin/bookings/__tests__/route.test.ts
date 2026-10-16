@@ -48,6 +48,18 @@ test("TSK-BE-27 / SCRUM-212: GET /api/admin/bookings valida query params (400)",
     new Request("http://localhost:3000/api/admin/bookings?limit=-5"),
   );
   assert.equal(invalidLimit.status, 400);
+
+  // Fecha con mes inválido (2026-13-45)
+  const invalidMonth = await bookingsRoute.GET(
+    new Request("http://localhost:3000/api/admin/bookings?dateFrom=2026-13-45"),
+  );
+  assert.equal(invalidMonth.status, 400);
+
+  // Rango invertido: dateFrom posterior a dateTo
+  const invertedRange = await bookingsRoute.GET(
+    new Request("http://localhost:3000/api/admin/bookings?dateFrom=2026-10-20&dateTo=2026-10-10"),
+  );
+  assert.equal(invertedRange.status, 400);
 });
 
 test("TSK-BE-27 / SCRUM-212: GET /api/admin/bookings responde con contrato canónico para rol Administrador", async () => {
@@ -64,4 +76,16 @@ test("TSK-BE-27 / SCRUM-212: GET /api/admin/bookings responde con contrato canó
   assert.equal(typeof body.data.metrics.confirmedCount, "number");
   assert.equal(typeof body.data.metrics.pendingCount, "number");
   assert.ok(Array.isArray(body.data.metrics.byService));
+});
+
+test("TSK-BE-27 / SCRUM-212: GET /api/admin/bookings admite alias PENDIENTE y expone tickets", async () => {
+  const response = await bookingsRoute.GET(
+    new Request("http://localhost:3000/api/admin/bookings?status=PENDIENTE"),
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.success, true);
+  for (const item of body.data.items) {
+    assert.ok(Array.isArray(item.tickets));
+  }
 });

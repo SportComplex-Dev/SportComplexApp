@@ -35,3 +35,20 @@ test("TSK-BE-27 / SCRUM-212: listAdminBookings acota límites de paginación", a
   const clampedOffset = await listAdminBookings({ offset: -5 });
   assert.equal(clampedOffset.offset, 0);
 });
+
+test("TSK-BE-27 / SCRUM-212: listAdminBookings admite alias PENDIENTE y mapea tickets", async () => {
+  const result = await listAdminBookings({ status: "PENDIENTE" });
+  assert.ok(result);
+  assert.ok(Array.isArray(result.items));
+  // Cada ítem debe exponer tickets array aunque sea vacío
+  for (const item of result.items) {
+    assert.ok(Array.isArray(item.tickets));
+  }
+});
+
+test("TSK-BE-27 / SCRUM-212: listAdminBookings busca por UUID de TicketQr y reserva", async () => {
+  const uuid = "12345678-1234-4234-8234-123456789abc";
+  const result = await listAdminBookings({ search: uuid });
+  assert.ok(result);
+  assert.ok(Array.isArray(result.items));
+});

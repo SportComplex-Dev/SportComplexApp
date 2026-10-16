@@ -75,6 +75,13 @@ export interface AdminBookingItem {
     emitidoEn: Date;
     usadoEn: Date | null;
   } | null;
+  tickets: Array<{
+    id: string;
+    codigo: string;
+    codigoUuid: string;
+    estado: string;
+    titularNombre: string;
+  }>;
   pago: {
     id: string;
     monto: number;
@@ -109,6 +116,8 @@ export async function listAdminBookings(
   if (filters.status) {
     if (filters.status === "CANCELADA") {
       where.estado = { in: ["CANCELADA_ADMINISTRATIVA", "CANCELADA_PAGO"] };
+    } else if (filters.status === "PENDIENTE") {
+      where.estado = "PENDIENTE_PAGO";
     } else {
       where.estado = filters.status as EstadoReserva;
     }
@@ -140,8 +149,22 @@ export async function listAdminBookings(
     where.OR = [
       { titular: { is: { nombre: { contains: term, mode: "insensitive" } } } },
       { titular: { is: { correo: { contains: term, mode: "insensitive" } } } },
-      ...(isUuid ? [{ id: term }] : []),
+      ...(isUuid
+        ? [
+            { id: term },
+            { ticketQr: { is: { codigoUuid: term } } },
+          ]
+        : []),
     ];
+  }
+
+  // Base contextual where para métricas (sin distorsión de filtros)
+  const baseWhere: Prisma.ReservaWhereInput = {};
+  if (Object.keys(dispConditions).length > 0) {
+    baseWhere.disponibilidad = { is: dispConditions };
+  }
+  if (where.OR) {
+    baseWhere.OR = where.OR;
   }
 
   // Fecha hoy en America/Bogota para métrica todayTotal
@@ -154,7 +177,34 @@ export async function listAdminBookings(
   const todayStart = new Date(`${bogotaDateStr}T00:00:00.000Z`);
   const todayEnd = new Date(`${bogotaDateStr}T23:59:59.999Z`);
 
-  const [total, rows, todayTotal, confirmedCount, pendingCount, services] = await Promise.all([
+  // Condición de confirmadas acotada a filtros activos
+  const confirmedWhere: Prisma.ReservaWhereInput = filters.status
+    ? filters.status === "CONFIRMADA"
+      ? { ...where }
+      : { ...where, estado: "CONFIRMADA" }
+    : { ...baseWhere, estado: "CONFIRMADA" };
+
+  // Condición de pendientes con TTL activo (RN-04 / expiraEn > now)
+  const pendingWhere: Prisma.ReservaWhereInput = filters.status
+    ? filters.status === "PENDIENTE" || filters.status === "PENDIENTE_PAGO"
+      ? { ...where, expiraEn: { gt: now } }
+      : { ...where, estado: "PENDIENTE_PAGO", expiraEn: { gt: now } }
+    : { ...baseWhere, estado: "PENDIENTE_PAGO", expiraEn: { gt: now } };
+
+  // Condición de hoy para métricas (acotada al servicio si se filtró)
+  const todayWhere: Prisma.ReservaWhereInput = {
+    disponibilidad: {
+      is: {
+        ...(filters.serviceId ? { servicioId: filters.serviceId } : {}),
+        fecha: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      },
+    },
+  };
+
+  const [total, rows, todayTotal, confirmedCount, pendingCount, services, rawServiceCounts] = await Promise.all([
     prisma.reserva.count({ where }),
     prisma.reserva.findMany({
       where,
@@ -216,49 +266,27 @@ export async function listAdminBookings(
         },
       },
     }),
-    prisma.reserva.count({
-      where: {
-        disponibilidad: {
-          is: {
-            fecha: {
-              gte: todayStart,
-              lte: todayEnd,
-            },
-          },
-        },
-      },
-    }),
-    prisma.reserva.count({ where: { estado: "CONFIRMADA" } }),
-    prisma.reserva.count({ where: { estado: "PENDIENTE_PAGO" } }),
+    prisma.reserva.count({ where: todayWhere }),
+    prisma.reserva.count({ where: confirmedWhere }),
+    prisma.reserva.count({ where: pendingWhere }),
     prisma.servicio.findMany({
       select: { id: true, nombre: true },
       orderBy: { id: "asc" },
     }),
+    prisma.$queryRaw<Array<{ servicio_id: number; count: number }>>`
+      SELECT d.servicio_id, COUNT(r.id)::int as count
+      FROM reserva r
+      JOIN disponibilidad d ON r.disponibilidad_id = d.id
+      WHERE r.estado = 'CONFIRMADA'
+      GROUP BY d.servicio_id
+    `,
   ]);
 
-  // Agregación de reservas confirmadas por servicio
-  const serviceCounts = await prisma.disponibilidad.findMany({
-    where: {
-      reservas: {
-        some: { estado: "CONFIRMADA" },
-      },
-    },
-    select: {
-      servicioId: true,
-      _count: {
-        select: {
-          reservas: {
-            where: { estado: "CONFIRMADA" },
-          },
-        },
-      },
-    },
-  });
-
   const countMap = new Map<number, number>();
-  for (const item of serviceCounts) {
-    const current = countMap.get(item.servicioId) ?? 0;
-    countMap.set(item.servicioId, current + item._count.reservas);
+  if (Array.isArray(rawServiceCounts)) {
+    for (const item of rawServiceCounts) {
+      countMap.set(Number(item.servicio_id), Number(item.count));
+    }
   }
 
   const byService: ServiceOccupancyMetric[] = services.map((s) => ({
@@ -298,6 +326,17 @@ export async function listAdminBookings(
       franja: r.disponibilidad.franja,
     },
     ticketQr: r.ticketQr,
+    tickets: r.ticketQr
+      ? [
+          {
+            id: r.ticketQr.id,
+            codigo: r.ticketQr.codigoUuid,
+            codigoUuid: r.ticketQr.codigoUuid,
+            estado: r.ticketQr.estado,
+            titularNombre: r.titular?.nombre ?? "",
+          },
+        ]
+      : [],
     pago: r.pago
       ? {
           id: r.pago.id,
