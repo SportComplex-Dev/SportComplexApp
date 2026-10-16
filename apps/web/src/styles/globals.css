@@ -5457,3 +5457,89 @@ button { cursor: pointer; }
   }
 }
 
+/* ============================================================
+   TSK-FE-36 / HU-40: Drawer colapsable en AdminLayout (Mobile)
+   ============================================================ */
+@media (max-width: 767px) {
+  .admin-shell {
+    grid-template-columns: 1fr !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-main {
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-topbar {
+    padding: 0 14px !important;
+    max-width: 100% !important;
+  }
+  .admin-top-actions {
+    gap: 8px !important;
+  }
+  .admin-content {
+    padding: 16px 12px 40px !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .admin-sidebar:not(.admin-drawer-sidebar) {
+    display: none !important;
+  }
+}
+
+.admin-drawer {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+  z-index: 60 !important;
+}
+
+:is(.dark, .club-app.dark) .admin-drawer {
+  background-color: #17211c !important;
+  background: #17211c !important;
+  border-right: 1px solid #27352d !important;
+}
+
+.admin-drawer .admin-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  overflow-x: visible !important;
+  padding: 16px 0 !important;
+}
+
+.admin-drawer .admin-nav a {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.admin-menu-trigger {
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.admin-menu-trigger:active {
+  transform: scale(0.95);
+}
+
+.admin-drawer-portal {
+  animation: drawer-fade-in 0.2s ease-out;
+}
+
+.admin-drawer {
+  animation: drawer-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes drawer-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
