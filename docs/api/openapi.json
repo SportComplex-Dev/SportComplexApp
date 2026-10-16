@@ -118,6 +118,9 @@
       },
       "AnalyticsQueryInput": {
         "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "AdminBookingsQuery": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
       }
     }
   },
@@ -194,6 +197,28 @@
           "Admin"
         ],
         "summary": "GET /api/admin/analytics",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
+    "/api/admin/bookings": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/bookings",
         "responses": {
           "200": {
             "description": "OK"
