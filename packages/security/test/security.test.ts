@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import {
   newTicketId,
   signTicket,
@@ -20,10 +21,10 @@ import {
   VERIFICATION_CODE_LENGTH,
 } from "../dist/token/index.js";
 import { createPasswordResetToken, verifyPasswordResetToken, isPasswordResetTokenCurrent, PASSWORD_RESET_TTL_MS } from "../dist/token/index.js";
+import { sendPasswordResetEmail } from "../dist/correo/index.js";
 import {
   consumeRateLimit,
   resetRateLimit,
-  rateLimitSize,
 } from "../dist/limite-tasa/index.js";
 import {
   buildPaymentMetadata,
@@ -102,6 +103,45 @@ test("Password reset: firma, TTL de 15 minutos y rechazo de alteraciones", () =>
   assert.equal(isPasswordResetTokenCurrent(claims!.credentialVersion, "$argon2id$new"), false);
   assert.equal(verifyPasswordResetToken(token, new Date(now.getTime() + PASSWORD_RESET_TTL_MS)), null);
   assert.equal(verifyPasswordResetToken(`${token}x`, now), null);
+});
+
+test("Password reset email: firma el payload para n8n y no reintenta", async () => {
+  const previousUrl = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+  const previousSecret = process.env.N8N_PASSWORD_RESET_HMAC_SECRET;
+  const previousFetch = globalThis.fetch;
+  const secret = "test-reset-webhook-secret-with-32-chars";
+  let receivedUrl = "";
+  let receivedBody = "";
+  let receivedSignature = "";
+
+  process.env.N8N_PASSWORD_RESET_WEBHOOK_URL = "https://n8n.example/webhook/auth-password-reset";
+  process.env.N8N_PASSWORD_RESET_HMAC_SECRET = secret;
+  globalThis.fetch = async (input, init) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    receivedUrl = request.url;
+    receivedBody = await request.text();
+    receivedSignature = request.headers.get("X-SportComplex-Signature") ?? "";
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    await sendPasswordResetEmail({
+      usuarioId: "user-1",
+      to: "ana@example.com",
+      nombre: "Ana",
+      resetUrl: "https://sportcomplex.example/reset-password?token=abc",
+    });
+    const expected = createHmac("sha256", secret).update(receivedBody).digest("hex");
+    assert.equal(receivedUrl, "https://n8n.example/webhook/auth-password-reset");
+    assert.equal(receivedSignature, `sha256=${expected}`);
+    assert.match(receivedBody, /"tipo":"password_reset"/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+    else process.env.N8N_PASSWORD_RESET_WEBHOOK_URL = previousUrl;
+    if (previousSecret === undefined) delete process.env.N8N_PASSWORD_RESET_HMAC_SECRET;
+    else process.env.N8N_PASSWORD_RESET_HMAC_SECRET = previousSecret;
+  }
 });
 
 test("Limite Tasa: consume and reset", () => {

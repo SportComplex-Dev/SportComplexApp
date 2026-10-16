@@ -1,4 +1,5 @@
 import ky from "ky";
+import { createHmac } from "node:crypto";
 
 /**
  * Parámetros de entrada para el despacho del correo de verificación de cuenta.
@@ -68,9 +69,29 @@ export async function sendVerificationCodeEmail(params: VerificationCodeEmailPar
 export async function sendPasswordResetEmail(params: { usuarioId: string; to: string; nombre: string; resetUrl: string }): Promise<void> {
   const url = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
   if (!url) return;
+  const secret = process.env.N8N_PASSWORD_RESET_HMAC_SECRET;
+  if (!secret || secret.length < 32) {
+    console.warn("[email] password reset dispatch skipped: N8N_PASSWORD_RESET_HMAC_SECRET is not configured with at least 32 characters.");
+    return;
+  }
+
+  const payload = {
+    tipo: "password_reset",
+    usuarioId: params.usuarioId,
+    correo: params.to,
+    nombre: params.nombre,
+    enlaceRestablecimiento: params.resetUrl,
+    expiraEnMinutos: 15,
+  };
+  const body = JSON.stringify(payload);
+  const signature = createHmac("sha256", secret).update(body).digest("hex");
   try {
     await ky.post(url, {
-      json: { tipo: "password_reset", usuarioId: params.usuarioId, correo: params.to, nombre: params.nombre, enlaceRestablecimiento: params.resetUrl, expiraEnMinutos: 15 },
+      body,
+      headers: {
+        "Content-Type": "application/json",
+        "X-SportComplex-Signature": `sha256=${signature}`,
+      },
       timeout: 2500,
       retry: 0,
     });

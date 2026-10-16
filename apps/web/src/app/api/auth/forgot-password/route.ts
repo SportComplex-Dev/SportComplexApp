@@ -55,5 +55,6 @@ export async function handleForgotPassword(request: Request, dependencies = defa
 }
 
 export async function POST(request: Request) {
+  // Endpoint público por diseño: cualquier visitante puede solicitar la recuperación.
   return handleForgotPassword(request);
 }

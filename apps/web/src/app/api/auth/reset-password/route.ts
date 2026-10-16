@@ -5,6 +5,7 @@ import { findPasswordResetUser, updatePasswordHash } from "@sportcomplex/db";
 import { updateSupabasePasswordByEmail } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
+  // Endpoint público por diseño: el token firmado es la credencial temporal de autorización.
   const body = await request.json().catch(() => ({}));
   const parsed = resetPasswordSchema.safeParse(body);
   if (!parsed.success) return fail("VALIDATION_ERROR", "Token y nueva contraseña inválidos", 400, parsed.error.flatten());

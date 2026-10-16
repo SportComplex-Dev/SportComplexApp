@@ -7,9 +7,10 @@
 HTTP 200 y el mismo mensaje. Para cuentas existentes genera un token firmado HMAC
 SHA-256 con vencimiento de 15 minutos y lo despacha al webhook configurado en
 `N8N_PASSWORD_RESET_WEBHOOK_URL`. El enlace se construye con `NEXT_PUBLIC_APP_URL`.
-La firma requiere `AUTH_RESET_TOKEN_SECRET` (mínimo 32 caracteres). El payload de
+La firma del token requiere `AUTH_RESET_TOKEN_SECRET` (mínimo 32 caracteres). El payload de
 correo contiene `tipo: password_reset`, `correo`, `nombre`, `enlaceRestablecimiento`
-y `expiraEnMinutos`.
+y `expiraEnMinutos`; el request se firma en `X-SportComplex-Signature` con el secreto
+compartido `N8N_PASSWORD_RESET_HMAC_SECRET`.
 
 `POST /api/auth/reset-password` valida el token y la nueva contraseña, aplica Argon2id
 y actualiza `usuario.password_hash` con Argon2id. Si la cuenta tiene identidad en
