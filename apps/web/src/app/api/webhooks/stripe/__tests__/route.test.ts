@@ -91,15 +91,16 @@ function buildEventPayload(overrides: {
   bookingId?: string;
   userId?: string;
 } = {}) {
+  const eventId = overrides.id ?? "evt_stripe_qr_1";
   const event = {
-    id: overrides.id ?? "evt_stripe_qr_1",
+    id: eventId,
     object: "event",
     api_version: "2024-06-20",
     created: Math.floor(Date.now() / 1000),
     type: overrides.type ?? "payment_intent.succeeded",
     data: {
       object: {
-        id: "pi_stripe_qr_1",
+        id: `pi_${eventId}`,
         object: "payment_intent",
         amount: 7500000,
         currency: "cop",
