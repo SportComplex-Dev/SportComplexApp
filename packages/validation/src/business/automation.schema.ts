@@ -278,3 +278,50 @@ export function createTestVerificationCodePayload(
   });
 }
 
+// ============================================================================
+// WORKFLOW: reservas/despacho-qr (Despacho del correo con QR)
+// ============================================================================
+
+export const ReservationQrEmailSchema = z.object({
+  reservaId: z.string().min(1, "El ID de reserva es requerido"),
+  ticketId: z.string().min(1, "El ID del ticket es requerido"),
+  correo: z.string().email("El correo debe ser un email válido").toLowerCase().trim(),
+  email: z.string().email().toLowerCase().trim().optional(),
+  nombre: z.string().optional().default("Deportista"),
+  cancha: z.string().optional().default("Cancha Principal"),
+  sede: z.string().optional().default("AKROS Club"),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+  franjaHoraria: z.string().optional().default("Por definir"),
+  qrPayload: z.string().min(1, "El payload del QR es requerido"),
+  qrImageUrl: z.string().url().optional(),
+  appUrl: z.string().url().optional(),
+  usuario: z
+    .object({
+      nombre: z.string().optional(),
+      email: z.string().email().optional(),
+    })
+    .optional(),
+  detalle: z
+    .object({
+      servicioNombre: z.string().optional(),
+      fecha: z.string().optional(),
+      horario: z.string().optional(),
+      precioTotal: z.string().optional(),
+      portalUrl: z.string().optional(),
+    })
+    .optional(),
+});
+
+export type ReservationQrEmailPayload = z.infer<typeof ReservationQrEmailSchema>;
+
+export const ReservationQrEmailResponseSchema = z.object({
+  ok: z.boolean().describe("Indica si el correo fue despachado exitosamente"),
+  mensaje: z.string().describe("Mensaje de respuesta de n8n"),
+  resendMessageId: z.string().optional().describe("ID del mensaje en Resend"),
+  entregadoA: z.string().optional().describe("Correo al que fue despachado"),
+  ticketId: z.string().optional().describe("ID del ticket asociado"),
+  despachadoAt: z.string().optional().describe("Fecha y hora ISO del despacho"),
+});
+
+export type ReservationQrEmailResponse = z.infer<typeof ReservationQrEmailResponseSchema>;
+
