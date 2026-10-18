@@ -29,6 +29,10 @@ backups/
 *.gpg
 *auth_users_snapshot*.json
 
+# Reportes de auditoría de purga (TSK-BD-02): IDs de registros eliminados.
+# Contienen PII/UUIDs de producción; custodiar localmente o fuera de git.
+packages/db/purge-reports/
+
 # Git Worktrees locales
 .worktrees/
 
