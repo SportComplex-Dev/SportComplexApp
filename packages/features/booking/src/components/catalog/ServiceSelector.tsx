@@ -21,7 +21,11 @@ export interface ServiceSelectorProps {
   onDateChange: (date: string) => void;
   timeSlots: DynamicTimeSlot[];
   selectedSlot: DynamicTimeSlot | null;
-  onSelectSlot: (slot: DynamicTimeSlot) => void;
+  /**
+   * Callback invocado al seleccionar un horario individual o null al limpiar selección.
+   * Para selección de múltiples franjas continuas se recomienda utilizar `onSlotsChange`.
+   */
+  onSelectSlot: (slot: DynamicTimeSlot | null) => void;
   selectedSlots?: DynamicTimeSlot[] | undefined;
   onSlotsChange?: ((slots: DynamicTimeSlot[]) => void) | undefined;
   selectedCategory: CategorySlug | 'todos';
@@ -31,6 +35,8 @@ export interface ServiceSelectorProps {
   disabledDateChange?: boolean | undefined;
   basePricePerHour?: number | undefined;
   isMember?: boolean | undefined;
+  serviceName?: string | undefined;
+  onValidationError?: ((errorMessage: string) => void) | undefined;
 }
 
 export function ServiceSelector({
@@ -43,6 +49,8 @@ export function ServiceSelector({
   onSlotsChange,
   basePricePerHour,
   isMember = false,
+  serviceName,
+  onValidationError,
   selectedCategory,
   onCategoryChange,
   cartServiceIds,
@@ -194,12 +202,17 @@ export function ServiceSelector({
               if (slots.length > 0) {
                 const first = slots[0];
                 if (first) onSelectSlot(first);
+              } else {
+                onSelectSlot(null);
               }
             }}
             basePricePerHour={basePricePerHour}
             isMember={isMember}
+            serviceName={serviceName}
+            onValidationError={onValidationError}
             disabled={disabledDateChange}
-          />        </div>
+          />
+        </div>
       </div>
 
       {/* Paso 2: Filtros de Categoría y Servicios */}

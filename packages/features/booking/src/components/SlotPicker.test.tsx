@@ -58,6 +58,7 @@ test('TSK-FE-31 / SlotPicker: renderiza franjas horarias y resumen reactivo de s
       basePricePerHour={40000}
       isMember={true}
       serviceName="Cancha de Tenis 1"
+      onValidationError={() => {}}
     />
   )
 
@@ -66,3 +67,32 @@ test('TSK-FE-31 / SlotPicker: renderiza franjas horarias y resumen reactivo de s
   assert.ok(html.includes('30% Descuento Socio Activo'), 'Debe mostrar el badge de membresía')
   assert.ok(html.includes('Cancha de Tenis 1'), 'Debe incluir el nombre del servicio')
 })
+
+test('TSK-FE-31 / SlotPicker: calcula tarifas dinámicas según servicio (Piscina $15.000 vs Tenis $50.000)', () => {
+  // Piscina: 3 horas continuas a $15.000/h sin membresía = $45.000
+  const pricingPiscina = calculateMultiSlotPricing(15000, 3, false)
+  assert.equal(pricingPiscina.subtotal, 45000)
+  assert.equal(pricingPiscina.discountAmount, 0)
+  assert.equal(pricingPiscina.total, 45000)
+
+  // Tenis: 2 horas continuas a $50.000/h con membresía socio (30% dto) = $70.000
+  const pricingTenisSocio = calculateMultiSlotPricing(50000, 2, true)
+  assert.equal(pricingTenisSocio.subtotal, 100000)
+  assert.equal(pricingTenisSocio.discountAmount, 30000)
+  assert.equal(pricingTenisSocio.total, 70000)
+
+  const piscinaHtml = renderToStaticMarkup(
+    <SlotPicker
+      timeSlots={mockSlots}
+      selectedSlots={[mockSlots[0], mockSlots[1], mockSlots[2]]}
+      onSlotsChange={() => {}}
+      basePricePerHour={15000}
+      isMember={false}
+      serviceName="Piscina Climatizada"
+    />
+  )
+  assert.ok(piscinaHtml.includes('Piscina Climatizada'), 'Debe mostrar el nombre de Piscina')
+  assert.ok(piscinaHtml.includes('3 horas continuas'), 'Debe reflejar 3 horas')
+  assert.ok(!piscinaHtml.includes('30% Descuento'), 'No debe mostrar descuento si no es socio')
+})
+

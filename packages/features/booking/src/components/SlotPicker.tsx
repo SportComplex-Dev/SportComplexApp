@@ -67,7 +67,7 @@ export function SlotPicker({
     return new Set(selectedSlots.map((s) => s.startTime))
   }, [selectedSlots])
 
-  const handleSlotClick = (slot: DynamicTimeSlot) => {
+  const handleSlotClick = (slot: DynamicTimeSlot, e?: React.MouseEvent) => {
     if (disabled || !slot.isAvailable) return
 
     const isAlreadySelected = selectedTimesSet.has(slot.startTime)
@@ -108,30 +108,33 @@ export function SlotPicker({
       return
     }
 
-    // Autocompletar rango si todos los intermedios están disponibles
-    const allSorted = [...timeSlots].sort((a, b) => a.startTime.localeCompare(b.startTime))
-    const firstSelected = sortedSelected[0]
-    const lastSelected = sortedSelected[sortedSelected.length - 1]
+    // Autocompletar rango únicamente con modificador explícito (Shift + Clic)
+    if (e?.shiftKey) {
+      const allSorted = [...timeSlots].sort((a, b) => a.startTime.localeCompare(b.startTime))
+      const firstSelected = sortedSelected[0]
+      const lastSelected = sortedSelected[sortedSelected.length - 1]
 
-    if (!firstSelected || !lastSelected) {
-      handleUpdate([slot])
-      return
-    }
-
-    const rangeStart = slot.startTime < firstSelected.startTime ? slot.startTime : firstSelected.startTime
-    const rangeEnd = slot.startTime > lastSelected.startTime ? slot.endTime : lastSelected.endTime
-
-    const subRange = allSorted.filter((s) => s.startTime >= rangeStart && s.endTime <= rangeEnd)
-    const allAvailable = subRange.every((s) => s.isAvailable)
-
-    if (allAvailable && subRange.length > 0) {
-      const rangeCheck = validateContinuousSlots(subRange)
-      if (rangeCheck.valid) {
-        handleUpdate(subRange)
+      if (!firstSelected || !lastSelected) {
+        handleUpdate([slot])
         return
+      }
+
+      const rangeStart = slot.startTime < firstSelected.startTime ? slot.startTime : firstSelected.startTime
+      const rangeEnd = slot.startTime > lastSelected.startTime ? slot.endTime : lastSelected.endTime
+
+      const subRange = allSorted.filter((s) => s.startTime >= rangeStart && s.endTime <= rangeEnd)
+      const allAvailable = subRange.every((s) => s.isAvailable)
+
+      if (allAvailable && subRange.length > 0) {
+        const rangeCheck = validateContinuousSlots(subRange)
+        if (rangeCheck.valid) {
+          handleUpdate(subRange)
+          return
+        }
       }
     }
 
+    // Clic estándar en franja separada o rango no continuo: notificar y cambiar selección a la franja actual
     const msg = 'Las reservas múltiples deben ser continuas (sin huecos intermedios entre horarios).'
     if (onValidationError) {
       onValidationError(msg)
@@ -164,7 +167,7 @@ export function SlotPicker({
               key={slot.startTime}
               type="button"
               disabled={isBlocked}
-              onClick={() => handleSlotClick(slot)}
+              onClick={(e) => handleSlotClick(slot, e)}
               aria-pressed={isSelected}
               aria-disabled={isBlocked}
               {...(!isBlocked && !shouldReduceMotion ? { whileHover: { scale: 1.02 }, whileTap: { scale: 0.97 } } : {})}
