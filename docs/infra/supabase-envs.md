@@ -37,15 +37,18 @@ shred -u backup_prod_prod.dump 2>/dev/null || rm -f backup_prod_prod.dump
 - **Auditoría y Purga:** Para no violar las restricciones `ON DELETE RESTRICT` (HU-21) de usuarios con reservas/pagos asociados y para purgar simultáneamente las identidades en Supabase Auth (`auth.users`), utilizar los scripts dedicados:
 
 ```bash
-## Opción A (Recomendada): Script TypeScript interactivo (PostgreSQL + Supabase Auth Admin API)
-## Modo dry-run (solo lectura / auditoría):
-pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.mts
+## Script TypeScript con lista blanca de staff (TSK-BD-02 / HU-37):
+## protege los correos institucionales y emite purge-reports/purge-report-*.json
+## con los IDs de los registros eliminados (auditoría).
+
+## Modo dry-run (solo lectura / auditoría) — ejecutar SIEMPRE primero:
+pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --dry-run
 
 ## Modo ejecución:
-pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.mts --execute
+pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --execute
 
-## Opción B: Script SQL transaccional directo (PostgreSQL)
-psql "$DIRECT_URL" -f packages/db/scripts/purge-test-users.sql
+## Requisito previo: backup verificado de producción (TSK-BD-01),
+## ver docs/TSK-BD-01-backup-produccion.md.
 ```
 
 ### 4. Bootstrap de Producción (`bootstrap:prod`)
