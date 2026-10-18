@@ -5,8 +5,7 @@
 > **plantilla vacía** `apps/web/.env.example`. Cada persona **rellena su propio** `.env.local`
 > una vez, normalmente obteniendo los valores del panel de Supabase del equipo.
 >
-> Documento relacionado: `README.md` (§Desarrollo local), `docs/AUTH-LOGIN-FIX.md`,
-> `docs/PLAN-AUTH-BACKEND.md`.
+> Documento relacionado: `README.md` (§Desarrollo local), [`../features/auth.md`](../features/auth.md).
 
 ---
 
@@ -114,7 +113,7 @@ El login por correo/contraseña usa, en este orden:
 
 Por eso, en desarrollo, deja `AUTH_ALLOW_LOCAL_FALLBACK="true"` para que sigan entrando las
 cuentas con `password_hash` que aún no se migraron a Supabase Auth. Cuando todas las cuentas
-tengan identidad en Supabase, ponlo en `"false"` (ver `docs/AUTH-LOGIN-FIX.md` §8).
+tengan identidad en Supabase, ponlo en `"false"` (ver [`../features/auth.md`](../features/auth.md)).
 
 ### Resetear la contraseña de una cuenta (admin)
 
@@ -155,7 +154,7 @@ curl -i -X POST http://localhost:3000/api/auth \
 |---|---|---|
 | `401 Credenciales incorrectas` (cuenta válida) | Falta `AUTH_ALLOW_LOCAL_FALLBACK="true"`, o la anon/service key es incorrecta | Revisa §2 y §3; reinicia el dev server |
 | `500` al iniciar sesión / "Error en la conexión a la base de datos" | `DATABASE_URL`/`DIRECT_URL` mal formadas (espacio, `ñ` sin encode, pooler equivocado) | Re-copia la connection string del Session pooler |
-| Se queda en `/login` tras un 200 | Rol no resuelto por el middleware | Ver `docs/AUTH-LOGIN-FIX.md` §4 |
+| Se queda en `/login` tras un 200 | Rol no resuelto por el middleware | Ver [`../features/auth.md`](../features/auth.md) |
 | `422/401 Invalid API key` en logs del server | Key de Supabase corrupta o de otro proyecto | Re-copia desde el panel (no desde chat) |
 | Cambié `.env.local` y no toma los cambios | Next.js cachea env al arrancar / `.next` viejo | Reinicia `pnpm dev`; si persiste, borra `apps/web/.next` |
 

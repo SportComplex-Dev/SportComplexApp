@@ -469,7 +469,8 @@ async function cmdVerify(): Promise<void> {
 
   const conn = parsePgUrl(ENV.databaseUrl);
   const port = await freePort(54331);
-  const clusterDir = path.resolve("C:/SC/verify-cluster");
+  const CLUSTER_DIR = process.env.BACKUP_VERIFY_CLUSTER_DIR || "C:/SC/verify-cluster";
+  const clusterDir = path.resolve(CLUSTER_DIR);
   rmSync(clusterDir, { recursive: true, force: true });
 
   console.log(`→ initdb en ${clusterDir} (puerto ${port})…`);
