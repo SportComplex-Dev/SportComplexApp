@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ChevronDown, LogOut } from 'lucide-react'
 import { initials } from '@sportcomplex/core'
-import { useApp } from '@/components/layout/app-provider'
+import { useOptionalApp } from '@/components/layout/app-provider'
 
 export function UserMenu({ variant = 'topbar' }: { variant?: 'topbar' | 'dark' | 'sidebar' }) {
-  const { session, logout } = useApp()
+  const app = useOptionalApp()
+  const session = app?.session ?? null
+  const logout = app?.logout ?? (() => {})
   const [open, setOpen] = useState(false)
   const shouldReduceMotion = useReducedMotion()
   const ref = useRef<HTMLDivElement>(null)
