@@ -3,11 +3,13 @@
 import Image from 'next/image'
 import { cn } from '@sportcomplex/ui'
 
+const NextImage = ((Image as unknown as { default?: typeof Image }).default ?? Image) as typeof Image
+
 export function Brand({ light = false }: { light?: boolean }) {
   return (
     <div className={cn('flex items-center gap-2.5 select-none', light ? 'text-white' : 'text-app')}>
       <div className="relative flex items-center">
-        <Image
+        <NextImage
           src={light ? '/images/Akros-logo.png' : '/images/Akros-logo-bosque.png'}
           alt="AKROS Active Lifestyle Club"
           width={40}
@@ -17,7 +19,7 @@ export function Brand({ light = false }: { light?: boolean }) {
           priority
         />
         {!light && (
-          <Image
+          <NextImage
             src="/images/Akros-logo.png"
             alt="AKROS Active Lifestyle Club"
             width={40}

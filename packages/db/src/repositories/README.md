@@ -1,5 +1,13 @@
 # Repositorios `packages/db`
-> Estado: vigente 2026-10-15
+> Estado: vigente 2026-10-16
+
+## `access/password-reset.ts` — Persistencia de restablecimiento
+
+- `findPasswordResetUserByEmail(email)`: busca una cuenta no eliminada para emitir el enlace.
+- `findPasswordResetUser(userId, email)`: vuelve a validar identidad y devuelve `passwordHash` para comprobar la versión del token.
+- `updatePasswordHash(userId, passwordHash)`: persiste el hash Argon2id nuevo en el campo existente `usuario.password_hash`.
+
+No agrega tablas ni columnas y no requiere migración.
 
 ## `access/verification-tokens.ts` — Acceso a Datos TokenVerificacion
 
