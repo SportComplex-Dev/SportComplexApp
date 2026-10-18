@@ -12,7 +12,7 @@ Contrato HTTP de la plataforma. `openapi.json` se **genera** (no se edita a mano
 pnpm docs:openapi
 ```
 
-`scripts/generate-openapi.ts`: escanea `apps/web/src/app/api/**/route.ts` (paths + métodos `GET/POST/PUT/PATCH/DELETE`), convierte `[id]` → `{id}`, y vuelca `components.schemas` desde `@sportcomplex/validation` vía `zod-to-openapi`. Salida: `docs/api/openapi.json` (41 paths). Commitear el diff generado.
+`scripts/generate-openapi.ts`: escanea `apps/web/src/app/api/**/route.ts` (paths + métodos `GET/POST/PUT/PATCH/DELETE`), convierte `[id]` → `{id}`, y vuelca `components.schemas` desde `@sportcomplex/validation` vía `zod-to-openapi`. Salida: `docs/api/openapi.json` (43 paths). Commitear el diff generado.
 
 ## Auth
 

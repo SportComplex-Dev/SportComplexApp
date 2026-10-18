@@ -17,6 +17,7 @@ export type {
 } from "./repositories/people/memberships.types";
 export * from "./repositories/access/tickets";
 export * from "./repositories/access/verification-tokens";
+export * from "./repositories/access/password-reset";
 export * from "./repositories/catalog/services";
 export * from "./repositories/catalog/tournaments";
 export * from "./repositories/catalog/analytics";
