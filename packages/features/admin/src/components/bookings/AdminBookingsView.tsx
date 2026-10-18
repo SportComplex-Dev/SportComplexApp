@@ -19,7 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
-import { Badge, Modal } from '@sportcomplex/ui'
+import { Badge, Card, Modal } from '@sportcomplex/ui'
 import type {
   AdminBookingItem,
   AdminBookingMetrics,
@@ -38,8 +38,18 @@ export interface AdminBookingsViewProps {
   onRefresh: () => void
 }
 
-function formatSlotTime(dateInput: string | Date): string {
+export function formatSlotTime(dateInput: string | Date): string {
   try {
+    if (!dateInput) return '00:00'
+
+    if (typeof dateInput === 'string') {
+      const trimmed = dateInput.trim()
+      // Si viene serializado directamente como hora "HH:mm" o "HH:mm:ss"
+      if (/^\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+        return trimmed.slice(0, 5)
+      }
+    }
+
     const d = new Date(dateInput)
     if (isNaN(d.getTime())) return '00:00'
     return d.toLocaleTimeString('es-CO', {
@@ -53,9 +63,23 @@ function formatSlotTime(dateInput: string | Date): string {
   }
 }
 
-function formatDateString(dateInput: string | Date): string {
+export function formatDateString(dateInput: string | Date): string {
   try {
-    const d = new Date(dateInput)
+    if (!dateInput) return ''
+    let d: Date
+    if (typeof dateInput === 'string') {
+      const clean = dateInput.trim()
+      // Normalizar formato YYYY-MM-DD o ISO con medianoche UTC (e.g. 2026-10-16T00:00:00Z)
+      // fijando la hora a mediodía para evitar desfase de 5 horas por UTC-5 (Bogotá)
+      const dateMatch = clean.match(/^(\d{4}-\d{2}-\d{2})/)?.[1]
+      if (dateMatch && (clean.length === 10 || clean.includes('T00:00:00'))) {
+        d = new Date(`${dateMatch}T12:00:00`)
+      } else {
+        d = new Date(clean)
+      }
+    } else {
+      d = dateInput
+    }
     if (isNaN(d.getTime())) return ''
     return d.toLocaleDateString('es-CO', {
       weekday: 'short',
@@ -85,9 +109,9 @@ export function formatStatusBadge(status: EstadoReservaAdmin) {
       )
     case 'EXPIRADA':
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
+        <Badge variant="secondary" className="text-[10px] font-bold">
           <Clock size={11} className="mr-1" /> Expirada
-        </span>
+        </Badge>
       )
     case 'CANCELADA_ADMINISTRATIVA':
     case 'CANCELADA_PAGO':
@@ -161,10 +185,10 @@ export function AdminBookingsView({
         </button>
       </div>
 
-      {/* 2. Tarjetas de KPIs Superiores */}
+      {/* 2. Tarjetas de KPIs Superiores (Utilizando Card de @sportcomplex/ui) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Reservas */}
-        <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xs relative overflow-hidden">
+        <Card className="p-4 border-[var(--line)] bg-[var(--surface)] relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-[var(--subtle)]">
             <span>TOTAL REGISTRADAS</span>
             <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -177,10 +201,10 @@ export function AdminBookingsView({
           <div className="mt-1 text-[11px] text-[var(--subtle)]">
             Histórico consultado: <b className="text-[var(--ink)]">{total}</b> reservas
           </div>
-        </div>
+        </Card>
 
         {/* KPI 2: Confirmadas */}
-        <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xs relative overflow-hidden">
+        <Card className="p-4 border-[var(--line)] bg-[var(--surface)] relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-[var(--subtle)]">
             <span>PAGADAS / CONFIRMADAS</span>
             <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -196,10 +220,10 @@ export function AdminBookingsView({
               {total > 0 ? Math.round((metrics.confirmedCount / total) * 100) : 0}%
             </b>
           </div>
-        </div>
+        </Card>
 
         {/* KPI 3: Pendientes Stripe TTL */}
-        <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xs relative overflow-hidden">
+        <Card className="p-4 border-[var(--line)] bg-[var(--surface)] relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-[var(--subtle)]">
             <span>EN CHECKOUT (TTL 15 MIN)</span>
             <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -212,10 +236,10 @@ export function AdminBookingsView({
           <div className="mt-1 text-[11px] text-[var(--subtle)]">
             Bloqueo temporal pesimista activo
           </div>
-        </div>
+        </Card>
 
         {/* KPI 4: Recaudación Visible */}
-        <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xs relative overflow-hidden">
+        <Card className="p-4 border-[var(--line)] bg-[var(--surface)] relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-[var(--subtle)]">
             <span>RECAUDACIÓN FILTRADA</span>
             <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -228,7 +252,7 @@ export function AdminBookingsView({
           <div className="mt-1 text-[11px] text-[var(--subtle)]">
             Suma de confirmadas mostradas
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* 3. Grid de Ocupación por Servicio */}
@@ -413,7 +437,7 @@ export function AdminBookingsView({
         </div>
 
         <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left text-xs sm:text-sm table-auto">
+          <table className="w-full min-w-[700px] text-left text-xs sm:text-sm table-auto">
             <thead className="bg-[var(--surface-soft)] text-[var(--subtle)] font-bold uppercase text-[10px] tracking-wider border-b border-[var(--line)]">
               <tr>
                 <th className="py-3 pl-6 pr-3 w-[15%]">Código / ID</th>

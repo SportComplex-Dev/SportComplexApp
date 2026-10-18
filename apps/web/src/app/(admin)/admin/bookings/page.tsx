@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import {
   AdminBookingsView,
   type AdminBookingItem,
@@ -33,16 +33,16 @@ export default function AdminBookingsPage() {
     limit: 15,
   })
 
-  // Cargar lista de servicios disponibles para el filtro
+  // Cargar lista de servicios disponibles para el filtro desde el endpoint administrativo oficial
   useEffect(() => {
-    fetch('/api/services')
+    fetch('/api/admin/services?entity=services')
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data)) {
           setAvailableServices(
             json.data.map((s: { id: number; name?: string; nombre?: string }) => ({
               id: s.id,
-              name: s.name || s.nombre || `Servicio #${s.id}`,
+              name: s.nombre || s.name || `Servicio #${s.id}`,
             }))
           )
         }
@@ -83,15 +83,27 @@ export default function AdminBookingsPage() {
     }
   }, [notify])
 
-  // Carga inicial y cuando cambian los filtros
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      startTransition(() => {
-        fetchBookings(filters)
-      })
-    }, 300)
+  const prevSearchRef = useRef(filters.search)
 
-    return () => clearTimeout(timer)
+  // Carga inicial y cuando cambian los filtros:
+  // Debounce de 300 ms únicamente si cambió el texto de búsqueda. Paginación y selects responden de inmediato.
+  useEffect(() => {
+    const isSearchChange = prevSearchRef.current !== filters.search
+    prevSearchRef.current = filters.search
+
+    if (isSearchChange) {
+      const timer = setTimeout(() => {
+        startTransition(() => {
+          fetchBookings(filters)
+        })
+      }, 300)
+
+      return () => clearTimeout(timer)
+    }
+
+    startTransition(() => {
+      fetchBookings(filters)
+    })
   }, [filters, fetchBookings])
 
   const handleFiltersChange = (newFilters: Partial<AdminBookingFiltersState>) => {
