@@ -7,16 +7,19 @@ on:
 
 jobs:
   check-hotfix:
-    name: Enforcement hotfix/* -> main
+    name: Enforcement hotfix/* o develop -> main
     if: github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Validar rama hotfix
         run: |
-          if [[ "${{ github.head_ref }}" != hotfix/* ]]; then
-            echo "::error::Solo ramas hotfix/* pueden mergearse a main"
-            exit 1
+          head_ref="${{ github.head_ref }}"
+          if [[ "$head_ref" == hotfix/* || "$head_ref" == develop ]]; then
+            echo "Rama $head_ref permitida hacia main"
+            exit 0
           fi
+          echo "::error::Solo ramas hotfix/* o develop pueden mergearse a main (recibido: $head_ref)"
+          exit 1
 
   verify:
     runs-on: ubuntu-latest
