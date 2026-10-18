@@ -193,6 +193,50 @@ test("POST /api/bookings/lock-cart: éxito 201 crea holds y devuelve URL de Stri
   assert.equal(mock._state.reservas[1].estado, "PENDIENTE_PAGO");
 });
 
+test("POST /api/bookings/lock-cart: bloquea franjas continuas y sincroniza su vencimiento con Stripe", async () => {
+  seedSlots();
+  const date = tomorrowBogota();
+  const diaSemana = mock._state.franjas[0].diaSemana;
+  mock._state.franjas.push({
+    id: 3,
+    servicioId: 1,
+    diaSemana,
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 11)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 12)),
+  });
+  mock._state.disponibilidades.push({
+    id: 3n,
+    servicioId: 1,
+    franjaId: 3,
+    fecha: new Date(`${date}T00:00:00.000Z`),
+    cuposTotales: 10,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+
+  const req = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 1,
+      franjas: [
+        { inicio: new Date(`${date}T10:00:00-05:00`).toISOString(), fin: new Date(`${date}T11:00:00-05:00`).toISOString() },
+        { inicio: new Date(`${date}T11:00:00-05:00`).toISOString(), fin: new Date(`${date}T12:00:00-05:00`).toISOString() },
+      ],
+    }),
+  });
+  let stripeExpiresAt: number | undefined;
+  const stripeWithCapturedExpiry = async (input: { now?: Date }) => {
+    stripeExpiresAt = Math.floor((input.now ?? new Date()).getTime() / 1000) * 1000 + 30 * 60_000;
+    return fakeStripeCheckout();
+  };
+  const res = await handleLockCart(req, authenticatedAsClient, stripeWithCapturedExpiry);
+  assert.equal(res.status, 201);
+  assert.equal(mock._state.reservas.length, 2);
+  assert.equal(mock._state.reservas[0].expiraEn.getTime(), stripeExpiresAt);
+  assert.equal(mock._state.reservas[1].expiraEn.getTime(), stripeExpiresAt);
+});
+
 test("POST /api/bookings/lock-cart: error definitivo de Stripe ejecuta compensación de todas las reservas", async () => {
   seedSlots();
   const req = new Request("http://localhost:3000/api/bookings/lock-cart", {
