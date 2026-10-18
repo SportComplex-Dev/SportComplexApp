@@ -97,7 +97,11 @@ export async function listAdminMembershipOverview(
     membersWithHistory++;
     if (memberships.length > 1) renewedClients++;
     const firstMembership = memberships[0];
-    if (firstMembership && firstMembership.fechaInicio >= thirtyDaysAgo) {
+    if (
+      firstMembership &&
+      firstMembership.fechaInicio >= thirtyDaysAgo &&
+      firstMembership.fechaInicio <= now
+    ) {
       newMembersLast30Days++;
     }
 
@@ -117,7 +121,9 @@ export async function listAdminMembershipOverview(
       memberships.every(
         (membership) =>
           membership.estado === EstadoMembresia.VENCIDA ||
-          membership.estado === EstadoMembresia.CANCELADA,
+          membership.estado === EstadoMembresia.CANCELADA ||
+          (membership.estado === EstadoMembresia.VIGENTE &&
+            membership.proximaRenovacion < today),
       )
     ) {
       segments.expired.push({ id: client.id, nombre: client.nombre });
