@@ -35,6 +35,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as dotenvConfig } from "dotenv";
@@ -87,9 +88,13 @@ function requireEnv(needsPassphrase: boolean): void {
 }
 
 function findPgTool(name: string): string {
-  const exe = `${name}.exe`;
+  const isWin = process.platform === "win32";
+  const exe = isWin ? `${name}.exe` : name;
   const candidates: string[] = [];
-  if (process.env.BACKUP_PG_BIN) candidates.push(path.join(process.env.BACKUP_PG_BIN, exe));
+  if (process.env.BACKUP_PG_BIN) {
+    candidates.push(path.join(process.env.BACKUP_PG_BIN, exe));
+    if (!isWin) candidates.push(path.join(process.env.BACKUP_PG_BIN, name));
+  }
   const toolsRoot = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "SportComplexTools") : null;
   if (toolsRoot && existsSync(toolsRoot)) {
     for (const entry of readdirSync(toolsRoot)) {
@@ -105,12 +110,14 @@ function findPgTool(name: string): string {
 
 function findGpg(): string {
   if (process.env.GPG_BIN && existsSync(process.env.GPG_BIN)) return process.env.GPG_BIN;
-  for (const candidate of [
-    "C:\\Program Files\\Git\\usr\\bin\\gpg.exe",
-    "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe",
-    "C:\\Program Files\\Gpg4win\\bin\\gpg.exe",
-  ]) {
-    if (existsSync(candidate)) return candidate;
+  if (process.platform === "win32") {
+    for (const candidate of [
+      "C:\\Program Files\\Git\\usr\\bin\\gpg.exe",
+      "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe",
+      "C:\\Program Files\\Gpg4win\\bin\\gpg.exe",
+    ]) {
+      if (existsSync(candidate)) return candidate;
+    }
   }
   return "gpg";
 }
@@ -216,12 +223,14 @@ function latestRunDir(): string {
       if (statSync(full).isDirectory()) candidates.push(full);
     }
   }
-  const altDir = path.resolve("C:/SC");
-  if (existsSync(altDir)) {
-    for (const entry of readdirSync(altDir)) {
-      const full = path.join(altDir, entry);
-      if (entry === "verify-cluster") continue;
-      if (statSync(full).isDirectory() && !candidates.includes(entry)) candidates.push(full);
+  if (process.platform === "win32") {
+    const altDir = path.resolve("C:/SC");
+    if (existsSync(altDir)) {
+      for (const entry of readdirSync(altDir)) {
+        const full = path.join(altDir, entry);
+        if (entry === "verify-cluster") continue;
+        if (statSync(full).isDirectory() && !candidates.includes(entry)) candidates.push(full);
+      }
     }
   }
   const dirs = candidates.sort();
@@ -469,7 +478,8 @@ async function cmdVerify(): Promise<void> {
 
   const conn = parsePgUrl(ENV.databaseUrl);
   const port = await freePort(54331);
-  const CLUSTER_DIR = process.env.BACKUP_VERIFY_CLUSTER_DIR || "C:/SC/verify-cluster";
+  const defaultClusterDir = process.platform === "win32" ? "C:/SC/verify-cluster" : path.join(os.tmpdir(), "sc-verify-cluster");
+  const CLUSTER_DIR = process.env.BACKUP_VERIFY_CLUSTER_DIR || defaultClusterDir;
   const clusterDir = path.resolve(CLUSTER_DIR);
   rmSync(clusterDir, { recursive: true, force: true });
 

@@ -66,8 +66,11 @@ pnpm --filter @sportcomplex/db backup upload
   contraseñas; si se pierde, los backups subidos son irrecuperables).
 - `backups/`, `*.gpg` y `*auth_users_snapshot*.json` están en `.gitignore`.
 - La passphrase y las credenciales nunca se versionan.
-- Contramedida operativa relacionada (entorno aislado, no producción):
-  `purge-test-users` en `packages/db/scripts/` (ver `supabase-envs.md` §3).
+- Operación relacionada de saneamiento pre-lanzamiento (TSK-BD-02):
+  `purge-test-users` en `packages/db/scripts/` purga cuentas de prueba preservando
+  la lista blanca de staff (ver `supabase-envs.md` §3). Solo debe ejecutarse como
+  paso previo al go-live; nunca en producción una vez que existan deportistas o
+  usuarios reales registrados.
 
 ## Evidencia del run de aceptación (2026-10-18)
 

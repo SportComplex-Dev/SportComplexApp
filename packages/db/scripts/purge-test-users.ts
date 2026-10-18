@@ -2,11 +2,13 @@
  * purge-test-users — Purga controlada de usuarios temporales en producción
  * (SCRUM-224 / TSK-BD-02, HU-37).
  *
- * Elimina fuera de la lista blanca de staff todos los usuarios temporales de
- * producción y sus dependencias en PostgreSQL, respetando las restricciones
- * ON DELETE RESTRICT (HU-21), y purga sus identidades en Supabase Auth vía
- * Admin API. Ninguna cuenta de la lista blanca de staff puede ser eliminada:
- * el script aborta si un candidato la vulnera.
+ * ATENCIÓN OPERATIVA: Este script es una herramienta de saneamiento puntual
+ * previo al lanzamiento (pre-go-live) para depurar usuarios generados durante
+ * fases de prueba. Elimina fuera de la lista blanca de staff todos los usuarios y
+ * sus dependencias en PostgreSQL (respetando ON DELETE RESTRICT) e identidades en
+ * Supabase Auth vía Admin API.
+ * NUNCA debe ejecutarse en producción una vez que comiencen a registrarse deportistas
+ * o clientes reales, ya que cualquier cuenta fuera de la lista blanca de staff sería purgada.
  *
  * Uso:
  *   pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --dry-run   # solo lectura (default)
@@ -145,6 +147,11 @@ function writeReport(report: PurgeReport): string {
 async function main() {
   console.log("=== Auditoría y Purga de Usuarios Temporales (TSK-BD-02 / SCRUM-224) ===");
   console.log(`Modo: ${EXECUTE ? "EJECUCIÓN" : "dry-run (default) — usa --execute para purgar"}`);
+
+  if (EXECUTE) {
+    console.warn("\n⚠️  ATENCIÓN OPERATIVA: Este script purga todas las cuentas fuera de la lista blanca de staff.");
+    console.warn("   Uso exclusivo para saneamiento pre-lanzamiento (pre-go-live). No usar con usuarios reales registrados.\n");
+  }
 
   const allUsers = await prisma.usuario.findMany({
     select: { id: true, correo: true, nombre: true },
