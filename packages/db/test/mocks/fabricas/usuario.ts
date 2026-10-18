@@ -53,6 +53,12 @@ export function crearUsuarioHandler(state: MockState) {
         const allowedRoles = where.rol.nombre.in;
         list = list.filter((u) => allowedRoles.includes(u.rolNombre));
       }
+      if (where?.rol?.nombre && typeof where.rol.nombre === "string") {
+        list = list.filter((u) => u.rolNombre === where.rol.nombre);
+      }
+      if (where?.deletedAt === null) {
+        list = list.filter((u) => u.deletedAt == null);
+      }
       if (where?.estado) {
         list = list.filter((u) => u.estado === where.estado);
       }
@@ -72,6 +78,10 @@ export function crearUsuarioHandler(state: MockState) {
           if (!select[key]) continue;
           if (key === "rol") {
             picked.rol = { id: u.rolId ?? 1, nombre: u.rolNombre ?? "VENDEDOR" };
+          } else if (key === "membresias") {
+            picked.membresias = state.membresias
+              .filter((m) => m.usuarioId === u.id)
+              .sort((a, b) => (a.fechaInicio?.getTime() ?? 0) - (b.fechaInicio?.getTime() ?? 0));
           } else {
             picked[key] = (u as any)[key];
           }

@@ -359,6 +359,28 @@
         }
       }
     },
+    "/api/admin/memberships": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET /api/admin/memberships",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
     "/api/admin/services/{id}": {
       "get": {
         "tags": [
