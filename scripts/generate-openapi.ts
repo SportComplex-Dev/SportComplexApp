@@ -123,6 +123,7 @@ const SCHEMA_EXPORTS: Record<string, string> = {
   AccessRedeem: "accessRedeemSchema",
   BotTicketQuery: "botTicketQuerySchema",
   AnalyticsQueryInput: "analyticsQuerySchema",
+  AdminBookingsQuery: "adminBookingsQuerySchema",
 };
 
 const SCHEMA_OVERRIDES: Record<string, unknown> = {
