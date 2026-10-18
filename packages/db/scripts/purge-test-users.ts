@@ -2,10 +2,11 @@
  * purge-test-users — Purga controlada de usuarios temporales en producción
  * (SCRUM-224 / TSK-BD-02, HU-37).
  *
- * Elimina usuarios de prueba y sus dependencias en PostgreSQL respetando las
- * restricciones ON DELETE RESTRICT (HU-21), y purga sus identidades en
- * Supabase Auth vía Admin API. Ninguna cuenta de la lista blanca de staff
- * puede ser eliminada: el script aborta si un candidato la vulnera.
+ * Elimina fuera de la lista blanca de staff todos los usuarios temporales de
+ * producción y sus dependencias en PostgreSQL, respetando las restricciones
+ * ON DELETE RESTRICT (HU-21), y purga sus identidades en Supabase Auth vía
+ * Admin API. Ninguna cuenta de la lista blanca de staff puede ser eliminada:
+ * el script aborta si un candidato la vulnera.
  *
  * Uso:
  *   pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --dry-run   # solo lectura (default)
@@ -55,21 +56,25 @@ const STAFF_ALLOWLIST = new Set(
     "lector@example.com",
     "laura.taquilla@sportcomplex.com",
     "carlos.lector@sportcomplex.com",
+    "official@akros.lat",
   ].map((e) => e.toLowerCase()),
 );
 
 // Dominio institucional: jamás se purga ninguna cuenta con este dominio.
 const STAFF_DOMAIN = "@sportcomplex.com";
 
-const TEST_PATTERN = /(test|bot|example|mock)/;
-
 function isStaffProtected(email: string): boolean {
   const c = email.toLowerCase();
   return STAFF_ALLOWLIST.has(c) || c.endsWith(STAFF_DOMAIN);
 }
 
-function isTestCandidate(email: string): boolean {
-  return TEST_PATTERN.test(email.toLowerCase()) && !isStaffProtected(email);
+// Criterio del ticket TSK-BD-02: purga TODO lo que NO esté en la lista blanca
+// de staff ("preservando únicamente las cuentas de staff autorizadas").
+// El filtro por patrón (test/bot/...) era insuficiente: los ~78 usuarios de
+// prueba de producción usan correos tipo deportistaN@sportmail.com y dominios
+// aleatorios que no contienen esas palabras.
+function isPurgeCandidate(email: string): boolean {
+  return !isStaffProtected(email);
 }
 
 const EXECUTE = process.argv.includes("--execute");
@@ -145,7 +150,7 @@ async function main() {
     select: { id: true, correo: true, nombre: true },
   });
 
-  const candidates = allUsers.filter((u) => isTestCandidate(u.correo));
+  const candidates = allUsers.filter((u) => isPurgeCandidate(u.correo));
   const protectedStaff = allUsers.filter((u) => isStaffProtected(u.correo));
   const candidateIds = candidates.map((u) => u.id);
 
@@ -160,7 +165,7 @@ async function main() {
   const authUsers = await listSupabaseAuthUsers();
   const candidateAuth: Array<{ email: string; id: string }> = [];
   for (const [email, id] of authUsers.entries()) {
-    if (isTestCandidate(email)) candidateAuth.push({ email, id });
+    if (isPurgeCandidate(email)) candidateAuth.push({ email, id });
   }
 
   console.log(`- Usuarios de prueba detectados en PostgreSQL: ${candidates.length}`);
