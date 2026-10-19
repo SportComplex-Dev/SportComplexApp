@@ -12,6 +12,7 @@ import {
   AdminMobileDrawer,
   type AdminNavItem,
 } from '@/components/layout/admin-mobile-drawer'
+import { UserMenu } from '@/components/layout/user-menu'
 import {
   Home,
   Ticket,
@@ -144,5 +145,35 @@ test('TSK-FE-36 / HU-40: Verificación de soporte responsive en sidebar de admin
   assert.ok(
     sidebarHtml.includes('hidden md:flex'),
     'El sidebar estático de escritorio debe tener clases "hidden md:flex" para ocultarse en < 768px',
+  )
+})
+
+test('FIX-ADMIN: UserMenu garantiza sesión de respaldo en sidebar y muestra datos de Administrador', () => {
+  const html = renderToStaticMarkup(
+    <AppProvider>
+      <UserMenu variant="sidebar" />
+    </AppProvider>,
+  )
+
+  assert.ok(
+    html.includes('admin-user'),
+    'UserMenu en sidebar debe renderizar el botón de usuario administrativo',
+  )
+  assert.ok(
+    html.includes('Administrador'),
+    'UserMenu debe mostrar el rol o nombre de Administrador',
+  )
+})
+
+test('FIX-ADMIN: UserMenu en admin-topbar renderiza el avatar interactivo con testid', () => {
+  const html = renderToStaticMarkup(
+    <AppProvider>
+      <UserMenu variant="admin-topbar" />
+    </AppProvider>,
+  )
+
+  assert.ok(
+    html.includes('admin-topbar-user-menu'),
+    'UserMenu en admin-topbar debe incluir el data-testid="admin-topbar-user-menu"',
   )
 })
