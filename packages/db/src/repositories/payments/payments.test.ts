@@ -46,6 +46,80 @@ function baseInput(overrides: Record<string, unknown> = {}) {
   } as Parameters<typeof procesarPagoWebhook>[0];
 }
 
+test("TSK-BE-31: varias reservas horarias contiguas del mismo servicio emiten un solo ticket de rango completo", async () => {
+  const mock = createMockPrisma();
+  const date = new Date("2026-10-25T00:00:00.000Z");
+  mock._state.franjas.push(
+    { id: 1, servicioId: 1, diaSemana: 7, horaInicio: new Date("1970-01-01T14:00:00.000Z"), horaFin: new Date("1970-01-01T15:00:00.000Z") },
+    { id: 2, servicioId: 1, diaSemana: 7, horaInicio: new Date("1970-01-01T15:00:00.000Z"), horaFin: new Date("1970-01-01T16:00:00.000Z") },
+  );
+  seedDisponibilidad(mock, { id: 1n, franjaId: 1, fecha: date });
+  seedDisponibilidad(mock, { id: 2n, franjaId: 2, fecha: date });
+  seedReserva(mock, { id: "reserva-contigua-1", disponibilidadId: 1n, total: 45000 });
+  seedReserva(mock, { id: "reserva-contigua-2", disponibilidadId: 2n, total: 45000 });
+
+  const result = await procesarPagoWebhook(
+    baseInput({ reservaId: undefined, reservaIds: ["reserva-contigua-1", "reserva-contigua-2"], monto: 90000 }),
+    { db: mock },
+  );
+
+  assert.equal(result.reservaConfirmada, true);
+  assert.equal(result.ticketQrEmitido, true);
+  assert.equal(result.ticketReservaId, "reserva-contigua-1");
+  assert.equal(mock._state.tickets.length, 1);
+  assert.equal(mock._state.tickets[0]?.reservaId, "reserva-contigua-1");
+  assert.equal(mock._state.tickets[0]?.inicioValidez?.toISOString(), "2026-10-25T19:00:00.000Z");
+  assert.equal(mock._state.tickets[0]?.finValidez?.toISOString(), "2026-10-25T21:00:00.000Z");
+  assert.ok(mock._state.reservas.every((reserva) => reserva.estado === "CONFIRMADA"));
+});
+
+test("TSK-BE-31: carritos discontinuos o con servicios distintos conservan un ticket por reserva", async () => {
+  const scenarios = [
+    { name: "franjas discontinuas", serviceIds: [1, 1], starts: [14, 16] },
+    { name: "servicios distintos", serviceIds: [1, 2], starts: [14, 15] },
+  ];
+
+  for (const [index, scenario] of scenarios.entries()) {
+    const mock = createMockPrisma();
+    const date = new Date("2026-10-25T00:00:00.000Z");
+    mock._state.franjas.push(...scenario.starts.map((hour, slotIndex) => ({
+      id: slotIndex + 1,
+      servicioId: scenario.serviceIds[slotIndex],
+      diaSemana: 7,
+      horaInicio: new Date(`1970-01-01T${String(hour).padStart(2, "0")}:00:00.000Z`),
+      horaFin: new Date(`1970-01-01T${String(hour + 1).padStart(2, "0")}:00:00.000Z`),
+    })));
+    seedDisponibilidad(mock, { id: 1n, franjaId: 1, servicioId: scenario.serviceIds[0], fecha: date });
+    seedDisponibilidad(mock, { id: 2n, franjaId: 2, servicioId: scenario.serviceIds[1], fecha: date });
+    seedReserva(mock, { id: `reserva-individual-${index}-1`, disponibilidadId: 1n, total: 45000 });
+    seedReserva(mock, { id: `reserva-individual-${index}-2`, disponibilidadId: 2n, total: 45000 });
+
+    const result = await procesarPagoWebhook(
+      baseInput({
+        stripePaymentIntentId: `pi_individual_${index}`,
+        reservaId: undefined,
+        reservaIds: [`reserva-individual-${index}-1`, `reserva-individual-${index}-2`],
+        monto: 90000,
+      }),
+      { db: mock },
+    );
+
+    assert.equal(result.reservaConfirmada, true, scenario.name);
+    assert.equal(result.ticketQrEmitido, true, scenario.name);
+    assert.equal(result.ticketReservaId, undefined, scenario.name);
+    assert.deepEqual(
+      mock._state.tickets.map((ticket) => ticket.reservaId).sort(),
+      [`reserva-individual-${index}-1`, `reserva-individual-${index}-2`],
+      scenario.name,
+    );
+    assert.deepEqual(
+      result.reservasConfirmadas.sort(),
+      [`reserva-individual-${index}-1`, `reserva-individual-${index}-2`],
+      scenario.name,
+    );
+  }
+});
+
 test("TSK-BD-09: reenviar el mismo webhook dos veces → 1 fila en PAGO y 1 reserva CONFIRMADA", async () => {
   const mock = createMockPrisma();
   seedReserva(mock);

@@ -308,13 +308,15 @@ model Reserva {
 
 // 11. TICKET_QR
 model TicketQr {
-  id         String       @id @default(uuid()) @db.Uuid
-  reservaId  String       @unique @map("reserva_id") @db.Uuid
-  codigoUuid String       @unique @default(uuid()) @map("codigo_uuid") @db.Uuid
-  usadoPor   String?      @map("usado_por") @db.Uuid
-  estado     EstadoTicket
-  emitidoEn  DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
-  usadoEn    DateTime?    @map("usado_en") @db.Timestamptz
+  id            String       @id @default(uuid()) @db.Uuid
+  reservaId     String       @unique @map("reserva_id") @db.Uuid
+  codigoUuid    String       @unique @default(uuid()) @map("codigo_uuid") @db.Uuid
+  inicioValidez DateTime?    @map("inicio_validez") @db.Timestamptz
+  finValidez    DateTime?    @map("fin_validez") @db.Timestamptz
+  usadoPor      String?      @map("usado_por") @db.Uuid
+  estado        EstadoTicket
+  emitidoEn     DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
+  usadoEn       DateTime?    @map("usado_en") @db.Timestamptz
 
   reserva        Reserva         @relation(fields: [reservaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   empleadoLector Usuario?        @relation("TicketUsadoPor", fields: [usadoPor], references: [id], onDelete: Restrict, onUpdate: Cascade)

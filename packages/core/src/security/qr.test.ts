@@ -8,6 +8,7 @@ import {
   signTicket,
   verifyTicketSignature,
 } from "./qr";
+import { signTicket as signTicketFromSecurity } from "@sportcomplex/security";
 
 const SECRET = "secreto-qr-tsk-be-19";
 
@@ -42,4 +43,20 @@ test("TSK-BE-19: payload manipulado o con prefijo ajeno se rechaza (null)", () =
 test("TSK-BE-19: buildTicketQrPayload valida los componentes", () => {
   assert.throws(() => buildTicketQrPayload("no-uuid", "a".repeat(64)));
   assert.throws(() => buildTicketQrPayload(newTicketId(), "firma-corta"));
+});
+
+test("TSK-BE-31: core comparte con security la firma de la ventana consolidada", () => {
+  const ticketId = newTicketId();
+  const window = {
+    start: new Date("2026-10-25T19:00:00.000Z"),
+    end: new Date("2026-10-25T21:00:00.000Z"),
+  };
+  const signature = signTicket(ticketId, SECRET, window);
+
+  assert.equal(signature, signTicketFromSecurity(ticketId, SECRET, window));
+  assert.equal(verifyTicketSignature(ticketId, signature, SECRET, window), true);
+  assert.equal(verifyTicketSignature(ticketId, signature, SECRET, {
+    ...window,
+    end: new Date("2026-10-25T22:00:00.000Z"),
+  }), false);
 });

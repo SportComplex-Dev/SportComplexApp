@@ -80,6 +80,7 @@ export interface ProcesarPagoResultado {
   reservaConfirmada: boolean;
   reservaEstado: string | null;
   ticketQrEmitido: boolean;
+  ticketReservaId?: string;
   franjaRestituida: boolean;
   membresiaActivada: boolean;
   reservasConfirmadas?: string[];
@@ -172,11 +173,45 @@ type ReservaResumen = {
   estado: string;
   canal?: string;
   vendedorId?: string | null;
-  disponibilidad?: { servicioId: number } | null;
+  disponibilidad?: {
+    servicioId: number;
+    fecha?: Date | string;
+    franja?: { horaInicio: Date | string; horaFin: Date | string };
+  } | null;
   disponibilidadId?: bigint | number | null;
   cantidadCupos?: number | null;
   total?: number | string | { toString(): string } | null;
 };
+
+type TicketWindow = { reservaId: string; start: Date; end: Date };
+
+function continuousTicketWindow(reservas: ReservaResumen[]): TicketWindow | null {
+  if (reservas.length < 2) return null;
+  const windows = reservas.map((reserva) => {
+    const disponibilidad = reserva.disponibilidad;
+    if (!disponibilidad?.fecha || !disponibilidad.franja) return null;
+    const date = disponibilidad.fecha instanceof Date
+      ? disponibilidad.fecha.toISOString().slice(0, 10)
+      : disponibilidad.fecha.slice(0, 10);
+    const localTime = (value: Date | string) =>
+      value instanceof Date ? value.toISOString().slice(11, 19) : value.slice(11, 19);
+    const start = new Date(`${date}T${localTime(disponibilidad.franja.horaInicio)}-05:00`);
+    const end = new Date(`${date}T${localTime(disponibilidad.franja.horaFin)}-05:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+    return { reservaId: reserva.id, serviceId: disponibilidad.servicioId, start, end };
+  });
+  if (windows.some((window) => window === null)) return null;
+  const ordered = (windows as NonNullable<(typeof windows)[number]>[])
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const serviceId = ordered[0]?.serviceId;
+  if (!serviceId || ordered.some((window) => window.serviceId !== serviceId)) return null;
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index - 1]?.end.getTime() !== ordered[index]?.start.getTime()) return null;
+  }
+  const first = ordered[0];
+  const last = ordered.at(-1);
+  return first && last ? { reservaId: first.reservaId, start: first.start, end: last.end } : null;
+}
 
 /**
  * Emite el `TICKET_QR` (estado `EMITIDO`) sin abortar transacciones de Postgres.
@@ -186,6 +221,7 @@ async function emitirTicketQr(
   tx: TxDb,
   reservaId: string,
   codigoUuid?: string,
+  window?: { start: Date; end: Date },
 ): Promise<boolean> {
   const existente = await tx.ticketQr.findUnique({ where: { reservaId } });
   if (existente) return false;
@@ -194,6 +230,7 @@ async function emitirTicketQr(
     data: {
       reservaId,
       ...(codigoUuid ? { codigoUuid } : {}),
+      ...(window ? { inicioValidez: window.start, finValidez: window.end } : {}),
       estado: "EMITIDO",
     },
   });
@@ -242,7 +279,15 @@ async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise
     if (targetReservaIds.length > 0) {
       reservasExistentes = (await tx.reserva.findMany({
         where: { id: { in: targetReservaIds } },
-        include: { disponibilidad: { select: { servicioId: true } } },
+        include: {
+          disponibilidad: {
+            select: {
+              servicioId: true,
+              fecha: true,
+              franja: { select: { horaInicio: true, horaFin: true } },
+            },
+          },
+        },
       })) as ReservaResumen[];
 
       if (input.vendedorId !== undefined) {
@@ -316,6 +361,7 @@ async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise
     let franjaRestituida = false;
     const reservasConfirmadas: string[] = [];
     const reservasEstado: Record<string, string> = {};
+    let ticketReservaId: string | undefined;
 
     if (targetReservaIds.length > 0) {
       if (input.estado === "APROBADO") {
@@ -336,13 +382,28 @@ async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise
           const count = typeof upd?.count === "number" ? upd.count : 0;
           if (count > 0) {
             reservasConfirmadas.push(...pendientesIds);
-            for (const rId of pendientesIds) {
-              const emitido = await emitirTicketQr(
+            const window = pendientesIds.length === targetReservaIds.length
+              ? continuousTicketWindow(reservasExistentes)
+              : null;
+            if (window) {
+              ticketQrEmitido = await emitirTicketQr(
                 tx,
-                rId,
-                pendientesIds.length === 1 ? input.ticketCodigoUuid : undefined,
+                window.reservaId,
+                input.ticketCodigoUuid,
+                { start: window.start, end: window.end },
               );
-              if (emitido) ticketQrEmitido = true;
+              if (ticketQrEmitido) ticketReservaId = window.reservaId;
+            } else {
+              for (const rId of pendientesIds) {
+                const emitido = await emitirTicketQr(
+                  tx,
+                  rId,
+                  pendientesIds.length === 1 ? input.ticketCodigoUuid : undefined,
+                );
+                if (emitido) {
+                  ticketQrEmitido = true;
+                }
+              }
             }
           }
         }
@@ -398,6 +459,7 @@ async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise
       reservaConfirmada,
       reservaEstado,
       ticketQrEmitido,
+      ...(ticketReservaId ? { ticketReservaId } : {}),
       franjaRestituida,
       membresiaActivada,
       reservasConfirmadas,

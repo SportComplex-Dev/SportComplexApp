@@ -100,6 +100,8 @@ export interface MockTicketQr {
   id: string;
   reservaId: string;
   codigoUuid: string;
+  inicioValidez?: Date | null;
+  finValidez?: Date | null;
   usadoPor: string | null;
   estado: string;
   usadoEn: Date | null;

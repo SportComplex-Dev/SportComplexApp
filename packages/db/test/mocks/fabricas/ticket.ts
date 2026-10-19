@@ -30,6 +30,8 @@ export function crearTicketHandler(state: MockState) {
           id: `ticket-${state.tickets.length + 1}`,
           reservaId: data.reservaId,
           codigoUuid: data.codigoUuid ?? randomUUID(),
+          inicioValidez: data.inicioValidez ?? null,
+          finValidez: data.finValidez ?? null,
           usadoPor: null,
           estado: data.estado ?? "EMITIDO",
           usadoEn: null,

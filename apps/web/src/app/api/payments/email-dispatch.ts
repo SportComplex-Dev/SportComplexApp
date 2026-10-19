@@ -1,5 +1,6 @@
 import { getReceiptReserva, type ClienteDb } from "@sportcomplex/db";
-import { buildTicketQrPayload, signTicket } from "@sportcomplex/core";
+import { buildTicketQrPayload } from "@sportcomplex/security";
+import { signTicket } from "@sportcomplex/security";
 import { renderTicketEmail } from "@sportcomplex/automation";
 import {
   sendReservationQrWebhook,
@@ -11,6 +12,15 @@ function formatearHora(hora: Date): string {
     return hora.toISOString().slice(11, 16);
   }
   return "00:00";
+}
+
+function formatBogotaTime(instant: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(instant);
 }
 
 function formatearPrecioCop(total: unknown): string {
@@ -41,9 +51,12 @@ export async function dispatchReservationTicketEmail(
   if (ticketQr?.codigoUuid) {
     ticketId = ticketQr.codigoUuid;
     if (qrSecret && qrSecret.trim().length > 0) {
+      const window = ticketQr.inicioValidez && ticketQr.finValidez
+        ? { start: ticketQr.inicioValidez, end: ticketQr.finValidez }
+        : undefined;
       qrPayload = buildTicketQrPayload(
         ticketQr.codigoUuid,
-        signTicket(ticketQr.codigoUuid, qrSecret),
+        signTicket(ticketQr.codigoUuid, qrSecret, window),
       );
     } else {
       qrPayload = ticketQr.codigoUuid;
@@ -54,13 +67,18 @@ export async function dispatchReservationTicketEmail(
   const portalUrl = `${appUrl}/portal/reservas/${receipt.id}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrPayload)}`;
 
-  const fechaStr =
-    disponibilidad.fecha instanceof Date
+  const fechaStr = ticketQr?.inicioValidez
+    ? ticketQr.inicioValidez.toLocaleDateString("en-CA", { timeZone: "America/Bogota" })
+    : disponibilidad.fecha instanceof Date
       ? disponibilidad.fecha.toISOString().slice(0, 10)
       : String(disponibilidad.fecha).slice(0, 10);
 
-  const horaInicio = formatearHora(disponibilidad.franja.horaInicio);
-  const horaFin = formatearHora(disponibilidad.franja.horaFin);
+  const horaInicio = ticketQr?.inicioValidez
+    ? formatBogotaTime(ticketQr.inicioValidez)
+    : formatearHora(disponibilidad.franja.horaInicio);
+  const horaFin = ticketQr?.finValidez
+    ? formatBogotaTime(ticketQr.finValidez)
+    : formatearHora(disponibilidad.franja.horaFin);
   const franjaHoraria = `${horaInicio} - ${horaFin}`;
   const precioTotal = formatearPrecioCop(receipt.total);
 
