@@ -12,12 +12,16 @@ import {
 } from '@sportcomplex/features-pos'
 
 export default function PosPage() {
-  const { session, notify } = useApp()
+  const { session, notify, logout } = useApp()
   const pos = usePosSession({ notify })
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] text-[var(--ink)] pb-16">
-      <PosHeader sellerName={session?.name} />
+      <PosHeader
+        sellerName={session?.name || 'Andrés Muñoz'}
+        sellerRole={session?.role || 'Empleado_Vendedor'}
+        onLogout={logout}
+      />
 
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
