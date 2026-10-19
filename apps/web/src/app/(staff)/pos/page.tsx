@@ -2,12 +2,8 @@
 
 import { useApp } from '@/components/layout/app-provider'
 import {
-  PosCatalogSelector,
-  PosClientForm,
-  PosPaymentStripe,
-  PosVoucherModal,
-  PosAltLinkModal,
   PosHeader,
+  PosSaleWizard,
   PosReprintPanel,
   usePosSession,
   useThermalPrinter,
@@ -26,58 +22,11 @@ export default function PosPage() {
         onLogout={logout}
       />
 
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-5 flex flex-col gap-5">
-            <PosCatalogSelector
-              selectedCategory={pos.selectedCategory} onSelectCategory={pos.setSelectedCategory}
-              selectedServiceId={pos.selectedServiceId} onSelectServiceId={pos.setSelectedServiceId}
-              selectedDate={pos.selectedDate} onSelectDate={pos.setSelectedDate}
-              selectedSlot={pos.selectedSlot} onSelectSlot={pos.setSelectedSlot}
-              attendees={pos.attendees} onSetAttendees={pos.setAttendees}
-              filteredServices={pos.filteredServices} currentService={pos.currentService}
-              todayStr={pos.todayStr} availableSlots={pos.availableSlots} isLoadingSlots={pos.isLoadingSlots}
-            />
-          </div>
-
-          <div className="lg:col-span-3 flex flex-col gap-5">
-            <PosClientForm
-              clientDoc={pos.clientDoc} onClientDocChange={pos.setClientDoc}
-              clientName={pos.clientName} onClientNameChange={pos.setClientName}
-              clientEmail={pos.clientEmail} onClientEmailChange={pos.setClientEmail}
-              clientPhone={pos.clientPhone} onClientPhoneChange={pos.setClientPhone}
-              isMember={pos.isMember} onIsMemberChange={pos.setIsMember}
-              onQuickWalkIn={pos.handleQuickWalkIn}
-            />
-          </div>
-
-          <div className="lg:col-span-4 flex flex-col gap-5">
-            <PosPaymentStripe
-              currentService={pos.currentService} subtotalBruto={pos.subtotalBruto}
-              descuentoMonto={pos.descuentoMonto} subtotalNeto={pos.subtotalNeto}
-              ivaMonto={pos.ivaMonto} totalFinal={pos.totalFinal} isMember={pos.isMember}
-              isProcessing={pos.isProcessing} processStep={pos.processStep} isTestMode={pos.isStripeTestMode}
-              onGenerateAltLink={pos.handleGenerateAltLink}
-            />
-            <PosReprintPanel printer={printer} notify={notify} />
-          </div>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 flex flex-col gap-8">
+        <PosSaleWizard sellerName={session?.name} pos={pos} printer={printer} />
+        <PosReprintPanel printer={printer} notify={notify} />
       </div>
-
-      {pos.confirmedBooking && (
-        <PosVoucherModal
-          booking={pos.confirmedBooking} sellerName={session?.name}
-          comprobante={pos.receiptComprobante} printer={printer}
-          onNextSale={pos.handleResetForNextSale}
-        />
-      )}
-
-      <PosAltLinkModal
-        isOpen={pos.isAltLinkModalOpen} onClose={pos.handleCloseAltLink}
-        waiting={pos.isAwaitingPayment} testMode={pos.isStripeTestMode}
-        altLinkUrl={pos.altLinkUrl} altLinkQrUrl={pos.altLinkQrUrl}
-        copiedLink={pos.copiedLink} onCopyLink={pos.handleCopyLink}
-      />
     </main>
   )
 }
+

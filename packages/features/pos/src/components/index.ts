@@ -4,6 +4,8 @@ export * from './sale/PosCatalogSelector'
 export * from './billing/PosPaymentStripe'
 export * from './billing/PosVoucherModal'
 export * from './billing/PosAltLinkModal'
+export * from './sale/PosSaleWizard'
 export * from './billing/PosTicketPreview'
 export * from './billing/PosTicketPrintActions'
 export * from './billing/PosReprintPanel'
+
