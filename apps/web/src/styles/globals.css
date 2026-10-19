@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @plugin 'tailwindcss-animate';
+@source '../../../../packages';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -278,8 +279,7 @@ button { cursor: pointer; }
 
 /* Transiciones Fluidas entre Rutas y Vistas (SCRUM-173) */
 .page-transition {
-  animation: page-fade-in var(--motion-duration-normal) var(--motion-ease-out) both;
-  will-change: opacity, transform;
+  animation: page-fade-in var(--motion-duration-normal) var(--motion-ease-out);
 }
 @keyframes page-fade-in {
   from {
@@ -288,7 +288,7 @@ button { cursor: pointer; }
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 @keyframes hero-pill-fill {
