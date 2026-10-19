@@ -119,3 +119,28 @@ test('TSK-FE-33: El enlace "¿Olvidaste tu contraseña?" en auth-form.tsx apunta
     'El href debe ser exactamente /forgot-password'
   )
 })
+
+
+test('TSK-FE-33: /forgot-password muestra error cuando el servidor responde HTTP 429 Too Many Requests', async () => {
+  const originalFetch = (globalThis as any).fetch
+  ;(globalThis as any).fetch = async () => ({
+    ok: false,
+    status: 429,
+    json: async () => ({ error: 'Too many requests' }),
+  })
+
+  try {
+    const { getByRole, findByRole } = render(React.createElement(ForgotPasswordPage))
+    const emailInput = getByRole('textbox') as HTMLInputElement
+    const submitButton = getByRole('button', { name: /enviar instrucciones/i })
+
+    fireEvent.change(emailInput, { target: { value: 'socio@sportcomplex.com' } })
+    fireEvent.click(submitButton)
+
+    const alert = await findByRole('alert')
+    assert.ok(alert.textContent?.includes('Demasiados intentos'), 'Debe advertir sobre límite de intentos')
+  } finally {
+    ;(globalThis as any).fetch = originalFetch
+  }
+})
+

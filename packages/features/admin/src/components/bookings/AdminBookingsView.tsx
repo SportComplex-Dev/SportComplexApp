@@ -17,9 +17,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Ban,
 } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { Badge, Card, Modal } from '@sportcomplex/ui'
+import { AdminBookingCancelModal } from './AdminBookingCancelModal'
 import type {
   AdminBookingItem,
   AdminBookingMetrics,
@@ -36,6 +38,7 @@ export interface AdminBookingsViewProps {
   availableServices?: Array<{ id: number; name: string }>
   onFiltersChange: (newFilters: Partial<AdminBookingFiltersState>) => void
   onRefresh: () => void
+  onCancelBooking?: (bookingId: string, motivo: string) => Promise<void>
 }
 
 export function formatSlotTime(dateInput: string | Date): string {
@@ -135,14 +138,31 @@ export function AdminBookingsView({
   availableServices = [],
   onFiltersChange,
   onRefresh,
+  onCancelBooking,
 }: AdminBookingsViewProps) {
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingItem | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [bookingToCancel, setBookingToCancel] = useState<AdminBookingItem | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
   const searchInputId = useId()
   const statusSelectId = useId()
   const serviceSelectId = useId()
   const dateFromId = useId()
   const dateToId = useId()
+
+  const handleConfirmCancel = async (bookingId: string, motivo: string) => {
+    if (!onCancelBooking) return
+    setIsCancelling(true)
+    try {
+      await onCancelBooking(bookingId, motivo)
+      setBookingToCancel(null)
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(null)
+      }
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -350,7 +370,7 @@ export function AdminBookingsView({
           {/* Filtro por Servicio */}
           <div>
             <label htmlFor={serviceSelectId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
-              Servicio
+              Servicio / Cancha
             </label>
             <select
               id={serviceSelectId}
@@ -359,17 +379,17 @@ export function AdminBookingsView({
               className="w-full px-3 py-2 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
             >
               <option value="">Todos los servicios</option>
-              {availableServices.map((s) => (
-                <option key={s.id} value={s.id.toString()}>
-                  {s.name}
+              {availableServices.map((srv) => (
+                <option key={srv.id} value={srv.id.toString()}>
+                  {srv.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Rango de Fechas o Limpiar */}
+          {/* Fechas */}
           <div className="flex gap-2">
-            <div className="flex-1">
+            <div className="w-1/2">
               <label htmlFor={dateFromId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
                 Desde
               </label>
@@ -381,7 +401,7 @@ export function AdminBookingsView({
                 className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
               />
             </div>
-            <div className="flex-1">
+            <div className="w-1/2">
               <label htmlFor={dateToId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
                 Hasta
               </label>
@@ -566,14 +586,26 @@ export function AdminBookingsView({
 
                       {/* Acciones */}
                       <td className="py-3 pl-3 pr-6 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBooking(b)}
-                          className="p-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] hover:bg-[var(--line)] text-[var(--ink)] transition-colors cursor-pointer"
-                          title="Ver detalle de la reserva"
-                        >
-                          <Eye size={13} />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBooking(b)}
+                            className="p-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] hover:bg-[var(--line)] text-[var(--ink)] transition-colors cursor-pointer"
+                            title="Ver detalle de la reserva"
+                          >
+                            <Eye size={13} />
+                          </button>
+                          {(b.estado === 'CONFIRMADA' || b.estado === 'PENDIENTE_PAGO') && onCancelBooking && (
+                            <button
+                              type="button"
+                              onClick={() => setBookingToCancel(b)}
+                              className="p-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                              title="Cancelar reserva administrativamente"
+                            >
+                              <Ban size={13} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -674,6 +706,18 @@ export function AdminBookingsView({
               </div>
             </div>
 
+            {(selectedBooking.estado === 'CONFIRMADA' || selectedBooking.estado === 'PENDIENTE_PAGO') && onCancelBooking && (
+              <div className="pt-2 border-t border-[var(--line)] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBookingToCancel(selectedBooking)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all cursor-pointer"
+                >
+                  <Ban size={13} /> Anular Reserva Administrativamente
+                </button>
+              </div>
+            )}
+
             {/* Liquidación Monetaria */}
             <div className="pt-2 border-t border-[var(--line)]">
               <div className="flex justify-between py-1">
@@ -718,6 +762,15 @@ export function AdminBookingsView({
           </div>
         </Modal>
       )}
+
+      {/* 8. Modal de Cancelación Administrativa (TSK-FE-28) */}
+      <AdminBookingCancelModal
+        booking={bookingToCancel}
+        isOpen={Boolean(bookingToCancel)}
+        onClose={() => setBookingToCancel(null)}
+        onConfirm={handleConfirmCancel}
+        isLoading={isCancelling}
+      />
     </div>
   )
 }

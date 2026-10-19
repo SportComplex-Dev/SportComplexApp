@@ -4,7 +4,7 @@ import type {
   AddToCartValidationResult,
   CheckoutRedirection,
 } from '../types/cart';
-import type { LockCartPayload, SingleLockPayload } from '../types/booking';
+import type { ContinuousLockCartPayload, LockCartPayload, SingleLockPayload } from '../types/booking';
 import { formatMoney } from '../utils/formatters';
 import { getBogotaDateAfter, getBogotaTodayISO } from '../utils/date';
 
@@ -152,6 +152,26 @@ export function buildLockCartPayload(cart: CartItem[], defaultDate: string): Loc
         cantidadCupos: 1,
       };
     }),
+  };
+}
+
+/** Construye el payload atómico de una sola cancha/servicio con franjas contiguas. */
+export function buildContinuousLockCartPayload(
+  serviceId: number,
+  slots: DynamicTimeSlot[],
+  date: string,
+): ContinuousLockCartPayload {
+  if (slots.length < 2) throw new Error('Se requieren al menos dos franjas continuas.');
+  const sorted = [...slots].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const continuity = validateContinuousSlots(sorted);
+  if (!continuity.valid) throw new Error(continuity.message);
+
+  return {
+    serviceId,
+    franjas: sorted.map((slot) => ({
+      inicio: new Date(`${date}T${slot.startTime}:00-05:00`).toISOString(),
+      fin: new Date(`${date}T${slot.endTime}:00-05:00`).toISOString(),
+    })),
   };
 }
 

@@ -72,6 +72,7 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [automation/workflows.md](./automation/workflows.md) | Workflows n8n por funcionalidad: OTP, QR, contingencia (con reintentos), reporte gerencial, festivos, cobro fallido, gestión de errores |
 | [automation/webhooks.md](./automation/webhooks.md) | Integración de webhooks Stripe/Resend y sistema de contingencia |
 | [automation/implementation-guide.md](./automation/implementation-guide.md) | Guía práctica de integración n8n en el backend |
+| [automation/plantilla-correo-ticket.md](./automation/plantilla-correo-ticket.md) | Plantilla de correo y pase QR transaccional (TSK-FE-37) |
 
 ## Infraestructura y despliegue
 

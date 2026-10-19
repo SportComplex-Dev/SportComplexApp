@@ -285,7 +285,11 @@ export async function createBookingHoldCart(input: {
       },
     });
 
-    const expiresAt = new Date(now.getTime() + HOLD_TTL_MINUTES * 60_000);
+    // Stripe usa expiración en segundos Unix. Redondear el origen al segundo
+    // alinea el vencimiento persistido con `expires_at` sin exceder los 30 min.
+    const expiresAt = new Date(
+      Math.floor(now.getTime() / 1000) * 1000 + HOLD_TTL_MINUTES * 60_000,
+    );
     const bookings = [];
     let total = 0;
 
@@ -337,6 +341,40 @@ export async function createBookingHoldCart(input: {
 
     return { bookings, total: Number(total.toFixed(2)), expiresAt };
   });
+}
+
+/**
+ * TSK-BE-30: valida las franjas consecutivas de un mismo servicio y delega
+ * su bloqueo atómico en la misma transacción multi-ítem.
+ */
+export async function createContinuousBookingHoldCart(input: {
+  items: CartItemInput[];
+  userId: string;
+}, now = new Date()): Promise<CartBookingResult> {
+  if (input.items.length < 2) {
+    throw new BookingError("La reserva continua requiere al menos 2 franjas.", "INVALID_CART_SIZE", 400);
+  }
+  const serviceId = input.items[0]?.serviceId;
+  if (input.items.some((item) => item.serviceId !== serviceId || item.cantidadCupos !== 1)) {
+    throw new BookingError(
+      "Las franjas continuas deben pertenecer al mismo servicio y reservar un cupo.",
+      "INVALID_CONTINUOUS_CART",
+      400,
+    );
+  }
+  for (let index = 0; index < input.items.length; index += 1) {
+    const item = input.items[index]!;
+    const start = new Date(item.startTime).getTime();
+    const end = new Date(item.endTime).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw new BookingError("La franja continua tiene un rango horario inválido.", "VALIDATION_ERROR", 400);
+    }
+    if (index > 0 && start !== new Date(input.items[index - 1]!.endTime).getTime()) {
+      throw new BookingError("Las franjas de la reserva deben ser consecutivas y estar ordenadas.", "NON_CONTIGUOUS_SLOTS", 400);
+    }
+  }
+
+  return createBookingHoldCart(input, now);
 }
 
 export async function createBookingHold(input: {

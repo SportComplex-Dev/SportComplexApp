@@ -82,7 +82,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="admin-nav-label">GESTIÓN</span>
           {navigation.map(({ name, icon: Icon, href }) => {
             const isCurrent =
-              pathname === href || (href === '/admin/catalog' && pathname === '/admin/services')
+              pathname === href ||
+              (href === '/admin' && pathname === '/admin/dashboard') ||
+              (href === '/admin/catalog' && pathname === '/admin/services')
             return (
               <Link key={href} href={href} className={isCurrent ? 'admin-nav-active' : ''}>
                 <Icon size={17} />

@@ -28,6 +28,7 @@ export {
 
 export {
   createBookingHoldCart,
+  createContinuousBookingHoldCart,
   createBookingHold,
   ESTADOS_OCUPAN_TITULAR,
   lockAvailability,

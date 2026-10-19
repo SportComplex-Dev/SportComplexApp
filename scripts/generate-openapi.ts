@@ -81,6 +81,7 @@ const KNOWN_REQUEST_SCHEMAS: Record<string, string> = {
   "/api/admin/services/categories": "CreateCategoriaInput",
   "/api/admin/services/categories/{id}": "UpdateCategoriaInput",
   "/api/admin/employees": "CreateEmployeeInput",
+  "/api/admin/bookings/{id}/cancel": "AdminBookingCancelInput",
   "/api/auth/login": "LoginInput",
   "/api/auth/register": "RegisterInput",
   "/api/auth/forgot-password": "ForgotPasswordInput",
@@ -124,9 +125,56 @@ const SCHEMA_EXPORTS: Record<string, string> = {
   BotTicketQuery: "botTicketQuerySchema",
   AnalyticsQueryInput: "analyticsQuerySchema",
   AdminBookingsQuery: "adminBookingsQuerySchema",
+  AdminBookingCancelInput: "adminBookingCancelSchema",
 };
 
 const SCHEMA_OVERRIDES: Record<string, unknown> = {
+  CartCheckoutRequest: {
+    description:
+      "Carrito compatible con el formato multi-servicio existente o con franjas consecutivas de un mismo servicio.",
+    oneOf: [
+      {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            minItems: 2,
+            items: {
+              type: "object",
+              required: ["serviceId", "startTime", "endTime"],
+              properties: {
+                serviceId: { type: "integer", minimum: 1 },
+                startTime: { type: "string", format: "date-time" },
+                endTime: { type: "string", format: "date-time" },
+                cantidadCupos: { type: "integer", minimum: 1, default: 1 },
+              },
+            },
+          },
+        },
+      },
+      {
+        type: "object",
+        required: ["serviceId", "franjas"],
+        properties: {
+          serviceId: { type: "integer", minimum: 1 },
+          franjas: {
+            type: "array",
+            minItems: 2,
+            description: "Debe estar ordenado y cada franja debe iniciar cuando termina la anterior.",
+            items: {
+              type: "object",
+              required: ["inicio", "fin"],
+              properties: {
+                inicio: { type: "string", format: "date-time" },
+                fin: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
   ForgotPasswordInput: {
     type: "object",
     required: ["email"],

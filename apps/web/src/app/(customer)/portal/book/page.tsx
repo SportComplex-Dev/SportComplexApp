@@ -9,7 +9,9 @@ import {
 } from '@sportcomplex/core';
 import {
   buildLockCartPayload,
+  buildContinuousLockCartPayload,
   buildSingleLockPayload,
+  calculateMultiSlotPricing,
   generateDynamicTimeSlots,
   getBogotaDateAfter,
   getNumericServiceId,
@@ -84,6 +86,18 @@ export default function BookPage() {
 
   const basePricePerHour = activeService.price;
 
+  const displayCart = useMemo(() => {
+    if (cart.length !== 1 || selectedSlots.length < 2) return cart;
+    const item = cart[0]!;
+    const lastSlot = [...selectedSlots].sort((a, b) => a.startTime.localeCompare(b.startTime)).at(-1);
+    if (!lastSlot) return cart;
+    return [{
+      ...item,
+      endTime: lastSlot.endTime,
+      price: calculateMultiSlotPricing(basePricePerHour, selectedSlots.length, isMember).total,
+    }];
+  }, [cart, selectedSlots, basePricePerHour, isMember]);
+
   function handleDateChange(newDate: string) {
     setDate(newDate);
     const newSlots = generateDynamicTimeSlots(newDate);
@@ -102,10 +116,10 @@ export default function BookPage() {
 
   function handleSlotsChange(slots: DynamicTimeSlot[]) {
     if (cart.length > 0 && selectedSlots.length > 0) {
-      const firstOld = selectedSlots[0]?.startTime;
-      const firstNew = slots[0]?.startTime;
-      if (firstOld !== firstNew) {
-        setMessage('Vacía el carrito antes de cambiar de horario para mantener los servicios en la misma franja.');
+      const sameSelection = slots.length === selectedSlots.length &&
+        slots.every((slot, index) => slot.startTime === selectedSlots[index]?.startTime);
+      if (!sameSelection) {
+        setMessage('Vacía el carrito antes de cambiar las franjas seleccionadas.');
         return;
       }
     }
@@ -138,6 +152,11 @@ export default function BookPage() {
     }
 
     const numericId = getNumericServiceId(service.id);
+
+    if (selectedSlots.length > 1 && cart.length > 0) {
+      setMessage('Una reserva de varias horas continuas solo puede incluir un servicio.');
+      return;
+    }
 
     const validation = validateCanAddToCart(cart, {
       serviceId: service.id,
@@ -176,6 +195,7 @@ export default function BookPage() {
   function handleClearCart() {
     setCart([]);
     setSelectedSlot(null);
+    setSelectedSlots([]);
     setMessage('');
     setCheckoutError('');
   }
@@ -196,12 +216,17 @@ export default function BookPage() {
     setCheckoutError('');
 
     try {
-      const isMulti = cart.length >= 2;
-      const endpoint = isMulti ? '/api/bookings/lock-cart' : '/api/bookings/lock';
+      const isContinuous = cart.length === 1 && selectedSlots.length >= 2;
+      const isMultiService = cart.length >= 2;
+      const endpoint = isContinuous || isMultiService
+        ? '/api/bookings/lock-cart'
+        : '/api/bookings/lock';
 
-      const payload = isMulti
-        ? buildLockCartPayload(cart, date)
-        : buildSingleLockPayload(cart[0], date);
+      const payload = isContinuous
+        ? buildContinuousLockCartPayload(cart[0]!.numericServiceId, selectedSlots, date)
+        : isMultiService
+          ? buildLockCartPayload(cart, date)
+          : buildSingleLockPayload(cart[0]!, date);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -292,7 +317,7 @@ export default function BookPage() {
               Elige tu espacio. <span className="text-[#c9ef75]">Arma tu plan.</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-5 text-white/75">
-              Selecciona una fecha y franja; después combina dos o más servicios distintos que quieras en el mismo horario y págalos juntos.
+              Selecciona una franja o varias horas consecutivas para un servicio. También puedes combinar servicios distintos en una misma franja.
             </p>
           </div>
         </header>
@@ -319,7 +344,7 @@ export default function BookPage() {
           />
 
           <Cart
-            cart={cart}
+            cart={displayCart}
             onRemoveService={handleRemoveService}
             onClearCart={handleClearCart}
             onReviewSelection={handleReviewSelection}
@@ -332,7 +357,7 @@ export default function BookPage() {
       <BookingSummaryModal
         isOpen={reviewOpen}
         onClose={() => setReviewOpen(false)}
-        cart={cart}
+        cart={displayCart}
         onProceedToPayment={handleProceedToPayment}
         isProcessing={isProcessingPayment}
         checkoutError={checkoutError}

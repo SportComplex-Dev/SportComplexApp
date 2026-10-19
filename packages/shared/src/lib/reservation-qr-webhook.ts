@@ -12,6 +12,7 @@ export interface ReservationQrWebhookPayload {
   franjaHoraria?: string;
   qrPayload?: string;
   qrImageUrl?: string;
+  html?: string;
   appUrl?: string;
   usuario?: {
     nombre?: string;

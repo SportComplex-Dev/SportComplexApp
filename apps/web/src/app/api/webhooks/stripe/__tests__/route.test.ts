@@ -196,6 +196,9 @@ test("TSK-BE-34 / SCRUM-239: webhook responde HTTP 200 en < 2 segundos y despach
     assert.ok(n8nPayloadCaptured.qrPayload, "Debe incluir el qrPayload");
     assert.ok(n8nPayloadCaptured.qrImageUrl, "Debe incluir la URL de la imagen QR");
     assert.ok(n8nPayloadCaptured.qrImageUrl.includes(encodeURIComponent(n8nPayloadCaptured.qrPayload)));
+    assert.ok(n8nPayloadCaptured.html, "Debe incluir el HTML transaccional renderizado (TSK-FE-37)");
+    assert.ok(n8nPayloadCaptured.html.includes("<!DOCTYPE html>"), "Debe contener DOCTYPE HTML");
+    assert.ok(n8nPayloadCaptured.html.includes("AKROS Active Lifestyle Club"), "Debe reflejar la identidad AKROS");
   } finally {
     globalThis.fetch = prevFetch;
   }
