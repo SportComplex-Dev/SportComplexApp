@@ -3781,6 +3781,28 @@ button { cursor: pointer; }
   object-fit: cover;
 }
 
+/* html5-qrcode calcula el ancho del <video> en px con `clientWidth` del
+   contenedor al momento de arrancar y NUNCA le pone altura. Si el contenedor
+   estaba oculto (display:none) el ancho queda en 0px -> la cámara enciende
+   pero no se ve nada; si está visible, el video (cuadrado) se desborda del
+   contenedor. Se fuerza a llenar la caja en ambos lectores. */
+.scanner-reader video,
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
+}
+
+/* La región de escaneo que inyecta la librería se llama
+   `<elementId>__scan_region`; con React 19 `useId()` el id es `reader-«r0»`,
+   así que se selecciona por sufijo y no por un id literal. */
+.scanner-reader [id$="__scan_region"],
+#qr-reader [id$="__scan_region"] {
+  width: 100%;
+  height: 100%;
+}
+
 .scanner-reader #reader__dashboard {
   color: var(--scanner-text);
 }

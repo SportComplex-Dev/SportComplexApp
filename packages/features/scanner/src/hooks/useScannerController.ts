@@ -19,6 +19,14 @@ import {
   useNetworkResilience,
 } from "@sportcomplex/shared/hooks";
 
+/** Espera a que el navegador aplique el layout (dos frames) antes de medir. */
+function esperarLayout(): Promise<void> {
+  if (typeof requestAnimationFrame !== "function") return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
 export function useScannerController() {
   const { isOnline, executeWithRetry, getCachedTicket, setCachedTicket } =
     useNetworkResilience();
@@ -252,6 +260,15 @@ export function useScannerController() {
 
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
+
+      // FIX: el contenedor #qr-reader está `hidden` (display:none) mientras la
+      // cámara está apagada. html5-qrcode dimensiona el <video> con
+      // `parentElement.clientWidth` al arrancar: si se arranca con el
+      // contenedor oculto, ese ancho es 0 y la imagen queda en 0px (la cámara
+      // enciende pero no se ve nada). Se muestra el contenedor ANTES de
+      // arrancar y se espera a que el navegador aplique el layout.
+      setConsultationCameraActive(true);
+      await esperarLayout();
 
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode("qr-reader");
