@@ -4,7 +4,7 @@ import {
   compensateFailedCheckout,
   createBookingHold,
 } from "@sportcomplex/db";
-import { createStripeCheckoutSession } from "@sportcomplex/core";
+import { createStripeCheckoutSession, STRIPE_MIN_AMOUNT_COP } from "@sportcomplex/core";
 import { bookingRequestSchema } from "@sportcomplex/validation";
 import { fail, created } from '@sportcomplex/shared/lib';
 
@@ -57,6 +57,18 @@ export async function POST(request: Request) {
       canal,
       vendedorId,
     });
+
+    const holdTotal = Number(hold.total);
+    if (holdTotal < STRIPE_MIN_AMOUNT_COP) {
+      await compensateFailedCheckout(hold.id).catch((compErr) => {
+        console.error("Fallo compensando el bloqueo tras error de monto mínimo:", compErr);
+      });
+      return fail(
+        "AMOUNT_BELOW_STRIPE_MINIMUM",
+        `El valor de la reserva ($${holdTotal.toLocaleString("es-CO")} COP) es inferior al mínimo permitido por Stripe ($${STRIPE_MIN_AMOUNT_COP.toLocaleString("es-CO")} COP).`,
+        400,
+      );
+    }
 
     // Stripe Checkout Session (fuera de cualquier transacción).
     let checkout;

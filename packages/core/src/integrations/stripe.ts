@@ -89,13 +89,18 @@ export function stripeAmountToMonto(amount: number): string {
   return (amount / 100).toFixed(2);
 }
 
-/** Convierte un total decimal (COP) a centavos enteros para Stripe. */
+/** Convierte un total decimal (COP) a centavos enteros para Stripe y valida el monto mínimo. */
 export function toStripeAmountCents(
   total: number | string | { toString(): string },
+  options?: { allowBelowMin?: boolean; minAmount?: number },
 ): number {
   const numeric = Number(String(total));
   if (!Number.isFinite(numeric) || numeric <= 0) {
     throw new Error("INVALID_CHECKOUT_AMOUNT");
+  }
+  const min = options?.minAmount ?? STRIPE_MIN_AMOUNT_COP;
+  if (!options?.allowBelowMin && numeric < min) {
+    throw new Error(`AMOUNT_BELOW_STRIPE_MINIMUM: El monto ($${numeric.toLocaleString("es-CO")} COP) es inferior al mínimo aceptado por Stripe ($${min.toLocaleString("es-CO")} COP).`);
   }
   const cents = Math.round(numeric * 100);
   if (!Number.isSafeInteger(cents) || cents <= 0) {

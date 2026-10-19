@@ -24,6 +24,7 @@ export default function ServiceBookingPage() {
 
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedSlotTime, setSelectedSlotTime] = useState('')
+  const [selectedSlotEndTime, setSelectedSlotEndTime] = useState('')
   const [attendees, setAttendees] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -46,10 +47,14 @@ export default function ServiceBookingPage() {
 
   const handleConfirmReservation = () => {
     setIsModalOpen(false)
+    // Store the full time range "HH:mm-HH:mm" so checkout can match the exact DB slot
+    const timeRange = selectedSlotEndTime
+      ? `${selectedSlotTime}-${selectedSlotEndTime}`
+      : selectedSlotTime
     setDraft({
       itemId: item.id,
       date: selectedDate,
-      time: selectedSlotTime,
+      time: timeRange,
       attendees: effectiveAttendees,
     })
     notify(
@@ -135,9 +140,11 @@ export default function ServiceBookingPage() {
               onSelectDate={(date) => {
                 setSelectedDate(date)
                 setSelectedSlotTime('')
+                setSelectedSlotEndTime('')
               }}
               onSelectSlot={(slot) => {
                 setSelectedSlotTime(slot.time)
+                setSelectedSlotEndTime(slot.endTime ?? '')
               }}
             />
           </div>

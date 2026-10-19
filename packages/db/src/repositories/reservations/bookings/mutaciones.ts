@@ -340,7 +340,7 @@ export async function createBookingHoldCart(input: {
     }
 
     return { bookings, total: Number(total.toFixed(2)), expiresAt };
-  });
+  }, { timeout: 15000 });
 }
 
 /**
@@ -506,5 +506,5 @@ export async function createBookingHold(input: {
         },
       },
     });
-  });
+  }, { timeout: 15000 });
 }

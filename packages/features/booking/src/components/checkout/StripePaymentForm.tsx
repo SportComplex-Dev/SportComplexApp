@@ -81,7 +81,9 @@ export function PaymentForm({ onSuccess }: { onSuccess?: (() => void) | undefine
     try {
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
-        confirmParams: { return_url: window.location.href },
+        confirmParams: {
+          return_url: `${window.location.origin}/confirmation`,
+        },
         redirect: "if_required",
       });
 
