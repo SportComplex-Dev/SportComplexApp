@@ -138,14 +138,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
         }
       }, 1800)
     } catch {
-      // Graceful fallback para cuando el backend aún no está disponible
-      setSuccess(true)
-      setToastMessage('Contraseña actualizada exitosamente')
-      setTimeout(() => {
-        if (router) {
-          router.push('/login')
-        }
-      }, 1800)
+      setError('Ocurrió un error de red al intentar actualizar la contraseña. Por favor intenta de nuevo.')
     } finally {
       setLoading(false)
     }

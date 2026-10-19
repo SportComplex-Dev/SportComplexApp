@@ -47,6 +47,7 @@ pnpm dev
 ```
 
 Variables: copiar `apps/web/.env.example` a `apps/web/.env.local`.
+Guía paso a paso (de dónde obtener cada valor, reset de admin, troubleshooting): `docs/infra/env-setup.md`.
 Infra local (n8n) sin dominios: ver [`docs/infra/local-dev.md`](./docs/infra/local-dev.md).
 
 ## Convenciones

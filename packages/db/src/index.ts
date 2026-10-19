@@ -10,8 +10,14 @@ export * from "./repositories/payments/receipts";
 export * from "./repositories/payments/contingencies";
 export * from "./repositories/people/employees";
 export * from "./repositories/people/memberships";
+export type {
+  AdminMembershipOverview,
+  AdminMembershipSegment,
+  CreateMembershipInput,
+} from "./repositories/people/memberships.types";
 export * from "./repositories/access/tickets";
 export * from "./repositories/access/verification-tokens";
+export * from "./repositories/access/password-reset";
 export * from "./repositories/catalog/services";
 export * from "./repositories/catalog/tournaments";
 export * from "./repositories/catalog/analytics";

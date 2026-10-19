@@ -23,6 +23,16 @@ SCRUM-*.xml
 # Credenciales locales generadas por scripts de migración (NO versionar)
 .auth-passwords.local.txt
 
+# Backups locales de producción (TSK-BD-01): dumps, artefactos GPG y snapshots
+# de identidades de Supabase Auth. Solo viven en el bucket privado `backups`.
+backups/
+*.gpg
+*auth_users_snapshot*.json
+
+# Reportes de auditoría de purga (TSK-BD-02): IDs de registros eliminados.
+# Contienen PII/UUIDs de producción; custodiar localmente o fuera de git.
+packages/db/purge-reports/
+
 # Git Worktrees locales
 .worktrees/
 
