@@ -2,7 +2,7 @@
 
 import { ArrowRight, CalendarCheck, X } from 'lucide-react'
 import { formatDate, type CatalogItem } from '@sportcomplex/core'
-import { Button, cn } from '@sportcomplex/ui'
+import { ActionButton, cn } from '@sportcomplex/ui'
 import { formatMoney } from '../../utils/formatters'
 
 export interface ReservationModalProps {
@@ -59,13 +59,13 @@ export function ReservationModal({
             {formatMoney(total)} <small>COP</small>
           </b>
         </div>
-        <Button
+        <ActionButton
           type="button"
-          onClick={proceed}
+          onClick={() => proceed()}
           className={cn('action-button w-full justify-center')}
         >
           Continuar al pago <ArrowRight size={16} />
-        </Button>
+        </ActionButton>
         <button type="button" onClick={close} className="modal-cancel">
           Seguir explorando
         </button>
