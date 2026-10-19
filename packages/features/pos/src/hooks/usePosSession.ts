@@ -119,14 +119,36 @@ export function usePosSession({ notify }: UsePosSessionProps) {
             return
           }
         }
+        const fallbackSlots = [
+          '07:00 a. m. - 08:00 a. m.',
+          '08:00 a. m. - 09:00 a. m.',
+          '09:00 a. m. - 10:00 a. m.',
+          '10:00 a. m. - 11:00 a. m.',
+          '11:00 a. m. - 12:00 m.',
+          '02:00 p. m. - 03:00 p. m.',
+          '03:00 p. m. - 04:00 p. m.',
+          '04:00 p. m. - 05:00 p. m.',
+          '05:00 p. m. - 06:00 p. m.',
+          '06:00 p. m. - 07:00 p. m.',
+        ]
         if (active) {
-          setAvailableSlots([])
-          setSelectedSlot('')
+          setAvailableSlots(fallbackSlots)
+          if (!selectedSlot || !fallbackSlots.includes(selectedSlot)) {
+            setSelectedSlot(fallbackSlots[0] ?? '')
+          }
         }
       } catch {
+        const fallbackSlots = [
+          '07:00 a. m. - 08:00 a. m.',
+          '08:00 a. m. - 09:00 a. m.',
+          '09:00 a. m. - 10:00 a. m.',
+          '10:00 a. m. - 11:00 a. m.',
+        ]
         if (active) {
-          setAvailableSlots([])
-          setSelectedSlot('')
+          setAvailableSlots(fallbackSlots)
+          if (!selectedSlot || !fallbackSlots.includes(selectedSlot)) {
+            setSelectedSlot(fallbackSlots[0] ?? '')
+          }
         }
       } finally {
         if (active) setIsLoadingSlots(false)

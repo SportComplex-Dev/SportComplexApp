@@ -205,6 +205,11 @@ export function PosCatalogSelector({
                 </button>
               )
             })}
+            {availableSlots.length === 0 && !isLoadingSlots && (
+              <p className="text-[11px] text-[var(--subtle)] col-span-2 py-3 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--line)]">
+                No hay franjas disponibles registradas para esta fecha.
+              </p>
+            )}
           </div>
         </div>
 
