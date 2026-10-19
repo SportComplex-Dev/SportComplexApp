@@ -1,12 +1,25 @@
 /**
  * Helper centralizado de URLs de assets CDN (TSK-FE-30b · HU-29).
- * Capa 0: sin dependencias internas. Fallback seguro a CDN de Supabase Storage.
+ * Capa 0: sin dependencias internas.
+ *
+ * Sin host hardcodeado: la base se deriva de `NEXT_PUBLIC_SUPABASE_URL`
+ * (horneada en build) + el bucket público, así cambiar de proyecto Supabase no
+ * obliga a tocar código. `NEXT_PUBLIC_ASSETS_BASE_URL` sigue mandando cuando
+ * está definida (override explícito, p. ej. un CDN externo).
  */
-const DEFAULT_ASSETS_CDN =
-  "https://phyesjwtzrmrcvmtajay.supabase.co/storage/v1/object/public/sportcomplex-assets";
+const ASSETS_BUCKET = "sportcomplex-assets";
 
 function getAssetsBase(): string {
-  return process.env.NEXT_PUBLIC_ASSETS_BASE_URL || DEFAULT_ASSETS_CDN;
+  const explicit = process.env.NEXT_PUBLIC_ASSETS_BASE_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(
+    /\/+$/,
+    "",
+  );
+  return supabaseUrl
+    ? `${supabaseUrl}/storage/v1/object/public/${ASSETS_BUCKET}`
+    : "";
 }
 
 export function getAssetUrl(path: string): string {

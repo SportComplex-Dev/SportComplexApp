@@ -69,7 +69,7 @@ Infra local (n8n) sin dominios: ver [`docs/infra/local-dev.md`](./docs/infra/loc
 
 ## Entornos Supabase
 
-- `prod` (ref `phyesjwtzrmrcvmtajay`) y `develop` (`ouemmmwpygmizyvtcpuc`): credenciales solo en secrets del environment `production` / `.env` local, nunca en git.
+- `prod` (ref `ouemmmwpygmizyvtcpuc`) y `develop` (ref `phyesjwtzrmrcvmtajay`, heredado con los datos históricos): credenciales solo en secrets del environment `production` / `.env` local, nunca en git.
 - Backup cifrado: `pg_dump -Fc` + `openssl enc -aes-256-cbc -pbkdf2 -iter 100000`; custodiar el `.enc` y destruir el plano.
 - Ventana domingos 02:00–04:00 COT; purga de usuarios de prueba con scripts `purge-test-users` (dry-run primero).
 - Bootstrap prod idempotente con `SEED_ADMIN_PASSWORD` (soporta `--rotate-password`).

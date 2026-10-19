@@ -30,7 +30,7 @@ Si el login responde `401 "Credenciales incorrectas"`, el 90% de las veces es qu
 
 ## 2. Supabase (obligatorio)
 
-Proyecto compartido del equipo: **`phyesjwtzrmrcvmtajay`**.
+Proyectos del equipo: **producción `ouemmmwpygmizyvtcpuc`** (donde apunta el `.env` del VPS y los secrets del environment `production`) y **desarrollo `phyesjwtzrmrcvmtajay`** (heredado, conserva los datos históricos). Pide las credenciales del proyecto que te toque; nunca las mezcles entre entornos.
 
 ### 2.1 URL y API keys
 
