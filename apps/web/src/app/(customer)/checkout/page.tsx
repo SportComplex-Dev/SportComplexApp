@@ -8,7 +8,7 @@ import {
   Lock, ShieldCheck, AlertCircle, Loader2,
 } from 'lucide-react'
 import {
-  calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
+  calculateBookingPrice, categoryBySlug, formatDate, formatMoney, resolveCatalogServiceId,
 } from '@sportcomplex/core'
 import {
   CheckoutTimer,
@@ -157,8 +157,8 @@ function CheckoutContent() {
       }
 
       try {
-        const serviceId = Number(currentItem.id)
-        if (isNaN(serviceId) || serviceId <= 0) {
+        const serviceId = resolveCatalogServiceId(currentItem)
+        if (!serviceId || serviceId <= 0) {
           setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
           setIsCreatingReservation(false)
           creatingRef.current = false
