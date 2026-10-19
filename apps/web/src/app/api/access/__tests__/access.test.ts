@@ -182,10 +182,11 @@ test("TSK-BE-31: modificar la ventana persistida invalida la firma HMAC del tick
   assert.equal(mock._state.lecturas.length, 0);
 });
 
-test("TSK-BE-11 (CRITERIO): UUID alterado con firma válida de otro código se rechaza sin tocar la BD", async () => {
+test("TSK-BE-11: UUID alterado se rechaza sin escribir; el formato con ventana requiere leer la fila antes del HMAC", async () => {
   seed();
-  // UUID con formato válido pero distinto del que firmó el QR: la firma ya no
-  // corresponde. Debe fallar en la verificación HMAC, ANTES de consultar la BD.
+  // UUID con formato válido pero distinto del que firmó el QR. Por compatibilidad
+  // con tickets de ventana, el escáner consulta la fila antes de validar el HMAC;
+  // una firma inválida nunca crea auditoría ni modifica el ticket.
   const alterado = "9f0d6f4e-0000-4000-8000-00000000beef";
   await assert.rejects(
     () =>

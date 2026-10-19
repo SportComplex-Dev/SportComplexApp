@@ -402,7 +402,6 @@ async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise
                 );
                 if (emitido) {
                   ticketQrEmitido = true;
-                  ticketReservaId ??= rId;
                 }
               }
             }

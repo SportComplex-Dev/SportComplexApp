@@ -457,6 +457,9 @@ importers:
       '@sportcomplex/domain':
         specifier: workspace:*
         version: link:../domain
+      '@sportcomplex/security':
+        specifier: workspace:*
+        version: link:../security
       '@sportcomplex/seed':
         specifier: workspace:*
         version: link:../seed

@@ -52,6 +52,7 @@ export function crearReservaHandler(state: MockState) {
           typeof where.disponibilidadId !== "object" &&
           reservation.disponibilidadId !== where.disponibilidadId
         ) return false;
+        if (where?.pagoId !== undefined && reservation.pagoId !== where.pagoId) return false;
         if (typeof where?.estado === "string" && reservation.estado !== where.estado) return false;
         if (Array.isArray(where?.estado?.in) && !where.estado.in.includes(reservation.estado)) {
           return false;

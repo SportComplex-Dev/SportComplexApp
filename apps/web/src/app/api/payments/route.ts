@@ -224,6 +224,8 @@ export async function POST(request: Request) {
       confirmadas &&
       confirmadas.length > 0
     ) {
+      // ticketReservaId solo se informa para el QR único consolidado; los
+      // demás carritos deben despachar un comprobante por cada reserva pagada.
       const ticketReservaIds = resultado.ticketReservaId
         ? [resultado.ticketReservaId]
         : confirmadas;

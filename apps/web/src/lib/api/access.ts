@@ -101,8 +101,11 @@ export async function procesarEscaneo(
   input: EscaneoInput,
   options: EscaneoOptions,
 ): Promise<EscaneoResultado> {
-  // Los tickets consolidados firman también el rango almacenado, así que se
-  // carga la fila para validar exactamente la ventana que usará el escáner.
+  // Trade-off TSK-BE-31: las firmas legacy se pueden prevalidar antes de DB,
+  // pero los tickets consolidados firman la ventana almacenada en la fila.
+  // Para distinguir ambos formatos compatibles, se carga la fila y luego se
+  // valida el HMAC. La ruta exige credenciales del lector; no se escribe ni
+  // registra una lectura hasta que la firma queda validada.
   const now = options.now ?? new Date();
   const db = options.db;
   const legacySignatureValid = verifyTicketSignature(input.ticketId, input.signature, options.qrSecret);

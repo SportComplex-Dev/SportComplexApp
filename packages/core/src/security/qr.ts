@@ -1,26 +1,16 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+export { signTicket, verifyTicketSignature } from "@sportcomplex/security";
 
-// RNF-03 + ARCHITECTURE §8.2: QR = UUIDv4 + HMAC-SHA256 servidor. Validar firma antes de DB.
+// RNF-03 + ARCHITECTURE §8.2: QR = UUIDv4 + HMAC-SHA256 del servidor.
 export function newTicketId(): string {
   return randomUUID();
 }
 
-export function signTicket(ticketId: string, secret: string): string {
-  return createHmac("sha256", secret).update(ticketId).digest("hex");
-}
-
-export function verifyTicketSignature(ticketId: string, signature: string, secret: string): boolean {
-  const expected = signTicket(ticketId, secret);
-  if (expected.length !== signature.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
-  return diff === 0;
-}
-
 // TSK-BE-19 — contenido del QR del comprobante: `SC1:<uuid>:<firma>`.
 // El ID y la firma viajan JUNTOS en el QR porque el escáner (RF-13) solo
-// necesita leer una vez; el par se separa aquí y se valida en el servidor
-// (`verifyTicketSignature`) antes de tocar la base de datos.
+// necesita leer una vez; el par se separa aquí y se valida en el servidor.
+// Para tickets legacy la firma se puede prevalidar sin DB; los tickets con
+// ventana consolidada requieren leer su rango persistido antes de verificar.
 export const TICKET_QR_PREFIX = "SC1";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FIRMA_RE = /^[0-9a-f]{64}$/i;
