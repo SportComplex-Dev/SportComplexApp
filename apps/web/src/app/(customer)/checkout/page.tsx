@@ -212,7 +212,7 @@ function CheckoutContent() {
 
         // Consultar disponibilidad real del DB para encontrar el endTime exacto de la franja
         // Esto resuelve el problema de franjas de 90 min en la DB vs 60 min en el frontend
-        let resolvedStartTime = interval.startTime
+        const resolvedStartTime = interval.startTime
         let resolvedEndTime = interval.endTime
 
         try {
@@ -223,25 +223,21 @@ function CheckoutContent() {
             const availData = await availRes.json() as { data?: Array<{ franja?: { horaInicio?: string; horaFin?: string }; fecha?: string }> }
             const startDate = new Date(interval.startTime)
             const startHHMM = `${String(startDate.getUTCHours()).padStart(2, '0')}:${String(startDate.getUTCMinutes()).padStart(2, '0')}`
-            // Ajuste de offset -05:00 → UTC: e.g. 07:00 COT = 12:00 UTC
-            const bogotaOffset = -5
-            const startHHMMCOT = String(startDate.getUTCHours() + bogotaOffset).padStart(2, '0') + ':' + String(startDate.getUTCMinutes()).padStart(2, '0')
+            const bogotaHour = (startDate.getUTCHours() - 5 + 24) % 24
+            const cotHHMM = `${String(bogotaHour).padStart(2, '0')}:${String(startDate.getUTCMinutes()).padStart(2, '0')}`
 
             const matchedSlot = (availData.data ?? []).find((slot) => {
               const dbStart = slot.franja?.horaInicio?.slice(0, 5) // "07:00"
-              return dbStart === startHHMM || dbStart === bogotaOffset < 0
-                ? String((startDate.getUTCHours() + bogotaOffset + 24) % 24).padStart(2, '0') + ':' + String(startDate.getUTCMinutes()).padStart(2, '0') === dbStart
-                : dbStart === startHHMMCOT
+              return dbStart === startHHMM || dbStart === cotHHMM
             })
 
             if (matchedSlot?.franja?.horaFin) {
               // Usar el endTime real de la franja de la DB
               const dbEndHHMM = matchedSlot.franja.horaFin.slice(0, 5) // "08:30"
-              const [endH, endM] = dbEndHHMM.split(':').map(Number)
-              const endDate = new Date(currentDraft.date + 'T00:00:00.000-05:00')
-              endDate.setHours(endDate.getHours() + (endH ?? 0))
-              endDate.setMinutes(endDate.getMinutes() + (endM ?? 0))
-              resolvedEndTime = endDate.toISOString()
+              const endDate = new Date(`${currentDraft.date}T${dbEndHHMM}:00.000-05:00`)
+              if (!Number.isNaN(endDate.getTime())) {
+                resolvedEndTime = endDate.toISOString()
+              }
             }
           }
         } catch {
