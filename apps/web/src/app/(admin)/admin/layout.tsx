@@ -84,7 +84,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const isCurrent =
               pathname === href ||
               (href === '/admin' && pathname === '/admin/dashboard') ||
-              (href === '/admin/catalog' && pathname === '/admin/services')
+              (href === '/admin/catalog' && pathname === '/admin/services') ||
+              (href !== '/admin' && pathname.startsWith(href))
             return (
               <Link key={href} href={href} className={isCurrent ? 'admin-nav-active' : ''}>
                 <Icon size={17} />
