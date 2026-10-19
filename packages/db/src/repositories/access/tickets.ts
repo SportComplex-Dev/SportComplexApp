@@ -51,6 +51,8 @@ export interface TicketParaEscaneo {
   estado: "EMITIDO" | "USADO";
   usadoPor: string | null;
   usadoEn: Date | null;
+  inicioValidez: Date | null;
+  finValidez: Date | null;
   reserva: {
     id: string;
     estado: string;

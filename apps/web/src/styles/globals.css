@@ -5523,8 +5523,32 @@ button { cursor: pointer; }
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-.admin-menu-trigger:active {
-  transform: scale(0.95);
+@media (min-width: 768px) {
+  .admin-menu-trigger {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-menu-trigger {
+    display: grid !important;
+  }
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-admin-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-menu-admin-topbar .user-dropdown {
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
 }
 
 .admin-drawer-portal {

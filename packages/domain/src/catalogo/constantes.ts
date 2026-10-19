@@ -1,4 +1,5 @@
 import type { CategoriaServicio } from "./tipos.js";
+import { getAssetUrl } from "../assets.js";
 
 export const sedes = ["Poblado", "Laureles"] as const;
 
@@ -11,7 +12,7 @@ export const categoriasServicio: CategoriaServicio[] = [
     icon: "court",
     tone: "lime",
     unit: "hora",
-    image: "/images/catalogo/canchas.webp",
+    image: getAssetUrl("/catalogo/categoria-canchas.webp"),
     tagline: "Instalaciones de alto nivel",
     highlight: "Césped sintético, polvo de ladrillo y pistas de pádel panorámicas con iluminación nocturna.",
   },
@@ -23,7 +24,7 @@ export const categoriasServicio: CategoriaServicio[] = [
     icon: "pool",
     tone: "blue",
     unit: "entrada",
-    image: "/images/catalogo/piscinas.webp",
+    image: getAssetUrl("/catalogo/categoria-piscinas.webp"),
     tagline: "Espacios acuáticos climatizados",
     highlight: "Carriles semiolímpicos de entrenamiento y zona recreativa infantil.",
   },
@@ -35,7 +36,7 @@ export const categoriasServicio: CategoriaServicio[] = [
     icon: "gym",
     tone: "orange",
     unit: "sesión",
-    image: "/images/catalogo/gimnasio.webp",
+    image: getAssetUrl("/catalogo/categoria-gimnasio.webp"),
     tagline: "Fuerza, rendimiento y bienestar",
     highlight: "Equipamiento biomecánico de última generación y zonas de entrenamiento funcional.",
   },
@@ -47,7 +48,7 @@ export const categoriasServicio: CategoriaServicio[] = [
     icon: "wellness",
     tone: "purple",
     unit: "acceso",
-    image: "/images/catalogo/zona-humeda.webp",
+    image: getAssetUrl("/catalogo/categoria-zona-humeda.webp"),
     tagline: "Recuperación y relajación integral",
     highlight: "Circuito de sauna seco, baño turco aromatizado y jacuzzis de hidromasaje.",
   },
