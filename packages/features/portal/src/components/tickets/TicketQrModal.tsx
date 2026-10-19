@@ -1,33 +1,31 @@
 'use client'
 
-import { Download, ShieldCheck, Printer, X } from 'lucide-react'
+import { Download, ShieldCheck, X } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { formatDate } from '@sportcomplex/core'
 import { QRGraphicHD } from '../passes/QrGraphic'
 import { AccessWindowIndicator } from '../passes/AccessWindowIndicator'
+import { ReceiptPdfLink } from '../passes/ReceiptPdfLink'
 import type { PortalTicket } from '../../utils/portal-utils'
 
 export interface TicketQrModalProps {
   ticket: PortalTicket | null
   onClose: () => void
-  onPrintTicket: (ticket: PortalTicket) => void
   onDownloadQr?: (ticket: PortalTicket) => void
   downloading?: boolean
-  printing?: boolean
 }
 
 /**
  * Único modal de pase digital (consolida PortalQrModal + antiguo QrModal).
- * La acción de descarga es opcional: el dashboard la omite (solo impresión),
- * la vista de tickets la incluye.
+ * La descarga del PNG es opcional: el dashboard la omite, la vista de tickets
+ * la incluye. El comprobante siempre se ofrece en PDF (el cliente no imprime
+ * en la térmica: eso es del operador en taquilla).
  */
 export function TicketQrModal({
   ticket,
   onClose,
-  onPrintTicket,
   onDownloadQr,
   downloading = false,
-  printing = false,
 }: TicketQrModalProps) {
   const shouldReduceMotion = useReducedMotion()
   if (!ticket) return null
@@ -108,14 +106,7 @@ export function TicketQrModal({
                 <Download size={15} /> Descargar Imagen QR (PNG)
               </button>
             )}
-            <button
-              type="button"
-              className="calendar-shortcut text-xs py-2 px-4 gap-2"
-              disabled={printing}
-              onClick={() => onPrintTicket(ticket)}
-            >
-              <Printer size={15} /> {onDownloadQr ? 'Imprimir Recibo (58mm)' : 'Imprimir / PDF'}
-            </button>
+            <ReceiptPdfLink reservaId={ticket.id} className="calendar-shortcut text-xs py-2 px-4 gap-2" label="Descargar PDF" />
             <button
               type="button"
               className="calendar-shortcut text-xs py-2 px-4"

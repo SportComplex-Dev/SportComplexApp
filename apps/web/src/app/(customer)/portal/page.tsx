@@ -8,7 +8,6 @@ import { useLastCode } from '@sportcomplex/shared/lib'
 import { useToday } from '@sportcomplex/shared/lib'
 import { usePublicCatalog } from '@sportcomplex/features-booking'
 import {
-  PrintableReceipt,
   useCustomerPortal,
   UpcomingBookingCard,
   PortalBookingsList,
@@ -25,14 +24,13 @@ export default function CustomerDashboardPage() {
   const {
     activeTab, setActiveTab, next, activeBookings, historyBookings,
     cancelledBookings, currentTabItems, selectedTicket, setSelectedTicket,
-    printingTicket, printingQrUrl, handlePrintTicket,
   } = useCustomerPortal(session?.name, today)
 
   const userName = session?.name ? session.name.split(' ').slice(0, 2).join(' ') : 'Cliente'
 
   return (
     <>
-      <main className="section-shell app-page no-print">
+      <main className="section-shell app-page">
         {/* Cabecera de bienvenida personalizada */}
         <div className="welcome-row">
           <div>
@@ -60,7 +58,7 @@ export default function CustomerDashboardPage() {
           activeTab={activeTab} setActiveTab={setActiveTab}
           activeBookings={activeBookings} historyBookings={historyBookings}
           cancelledBookings={cancelledBookings} currentTabItems={currentTabItems}
-          onOpenQR={setSelectedTicket} onPrintTicket={handlePrintTicket} onSelectCode={setLastCode}
+          onOpenQR={setSelectedTicket} onSelectCode={setLastCode}
         />
 
         {/* Sección Hecho para Ti: Catálogo de Servicios */}
@@ -68,10 +66,7 @@ export default function CustomerDashboardPage() {
       </main>
 
       {/* Modal QR de Alta Definición para Torniquetes (RF-12 / RF-10) */}
-      <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} onPrintTicket={handlePrintTicket} />
-
-      {/* Comprobante en formato imprimible PDF */}
-      <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} />
+      <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
     </>
   )
 }

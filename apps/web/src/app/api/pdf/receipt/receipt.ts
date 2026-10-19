@@ -120,7 +120,7 @@ export function leerMembrete(
     return texto ? texto : null;
   };
   return {
-    entidad: limpio(env.RECEIPT_ENTIDAD) ?? "SportComplex — Complejo Deportivo",
+    entidad: limpio(env.RECEIPT_ENTIDAD) ?? "Akros Latam",
     nit: limpio(env.RECEIPT_NIT),
     direccion: limpio(env.RECEIPT_DIRECCION),
     telefono: limpio(env.RECEIPT_TELEFONO),

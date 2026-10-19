@@ -15,7 +15,7 @@
 > **Criterio de Prevalencia y Ajustes Recientes:**  
 > En orden cronológico, los requerimientos detallados priman sobre el *Gist* inicial. En la presente revisión se incorporan definiciones críticas de arquitectura:
 > 1. **Modelo 100% Cashless:** Toda transacción monetaria (en línea y en taquilla presencial) se procesa exclusivamente vía **Stripe**. Queda totalmente eliminado el manejo de dinero en efectivo.
-> 2. **Simulación de Impresión en PDF:** Se prescinde de impresoras térmicas físicas de punto de venta. La emisión de tiquetes se efectúa mediante generación y simulación de impresión en formato **PDF** digital.
+> 2. **Simulación de Impresión en PDF:** Se prescinde de impresoras térmicas físicas de punto de venta. La emisión de tiquetes se efectúa mediante generación y simulación de impresión en formato **PDF** digital. *(Enmendado por [ADR 008](../architecture/adrs/008-impresion-termica-navegador.md): la taquilla imprime tickets en la térmica de 58 mm por Bluetooth o USB desde el navegador; el cliente solo descarga el PDF.)*
 > 3. **Landing Page Estática:** El punto de entrada al dominio principal del complejo es un portal web estático institucional con vitrina de servicios y redirección a login/registro.
 > 4. **API de Festivos Nager Holidays:** El cálculo de lunes festivos para la regla de piscinas se integra directamente con la API externa **Nager.Date**.
 
@@ -73,7 +73,7 @@ El sistema abarcará los siguientes módulos funcionales y técnicos:
 
 Los siguientes elementos quedan formalmente excluidos del proyecto:
 1. **Recepción o Custodia de Dinero en Efectivo:** El sistema no dispondrá de módulos de apertura de caja menor, arqueo de billetes ni registro de pagos en efectivo; toda transacción física presencial se canalizará mediante Stripe.
-2. **Controladores para Impresoras Térmicas de Hardware:** No se desarrollará soporte para hardware de impresión térmica ni protocolos ESC/POS; la emisión se resuelve mediante simulación a documento PDF.
+2. **Controladores para Impresoras Térmicas de Hardware:** No se desarrollarán drivers de impresora. *(Enmendado por [ADR 008](../architecture/adrs/008-impresion-termica-navegador.md): el POS genera bytes ESC/POS de 58 mm y los envía por Bluetooth o USB desde el navegador, sin drivers propios; el resto de la emisión sigue en PDF.)*
 3. **Reversiones Bancarias Automáticas ante Contingencia:** La inhabilitación administrativa no ejecuta devoluciones directas vía API de Stripe; actúa como placeholder hacia n8n para reprogramaciones o gestión manual.
 4. **Cancelaciones Voluntarias por Autoservicio del Cliente:** El usuario no dispone de cancelación o reembolso autónomo desde su panel.
 5. **Aplicaciones Móviles Nativas:** No se generarán instalables de tiendas (iOS/Android); toda la solución opera sobre navegadores web modernos.
@@ -421,7 +421,7 @@ graph TD
 * **Fuente:** Requerimientos Detallados (Sección 8).
 
 ### 7.5. RNF-05: Generación y Simulación de Impresión en Formato PDF Estándar
-* **Descripción:** El sistema prescindirá de dependencias con impresoras térmicas de hardware. En su lugar, el módulo POS y el portal de clientes generarán comprobantes digitales en formato **PDF** estructurado, compatible con cualquier lector PDF estándar y optimizado con reglas `@media print` para emular el formato de recibo o factura comercial con su código QR centrado de alta legibilidad.
+* **Descripción:** El sistema prescindirá de dependencias con impresoras térmicas de hardware. En su lugar, el módulo POS y el portal de clientes generarán comprobantes digitales en formato **PDF** estructurado, compatible con cualquier lector PDF estándar y optimizado con reglas `@media print` para emular el formato de recibo o factura comercial con su código QR centrado de alta legibilidad. *(Enmendado por [ADR 008](../architecture/adrs/008-impresion-termica-navegador.md): el PDF de 58 mm se genera en el servidor (`GET /api/pdf/receipt/file`) a partir del mismo bitmap que el POS imprime en la térmica; solo el operador imprime en papel y el cliente descarga el PDF.)*
 * **Fuente:** Refinamiento: *"sobretodo el RNF 05 ya que realmente no se va a imprimir nada sino que se va a hacer una simulacion mandando a imprimir como pdf"*.
 
 ### 7.6. RNF-06: Arquitectura y Plataforma Next.js
@@ -652,7 +652,7 @@ sequenceDiagram
 ### 12.1. Decisiones Acordadas y Ratificadas con el Cliente
 * **Decisión 1 (Landing Page Inicial):** Al ingresar al dominio raíz del complejo, el usuario visualiza una página web estática informativa con el catálogo de instalaciones y enlaces directos a login/registro.
 * **Decisión 2 (Modelo 100% Cashless):** Se elimina el efectivo en su totalidad. Las ventas en taquilla física se cobran exclusivamente mediante la pasarela Stripe.
-* **Decisión 3 (Simulación de Impresión en PDF):** No se utilizarán impresoras térmicas físicas. Los comprobantes con código QR se generan y descargan como archivos PDF estándar.
+* **Decisión 3 (Simulación de Impresión en PDF):** No se utilizarán impresoras térmicas físicas. Los comprobantes con código QR se generan y descargan como archivos PDF estándar. *(Enmendado por [ADR 008](../architecture/adrs/008-impresion-termica-navegador.md): la taquilla imprime tickets en la térmica de 58 mm por Bluetooth o USB desde el navegador; el cliente solo descarga el PDF.)*
 * **Decisión 4 (Integración con Nager.Date API):** La verificación de festivos oficiales en Colombia para el mantenimiento de piscinas se realiza a través de la API externa Nager Holidays.
 * **Decisión 5 (Multirreserva Concurrente):** Un mismo usuario puede contratar múltiples reservas en servicios diferentes durante la misma franja horaria.
 * **Decisión 6 (TTL de Bloqueo Temporal, revisada):** El temporizador de retención de franja durante el proceso de pago se fija en **30 minutos**, alineado al mínimo de plataforma de Stripe Checkout Sessions (`expires_at >= 30 min`). *(Originalmente 15 minutos; ajustado en TSK-BE-09.)*

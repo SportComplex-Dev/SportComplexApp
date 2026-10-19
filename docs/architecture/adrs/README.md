@@ -9,3 +9,4 @@
 - [005-localizacion-imagenes.md](./005-localizacion-imagenes.md) — Imágenes localizadas — catálogo sin dependencia de CDNs externos.
 - [006-grafo-dependencias.md](./006-grafo-dependencias.md) — Grafo acíclico de dependencias — dirección y reglas entre capas.
 - [007-mapeo-campos-compatibilidad.md](./007-mapeo-campos-compatibilidad.md) — Mapeo de campos contractuales — nomenclatura TS vs columnas SQL.
+- [008-impresion-termica-navegador.md](./008-impresion-termica-navegador.md) — Impresión térmica en taquilla desde el navegador (Bluetooth o USB) — solo el operador imprime; el cliente descarga el PDF.

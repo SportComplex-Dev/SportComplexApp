@@ -56,11 +56,9 @@ test('TicketListItem: renders confirmed booking details and full action suite', 
   const html = renderToStaticMarkup(
     <TicketListItem
       booking={mockConfirmedBooking}
-      isPrinting={false}
       downloadingId={null}
       onOpenQR={() => {}}
       onDownloadQR={() => {}}
-      onPrint={() => {}}
       onSelectCode={() => {}}
     />
   )
@@ -75,7 +73,8 @@ test('TicketListItem: renders confirmed booking details and full action suite', 
   // Actions for confirmed booking
   assert.ok(html.includes('Ver QR de Acceso'), 'Debe renderizar botón para ver QR')
   assert.ok(html.includes('Descargar QR'), 'Debe renderizar botón para descargar QR')
-  assert.ok(html.includes('Imprimir Recibo (58mm)'), 'Debe renderizar botón para recibo térmico')
+  assert.ok(html.includes('Descargar PDF'), 'Debe ofrecer el comprobante en PDF')
+  assert.ok(!html.includes('Imprimir'), 'El cliente no imprime: eso es del operador en taquilla')
   assert.ok(html.includes('Pase Digital'), 'Debe renderizar enlace al pase digital')
   assert.ok(html.includes('/confirmation'), 'Enlace de pase digital debe dirigir a /confirmation')
 })
@@ -84,18 +83,16 @@ test('TicketListItem: renders past or used booking with re-booking and receipt a
   const html = renderToStaticMarkup(
     <TicketListItem
       booking={mockUsedBooking}
-      isPrinting={false}
       downloadingId={null}
       onOpenQR={() => {}}
       onDownloadQR={() => {}}
-      onPrint={() => {}}
       onSelectCode={() => {}}
     />
   )
 
   assert.ok(html.includes('Pase Fitness Gimnasio'), 'Debe mostrar el servicio usado')
   assert.ok(html.includes('Usada'), 'Debe mostrar el badge Usada')
-  assert.ok(html.includes('Imprimir Recibo (58mm)'), 'Debe permitir imprimir recibo de reservas pasadas')
+  assert.ok(html.includes('Descargar PDF'), 'Debe permitir descargar el recibo de reservas pasadas')
   assert.ok(html.includes('Reservar de nuevo'), 'Debe ofrecer enlace para reservar de nuevo')
   assert.ok(html.includes('/services'), 'Enlace debe dirigir a /services')
 
@@ -108,15 +105,13 @@ test('TicketListItem: renders cancelled booking correctly and handles loading st
   const htmlCancelled = renderToStaticMarkup(
     <TicketListItem
       booking={mockCancelledBooking}
-      isPrinting={true}
       downloadingId="book-canc-103"
       onOpenQR={() => {}}
       onDownloadQR={() => {}}
-      onPrint={() => {}}
       onSelectCode={() => {}}
     />
   )
 
   assert.ok(htmlCancelled.includes('Cancelada'), 'Debe mostrar badge Cancelada')
-  assert.ok(htmlCancelled.includes('disabled=""'), 'Botones deben reflejar estado de carga cuando isPrinting es true')
+  assert.ok(htmlCancelled.includes('destinatario=PORTAL'), 'El recibo de una cancelada también se descarga en PDF')
 })
