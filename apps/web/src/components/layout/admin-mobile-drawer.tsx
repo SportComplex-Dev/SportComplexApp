@@ -148,7 +148,8 @@ export function AdminMobileDrawer({
             const isCurrent =
               pathname === href ||
               (href === '/admin' && pathname === '/admin/dashboard') ||
-              (href === '/admin/catalog' && pathname === '/admin/services')
+              (href === '/admin/catalog' && pathname === '/admin/services') ||
+              (href !== '/admin' && pathname.startsWith(href))
             return (
               <Link
                 key={href}

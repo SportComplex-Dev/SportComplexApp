@@ -105,6 +105,15 @@ jobs:
             else
               echo "AVISO: INTERNAL_API_KEY ausente en APPS_WEB_ENV; /api/internal/* responderá 503"
             fi
+            # 5d. Secret HMAC de restablecimiento de contraseña web<->n8n.
+            #     Vive en APPS_WEB_ENV (apps/web/.env); se propaga a docker/.env
+            #     para que el workflow n8n valide X-SportComplex-Signature.
+            HMAC_KEY=$(grep -E '^N8N_PASSWORD_RESET_HMAC_SECRET=' ~/SportComplexApp/apps/web/.env | tail -n 1 | cut -d= -f2-)
+            if [ -n "$HMAC_KEY" ]; then
+              sed -i '/^N8N_PASSWORD_RESET_HMAC_SECRET=/d' ~/SportComplexApp/docker/.env 2>/dev/null || true
+              printf 'N8N_PASSWORD_RESET_HMAC_SECRET=%s\n' "$HMAC_KEY" >> ~/SportComplexApp/docker/.env
+              chmod 600 "$HOME/SportComplexApp/docker/.env"
+            fi
 
             # 6. Migrar y levantar web/caddy (n8n se levanta tras el import)
             sudo docker compose up migrate        # prisma migrate deploy (sale solo)

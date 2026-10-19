@@ -3,8 +3,17 @@ import fs from "node:fs";
 
 const isCI = !!process.env.CI;
 const systemChromium = "/usr/bin/chromium";
-const hasSystemChromium = process.platform === "linux" && fs.existsSync(systemChromium);
-const chromiumExecutable = process.env.CHROMIUM_PATH || (hasSystemChromium ? systemChromium : undefined);
+const winChromium = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const hasSystemChromium =
+  (process.platform === "linux" && fs.existsSync(systemChromium)) ||
+  (process.platform === "win32" && fs.existsSync(winChromium));
+const chromiumExecutable =
+  process.env.CHROMIUM_PATH ||
+  (process.platform === "win32" && fs.existsSync(winChromium)
+    ? winChromium
+    : hasSystemChromium
+      ? systemChromium
+      : undefined);
 
 export default defineConfig({
   testDir: "./e2e",

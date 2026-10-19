@@ -14,6 +14,7 @@ import {
   ScannerCameraView,
   ManualEntryCard,
   ShiftScannerView,
+  ExpiredSlotScreen,
 } from "@sportcomplex/features-scanner";
 import { useOptionalApp } from "@/components/layout/app-provider";
 
@@ -22,6 +23,12 @@ export default function ScannerPage() {
   const app = useOptionalApp();
   const session = app?.session;
   const logout = app?.logout;
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as unknown as { __scannerScanTurno?: (payload: string) => void }).__scannerScanTurno = c.handleScanTurno;
+    }
+  }, [c.handleScanTurno]);
 
   return (
     <main data-scanner-theme={c.theme} className="min-h-screen bg-[var(--app-bg)] text-[var(--ink)] p-4 sm:p-6 lg:p-8">
@@ -130,6 +137,15 @@ export default function ScannerPage() {
               onToggleFacingMode={c.toggleFacingMode} onOpenCamera={c.handleOpenCameraTurno}
               onScan={c.handleScanTurno} onCameraError={c.handleCameraErrorTurno}
             />
+            <div className="max-w-4xl mx-auto">
+              <ManualEntryCard
+                showManualInput={c.showManualInput} setShowManualInput={c.setShowManualInput}
+                manualPayload={c.manualPayload} setManualPayload={c.setManualPayload}
+                manualTicketId={c.manualTicketId} setManualTicketId={c.setManualTicketId}
+                manualSignature={c.manualSignature} setManualSignature={c.setManualSignature}
+                consultationLoading={c.isRedeeming} onSubmit={c.handleManualSubmit}
+              />
+            </div>
             <TicketValidationModal
               isOpen={c.isModalOpen} state={c.flowState} ticket={c.ticket} message={c.modalMessage}
               employeeName={session?.name ?? ""} isRedeeming={c.isRedeeming} isOnline={c.isOnline}
@@ -139,6 +155,20 @@ export default function ScannerPage() {
               <ZoneMismatchScreen
                 message={c.zoneMismatch.message} ticketId={c.zoneMismatch.ticketId}
                 postServiceName={c.activeShift.courtName} onContinue={c.handleScanNextTurno}
+              />
+            )}
+            {c.expiredSlot && (
+              <ExpiredSlotScreen
+                userName={c.expiredSlot.userName}
+                ticketId={c.expiredSlot.ticketId}
+                reservationId={c.expiredSlot.reservationId}
+                targetCourtName={c.expiredSlot.targetCourtName}
+                expiredDetails={c.expiredSlot.expiredDetails}
+                message={c.expiredSlot.message}
+                onContinue={() => {
+                  c.setExpiredSlot(null);
+                  c.handleScanNextTurno();
+                }}
               />
             )}
           </div>

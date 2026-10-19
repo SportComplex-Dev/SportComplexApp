@@ -41,6 +41,7 @@ export interface AdminMembershipsViewProps {
   data?: AdminMembershipOverviewData | null
   isLoading?: boolean
   onRefresh?: () => void
+  initialTab?: MembershipSegmentTab
 }
 
 /** Formatea fechas con zona horaria America/Bogota sin desfases */
@@ -64,8 +65,9 @@ export function AdminMembershipsView({
   data,
   isLoading = false,
   onRefresh,
+  initialTab = 'active',
 }: AdminMembershipsViewProps) {
-  const [activeTab, setActiveTab] = useState<MembershipSegmentTab>('active')
+  const [activeTab, setActiveTab] = useState<MembershipSegmentTab>(initialTab)
   const [searchQuery, setSearchQuery] = useState('')
 
   const activeMembers = data?.segments?.active ?? []
