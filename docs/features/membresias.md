@@ -203,6 +203,33 @@ El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el
 ### Testing
 `packages/features/portal/src/utils/__tests__/membership-utils.test.ts` (cálculo de desglose, formato, flujos de suscripción y errores).
 
+---
+
+## Consola de Membresías en Administración (TSK-FE-29 / HU-35)
+
+### Contexto
+La administración requiere auditar y monitorear los ingresos recurrentes y el estado de la base de socios del complejo deportivo desde una interfaz dedicada en `/admin/memberships`.
+
+### Cómo funciona
+- **Componente**: `AdminMembershipsView` (`packages/features/admin/src/dashboard/AdminMembershipsView.tsx` y re-exportado en `components/dashboard`).
+- **Vista Web**: `apps/web/src/app/(admin)/admin/memberships/page.tsx` conectado al contrato `GET /api/admin/memberships`.
+- **Pestañas Interactivas (Segmentación en Memoria)**:
+  - **Activas**: Clientes con membresía vigente (`estado = VIGENTE` y `proximaRenovacion >= now`). Muestra contador reactivo y fechas de inicio/renovación.
+  - **Sin Membresía**: Clientes registrados en el sistema sin registros en la tabla de membresías (público potencial).
+  - **Histórico**: Clientes cuyo historial está compuesto por membresías vencidas o canceladas.
+- **KPIs de Retención y Fidelización**:
+  - `Socios Activos`: Conteo total de clientes al día con membresía.
+  - `Tasa de Renovación`: Porcentaje histórico de clientes que han renovado o tenido más de una membresía.
+  - `Nuevos del Mes`: Altas registradas en los últimos 30 días.
+  - `Sin Membresía`: Conteo de clientes libres/ocasionales.
+- **Búsqueda en Tiempo Real**: Input de filtrado instantáneo en memoria por nombre del cliente o identificador (ID).
+- **Zona Horaria y Resiliencia**: Manejo de fechas normalizado a `America/Bogota` (COT) y manejo de estados de carga y error con botón de refresco interactivo.
+
+### Verificación y Tests
+- `packages/features/admin/src/dashboard/admin-memberships-view.test.ts` (16 pruebas unitarias aprobadas).
+- `apps/web/src/app/(admin)/admin/memberships/__tests__/memberships-page.test.tsx` (Pruebas de render y accesibilidad).
+
 ## Trazabilidad
 
-> Ref histórica: HU-20 (RF-16) · rama `feature/tsk-bd-11-persistencia-membresias-catalogo` · Fase F0
+> Ref histórica: HU-20 / HU-35 (RF-16) · tareas `TSK-BE-28` y `TSK-FE-29` · rama `feature/SC-217-admin-memberships-view` · Fase F3
+
