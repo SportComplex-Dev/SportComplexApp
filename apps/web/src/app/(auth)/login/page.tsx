@@ -12,7 +12,7 @@ import { Brand } from '@/components/brand/brand'
 import { ThemeToggle, useThemeToggle } from '@/components/layout/theme-toggle'
 import { ActionButton } from '@sportcomplex/ui'
 import { GoogleMark } from '@/components/brand/google-mark'
-import { useApp } from '@/components/layout/app-provider'
+import { useOptionalApp } from '@/components/layout/app-provider'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 
@@ -32,8 +32,14 @@ function getSafeNextPath() {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { login: syncLogin } = useApp()
+  let router: ReturnType<typeof useRouter> | null = null
+  try {
+    router = useRouter()
+  } catch {
+    // Fallback defensivo para entornos de prueba sin RouterContext
+  }
+  const app = useOptionalApp()
+  const syncLogin = app?.login
   const { dark, toggleTheme } = useThemeToggle()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,8 +75,8 @@ export default function LoginPage() {
 
       if (session?.user) {
         const role = getUserRole(session.user.role)
-        router.replace(getSafeNextPath() ?? roleHome[role])
-        router.refresh()
+        router?.replace(getSafeNextPath() ?? roleHome[role])
+        router?.refresh()
         return
       }
 
@@ -122,8 +128,8 @@ export default function LoginPage() {
 
       if (!res.ok || !result?.success) {
         if (result?.error?.code === 'ACCOUNT_PENDING') {
-          router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
-          router.refresh()
+          router?.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
+          router?.refresh()
           return
         }
         setError(result?.error?.message || 'Correo o contraseña incorrectos.')
@@ -133,10 +139,10 @@ export default function LoginPage() {
       // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
       const role: Role = result.data.user.role
       if (result.data.user) {
-        syncLogin(result.data.user.email, result.data.user.name, result.data.user.role)
+        syncLogin?.(result.data.user.email, result.data.user.name, result.data.user.role)
       }
-      router.push(getSafeNextPath() ?? roleHome[role])
-      router.refresh()
+      router?.push(getSafeNextPath() ?? roleHome[role])
+      router?.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.')
     } finally {
@@ -205,7 +211,12 @@ export default function LoginPage() {
                 />
               </label>
               <label>
-                Contraseña
+                <div className="flex items-center justify-between">
+                  <span>Contraseña</span>
+                  <Link href="/forgot-password" className="forgot-link text-xs">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
                 <Input
                   type="password"
                   value={password}

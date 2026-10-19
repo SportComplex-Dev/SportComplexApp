@@ -566,3 +566,4 @@ El panel monolítico original fue refactorizado en subcomponentes especializados
 ## Trazabilidad
 
 > Ref histórica: HU-21 (RF-18 / RN-10) · SCRUM-141 · ramas de auth (OAuth, verificación, empleados y roles)
+> Recuperación y restablecimiento de contraseñas: ver [recuperacion-contrasena.md](./recuperacion-contrasena.md) (TSK-FE-33 / HU-38 / RF-01)
