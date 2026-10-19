@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Coffee, QrCode, ScanLine, ShieldCheck, Utensils, Wifi, Zap } from 'lucide-react'
+import { getAssetUrl } from "@sportcomplex/core/assets";
 
 export function LifestyleAndDigitalPass() {
   return (
@@ -12,7 +13,7 @@ export function LifestyleAndDigitalPass() {
         <div className="lifestyle-card">
           <div className="lifestyle-media">
             <Image
-              src="/images/catalogo/sports-bar-lounge.webp"
+              src={getAssetUrl("/catalogo/sports-bar-lounge.webp")}
               alt="AKROS Club Lounge y Café Saludable"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"

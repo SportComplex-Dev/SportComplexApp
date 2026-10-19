@@ -5,5 +5,4 @@ export * from "./components/display/Badge";
 export * from "./components/forms/Input";
 export * from "./components/dialogs/Modal";
 export * from "./components/forms/ActionButton";
-export * from "./templates/ticket-receipt";
 export * from "./lib/utils";

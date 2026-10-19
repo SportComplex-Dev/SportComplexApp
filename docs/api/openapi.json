@@ -1638,6 +1638,50 @@
           }
         }
       }
+    },
+    "/api/pdf/receipt/file": {
+      "get": {
+        "tags": [
+          "Portal"
+        ],
+        "summary": "GET /api/pdf/receipt/file",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
+    "/api/pos/tickets/lookup": {
+      "get": {
+        "tags": [
+          "POS"
+        ],
+        "summary": "GET /api/pos/tickets/lookup",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
     }
   }
 }

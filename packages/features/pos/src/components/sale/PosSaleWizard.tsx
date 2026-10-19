@@ -33,16 +33,20 @@ import { PosPaymentStripe } from '../billing/PosPaymentStripe'
 import { PosVoucherModal } from '../billing/PosVoucherModal'
 import { PosAltLinkModal } from '../billing/PosAltLinkModal'
 import type { usePosSession } from '../../hooks/usePosSession'
+import { useThermalPrinter, type ThermalPrinter } from '../../hooks/useThermalPrinter'
 
 export interface PosSaleWizardProps {
   sellerName?: string
   pos: ReturnType<typeof usePosSession>
+  printer?: ThermalPrinter
 }
 
 export type WizardStepId = 1 | 2 | 3
 
-export function PosSaleWizard({ sellerName, pos }: PosSaleWizardProps) {
+export function PosSaleWizard({ sellerName, pos, printer }: PosSaleWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStepId>(1)
+  const defaultPrinter = useThermalPrinter()
+  const activePrinter = printer ?? defaultPrinter
 
   // Validaciones de paso
   const isStep1Complete = Boolean(pos.currentService && pos.selectedSlot)
@@ -609,7 +613,7 @@ export function PosSaleWizard({ sellerName, pos }: PosSaleWizardProps) {
                 isMember={pos.isMember}
                 isProcessing={pos.isProcessing}
                 processStep={pos.processStep}
-                onProcessPayment={pos.handleProcessStripePayment}
+                isTestMode={pos.isStripeTestMode}
                 onGenerateAltLink={pos.handleGenerateAltLink}
               />
             </div>
@@ -624,15 +628,17 @@ export function PosSaleWizard({ sellerName, pos }: PosSaleWizardProps) {
         <PosVoucherModal
           booking={pos.confirmedBooking}
           {...(sellerName ? { sellerName } : {})}
-          receiptQrUrl={pos.receiptQrUrl}
-          onPrint={() => window.print()}
+          comprobante={pos.receiptComprobante}
+          printer={activePrinter}
           onNextSale={handleResetWizard}
         />
       )}
 
       <PosAltLinkModal
         isOpen={pos.isAltLinkModalOpen}
-        onClose={() => pos.setIsAltLinkModalOpen(false)}
+        onClose={pos.handleCloseAltLink}
+        waiting={pos.isAwaitingPayment}
+        testMode={pos.isStripeTestMode}
         altLinkUrl={pos.altLinkUrl}
         altLinkQrUrl={pos.altLinkQrUrl}
         copiedLink={pos.copiedLink}

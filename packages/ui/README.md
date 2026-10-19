@@ -4,13 +4,12 @@
 
 ## Qué es
 
-Chrome genérico y primitivas planas React 19 + Tailwind 4 + `motion`: Button, Card, Dialog, Badge, Input, Modal, ActionButton, ConfirmDialog, TicketReceipt, `cn`. Sin lógica de negocio.
+Chrome genérico y primitivas planas React 19 + Tailwind 4 + `motion`: Button, Card, Dialog, Badge, Input, Modal, ActionButton, ConfirmDialog, `cn`. Sin lógica de negocio.
 
 ## Estructura / Exports
 
 ```
 src/components/{forms/{Button,Input,ActionButton},dialogs/{Dialog,Modal},display/{Card,Badge}}
-src/templates/ticket-receipt.tsx
 src/lib/utils.ts  # cn()
 src/index.ts
 ```

@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  LogOut,
   Menu,
   Moon,
   Search,
@@ -43,7 +44,7 @@ const navigation: { name: string; icon: LucideIcon; href: string }[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { session, notify, toast, closeToast, dark, setDark } = useApp()
+  const { notify, toast, closeToast, dark, setDark, logout } = useApp()
   const today = useToday()
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), [])
@@ -57,7 +58,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         (item.href !== '/admin' && pathname.startsWith(item.href))
     )?.name ?? 'Resumen'
   const pending = 0
-  const initials = session?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'AD'
 
   return (
     <main className={`admin-shell club-app ${dark ? 'dark' : ''}`}>
@@ -159,7 +159,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Activity size={17} />
               <i />
             </button>
-            <span className="admin-avatar">{initials}</span>
+            <button
+              type="button"
+              className="admin-icon-button logout-button"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              onClick={() => logout()}
+              data-testid="admin-topbar-logout-button"
+            >
+              <LogOut size={17} />
+            </button>
+            <UserMenu variant="admin-topbar" />
           </div>
         </header>
         <div className="admin-content">{children}</div>

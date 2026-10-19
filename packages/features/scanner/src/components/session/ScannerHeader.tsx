@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CameraOff, MicOff, Moon, RefreshCcw, Sun, Volume2 } from "lucide-react";
+import { CameraOff, LogOut, MicOff, Moon, RefreshCcw, Sun, User, Volume2 } from "lucide-react";
 
 import type { ShiftOption } from "../../types";
 
@@ -9,18 +9,22 @@ export type ScannerHeaderProps = {
   activeShift: ShiftOption | null;
   audioEnabled: boolean;
   theme: "dark" | "light";
+  employeeName?: string;
   onToggleAudio: () => void;
   onToggleTheme: () => void;
   onChangeShift: () => void;
+  onLogout?: () => void;
 };
 
 export function ScannerHeader({
   activeShift,
   audioEnabled,
   theme,
+  employeeName,
   onToggleAudio,
   onToggleTheme,
   onChangeShift,
+  onLogout,
 }: ScannerHeaderProps) {
   return (
     <motion.header
@@ -43,6 +47,13 @@ export function ScannerHeader({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {employeeName && (
+            <div className="hidden md:flex items-center gap-1.5 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-text">
+              <User className="h-3.5 w-3.5 text-brand-accent" />
+              <span className="truncate max-w-[120px]">{employeeName}</span>
+            </div>
+          )}
+
           <button
             type="button"
             aria-label={theme === "dark" ? "Activar modo claro" : "Activar modo oscuro"}
@@ -71,6 +82,20 @@ export function ScannerHeader({
             <RefreshCcw className="h-4 w-4" />
             <span className="hidden sm:inline">Cambiar puesto</span>
           </button>
+
+          {onLogout && (
+            <button
+              type="button"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              onClick={onLogout}
+              className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 cursor-pointer"
+              data-testid="scanner-header-logout-button"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Salir</span>
+            </button>
+          )}
         </div>
       </div>
     </motion.header>

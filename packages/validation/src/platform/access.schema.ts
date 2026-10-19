@@ -40,3 +40,11 @@ export const accessRedeemSchema = z.object({
 
 export type AccessRedeem = z.infer<typeof accessRedeemSchema>;
 
+
+// Reimpresión en taquilla — el operador lee el QR del pase (`SC1:<uuid>:<firma>`)
+// o escribe el UUID del boleto/reserva.
+export const ticketReprintLookupSchema = z.object({
+  codigo: z.string().trim().min(1, "Escanee el QR o escriba el código.").max(200),
+});
+
+export type TicketReprintLookup = z.infer<typeof ticketReprintLookupSchema>;

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
-  serverExternalPackages: ["@node-rs/argon2"],
+  serverExternalPackages: ["@node-rs/argon2", "@sportcomplex/automation"],
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   experimental: {
     optimizePackageImports: ["@sportcomplex/ui"],
@@ -22,7 +22,13 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "phyesjwtzrmrcvmtajay.supabase.co",
+        pathname: "/storage/v1/object/public/sportcomplex-assets/**",
+      },
+    ],
   },
 };
 

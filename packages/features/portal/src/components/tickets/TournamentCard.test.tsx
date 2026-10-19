@@ -61,7 +61,6 @@ test('TournamentCard: renders tournament details with confirmed status and actio
       tournament={mockTournamentConfirmed}
       sessionName="Carlos Socio"
       onOpenQR={() => {}}
-      onPrint={() => {}}
     />
   )
 
@@ -74,7 +73,7 @@ test('TournamentCard: renders tournament details with confirmed status and actio
 
   // Verify action buttons
   assert.ok(html.includes('Ver QR de Acceso'), 'Debe renderizar botón para ver QR')
-  assert.ok(html.includes('PDF'), 'Debe renderizar botón para comprobante PDF')
+  assert.ok(!html.includes('Imprimir'), 'El cliente no imprime tickets')
 })
 
 test('TournamentCard: renders pending payment status and notices correctly', () => {
@@ -83,7 +82,6 @@ test('TournamentCard: renders pending payment status and notices correctly', () 
       tournament={mockTournamentPending}
       sessionName="Carlos Socio"
       onOpenQR={() => {}}
-      onPrint={() => {}}
     />
   )
 
@@ -98,7 +96,6 @@ test('TournamentCard: renders free tournament indicator and alternative statuses
     <TournamentCard
       tournament={mockTournamentGratuito}
       onOpenQR={() => {}}
-      onPrint={() => {}}
     />
   )
 
@@ -119,7 +116,6 @@ test('TournamentCard: renders free tournament indicator and alternative statuses
     <TournamentCard
       tournament={tournamentFinished}
       onOpenQR={() => {}}
-      onPrint={() => {}}
     />
   )
   assert.ok(htmlFinished.includes('Pendiente Pago'), 'Estado no confirmado entra en rama secundaria')

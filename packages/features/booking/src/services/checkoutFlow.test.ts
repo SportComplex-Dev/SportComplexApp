@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  clasificarErrorReserva,
   pollPaymentConfirmation,
   resolvePaymentOutcome,
+  resolverServiceIdReserva,
 } from "./checkoutFlow";
 import type { VerificationState } from "../types/checkout";
 
@@ -190,4 +192,32 @@ test("checkoutFlow - resolvePaymentOutcome: llama onPending y NO onConfirmed si 
 
   assert.equal(confirmedCalled, false);
   assert.equal(pendingCalled, true);
+});
+
+test("resolverServiceIdReserva (#114): usa el id numérico de la BD, no el slug", () => {
+  assert.equal(resolverServiceIdReserva({ id: "tenis-cancha-1", dbId: 17 }), 17);
+  assert.equal(resolverServiceIdReserva({ id: "cancha-de-tenis-polvo-de-ladrillo", dbId: 3 }), 3);
+  assert.equal(resolverServiceIdReserva({ id: "12" }), 12);
+  assert.equal(resolverServiceIdReserva({ id: "tenis-cancha-1" }), null, "un slug sin dbId no se manda a la API");
+});
+
+test("clasificarErrorReserva (#115): distingue sesión, datos y disponibilidad por el código real", () => {
+  assert.equal(clasificarErrorReserva(401, { error: { code: "UNAUTHORIZED" } }).tipo, "sesion");
+  assert.equal(clasificarErrorReserva(403, { error: { code: "FORBIDDEN" } }).tipo, "sesion");
+
+  const datos = clasificarErrorReserva(400, { error: { code: "VALIDATION_ERROR", message: "Payload de reserva inválido." } });
+  assert.equal(datos.tipo, "datos");
+  assert.equal(datos.mensaje, "Payload de reserva inválido.");
+
+  const cupo = clasificarErrorReserva(409, { error: { code: "CAPACITY_EXCEEDED", message: "No hay cupos suficientes." } });
+  assert.equal(cupo.tipo, "disponibilidad");
+  assert.equal(cupo.mensaje, "No hay cupos suficientes.");
+  assert.equal(clasificarErrorReserva(404, { error: { code: "SLOT_NOT_FOUND" } }).tipo, "disponibilidad");
+  assert.equal(
+    clasificarErrorReserva(409, { error: { code: "TITULAR_RESERVATION_OVERLAP" } }).tipo,
+    "disponibilidad",
+    "una reserva propia que se solapa es conflicto de disponibilidad",
+  );
+
+  assert.equal(clasificarErrorReserva(500, null).tipo, "servidor");
 });

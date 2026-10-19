@@ -1,6 +1,6 @@
 'use client'
 
-import { Download, QrCode } from 'lucide-react'
+import { QrCode } from 'lucide-react'
 import { formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import type { UserTournamentItem } from '../../types/portal'
@@ -10,14 +10,12 @@ interface TournamentCardProps {
   tournament: UserTournamentItem
   sessionName?: string
   onOpenQR: (ticket: PortalTicket) => void
-  onPrint: (ticket: PortalTicket) => void
 }
 
 export function TournamentCard({
   tournament,
   sessionName,
   onOpenQR,
-  onPrint,
 }: TournamentCardProps) {
   const ins = tournament.miInscripcion
   const estadoIns = ins?.estado ?? 'CONFIRMADA'
@@ -98,14 +96,6 @@ export function TournamentCard({
               className="action-button text-xs py-2 px-3.5 gap-2"
             >
               <QrCode size={15} /> Ver QR de Acceso
-            </button>
-            <button
-              type="button"
-              onClick={() => onPrint(makeFakeBooking())}
-              className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-              title="Descargar comprobante en PDF"
-            >
-              <Download size={14} /> PDF
             </button>
           </>
         ) : (

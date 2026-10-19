@@ -14,6 +14,7 @@
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "7.10.0",
+    "@sportcomplex/automation": "workspace:*",
     "@sportcomplex/core": "workspace:*",
     "@sportcomplex/db": "workspace:*",
     "@sportcomplex/domain": "workspace:*",
@@ -22,6 +23,7 @@
     "@sportcomplex/features-scanner": "workspace:*",
     "@sportcomplex/features-tournament": "workspace:*",
     "@sportcomplex/features-pos": "workspace:*",
+    "@sportcomplex/printing": "workspace:*",
     "@sportcomplex/security": "workspace:*",
     "@sportcomplex/shared": "workspace:*",
     "@sportcomplex/ui": "workspace:*",

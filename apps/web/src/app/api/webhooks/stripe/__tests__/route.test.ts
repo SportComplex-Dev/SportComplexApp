@@ -19,6 +19,7 @@ const mock = createMockPrisma();
 // Import route handler DESPUÉS de inyectar el mock de Prisma.
 const stripeWebhookRoute = await import("@/app/api/webhooks/stripe/route");
 const paymentsRoute = await import("@/app/api/payments/route");
+const { parseTicketQrPayload, verifyTicketSignature } = await import("@sportcomplex/security");
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -116,6 +117,33 @@ function buildEventPayload(overrides: {
   return JSON.stringify(event);
 }
 
+function buildCheckoutSessionPayload(input: {
+  id: string;
+  paymentIntentId: string;
+  reservaId: string;
+  userId: string;
+  amountTotal?: number;
+}) {
+  return JSON.stringify({
+    id: `evt_${input.id}`,
+    object: "event",
+    api_version: "2024-06-20",
+    created: Math.floor(Date.now() / 1000),
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: input.id,
+        object: "checkout.session",
+        payment_intent: input.paymentIntentId,
+        payment_status: "paid",
+        amount_total: input.amountTotal ?? 7500000,
+        currency: "cop",
+        metadata: { bookingId: input.reservaId, userId: input.userId },
+      },
+    },
+  });
+}
+
 function signPayload(payload: string) {
   return stripe.webhooks.generateTestHeaderString({
     payload,
@@ -137,6 +165,109 @@ function postStripeWebhook(payload: string, signature?: string) {
 
 test("TSK-BE-34 / SCRUM-239: alias de stripe reexporta POST canónico", () => {
   assert.equal(stripeWebhookRoute.POST, paymentsRoute.POST);
+});
+
+test("TSK-BE-31: checkout.session.completed confirma reserva y emite un ticket", async () => {
+  const { reservaId, userId } = seedTestData({
+    reservaId: "res-checkout-session-be31",
+    userId: "usr-checkout-session-be31",
+  });
+  const payload = buildCheckoutSessionPayload({
+    id: "cs_checkout_session_be31",
+    paymentIntentId: "pi_checkout_session_be31",
+    reservaId,
+    userId,
+  });
+  const signature = signPayload(payload);
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200 });
+
+  try {
+    const response = await postStripeWebhook(payload, signature);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.reservaConfirmada, true);
+    assert.equal(body.data.ticketQrEmitido, true);
+    assert.equal(mock._state.reservas.find((r: any) => r.id === reservaId)?.estado, "CONFIRMADA");
+    assert.equal(mock._state.tickets.filter((t: any) => t.reservaId === reservaId).length, 1);
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test("TSK-BE-31: checkout multi-hora envía un único QR firmado para toda la ventana", async () => {
+  const userId = "usr-be31-multislot";
+  const firstId = "res-be31-multislot-1";
+  const secondId = "res-be31-multislot-2";
+  const { reserva: first, userId: seededUserId } = seedTestData({ reservaId: firstId, userId });
+  const date = new Date("2026-10-25T00:00:00.000Z");
+  const firstAvailabilityId = 901n;
+  const secondAvailabilityId = 902n;
+  first.disponibilidadId = firstAvailabilityId;
+  first.total = 75000;
+  mock._state.franjas.push(
+    { id: 901, servicioId: 1, diaSemana: 7, horaInicio: new Date("1970-01-01T14:00:00.000Z"), horaFin: new Date("1970-01-01T15:00:00.000Z") },
+    { id: 902, servicioId: 1, diaSemana: 7, horaInicio: new Date("1970-01-01T15:00:00.000Z"), horaFin: new Date("1970-01-01T16:00:00.000Z") },
+  );
+  mock._state.disponibilidades.push(
+    { id: firstAvailabilityId, servicioId: 1, franjaId: 901, fecha: date, cuposTotales: 4, cuposOcupados: 1, bloqueadaMantenimiento: false },
+    { id: secondAvailabilityId, servicioId: 1, franjaId: 902, fecha: date, cuposTotales: 4, cuposOcupados: 1, bloqueadaMantenimiento: false },
+  );
+  mock._state.reservas.push({
+    id: secondId,
+    disponibilidadId: secondAvailabilityId,
+    titularId: seededUserId,
+    estado: "PENDIENTE_PAGO",
+    cantidadCupos: 1,
+    total: 75000,
+    subtotal: 75000,
+    descuentoPct: 0,
+    pagoId: null,
+  });
+
+  const previousQrSecret = process.env.QR_HMAC_SECRET;
+  process.env.QR_HMAC_SECRET = "qr-hmac-secret-be31-test";
+  const payload = buildCheckoutSessionPayload({
+    id: "cs_checkout_be31_multislot",
+    paymentIntentId: "pi_checkout_be31_multislot",
+    reservaId: `${firstId},${secondId}`,
+    userId,
+    amountTotal: 15000000,
+  });
+  const previousFetch = globalThis.fetch;
+  const dispatched: any[] = [];
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("reservas/despacho-qr")) {
+      dispatched.push(JSON.parse(String(init?.body)));
+    }
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  };
+
+  try {
+    const response = await postStripeWebhook(payload, signPayload(payload));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.data.reservaConfirmada, true);
+    assert.deepEqual(body.data.reservasConfirmadas, [firstId, secondId]);
+    assert.equal(mock._state.reservas.find((r: any) => r.id === firstId)?.estado, "CONFIRMADA");
+    assert.equal(mock._state.reservas.find((r: any) => r.id === secondId)?.estado, "CONFIRMADA");
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(mock._state.tickets.filter((ticket: any) => ticket.reservaId === firstId || ticket.reservaId === secondId).length, 1);
+    assert.equal(dispatched.length, 1);
+    assert.equal(dispatched[0]?.franjaHoraria, "14:00 - 16:00");
+    const qr = parseTicketQrPayload(dispatched[0]?.qrPayload);
+    assert.ok(qr);
+    assert.equal(verifyTicketSignature(qr.ticketId, qr.signature, process.env.QR_HMAC_SECRET!, {
+      start: new Date("2026-10-25T19:00:00.000Z"),
+      end: new Date("2026-10-25T21:00:00.000Z"),
+    }), true);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousQrSecret === undefined) delete process.env.QR_HMAC_SECRET;
+    else process.env.QR_HMAC_SECRET = previousQrSecret;
+  }
 });
 
 test("TSK-BE-34 / SCRUM-239: webhook responde HTTP 200 en < 2 segundos y despacha correo con payload de boleto y QR", async () => {
@@ -196,6 +327,9 @@ test("TSK-BE-34 / SCRUM-239: webhook responde HTTP 200 en < 2 segundos y despach
     assert.ok(n8nPayloadCaptured.qrPayload, "Debe incluir el qrPayload");
     assert.ok(n8nPayloadCaptured.qrImageUrl, "Debe incluir la URL de la imagen QR");
     assert.ok(n8nPayloadCaptured.qrImageUrl.includes(encodeURIComponent(n8nPayloadCaptured.qrPayload)));
+    assert.ok(n8nPayloadCaptured.html, "Debe incluir el HTML transaccional renderizado (TSK-FE-37)");
+    assert.ok(n8nPayloadCaptured.html.includes("<!DOCTYPE html>"), "Debe contener DOCTYPE HTML");
+    assert.ok(n8nPayloadCaptured.html.includes("AKROS Active Lifestyle Club"), "Debe reflejar la identidad AKROS");
   } finally {
     globalThis.fetch = prevFetch;
   }

@@ -1,12 +1,14 @@
 'use client'
 
-import { AlertCircle, ShieldCheck, Store, User } from 'lucide-react'
+import { AlertCircle, LogOut, ShieldCheck, Store, User } from 'lucide-react'
 
 export interface PosHeaderProps {
   sellerName?: string
+  sellerRole?: string
+  onLogout?: () => void
 }
 
-export function PosHeader({ sellerName }: PosHeaderProps) {
+export function PosHeader({ sellerName, sellerRole, onLogout }: PosHeaderProps) {
   return (
     <>
       <div className="bg-[#123e30] text-white px-4 py-3 shadow-md border-b border-[#1d6048]">
@@ -24,12 +26,25 @@ export function PosHeader({ sellerName }: PosHeaderProps) {
           <div className="flex items-center gap-3 text-xs">
             <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/20 flex items-center gap-2">
               <User size={14} className="text-[#c9ef75]" />
-              <span>Vendedor: <strong>{sellerName || 'Andrés Muñoz'}</strong></span>
+              <span>Vendedor: <strong>{sellerName || 'Andrés Muñoz'}</strong>{sellerRole ? <span className="text-white/70 ml-1">({sellerRole})</span> : null}</span>
             </div>
             <div className="hidden sm:flex items-center gap-1.5 text-[#c9ef75] bg-black/20 px-3 py-1.5 rounded-lg border border-[#c9ef75]/30">
               <ShieldCheck size={15} />
               <span>Modelo 100% Sin Efectivo</span>
             </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="bg-white/10 hover:bg-red-500/20 hover:text-red-200 text-white px-3 py-1.5 rounded-lg border border-white/20 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400"
+                data-testid="pos-logout-button"
+              >
+                <LogOut size={14} />
+                <span className="hidden sm:inline">Cerrar sesión</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

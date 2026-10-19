@@ -219,6 +219,14 @@ export interface ReceiptApiResponse {
 }
 
 /**
+ * URL del comprobante en PDF de 58 mm (mismo bitmap que imprime la taquilla).
+ * El cliente lo descarga; imprimir en la térmica es exclusivo del operador.
+ */
+export function receiptPdfUrl(reservaId: string): string {
+  return `/api/pdf/receipt/file?reservaId=${encodeURIComponent(reservaId)}&destinatario=PORTAL`
+}
+
+/**
  * Consulta la estructura y datos oficiales del comprobante emitido desde el backend (TSK-BE-19).
  */
 export async function fetchReceiptData(reservaId: string): Promise<ReceiptApiResponse | null> {
