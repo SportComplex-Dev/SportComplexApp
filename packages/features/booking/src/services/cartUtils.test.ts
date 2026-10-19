@@ -5,6 +5,7 @@ import {
   validateCanAddToCart,
   calculateCartTotal,
   buildLockCartPayload,
+  buildContinuousLockCartPayload,
   buildSingleLockPayload,
   generateDynamicTimeSlots,
   getNumericServiceId,
@@ -231,6 +232,22 @@ test('cartUtils - buildLockCartPayload: formats payload with valid ISO strings',
   const expectedEnd = new Date(`${date}T18:00:00-05:00`).toISOString();
   assert.equal(payload.items[0]?.startTime, expectedStart);
   assert.equal(payload.items[0]?.endTime, expectedEnd);
+});
+
+test('buildContinuousLockCartPayload serializes every contiguous slot in Bogota time', () => {
+  const date = '2026-10-15';
+  const payload = buildContinuousLockCartPayload(1, [
+    { startTime: '15:00', endTime: '16:00', label: '15:00 – 16:00', isAvailable: true },
+    { startTime: '14:00', endTime: '15:00', label: '14:00 – 15:00', isAvailable: true },
+  ], date);
+
+  assert.deepEqual(payload, {
+    serviceId: 1,
+    franjas: [
+      { inicio: new Date(`${date}T14:00:00-05:00`).toISOString(), fin: new Date(`${date}T15:00:00-05:00`).toISOString() },
+      { inicio: new Date(`${date}T15:00:00-05:00`).toISOString(), fin: new Date(`${date}T16:00:00-05:00`).toISOString() },
+    ],
+  });
 });
 
 test('cartUtils - buildSingleLockPayload: constructs single lock payload correctly', () => {

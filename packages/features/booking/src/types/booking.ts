@@ -20,5 +20,14 @@ export const lockCartPayloadSchema = z.object({
   items: z.array(singleLockPayloadSchema).min(1),
 });
 
+export const continuousLockCartPayloadSchema = z.object({
+  serviceId: z.coerce.number().int().positive(),
+  franjas: z.array(z.object({
+    inicio: z.string().datetime(),
+    fin: z.string().datetime(),
+  })).min(2),
+});
+
 export type SingleLockPayload = z.infer<typeof singleLockPayloadSchema>;
 export type LockCartPayload = z.infer<typeof lockCartPayloadSchema>;
+export type ContinuousLockCartPayload = z.infer<typeof continuousLockCartPayloadSchema>;
