@@ -759,3 +759,14 @@ No se modificó el esquema ni se creó/aplicó una migración. `pnpm --filter we
 Para resolver la limitación de entrega cuando n8n se encuentra temporalmente inactivo o inaccesible (evitando que se pierda la notificación a los clientes afectados), se definió **TSK-BE-22b**:
 - **Alcance**: Cola persistente de salida (*Outbox pattern*) en base de datos basada en los registros de `inhabilitacion_servicio` con `webhook_enviado_en IS NULL` o cola dedicada.
 - **Worker/Job**: Proceso de reintentos periódicos con retroceso exponencial (*exponential backoff*), conservando la firma HMAC `X-SportComplex-Signature` hasta recibir HTTP 2xx de n8n o alcanzar el umbral de *dead-letter* (coordinado con TSK-AU-08 / SCRUM-147).
+
+---
+
+## Restablecimiento de Contraseña (`restablecimiento-contrasena.json`)
+
+- **Disparador**: Webhook HTTP POST en `/webhook/auth-password-reset` (`rawBody: true`).
+- **Seguridad**: Verificación HMAC-SHA256 en header `X-SportComplex-Signature` (`sha256=<hex>`) con el secreto compartido `N8N_PASSWORD_RESET_HMAC_SECRET`. Retorna 401 si la firma es inválida.
+- **Respuesta síncrona**: HTTP 200 `{ "ok": true, "mensaje": "Solicitud de restablecimiento recibida, despachando correo" }`.
+- **Despacho asíncrono**: Resend API (`POST https://api.resend.com/emails`) con `Authorization: Bearer {{ $env.RESEND_API_KEY }}`.
+- **Plantilla**: HTML Dark Mode institucional Akros con botón directo a `/reset-password?token=...` y texto de respaldo.
+
