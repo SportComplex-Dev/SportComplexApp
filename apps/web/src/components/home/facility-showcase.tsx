@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { ArrowRight, CheckCircle2, Clock, Flame, Lightbulb, Shield, Sparkles, SunMedium, Trophy } from 'lucide-react'
 
+const ASSETS_BASE = process.env.NEXT_PUBLIC_ASSETS_BASE_URL || "";
+const asset = (p: string) => (ASSETS_BASE ? `${ASSETS_BASE}${p}` : p);
+
 interface Facility {
   id: string
   title: string
@@ -33,7 +36,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Pádel Panorámico',
     subtitle: 'Vidrio templado continuo y césped texturizado WPT',
     description: 'Nuestras 4 pistas de pádel panorámicas cuentan con cerramiento de vidrio continuo de 12 mm sin columnas esquineras, garantizando visión periférica total y rebotes acústicamente limpios. Iluminación LED de 800 lux calibrada para juego nocturno sin sombras.',
-    image: '/images/catalogo/padel-panoramico.webp',
+    image: asset('/catalogo/padel-panoramico.webp'),
     priceFrom: '$90.000',
     unit: 'hora (4 jugadores)',
     statusTag: 'Pistas disponibles hoy',
@@ -51,7 +54,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Tenis Roland Garros',
     subtitle: 'Tierra batida tratada con drenaje francés subterráneo',
     description: '3 pistas oficiales de arcilla roja mantenidas diariamente con riego automatizado y cepillado profesional. Ofrecen el deslizamiento óptimo para proteger las articulaciones y favorecer los intercambios tácticos de fondo de pista.',
-    image: '/images/catalogo/tenis-roland-garros.webp',
+    image: asset('/catalogo/tenis-roland-garros.webp'),
     priceFrom: '$75.000',
     unit: 'hora',
     statusTag: 'Humedad controlada',
@@ -69,7 +72,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Fútbol Sintético',
     subtitle: 'Monofilamento de 50mm con relleno de corcho orgánico',
     description: 'Césped sintético certificado FIFA Quality Pro con relleno de ecocorcho termoaislante que reduce la temperatura del campo hasta 8°C bajo el sol de Medellín. Cerramiento perimetral de red elástica y graderías techadas.',
-    image: '/images/catalogo/futbol-sintetico.webp',
+    image: asset('/catalogo/futbol-sintetico.webp'),
     priceFrom: '$160.000',
     unit: 'hora',
     statusTag: 'Reserva activa',
@@ -87,7 +90,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Piscina Climatizada',
     subtitle: '25 metros, 6 carriles y filtración salina por electrólisis',
     description: 'Temperatura estable del agua a 28°C todo el año. Sistema ecológico de electrólisis salina que no irrita los ojos ni reseca la piel. Líneas corcheras rompeolas antimovimiento para entrenamiento técnico o nado libre.',
-    image: '/images/catalogo/piscina-climatizada.webp',
+    image: asset('/catalogo/piscina-climatizada.webp'),
     priceFrom: '$32.000',
     unit: 'sesión / carril',
     statusTag: 'Agua a 28°C',
@@ -105,7 +108,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Gimnasio Pro',
     subtitle: 'Maquinaria de poleas convergentes y zona de peso libre Eleiko',
     description: 'Zona de fuerza equipada con barras olímpicas calibradas, plataformas de halterofilia de caucho vulcanizado de 50mm, jaulas de potencia y área de entrenamiento funcional con césped de arrastre de trineo.',
-    image: '/images/catalogo/gimnasio-pro.webp',
+    image: asset('/catalogo/gimnasio-pro.webp'),
     priceFrom: '$38.000',
     unit: 'pase de día',
     statusTag: 'Aforo actual 42%',
@@ -123,7 +126,7 @@ const FACILITIES: Facility[] = [
     tabName: 'Zona Wellness',
     subtitle: 'Sauna finlandés de cedro, baño turco aromatizado y crioterapia',
     description: 'La recuperación es parte fundamental del rendimiento deportivo. Nuestro circuito combina sauna seco a 85°C, baño de vapor con eucalipto silvestre, jacuzzis de hidromasaje y pileta de inmersión fría a 10°C para vasoconstricción post-esfuerzo.',
-    image: '/images/catalogo/zona-wellness.webp',
+    image: asset('/catalogo/zona-wellness.webp'),
     priceFrom: '$45.000',
     unit: 'circuito 90 min',
     statusTag: 'Ambiente sereno',

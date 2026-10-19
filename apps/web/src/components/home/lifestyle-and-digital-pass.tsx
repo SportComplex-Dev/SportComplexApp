@@ -4,6 +4,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Coffee, QrCode, ScanLine, ShieldCheck, Utensils, Wifi, Zap } from 'lucide-react'
 
+const ASSETS_BASE = process.env.NEXT_PUBLIC_ASSETS_BASE_URL || "";
+const asset = (p: string) => (ASSETS_BASE ? `${ASSETS_BASE}${p}` : p);
+
 export function LifestyleAndDigitalPass() {
   return (
     <section className="section-shell lifestyle-and-tech-section">
@@ -12,7 +15,7 @@ export function LifestyleAndDigitalPass() {
         <div className="lifestyle-card">
           <div className="lifestyle-media">
             <Image
-              src="/images/catalogo/sports-bar-lounge.webp"
+              src={asset("/catalogo/sports-bar-lounge.webp")}
               alt="AKROS Club Lounge y Café Saludable"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"

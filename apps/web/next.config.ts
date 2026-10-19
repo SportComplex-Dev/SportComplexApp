@@ -22,7 +22,13 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "phyesjwtzrmrcvmtajay.supabase.co",
+        pathname: "/storage/v1/object/public/sportcomplex-assets/**",
+      },
+    ],
   },
 };
 

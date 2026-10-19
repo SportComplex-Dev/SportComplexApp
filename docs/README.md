@@ -44,6 +44,7 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [features/torneos.md](./features/torneos.md) | Modelo de torneos, bloqueos, inscripciones, endpoints admin y bloqueo preventivo |
 | [features/chatbot-analitica.md](./features/chatbot-analitica.md) | Endpoints para chatbot y agregaciones analíticas |
 | [features/reglamentos.md](./features/reglamentos.md) | Reglamentos y marco normativo (`/rules`) |
+| [features/assets-multimedia.md](./features/assets-multimedia.md) | Optimización de imágenes (Sharp/WebP/AVIF) y migración a Supabase Storage CDN |
 
 ## Packages (código)
 
