@@ -2,7 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { AdminBookingsView, formatStatusBadge } from './AdminBookingsView'
+import {
+  AdminBookingsView,
+  formatStatusBadge,
+  formatDateString,
+  formatSlotTime,
+} from './AdminBookingsView'
 import type { AdminBookingItem } from './types'
 
 const mockBookings: AdminBookingItem[] = [
@@ -53,21 +58,41 @@ const mockBookings: AdminBookingItem[] = [
   },
 ]
 
-test('TSK-FE-27 / formatStatusBadge retorna badges semánticos correspondientes', () => {
+test('TSK-FE-27 / formatStatusBadge retorna badges semánticos con componente Badge de @sportcomplex/ui', () => {
   const confirmedMarkup = renderToStaticMarkup(formatStatusBadge('CONFIRMADA'))
   assert.ok(confirmedMarkup.includes('Confirmada'), 'Debe incluir texto Confirmada')
+  assert.ok(confirmedMarkup.includes('data-slot="badge"'), 'Debe utilizar Badge de @sportcomplex/ui')
 
   const pendingMarkup = renderToStaticMarkup(formatStatusBadge('PENDIENTE_PAGO'))
   assert.ok(pendingMarkup.includes('Pendiente Pago'), 'Debe incluir Pendiente Pago')
+  assert.ok(pendingMarkup.includes('data-slot="badge"'), 'Debe utilizar Badge de @sportcomplex/ui')
 
   const expiredMarkup = renderToStaticMarkup(formatStatusBadge('EXPIRADA'))
   assert.ok(expiredMarkup.includes('Expirada'), 'Debe incluir Expirada')
+  assert.ok(expiredMarkup.includes('data-slot="badge"'), 'EXPIRADA debe utilizar Badge de @sportcomplex/ui')
 
   const cancelledMarkup = renderToStaticMarkup(formatStatusBadge('CANCELADA'))
   assert.ok(cancelledMarkup.includes('Cancelada'), 'Debe incluir Cancelada')
+  assert.ok(cancelledMarkup.includes('data-slot="badge"'), 'Debe utilizar Badge de @sportcomplex/ui')
 })
 
-test('TSK-FE-27 / AdminBookingsView renderiza encabezados, KPIs y filas de reservas', () => {
+test('TSK-FE-27 / formatDateString previene desfase de fecha (off-by-one) por UTC-5 en medianoche', () => {
+  // Cadena ISO con medianoche UTC: no debe retroceder al día anterior (15 oct) en Bogotá UTC-5
+  const formattedUtcMidnight = formatDateString('2026-10-16T00:00:00Z')
+  assert.ok(formattedUtcMidnight.includes('16'), 'Debe mantener el día 16 y no retroceder al 15')
+
+  // Cadena YYYY-MM-DD limpia
+  const formattedDateOnly = formatDateString('2026-10-16')
+  assert.ok(formattedDateOnly.includes('16'), 'Debe mantener el día 16 para formato YYYY-MM-DD')
+})
+
+test('TSK-FE-27 / formatSlotTime parsea cadenas directas de hora HH:mm y HH:mm:ss sin caer a fallback', () => {
+  assert.strictEqual(formatSlotTime('07:00'), '07:00', 'Debe parsear 07:00 directamente')
+  assert.strictEqual(formatSlotTime('07:00:00'), '07:00', 'Debe recortar segundos en 07:00:00')
+  assert.strictEqual(formatSlotTime('18:30'), '18:30', 'Debe parsear 18:30 directamente')
+})
+
+test('TSK-FE-27 / AdminBookingsView renderiza encabezados, KPIs con Card y filas de reservas', () => {
   const markup = renderToStaticMarkup(
     <AdminBookingsView
       bookings={mockBookings}
@@ -97,6 +122,8 @@ test('TSK-FE-27 / AdminBookingsView renderiza encabezados, KPIs y filas de reser
   assert.ok(markup.includes('carlos@example.com'), 'Debe mostrar el correo del cliente')
   assert.ok(markup.includes('Cancha de Tenis · Cancha 1'), 'Debe mostrar el nombre del servicio')
   assert.ok(markup.includes('res-uuid'), 'Debe mostrar el código o UUID de la reserva')
+  assert.ok(markup.includes('data-slot="card"'), 'Los KPIs deben usar componente Card de @sportcomplex/ui')
+  assert.ok(markup.includes('min-w-[700px]'), 'La tabla debe tener min-w para adaptabilidad móvil con scroll horizontal')
 })
 
 test('TSK-FE-27 / AdminBookingsView renderiza empty state cuando no hay reservas', () => {

@@ -191,3 +191,57 @@ export function resolveCheckoutRedirection(
     url: checkoutUrl || `/checkout${query}`,
   };
 }
+
+
+/**
+ * TSK-FE-31 / HU-26: Validación de continuidad en selección de franjas horarias.
+ * Las franjas deben ser estrictamente consecutivas sin huecos temporales (gaps).
+ */
+export function validateContinuousSlots(slots: DynamicTimeSlot[]): {
+  valid: boolean;
+  message?: string;
+} {
+  if (slots.length <= 1) return { valid: true };
+
+  const sorted = [...slots].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    if (current && next && current.endTime !== next.startTime) {
+      return {
+        valid: false,
+        message: 'Las reservas múltiples deben ser continuas (sin huecos intermedios entre horarios).',
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * TSK-FE-31: Cálculo reactivo de precio con subtotal y descuento del 30% para socios.
+ */
+export function calculateMultiSlotPricing(
+  basePricePerHour: number,
+  slotCount: number,
+  isMember: boolean = false,
+): {
+  subtotal: number;
+  discountPct: number;
+  discountAmount: number;
+  total: number;
+} {
+  const count = Math.max(0, slotCount);
+  const subtotal = basePricePerHour * count;
+  const discountPct = isMember ? 30 : 0;
+  const discountAmount = Math.round(subtotal * (discountPct / 100));
+  const total = subtotal - discountAmount;
+
+  return {
+    subtotal,
+    discountPct,
+    discountAmount,
+    total,
+  };
+}

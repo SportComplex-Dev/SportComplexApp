@@ -429,7 +429,8 @@ button { cursor: pointer; }
   .booking-page, .payment-page { padding-top: 20px; }.booking-page > .back-link, .payment-page > .back-link { margin-bottom: 18px; }.booking-layout { grid-template-columns: 1fr; gap: 17px; }.booking-heading { gap: 10px; }.booking-icon { width: 42px; height: 42px; }.booking-heading h1 { font-size: 18px; }.booking-heading p { font-size: 12px; }.booking-photo { height: 155px; }.calendar-section, .slots-section { margin-top: 21px; }.calendar-heading h2, .slots-title h2 { font-size: 14px; }.calendar-heading p, .slots-title p { font-size: 12px; }.calendar-month { gap: 5px; padding: 7px; font-size: 12px; }.week-grid { gap: 5px; }.day-choice { min-height: 60px; border-radius: 7px; }.day-choice > span { font-size: 11px; }.day-choice b { font-size: 13px; }.slot-grid { grid-template-columns: repeat(3, 1fr); gap: 7px; }.slot-button { min-height: 44px; font-size: 12px; }.booking-summary { position: static; padding: 17px; }.booking-summary h3 { display: none; }.summary-detail { margin: 12px 0; }.summary-total { margin-top: 13px; }.summary-help { display: none; }.summary-note { margin-bottom: 0; }
   .payment-page { padding-bottom: 65px; }.checkout-progress { justify-content: center; margin-bottom: 25px; }.checkout-progress > i { width: 30px; }.payment-layout { grid-template-columns: 1fr; gap: 12px; }.payment-form h1 { font-size: 26px; }.payment-form > p { font-size: 12px; }.payment-safe { padding: 10px; }.payment-method { padding: 14px; }.order-card { margin-top: 0; }.confirmation-page { min-height: calc(100svh - 62px); padding-top: 33px; }.success-ring { width: 58px; height: 58px; }.confirmation-page h1 { font-size: 32px; }.confirmation-copy { max-width: 290px; line-height: 1.6; }.ticket-card { padding: 18px 15px 0; }.ticket-header h2 { font-size: 15px; }.ticket-separator { margin-right: -15px; margin-left: -15px; }.ticket-qr { gap: 11px; padding: 9px; }.qr-shell { width: 84px; height: 84px; padding: 5px; }.qr-grid { width: 72px; height: 72px; }.ticket-footer { flex-direction: column; gap: 8px; margin-right: -15px; margin-left: -15px; padding: 11px 14px; }.email-notice { padding: 10px; }.confirmation-actions { flex-direction: column; gap: 7px; }.confirmation-actions .action-button { width: 100%; }
   .scanner-page { padding: 13px 17px 13px; }.scanner-title { margin-top: 25px; }.scanner-title h1 { font-size: 24px; }.camera-preview { height: min(40vh, 315px); min-height: 215px; }.camera-frame { width: 160px; height: 160px; }.scanner-bottom { font-size: 11px; }
-  .admin-shell { grid-template-columns: 1fr; }.admin-sidebar { position: relative; z-index: 3; height: auto; padding: 12px 16px 9px; border-right: 0; border-bottom: 1px solid #e8ebe7; }.admin-brand { padding: 0; }.admin-workspace, .admin-sidebar-bottom, .admin-nav-label { display: none; }.admin-nav { flex-direction: row; gap: 5px; overflow-x: auto; padding-top: 12px; }.admin-nav :is(button, a) { min-width: max-content; min-height: 44px; gap: 6px; padding: 0 11px; font-size: 12px; }.admin-nav :is(button, a) svg { width: 14px; }.admin-nav :is(button, a) > i { display: none; }.admin-topbar { min-height: 52px; height: auto; padding: 4px 16px; }.admin-today { font-size: 0; }.admin-today svg { width: 16px; }.admin-top-actions { gap: 8px; }.admin-content { padding: 20px 14px 52px; }.admin-page-heading h1 { font-size: 19px; }.admin-page-heading .eyebrow { font-size: 11px; }.admin-page-heading p { font-size: 12px; }.admin-export { gap: 6px; min-height: 44px; padding: 0 12px; font-size: 12px; }.admin-export svg { width: 13px; }.metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }.metric-card { min-height: 105px; padding: 10px; }.metric-card-top { font-size: 12px; }.metric-card-value { font-size: 18px; }.metric-card-foot { font-size: 11px; }.metric-sparkline { right: 7px; bottom: 10px; gap: 2px; }.metric-sparkline i { width: 3px; }.admin-data-grid { grid-template-columns: 1fr; gap: 9px; margin-top: 9px; }.chart-card, .occupancy-card, .reservations-card { padding: 12px; }.bar-chart { height: 135px; }.bar-pair { height: 105px; }.occupancy-main { justify-content: space-evenly; }.reservations-card { margin-top: 9px; }.reservations-card .data-card-heading h2 { font-size: 13px; }.table-wrap { margin-right: -12px; }.table-wrap table { min-width: 535px; }.table-wrap th, .table-wrap td { padding-right: 10px; }.table-wrap th:first-child, .table-wrap td:first-child { padding-left: 0; }
+  .admin-shell { grid-template-columns: 1fr; }.admin-sidebar { position: relative; z-index: 3; height: auto; padding: 12px 16px 9px; border-right: 0; border-bottom: 1px solid #e8ebe7; }.admin-brand { padding: 0; }.admin-workspace, .admin-sidebar-bottom, .admin-nav-label { display: none; }.admin-nav { flex-direction: row; gap: 5px; overflow-x: auto; padding-top: 12px; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.admin-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }.admin-nav :is(button, a) { min-width: max-content; min-height: 44px; gap: 6px; padding: 0 11px; font-size: 12px; }.admin-nav :is(button, a) svg { width: 14px; }.admin-nav :is(button, a) > i { display: none; }.admin-topbar { min-height: 52px; height: auto; padding: 4px 16px; }.admin-today { font-size: 0; }.admin-today svg { width: 16px; }.admin-top-actions { gap: 8px; }.admin-content { padding: 20px 14px 52px; }.admin-page-heading h1 { font-size: 19px; }.admin-page-heading .eyebrow { font-size: 11px; }.admin-page-heading p { font-size: 12px; }.admin-export { gap: 6px; min-height: 44px; padding: 0 12px; font-size: 12px; }.admin-export svg { width: 13px; }.metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }.metric-card { min-height: 105px; padding: 10px; }.metric-card-top { font-size: 12px; }.metric-card-value { font-size: 18px; }.metric-card-foot { font-size: 11px; }.metric-sparkline { right: 7px; bottom: 10px; gap: 2px; }.metric-sparkline i { width: 3px; }.admin-data-grid { grid-template-columns: 1fr; gap: 9px; margin-top: 9px; }.chart-card, .occupancy-card, .reservations-card { padding: 12px; }.bar-chart { height: 135px; }.bar-pair { height: 105px; }.occupancy-main { justify-content: space-evenly; }.reservations-card { margin-top: 9px; }.reservations-card .data-card-heading h2 { font-size: 13px; }.table-wrap { margin-right: -12px; }.table-wrap table { min-width: 535px; }.table-wrap th, .table-wrap td { padding-right: 10px; }.table-wrap th:first-child, .table-wrap td:first-child { padding-left: 0; }
   .preview-toolbar { right: 8px; bottom: 7px; height: 31px; }.toast-message { right: 10px; bottom: 50px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -460,15 +461,16 @@ button { cursor: pointer; }
 .demo-page-heading p { margin: 0; color: var(--subtle); font-size: 12px; line-height: 1.6; }
 .demo-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--subtle); font-size: 11px; font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
 .demo-pill i { width: 7px; height: 7px; border-radius: 50%; background: #88ac54; }
-.demo-card { padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.demo-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); max-width: 100%; overflow: hidden; }
 .demo-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 17px; color: var(--brand-primary-strong); }
 .demo-card-heading h2, .demo-side-note h2 { margin: 0 0 5px; color: var(--ink); font-size: 16px; letter-spacing: -.025em; }
 .demo-card-heading p { margin: 0; color: var(--subtle); font-size: 13px; line-height: 1.5; }
 .demo-record { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); }.demo-record > div { display: grid; gap: 5px; }.demo-record b { font-size: 14px; }.demo-record span { color: var(--subtle); font-size: 12px; }
 .demo-status { display: inline-flex; width: fit-content; padding: 4px 7px; border-radius: 99px; background: var(--surface-soft); color: var(--subtle); font-size: 11px; font-weight: 700; }.demo-status-active { background: var(--state-success-surface); color: var(--state-success); }
-.demo-admin-nav { display: flex; gap: 7px; margin: 0 0 16px; overflow-x: auto; }.demo-admin-nav button { min-height: 35px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--subtle); font-size: 13px; font-weight: 650; white-space: nowrap; }.demo-admin-nav .demo-admin-active { border-color: var(--brand-primary-strong); color: var(--brand-primary-strong); }
+.demo-admin-nav { display: flex; gap: 7px; margin: 0 0 16px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.demo-admin-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }.demo-admin-nav button { min-height: 35px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--subtle); font-size: 13px; font-weight: 650; white-space: nowrap; }.demo-admin-nav .demo-admin-active { border-color: var(--brand-primary-strong); color: var(--brand-primary-strong); }
 .demo-table-wrap { width: 100%; overflow-x: auto; margin-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-@media (min-width: 1024px) { .demo-table-wrap { overflow-x: visible; } }.demo-table { width: 100%; border-collapse: collapse; text-align: left; }.demo-table th { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--subtle); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }.demo-table td { padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; }
+/* .demo-table-wrap overflow-x is always auto to prevent card overflow */.demo-table { width: 100%; border-collapse: collapse; text-align: left; }.demo-table th { padding: 8px 5px; border-bottom: 1px solid var(--line); color: var(--subtle); font-size: 11px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }.demo-table td { padding: 8px 5px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 12px; }
 .demo-table select, .demo-table input, .demo-field input, .demo-field select, .scanner-field input, .scanner-field select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px; outline: none; background: var(--surface); color: var(--ink); font-size: 13px; }.demo-table input { width: 150px; }
 .demo-table select:focus, .demo-table input:focus, .demo-field input:focus, .demo-field select:focus, .scanner-field input:focus, .scanner-field select:focus { border-color: var(--brand-primary-strong); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary-strong) 20%, transparent); }
 .demo-inline-edit { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 8px; border-top: 1px solid var(--line); }.demo-inline-edit p { color: var(--subtle); font-size: 13px; }
@@ -5455,5 +5457,91 @@ button { cursor: pointer; }
   .no-print {
     display: none !important;
   }
+}
+
+/* ============================================================
+   TSK-FE-36 / HU-40: Drawer colapsable en AdminLayout (Mobile)
+   ============================================================ */
+@media (max-width: 767px) {
+  .admin-shell {
+    grid-template-columns: 1fr !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-main {
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  .admin-topbar {
+    padding: 0 14px !important;
+    max-width: 100% !important;
+  }
+  .admin-top-actions {
+    gap: 8px !important;
+  }
+  .admin-content {
+    padding: 16px 12px 40px !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .admin-sidebar:not(.admin-drawer-sidebar) {
+    display: none !important;
+  }
+}
+
+.admin-drawer {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+  z-index: 60 !important;
+}
+
+:is(.dark, .club-app.dark) .admin-drawer {
+  background-color: #17211c !important;
+  background: #17211c !important;
+  border-right: 1px solid #27352d !important;
+}
+
+.admin-drawer .admin-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  overflow-x: visible !important;
+  padding: 16px 0 !important;
+}
+
+.admin-drawer .admin-nav a {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.admin-menu-trigger {
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.admin-menu-trigger:active {
+  transform: scale(0.95);
+}
+
+.admin-drawer-portal {
+  animation: drawer-fade-in 0.2s ease-out;
+}
+
+.admin-drawer {
+  animation: drawer-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes drawer-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
