@@ -1,5 +1,5 @@
 import { authorizeApiRequest } from "@/lib/api/api-auth";
-import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
+import { BookingError, createBookingHold, getReadOnlyBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
 import { created, fail, ok } from '@sportcomplex/shared/lib';
 
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    return ok(await getBookableAvailability(parsed.data.serviceId, parsed.data.date));
+    return ok(await getReadOnlyBookableAvailability(parsed.data.serviceId, parsed.data.date));
   } catch (error: unknown) {
     if (error instanceof BookingError) {
       return fail(error.code, error.message, error.status);

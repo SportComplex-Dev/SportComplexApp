@@ -23,9 +23,11 @@ test("TSK-BE-09: checkoutExpiresAt = now + 30 min (TTL del hold = mínimo Stripe
 test("TSK-BE-09: toStripeAmountCents convierte decimales a centavos", () => {
   assert.equal(toStripeAmountCents(2500), 250_000);
   assert.equal(toStripeAmountCents("2500.00"), 250_000);
-  assert.equal(toStripeAmountCents({ toString: () => "1234.56" }), 123_456);
+  assert.equal(toStripeAmountCents({ toString: () => "3234.56" }), 323_456);
   assert.throws(() => toStripeAmountCents(0), /INVALID_CHECKOUT_AMOUNT/);
   assert.throws(() => toStripeAmountCents("abc"), /INVALID_CHECKOUT_AMOUNT/);
+  assert.throws(() => toStripeAmountCents(1999), /AMOUNT_BELOW_STRIPE_MINIMUM/);
+  assert.equal(toStripeAmountCents(1000, { allowBelowMin: true }), 100_000);
 });
 
 test("TSK-BE-09: buildCheckoutSessionParams usa expires_at de 30 min (TTL unificado) y metadata para multi-item", () => {
@@ -81,7 +83,7 @@ test("TSK-BE-09: createStripeCheckoutSession devuelve el PI si viene expandido",
     },
   };
   const result = await createStripeCheckoutSession(
-    { reservaIds: ["r-1"], userId: "u-1", total: 1000, items: [{ reservaId: "r-1", servicioNombre: "Test", cantidadCupos: 1, subtotal: 1000 }] },
+    { reservaIds: ["r-1"], userId: "u-1", total: 5000, items: [{ reservaId: "r-1", servicioNombre: "Test", cantidadCupos: 1, subtotal: 5000 }] },
     { client: fake },
   );
   assert.equal(result.sessionId, "cs_test_1");
@@ -99,7 +101,7 @@ test("TSK-BE-09: createStripeCheckoutSession NO exige PI al crear la sesión (RF
     },
   };
   const result = await createStripeCheckoutSession(
-    { reservaIds: ["r-2"], userId: "u-2", total: 1000, items: [{ reservaId: "r-2", servicioNombre: "Test", cantidadCupos: 1, subtotal: 1000 }] },
+    { reservaIds: ["r-2"], userId: "u-2", total: 5000, items: [{ reservaId: "r-2", servicioNombre: "Test", cantidadCupos: 1, subtotal: 5000 }] },
     { client: fake },
   );
   assert.equal(result.sessionId, "cs_test_2");
@@ -122,7 +124,7 @@ test("TSK-BE-09: createStripeCheckoutSession envuelve errores del SDK en STRIPE_
   await assert.rejects(
     () =>
       createStripeCheckoutSession(
-        { reservaIds: ["r-4"], userId: "u-4", total: 1000, items: [{ reservaId: "r-4", servicioNombre: "Test", cantidadCupos: 1, subtotal: 1000 }] },
+        { reservaIds: ["r-4"], userId: "u-4", total: 5000, items: [{ reservaId: "r-4", servicioNombre: "Test", cantidadCupos: 1, subtotal: 5000 }] },
         { client: fake },
       ),
     (err: unknown) =>
@@ -184,7 +186,7 @@ test("TSK-BE-18: crea PaymentIntent con clave de idempotencia y devuelve client_
     userId: "cliente-2",
     serviceId: 3,
     vendedorId: "vendedor-2",
-    total: 1250,
+    total: 5000,
   };
   const expected = buildPosPaymentIntentParams(input);
   const result = await createPosPaymentIntent(input, {
@@ -221,7 +223,7 @@ test("TSK-BE-18: rechaza un intent idempotente reutilizado por otro vendedor", a
           userId: "cliente-3",
           serviceId: 3,
           vendedorId: "vendedor-actual",
-          total: 1250,
+          total: 5000,
         },
         {
           client: {
@@ -230,7 +232,7 @@ test("TSK-BE-18: rechaza un intent idempotente reutilizado por otro vendedor", a
                 return {
                   id: "pi_pos_3",
                   client_secret: "pi_pos_3_secret_test",
-                  amount: 125_000,
+                  amount: 500_000,
                   currency: "cop",
                   status: "requires_payment_method",
                   metadata: {

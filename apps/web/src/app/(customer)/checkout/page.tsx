@@ -8,7 +8,7 @@ import {
   Lock, ShieldCheck, AlertCircle, Loader2,
 } from 'lucide-react'
 import {
-  calculateBookingPrice, categoryBySlug, formatDate, formatMoney, resolveCatalogServiceId,
+  calculateBookingPrice, categoryBySlug, formatDate, formatMoney, resolveCatalogServiceId, STRIPE_MIN_AMOUNT_COP,
 } from '@sportcomplex/core'
 import {
   CheckoutTimer,
@@ -148,6 +148,7 @@ function CheckoutContent() {
       setIsCreatingReservation(true)
       setHoldError(null)
 
+      // Extraer la hora de inicio del draft (puede ser "07:00" o "07:00-08:30" o "08:00 a. m. - 09:00 a. m.")
       const interval = parseSlotInterval(currentDraft.date, currentDraft.time)
       if (!interval) {
         setHoldError('El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.')
@@ -157,6 +158,14 @@ function CheckoutContent() {
       }
 
       try {
+        const estimatedTotal = calculateBookingPrice(currentItem, currentDraft.attendees)
+        if (estimatedTotal < STRIPE_MIN_AMOUNT_COP) {
+          setHoldError(`El valor total ($${formatMoney(estimatedTotal)} COP) es inferior al mínimo permitido por la pasarela de pago Stripe ($${formatMoney(STRIPE_MIN_AMOUNT_COP)} COP).`)
+          setIsCreatingReservation(false)
+          creatingRef.current = false
+          return
+        }
+
         const serviceId = resolveCatalogServiceId(currentItem)
         if (!serviceId || serviceId <= 0) {
           setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
@@ -165,17 +174,60 @@ function CheckoutContent() {
           return
         }
 
+        // Consultar disponibilidad real del DB para encontrar el endTime exacto de la franja
+        // Esto resuelve el problema de franjas de 90 min en la DB vs 60 min en el frontend
+        let resolvedStartTime = interval.startTime
+        let resolvedEndTime = interval.endTime
+
+        try {
+          const availRes = await fetch(`/api/bookings?serviceId=${serviceId}&date=${currentDraft.date}`, {
+            signal: AbortSignal.timeout(10000),
+          })
+          if (availRes.ok) {
+            const availData = await availRes.json() as { data?: Array<{ franja?: { horaInicio?: string; horaFin?: string }; fecha?: string }> }
+            const startDate = new Date(interval.startTime)
+            const startHHMM = `${String(startDate.getUTCHours()).padStart(2, '0')}:${String(startDate.getUTCMinutes()).padStart(2, '0')}`
+            // Ajuste de offset -05:00 → UTC: e.g. 07:00 COT = 12:00 UTC
+            const bogotaOffset = -5
+            const startHHMMCOT = String(startDate.getUTCHours() + bogotaOffset).padStart(2, '0') + ':' + String(startDate.getUTCMinutes()).padStart(2, '0')
+
+            const matchedSlot = (availData.data ?? []).find((slot) => {
+              const dbStart = slot.franja?.horaInicio?.slice(0, 5) // "07:00"
+              return dbStart === startHHMM || dbStart === bogotaOffset < 0
+                ? String((startDate.getUTCHours() + bogotaOffset + 24) % 24).padStart(2, '0') + ':' + String(startDate.getUTCMinutes()).padStart(2, '0') === dbStart
+                : dbStart === startHHMMCOT
+            })
+
+            if (matchedSlot?.franja?.horaFin) {
+              // Usar el endTime real de la franja de la DB
+              const dbEndHHMM = matchedSlot.franja.horaFin.slice(0, 5) // "08:30"
+              const [endH, endM] = dbEndHHMM.split(':').map(Number)
+              const endDate = new Date(currentDraft.date + 'T00:00:00.000-05:00')
+              endDate.setHours(endDate.getHours() + (endH ?? 0))
+              endDate.setMinutes(endDate.getMinutes() + (endM ?? 0))
+              resolvedEndTime = endDate.toISOString()
+            }
+          }
+        } catch {
+          // Si falla la consulta de disponibilidad, usar el endTime estimado del parseSlotInterval
+        }
+
         // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             serviceId,
-            startTime: interval.startTime,
-            endTime: interval.endTime,
+            startTime: resolvedStartTime,
+            endTime: resolvedEndTime,
             cantidadCupos: currentDraft.attendees,
           }),
         })
+
+        if (res.status === 401) {
+          router.push('/login?redirect=/checkout')
+          return
+        }
 
         const data = await res.json()
         if (cancelled) return
@@ -289,6 +341,50 @@ function CheckoutContent() {
     })
   }
 
+  const [isRedirectingToStripe, setIsRedirectingToStripe] = useState(false)
+
+  const handleRedirectToStripe = async () => {
+    if (!activeDraft || !item || paymentBlocked) return
+    setIsRedirectingToStripe(true)
+    try {
+      const interval = parseSlotInterval(activeDraft.date, activeDraft.time)
+      if (!interval) {
+        notify('Horario inválido.', 'error')
+        setIsRedirectingToStripe(false)
+        return
+      }
+      const serviceId = resolveCatalogServiceId(item)
+
+      const res = await fetch('/api/bookings/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId,
+          startTime: interval.startTime,
+          endTime: interval.endTime,
+          cantidadCupos: activeDraft.attendees,
+        }),
+      })
+
+      if (res.status === 401) {
+        router.push('/login?redirect=/checkout')
+        return
+      }
+
+      const data = await res.json()
+      if (res.ok && data?.data?.checkout?.url) {
+        window.location.href = data.data.checkout.url
+      } else {
+        const msg = data?.error?.message || 'No se pudo generar la sesión de pago de Stripe.'
+        notify(msg, 'error')
+        setIsRedirectingToStripe(false)
+      }
+    } catch {
+      notify('Error de conexión con la pasarela de Stripe.', 'error')
+      setIsRedirectingToStripe(false)
+    }
+  }
+
   return (
     <main className="section-shell payment-page">
       <Link href={`/services/${item.category}/${item.id}`} className="back-link">
@@ -379,10 +475,35 @@ function CheckoutContent() {
               </p>
             </div>
           ) : (
-            <PaymentMethodSelector
-              reservationId={reservationId}
-              onPaymentSuccess={handlePaymentSuccess}
-            />
+            <>
+              <div className="mb-4 rounded-xl border border-[#e1e6df] bg-[#f7f8f5] p-4 dark:border-[#26352d] dark:bg-[#1a251f] flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-ink">¿Prefieres la pantalla completa de Stripe?</p>
+                  <p className="text-[11px] text-subtle">Paga directamente en la pasarela externa de checkout.stripe.com</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRedirectToStripe}
+                  disabled={isRedirectingToStripe || paymentBlocked}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#635bff] text-white text-xs font-semibold hover:opacity-90 transition shrink-0 disabled:opacity-50"
+                >
+                  {isRedirectingToStripe ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" /> Conectando con Stripe…
+                    </>
+                  ) : (
+                    <>
+                      Ir a Stripe Checkout <ArrowRight size={13} />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <PaymentMethodSelector
+                reservationId={reservationId}
+                onPaymentSuccess={handlePaymentSuccess}
+              />
+            </>
           )}
 
           <div className="mt-6 flex items-start gap-2 text-xs leading-5 text-subtle">
@@ -438,6 +559,11 @@ function CheckoutContent() {
               {formatMoney(total)} <small>COP</small>
             </b>
           </div>
+          {total < STRIPE_MIN_AMOUNT_COP && (
+            <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-300">
+              ⚠️ Monto inferior al mínimo permitido por Stripe ($2.000 COP).
+            </div>
+          )}
           <div className="mt-4 pt-3 border-t border-[var(--line)] text-[11.5px] text-[var(--subtle)] flex items-center justify-between">
             <span>IVA incluido (19%)</span>
             <span>{formatMoney(Math.round((total * 19) / 119))} COP</span>

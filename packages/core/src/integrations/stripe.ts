@@ -26,6 +26,8 @@ function stripeSessionExpiresAtSec(from: Date): number {
 }
 
 export const STRIPE_CURRENCY = "cop" as const;
+/** Monto mínimo aceptado por la plataforma Stripe para COP (~$0.50 USD = 2.000 COP). */
+export const STRIPE_MIN_AMOUNT_COP = 2000 as const;
 
 // Re-exportados para conveniencia del flujo de checkout (definidos en
 // `domain/index.ts` y `services/availability.ts`; no duplicar).
@@ -86,13 +88,18 @@ export function stripeAmountToMonto(amount: number): string {
   return (amount / 100).toFixed(2);
 }
 
-/** Convierte un total decimal (COP) a centavos enteros para Stripe. */
+/** Convierte un total decimal (COP) a centavos enteros para Stripe y valida el monto mínimo. */
 export function toStripeAmountCents(
   total: number | string | { toString(): string },
+  options?: { allowBelowMin?: boolean; minAmount?: number },
 ): number {
   const numeric = Number(String(total));
   if (!Number.isFinite(numeric) || numeric <= 0) {
     throw new Error("INVALID_CHECKOUT_AMOUNT");
+  }
+  const min = options?.minAmount ?? STRIPE_MIN_AMOUNT_COP;
+  if (!options?.allowBelowMin && numeric < min) {
+    throw new Error(`AMOUNT_BELOW_STRIPE_MINIMUM: El monto ($${numeric.toLocaleString("es-CO")} COP) es inferior al mínimo aceptado por Stripe ($${min.toLocaleString("es-CO")} COP).`);
   }
   const cents = Math.round(numeric * 100);
   if (!Number.isSafeInteger(cents) || cents <= 0) {

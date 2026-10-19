@@ -4,7 +4,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
 import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { fail, ok } from '@sportcomplex/shared/lib';
-import { buildPaymentMetadata, STRIPE_CURRENCY } from "@sportcomplex/core";
+import { buildPaymentMetadata, STRIPE_CURRENCY, STRIPE_MIN_AMOUNT_COP } from "@sportcomplex/core";
 import { prisma } from "@sportcomplex/db";
 
 const requestSchema = z.object({
@@ -130,6 +130,15 @@ export async function POST(
         "RESERVATION_NOT_PAYABLE",
         "Esta reserva ya no está pendiente de pago o su tiempo de reserva venció.",
         409,
+      );
+    }
+
+    const totalCop = Number(reservation.total);
+    if (totalCop < STRIPE_MIN_AMOUNT_COP) {
+      return fail(
+        "AMOUNT_BELOW_STRIPE_MINIMUM",
+        `El valor de la reserva ($${totalCop.toLocaleString("es-CO")} COP) es inferior al mínimo permitido por la pasarela de pago Stripe ($${STRIPE_MIN_AMOUNT_COP.toLocaleString("es-CO")} COP).`,
+        400,
       );
     }
 
