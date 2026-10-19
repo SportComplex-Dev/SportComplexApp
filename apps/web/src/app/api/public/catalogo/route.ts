@@ -1,6 +1,6 @@
 import { getServicios, getCategorias } from "@sportcomplex/db";
 import { ok, fail } from '@sportcomplex/shared/lib';
-import { obtenerSlug } from '@sportcomplex/seed';
+import { obtenerRutaImagenServicio, obtenerSlug } from '@sportcomplex/seed';
 
 export const revalidate = 60;
 
@@ -15,12 +15,21 @@ export async function GET() {
       getCategorias(),
     ]);
 
+    const nombreCategoria = new Map(
+      categorias.map((c: { id: number; nombre: string }) => [c.id, c.nombre]),
+    );
     return ok(
       {
-        servicios: servicios.map((s: { id: number } & Record<string, unknown>) => ({
-          ...s,
-          slug: obtenerSlug(s.id) ?? undefined,
-        })),
+        servicios: servicios.map((s: { id: number; categoriaId: number } & Record<string, unknown>) => {
+          const slug = obtenerSlug(s.id);
+          return {
+            ...s,
+            slug: slug ?? undefined,
+            // Ruta real del mapa canónico (o la de su categoría): el cliente
+            // ya no arma `<nombre>.webp`, que daba 404 (issue #115).
+            imagen: obtenerRutaImagenServicio(slug, nombreCategoria.get(s.categoriaId)),
+          };
+        }),
         categorias,
       },
       {

@@ -51,6 +51,7 @@ export function usePublicCatalog(): PublicCatalogData {
             tipoPiscina?: string | null
             description?: string
             slug?: string
+            imagen?: string
           }>
         }
       }) => {
@@ -76,6 +77,7 @@ export function usePublicCatalog(): PublicCatalogData {
             const serviceSlug = s.slug ?? s.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
             const item: CatalogItem = {
               id: serviceSlug,
+              dbId: s.id,
               name: s.nombre,
               category: catSlug,
               sede: 'Poblado',
@@ -83,7 +85,9 @@ export function usePublicCatalog(): PublicCatalogData {
               price: Number(s.tarifa) || 0,
               capacity: s.capacidadMaxima || 1,
               status: s.estado === 'ACTIVO' ? 'Disponible' : 'Mantenimiento',
-              image: `/images/catalogo/${serviceSlug}.webp`,
+              // La ruta la resuelve el servidor con el mapa canónico de imágenes;
+              // armarla desde el nombre daba 404 (issue #115).
+              image: s.imagen ?? `/images/catalogo/categoria-${catSlug}.webp`,
             }
             if (s.tipoPiscina) {
               item.poolType = s.tipoPiscina as 'PUBLICA' | 'PRIVADA'

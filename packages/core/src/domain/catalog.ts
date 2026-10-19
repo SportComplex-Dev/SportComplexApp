@@ -75,7 +75,10 @@ export function categoryBySlug(slug: string): ServiceCategory | undefined {
 export type CatalogStatus = 'Disponible' | 'Mantenimiento' | 'Ocupado';
 
 export interface CatalogItem {
+  /** Slug del servicio (rutas `/services/<categoria>/<id>`). */
   id: string;
+  /** `servicio.id` en la BD: es el `serviceId` que exigen las APIs de reserva. */
+  dbId?: number;
   name: string;
   category: CategorySlug;
   subCategory?: string;

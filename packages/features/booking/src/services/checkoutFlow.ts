@@ -77,3 +77,70 @@ export function resolvePaymentOutcome({
     onPending();
   }
 }
+
+export type TipoErrorReserva = 'sesion' | 'datos' | 'disponibilidad' | 'servidor'
+
+export interface ErrorReserva {
+  tipo: TipoErrorReserva
+  titulo: string
+  mensaje: string
+}
+
+/** Códigos de `/api/bookings` que significan "ese horario ya no se puede tomar". */
+const CODIGOS_DISPONIBILIDAD = new Set([
+  'CAPACITY_EXCEEDED',
+  'SLOT_BLOCKED',
+  'SLOT_IN_PAST',
+  'SLOT_NOT_FOUND',
+  'SERVICE_UNAVAILABLE',
+  'HOLD_EXPIRED',
+])
+const CODIGOS_SESION = new Set(['UNAUTHORIZED', 'FORBIDDEN'])
+
+/**
+ * Clasifica el rechazo de `POST /api/bookings` por su código real
+ * (`data.error.code`), para que el checkout no muestre un texto genérico
+ * (issue #115): sesión inválida, datos inválidos o conflicto de disponibilidad.
+ */
+export function clasificarErrorReserva(
+  status: number,
+  body: { error?: { code?: string; message?: string } } | null | undefined,
+): ErrorReserva {
+  const code = body?.error?.code
+  const detalle = body?.error?.message
+  if (status === 401 || status === 403 || (code && CODIGOS_SESION.has(code))) {
+    return {
+      tipo: 'sesion',
+      titulo: 'Tu sesión no es válida',
+      mensaje: 'Inicia sesión con tu cuenta de cliente para reservar este horario.',
+    }
+  }
+  if ((code && CODIGOS_DISPONIBILIDAD.has(code)) || status === 409) {
+    return {
+      tipo: 'disponibilidad',
+      titulo: 'Ese horario ya no está disponible',
+      mensaje: detalle || 'El cupo se ocupó o la franja dejó de estar disponible. Elige otro horario.',
+    }
+  }
+  if (status >= 400 && status < 500) {
+    return {
+      tipo: 'datos',
+      titulo: 'No se pudo reservar el horario',
+      mensaje: detalle || 'Los datos de la reserva no son válidos. Vuelve a seleccionar el servicio y el horario.',
+    }
+  }
+  return {
+    tipo: 'servidor',
+    titulo: 'No se pudo reservar el horario',
+    mensaje: detalle || 'Ocurrió un error en el servidor. Intenta de nuevo en unos minutos.',
+  }
+}
+
+/**
+ * `serviceId` numérico que exigen las APIs de reserva (issue #114): el `id` del
+ * catálogo es el slug; el número viene en `dbId`. `null` si no se puede resolver.
+ */
+export function resolverServiceIdReserva(item: { id: string; dbId?: number }): number | null {
+  const id = item.dbId ?? Number(item.id)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
