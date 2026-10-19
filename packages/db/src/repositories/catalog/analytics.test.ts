@@ -111,6 +111,28 @@ test("TSK-BE-24 Mock: filtro de fecha y agrupación semanal", async () => {
   assert.equal(res.filters.period, "weekly");
 });
 
+test("TSK-BE-24: getAnalytics ignora `_state` y usa solo $queryRawUnsafe (regresión)", async () => {
+  const consultas: string[] = [];
+  const dbSinMock = {
+    // Si el repositorio volviera a ramificar por `_state`, este pago se contaría.
+    _state: {
+      pagos: [
+        { estado: "APROBADO", monto: 999999, tipo: "RESERVA", creadoEn: new Date() },
+      ],
+    },
+    $queryRawUnsafe: async (sql: string) => {
+      consultas.push(sql);
+      return [];
+    },
+  } as any;
+
+  const res = await getAnalytics({ db: dbSinMock, period: "daily" });
+
+  assert.equal(consultas.length, 4, "debe consultar las 4 vistas");
+  assert.equal(res.summary.totalRevenue, 0, "no debe leer el estado en memoria");
+  assert.equal(res.summary.totalTransactions, 0);
+});
+
 test("TSK-BE-24 Criterio de Aceptación Clave (BD Real): responde en < 2 s y cuadra contra COUNT directo transaccional", async (t) => {
   const connectionUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
   if (!connectionUrl) {
