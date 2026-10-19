@@ -60,6 +60,11 @@ COPY --from=builder /app/packages/db/prisma.config.ts ./packages/db/prisma.confi
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
+# El optimizador de imágenes de Next escribe en `.next/cache`, que no existe en
+# el output standalone y `/app` pertenece a root: con USER nodejs cada imagen
+# fallaba con `EACCES: permission denied, mkdir '/app/apps/web/.next/cache'`
+# (unhandledRejection por request + cero caché de imágenes).
+RUN mkdir -p /app/apps/web/.next/cache && chown -R nodejs:nodejs /app/apps/web/.next
 USER nodejs
 EXPOSE 3000
 ENV PORT=3000
