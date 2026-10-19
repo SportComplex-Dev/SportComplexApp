@@ -66,7 +66,7 @@ export function TopBar() {
           <Brand />
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex" aria-label="Navegación principal">
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
           {navItems.map(({ label, href }) => (
             <Link
               key={href}
@@ -78,7 +78,7 @@ export function TopBar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle dark={dark} onToggle={toggleTheme} />
           <span className="topbar-action-divider" aria-hidden="true" />
           {ready && session ? (
@@ -93,7 +93,7 @@ export function TopBar() {
             whileTap={shouldReduceMotion ? undefined : { scale: 0.92 }}
             aria-label={openMenu ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={openMenu}
-            className="mobile-menu md:hidden"
+            className="mobile-menu lg:hidden"
             onClick={() => setOpenMenu(!openMenu)}
           >
             {openMenu ? <X size={20} /> : <Menu size={20} />}
@@ -108,7 +108,7 @@ export function TopBar() {
             animate={shouldReduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="mobile-nav overflow-hidden"
+            className="mobile-nav overflow-y-auto max-h-[calc(100vh-65px)]"
           >
             {navItems.map(({ label, href }) => (
               <Link key={href} href={href} onClick={close}>

@@ -205,15 +205,15 @@ function MembershipPortalContent() {
       <main className="section-shell app-page no-print pb-16">
         {/* Encabezado del Portal de Membresías */}
         <div className="welcome-row mb-8">
-          <div>
-            <div className="eyebrow flex items-center gap-2">
-              <Crown size={14} className="text-[#c9ef75]" />
-              <span>MEMBRESÍAS Y BENEFICIOS EXCLUSIVOS</span>
+          <div className="min-w-0 max-w-full">
+            <div className="eyebrow flex flex-wrap items-center gap-2">
+              <Crown size={14} className="text-[#c9ef75] shrink-0" />
+              <span className="break-words">MEMBRESÍAS Y BENEFICIOS EXCLUSIVOS</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 mb-2 break-words">
               Membresías con <span className="text-[#c9ef75]">30 % de Descuento</span> Permanente
             </h1>
-            <p className="text-[var(--subtle)] text-sm max-w-2xl leading-relaxed">
+            <p className="text-[var(--subtle)] text-sm max-w-2xl leading-relaxed break-words">
               Disfruta de la mejor experiencia deportiva con tarifas preferenciales en todas tus reservas
               de canchas, pistas y acceso total al complejo deportivo. Tarifas transparentes sin cargos ocultos.
             </p>
@@ -261,8 +261,8 @@ function MembershipPortalContent() {
               </div>
 
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                  <div className="flex items-center gap-2.5 mb-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5 mb-2">
                     <Badge variant="success" className="text-xs font-bold px-3 py-1 bg-[#c9ef75] text-[#091b13]">
                       MEMBRESÍA {membresiaActiva.estado}
                     </Badge>
@@ -270,7 +270,7 @@ function MembershipPortalContent() {
                       PLAN #{membresiaActiva.plan?.id ?? membresiaActiva.id}
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-1">
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-1 break-words">
                     {membresiaActiva.plan?.nombre || 'Plan de Membresía Activo'}
                   </h2>
                   <p className="text-xs sm:text-sm text-[#d1fae5] max-w-xl">
@@ -279,7 +279,7 @@ function MembershipPortalContent() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-xl border border-white/10 shrink-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-xl border border-white/10 shrink-0">
                   <div>
                     <span className="text-[11px] text-gray-300 flex items-center gap-1">
                       <Calendar size={12} /> Fecha de Inicio
@@ -343,7 +343,7 @@ function MembershipPortalContent() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
               {planes.map((plan) => {
                 const isCurrent = membresiaActiva?.plan?.id === plan.id && isVigente
                 const isSubscribingThis = subscribingPlanId === plan.id
@@ -360,7 +360,7 @@ function MembershipPortalContent() {
                     )}
 
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                         <span className="membership-kicker">PLAN {plan.periodicidad}</span>
                         <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#c9ef75] text-[#091b13]">
                           30% DTO. EN RESERVAS
@@ -375,7 +375,7 @@ function MembershipPortalContent() {
                           </span>
                           <span className="text-[11px] text-[var(--subtle)]">/ {plan.periodicidadLabel.toLowerCase()}</span>
                         </div>
-                        <div className="mt-2 pt-2 border-t border-[var(--line)] flex items-center justify-between text-[11px]">
+                        <div className="mt-2 pt-2 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-1 text-[11px]">
                           <span className="text-[var(--subtle)]">Beneficio exclusivo:</span>
                           <span className="text-[#557b53] dark:text-[#c9ef75] font-bold">
                             30% OFF en canchas y piscinas
