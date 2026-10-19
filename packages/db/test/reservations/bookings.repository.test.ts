@@ -383,6 +383,53 @@ test("TSK-BE-30: rechaza huecos antes de crear holds", async () => {
   assert.equal(mock._state.reservas.length, before);
 });
 
+test("TSK-BE-30: revierte todas las franjas si una ya no tiene cupo", async () => {
+  const first = addAforoSlot(1);
+  const franjaId = mock._state.franjas.length + 1;
+  const availabilityId = BigInt(mock._state.disponibilidades.length + 1);
+  const secondStart = new Date(`${first.date}T11:00:00-05:00`);
+  const secondEnd = new Date(`${first.date}T12:00:00-05:00`);
+  mock._state.franjas.push({
+    id: franjaId,
+    servicioId: first.serviceId,
+    diaSemana: mock._state.franjas.at(-1).diaSemana,
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 11)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 12)),
+  });
+  mock._state.disponibilidades.push({
+    id: availabilityId,
+    servicioId: first.serviceId,
+    franjaId,
+    fecha: new Date(`${first.date}T00:00:00.000Z`),
+    cuposTotales: 1,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+  await createBookingHold({
+    serviceId: first.serviceId,
+    startTime: secondStart.toISOString(),
+    endTime: secondEnd.toISOString(),
+    cantidadCupos: 1,
+    userId: "00000000-0000-4000-8000-00000000be32",
+  });
+  const firstAvailability = mock._state.disponibilidades.find((item: any) => item.id === first.availabilityId);
+  const beforeReservations = mock._state.reservas.length;
+
+  await assert.rejects(
+    createContinuousBookingHoldCart({
+      userId: "00000000-0000-4000-8000-00000000be33",
+      items: [
+        { serviceId: first.serviceId, startTime: first.startsAt.toISOString(), endTime: first.endsAt.toISOString(), cantidadCupos: 1 },
+        { serviceId: first.serviceId, startTime: secondStart.toISOString(), endTime: secondEnd.toISOString(), cantidadCupos: 1 },
+      ],
+    }),
+    (error: unknown) => error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
+  );
+
+  assert.equal(mock._state.reservas.length, beforeReservations);
+  assert.equal(firstAvailability.cuposOcupados, 0);
+});
+
 test("SCRUM-163: fallo atómico en createBookingHoldCart si 1 ítem no tiene cupos → 0 holds creados", async () => {
   const slot1 = addAforoSlot(10);
   const slot2 = addAforoSlot(1);
