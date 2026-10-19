@@ -219,12 +219,12 @@ export function AdminMembershipsView({
 
       {/* Tabs y Buscador */}
       <Card className="p-4 sm:p-5 border-border bg-card shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-border">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-border">
           {/* Tabs Segmentados */}
           <div
             role="tablist"
             aria-label="Segmentos de membresías"
-            className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl max-w-full overflow-x-auto"
+            className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl overflow-x-auto shrink-0 scrollbar-none"
           >
             <button
               type="button"
@@ -232,7 +232,7 @@ export function AdminMembershipsView({
               aria-selected={activeTab === 'active'}
               data-testid="tab-active"
               onClick={() => setActiveTab('active')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+              className={`whitespace-nowrap shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'active'
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -251,7 +251,7 @@ export function AdminMembershipsView({
               aria-selected={activeTab === 'none'}
               data-testid="tab-none"
               onClick={() => setActiveTab('none')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+              className={`whitespace-nowrap shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'none'
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -270,7 +270,7 @@ export function AdminMembershipsView({
               aria-selected={activeTab === 'expired'}
               data-testid="tab-expired"
               onClick={() => setActiveTab('expired')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+              className={`whitespace-nowrap shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'expired'
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -285,7 +285,7 @@ export function AdminMembershipsView({
           </div>
 
           {/* Buscador en tiempo real */}
-          <div className="relative w-full md:w-80">
+          <div className="relative w-full lg:w-72 shrink-0">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
@@ -325,7 +325,7 @@ export function AdminMembershipsView({
                 <th className="py-3 px-4">
                   {activeTab === 'active' ? 'Próxima Renovación' : 'Fecha Fin / Expiración'}
                 </th>
-                <th className="py-3 px-4 text-right">Identificador</th>
+                <th className="py-3 px-4 text-right hidden md:table-cell">Identificador</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -386,17 +386,26 @@ export function AdminMembershipsView({
                     {/* Estado con Badge */}
                     <td className="py-3.5 px-4">
                       {activeTab === 'active' && (
-                        <Badge variant="success" className="text-xs font-semibold">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                        >
                           Vigente
                         </Badge>
                       )}
                       {activeTab === 'none' && (
-                        <Badge variant="secondary" className="text-xs font-semibold">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                        >
                           Sin Membresía
                         </Badge>
                       )}
                       {activeTab === 'expired' && (
-                        <Badge variant="warning" className="text-xs font-semibold">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+                        >
                           Histórico / Vencida
                         </Badge>
                       )}
@@ -413,7 +422,7 @@ export function AdminMembershipsView({
                     </td>
 
                     {/* ID */}
-                    <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">
+                    <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground hidden md:table-cell">
                       <span title={member.id}>
                         {member.id.length > 12 ? `${member.id.substring(0, 8)}...` : member.id}
                       </span>
