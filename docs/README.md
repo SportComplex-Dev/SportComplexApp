@@ -35,6 +35,7 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | Doc | Dominio |
 |---|---|
 | [features/auth.md](./features/auth.md) | Google OAuth, vinculación de cuentas, plan de backend de auth, fix de login, empleados/roles y reglas de borrado |
+| [features/recuperacion-contrasena.md](./features/recuperacion-contrasena.md) | Flujo de recuperación y restablecimiento de contraseña (`/forgot-password`, `/reset-password`), Zod y Suspense |
 | [features/catalogo.md](./features/catalogo.md) | CRUD de categorías e instancias con unicidad y calendario propio |
 | [features/reservas.md](./features/reservas.md) | Franjas horarias y aforo, ventana de 15 días, bloqueo temporal en checkout, multirreserva y multi-servicio en la misma franja, historial con cursor |
 | [features/piscinas.md](./features/piscinas.md) | Motor de mantenimiento de piscinas, modalidad aforo concurrente/exclusividad |
@@ -71,6 +72,7 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 | [automation/workflows.md](./automation/workflows.md) | Workflows n8n por funcionalidad: OTP, QR, contingencia (con reintentos), reporte gerencial, festivos, cobro fallido, gestión de errores |
 | [automation/webhooks.md](./automation/webhooks.md) | Integración de webhooks Stripe/Resend y sistema de contingencia |
 | [automation/implementation-guide.md](./automation/implementation-guide.md) | Guía práctica de integración n8n en el backend |
+| [automation/plantilla-correo-ticket.md](./automation/plantilla-correo-ticket.md) | Plantilla de correo y pase QR transaccional (TSK-FE-37) |
 
 ## Infraestructura y despliegue
 
