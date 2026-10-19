@@ -62,11 +62,14 @@ export function ScannerCameraView({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Contenedor DOM para html5-qrcode */}
+        {/* Contenedor DOM para html5-qrcode. La altura es FIJA (`h-[260px]`) y
+            no `min-h`: el <video> que inyecta la librería se estira con
+            `height:100%` (ver globals.css) y necesita un padre con altura
+            resuelta para no desbordarse. */}
         <div
           id="qr-reader"
-          className={`w-full overflow-hidden rounded-xl border border-[var(--brand-border)] bg-black/5 dark:bg-black/40 min-h-[260px] flex items-center justify-center ${
-            consultationCameraActive ? "block" : "hidden"
+          className={`w-full overflow-hidden rounded-xl border border-[var(--brand-border)] bg-black/5 dark:bg-black/40 h-[260px] flex items-center justify-center ${
+            consultationCameraActive ? "" : "hidden"
           }`}
         />
 
