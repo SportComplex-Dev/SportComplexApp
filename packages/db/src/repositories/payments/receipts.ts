@@ -28,6 +28,8 @@ export interface ReceiptTicket {
   estado: "EMITIDO" | "USADO";
   emitidoEn: Date;
   usadoEn: Date | null;
+  inicioValidez: Date | null;
+  finValidez: Date | null;
 }
 
 export interface ReceiptData {
@@ -84,6 +86,8 @@ export async function getReceiptReserva(
           estado: true,
           emitidoEn: true,
           usadoEn: true,
+          inicioValidez: true,
+          finValidez: true,
         },
       },
     },

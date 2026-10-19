@@ -1,4 +1,4 @@
-import { buildTicketQrPayload, signTicket } from "@sportcomplex/core";
+import { buildTicketQrPayload, signTicket } from "@sportcomplex/security";
 import {
   getReceiptReserva,
   ReceiptError,
@@ -228,13 +228,29 @@ export async function construirComprobante(
   autorizarComprobante({ solicitante, titularId: reserva.titular.id });
 
   const { disponibilidad, titular, ticketQr } = reserva;
-  const inicio = instanteDeFranja(disponibilidad.fecha, disponibilidad.franja.horaInicio);
-  const fin = instanteDeFranja(disponibilidad.fecha, disponibilidad.franja.horaFin);
+  const inicio = ticketQr?.inicioValidez ?? instanteDeFranja(disponibilidad.fecha, disponibilidad.franja.horaInicio);
+  const fin = ticketQr?.finValidez ?? instanteDeFranja(disponibilidad.fecha, disponibilidad.franja.horaFin);
+  const horaVentana = (instant: Date) => new Intl.DateTimeFormat("en-GB", {
+    timeZone: BOGOTA_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(instant);
 
   // Firma en servidor: el `payload` que ve el cliente es el que se valida en
   // portería (RF-13), pero el secreto nunca sale de aquí.
   const payload = ticketQr
-    ? buildTicketQrPayload(ticketQr.codigoUuid, signTicket(ticketQr.codigoUuid, qrSecret))
+    ? buildTicketQrPayload(
+        ticketQr.codigoUuid,
+        signTicket(
+          ticketQr.codigoUuid,
+          qrSecret,
+          ticketQr.inicioValidez && ticketQr.finValidez
+            ? { start: ticketQr.inicioValidez, end: ticketQr.finValidez }
+            : undefined,
+        ),
+      )
     : null;
   const qr = payload
     ? {
@@ -266,9 +282,9 @@ export async function construirComprobante(
       id: disponibilidad.servicio.id,
       nombre: disponibilidad.servicio.nombre,
       modalidad: disponibilidad.servicio.modalidad,
-      fecha: disponibilidad.fecha.toISOString().slice(0, 10),
-      horaInicio: horaLegible(disponibilidad.franja.horaInicio),
-      horaFin: horaLegible(disponibilidad.franja.horaFin),
+      fecha: inicio.toLocaleDateString("en-CA", { timeZone: BOGOTA_TIME_ZONE }),
+      horaInicio: ticketQr?.inicioValidez ? horaVentana(inicio) : horaLegible(disponibilidad.franja.horaInicio),
+      horaFin: ticketQr?.finValidez ? horaVentana(fin) : horaLegible(disponibilidad.franja.horaFin),
       ventana: { inicio: inicio.toISOString(), fin: fin.toISOString() },
     },
     titular: { id: titular.id, nombre: titular.nombre, correo: titular.correo || null },
