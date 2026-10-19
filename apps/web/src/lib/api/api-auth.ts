@@ -3,6 +3,10 @@ import { fail } from '@sportcomplex/shared/lib';
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from "@/lib/supabase/server";
 import { prisma } from "@sportcomplex/db";
 import { normalizeRole, type CanonicalRole } from "@/lib/auth/session";
+import {
+  getAuthenticateOverride,
+  type SessionLike,
+} from "@/lib/api/auth-overrides";
 import { headers } from "next/headers";
 
 export interface ApiActor {
@@ -13,10 +17,6 @@ export interface ApiActor {
 export type ApiAuthorization =
   | { authorized: true; actor: ApiActor }
   | { authorized: false; response: Response };
-
-interface SessionLike {
-  user?: { id?: string | null; email?: string | null } | null;
-}
 
 export interface AuthorizationAccount {
   id: string;
@@ -49,17 +49,10 @@ export async function authorizeApiRequest(
   dependencies: AuthorizationDependencies = {},
 ): Promise<ApiAuthorization> {
   try {
-    const injectedSession =
-      process.env.NODE_ENV === "test"
-        ? (globalThis as typeof globalThis & {
-            __scAuthSession?: SessionLike | null;
-          }).__scAuthSession
-        : undefined;
-    if (
-      process.env.NODE_ENV !== "test" &&
-      !dependencies.authenticate &&
-      injectedSession === undefined
-    ) {
+    const authenticateOverride =
+      dependencies.authenticate ?? getAuthenticateOverride();
+
+    if (!authenticateOverride) {
       const requestHeaders = await headers();
       const userId = requestHeaders.get("x-sc-authenticated-user-id");
       const role = normalizeRole(requestHeaders.get("x-sc-authenticated-role"));
@@ -74,15 +67,11 @@ export async function authorizeApiRequest(
       }
     }
 
-    const authenticate =
-      dependencies.authenticate ??
-      (injectedSession !== undefined
-        ? async () => injectedSession
-        : auth);
+    const authenticate = authenticateOverride ?? auth;
     let session = await authenticate();
     if (
+      !authenticateOverride &&
       !session?.user?.id &&
-      process.env.NODE_ENV !== "test" &&
       isSupabaseAuthConfigured()
     ) {
       const requestHeaders = await headers();
@@ -115,12 +104,7 @@ export async function authorizeApiRequest(
       };
     }
 
-    const db: AuthorizationDatabase =
-      dependencies.db ??
-      (process.env.NODE_ENV === "test"
-        ? (globalThis as unknown as { __scPrisma?: AuthorizationDatabase }).__scPrisma
-        : undefined) ??
-      prisma;
+    const db: AuthorizationDatabase = dependencies.db ?? prisma;
     const account = (await db.usuario.findUnique({
       where: { id: userId },
       select: {

@@ -5,9 +5,9 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  *
  * En producción siempre es `PrismaClient` (o su cliente transaccional).
  * En tests se inyecta el doble de `test/mocks` (`createMockPrisma`), que
- * replica por duck-typing los delegados usados (`_state` + modelos +
- * `$transaction`). Los tests no se verifican con tsc (ver `tsconfig`),
- * así que el contrato con el mock vive en `test/mocks/*.ts`, no aquí.
+ * replica por duck-typing los delegados usados (modelos + `$transaction`).
+ * Los tests no se verifican con tsc (ver `tsconfig`), así que el contrato
+ * con el mock vive en `test/mocks/*.ts`, no aquí.
  */
 export type ClienteDb = PrismaClient | Prisma.TransactionClient;
 

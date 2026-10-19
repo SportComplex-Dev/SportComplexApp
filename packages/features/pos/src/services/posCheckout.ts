@@ -53,12 +53,24 @@ function defaultFail(
 
 async function resolveDb(injected?: PosDatabaseClient | unknown): Promise<PosDatabaseClient> {
   if (injected) return injected as PosDatabaseClient;
-  if (process.env.NODE_ENV === "test") {
-    const testDb = (globalThis as unknown as { __scPrisma?: unknown }).__scPrisma;
-    if (testDb) return testDb as PosDatabaseClient;
-  }
   const dbModule = await import("@sportcomplex/db");
   return dbModule.prisma as unknown as PosDatabaseClient;
+}
+
+type PosAuthSession = {
+  user?: { id?: string | null; email?: string | null; role?: string | null } | null;
+};
+
+let authenticateOverride: (() => Promise<PosAuthSession | null>) | undefined;
+
+/**
+ * Composición: sustituye el proveedor de sesión cuando el handler se ejecuta
+ * fuera de NextAuth. No lee variables de entorno ni conoce a los tests.
+ */
+export function configurePosAuthorization(
+  authenticate: (() => Promise<PosAuthSession | null>) | undefined,
+): void {
+  authenticateOverride = authenticate;
 }
 
 async function defaultAuthorize(
@@ -66,16 +78,9 @@ async function defaultAuthorize(
   db: PosDatabaseClient,
   failFn: typeof defaultFail,
 ): Promise<PosAuthorizationResult> {
-  const injectedSession =
-    process.env.NODE_ENV === "test"
-      ? (globalThis as unknown as {
-          __scAuthSession?: {
-            user?: { id?: string | null; email?: string | null; role?: string | null } | null;
-          } | null;
-        }).__scAuthSession
-      : undefined;
+  const session = authenticateOverride ? await authenticateOverride() : undefined;
 
-  const userId = injectedSession?.user?.id;
+  const userId = session?.user?.id;
   if (!userId) {
     return {
       authorized: false,
@@ -92,9 +97,9 @@ async function defaultAuthorize(
       rol: { select: { nombre: true } },
     },
   })) ?? (
-    injectedSession?.user?.email
+    session?.user?.email
       ? await db.usuario.findUnique({
-          where: { correo: injectedSession.user.email },
+          where: { correo: session.user.email },
           select: {
             id: true,
             estado: true,
@@ -112,7 +117,7 @@ async function defaultAuthorize(
     };
   }
 
-  const rawRole = (account.rol?.nombre || injectedSession?.user?.role || "").trim().toUpperCase();
+  const rawRole = (account.rol?.nombre || session?.user?.role || "").trim().toUpperCase();
   let role: string | null = null;
   if (rawRole === "ADMIN" || rawRole === "ADMINISTRADOR") {
     role = "Administrador";

@@ -7,10 +7,14 @@ const mock = createMockPrisma();
 Reflect.set(process.env, "NODE_ENV", "test");
 (globalThis as any).__scPrisma = mock;
 
-const { createPosCheckoutPostHandler } = await import("./posCheckout");
+const { createPosCheckoutPostHandler, configurePosAuthorization } = await import("./posCheckout");
 
 const VENDEDOR_ID = "00000000-0000-4000-8000-000000000020";
 const CLIENTE_ID = "00000000-0000-4000-8000-000000000001";
+
+function setSession(session: any) {
+  configurePosAuthorization(async () => session);
+}
 
 // Handler con inyección controlada de Stripe para test
 const mockCreatePaymentIntent = async (input: any) => ({
@@ -58,7 +62,7 @@ function resetDb() {
 
 test("POS API: 401 si no hay sesión autenticada", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = null;
+  setSession(null);
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -79,9 +83,9 @@ test("POS API: 401 si no hay sesión autenticada", async () => {
 
 test("POS API: 403 si el rol autenticado es Cliente (exclusivo para Taquilla)", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: CLIENTE_ID, email: "cliente@akros.test", role: "Cliente" },
-  };
+  });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -102,9 +106,9 @@ test("POS API: 403 si el rol autenticado es Cliente (exclusivo para Taquilla)", 
 
 test("POS API (RN-13 / RF-17): 400 si se intenta pagar en efectivo (cero efectivo)", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -128,9 +132,9 @@ test("POS API (RN-13 / RF-17): 400 si se intenta pagar en efectivo (cero efectiv
 
 test("POS API (SEC-03 / RN-08): cliente sin membresía VIGENTE no recibe descuento del 30% aunque envíe esSocio: true", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -159,9 +163,9 @@ test("POS API (SEC-03 / RN-08): cliente sin membresía VIGENTE no recibe descuen
 
 test("POS API (SEC-03 / RN-08): cliente CON membresía VIGENTE sí recibe descuento automático del 30%", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   // Registrar membresía VIGENTE en la BD para el cliente
   mock._state.membresias.push({
@@ -200,9 +204,9 @@ test("POS API (SEC-03 / RN-08): cliente CON membresía VIGENTE sí recibe descue
 
 test("POS API (PERF-01): 409 CAPACITY_EXCEEDED si los cupos solicitados superan el límite", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   mock._state.disponibilidades.push({
     id: 101n,
@@ -238,9 +242,9 @@ test("POS API (PERF-01): 409 CAPACITY_EXCEEDED si los cupos solicitados superan 
 
 test("POS API (PERF-01): 409 SLOT_BLOCKED si la franja está bloqueada por mantenimiento", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   mock._state.disponibilidades.push({
     id: 102n,
@@ -276,9 +280,9 @@ test("POS API (PERF-01): 409 SLOT_BLOCKED si la franja está bloqueada por mante
 
 test("POS API (SEC-02 / ARCH-01): venta presencial emite PaymentIntent y crea reserva PENDIENTE_PAGO", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -344,9 +348,9 @@ test("POS API: rechaza montos bajo el mínimo de Stripe sin crear reserva ni ocu
 
 test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo compatible con /checkout", async () => {
   resetDb();
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
     method: "POST",
@@ -382,9 +386,9 @@ test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo
 test("POS API (ARCH-03): genera sesión real de Stripe Checkout cuando createCheckoutSession está inyectado", async () => {
   resetDb();
   let sesionPedida: any;
-  (globalThis as any).__scAuthSession = {
+  setSession({
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
-  };
+  });
 
   const handlerConStripe = createPosCheckoutPostHandler({
     createPaymentIntent: mockCreatePaymentIntent as any,

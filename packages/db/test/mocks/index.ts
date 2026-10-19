@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { crearEstadoInicial } from "./estado.js";
+import { consultarVistasAnalitica } from "./analitica.js";
 import { crearUsuarioHandler } from "./fabricas/usuario.js";
 import { crearServicioHandler } from "./fabricas/servicio.js";
 import { crearDisponibilidadHandler } from "./fabricas/disponibilidad.js";
@@ -9,6 +10,7 @@ import { crearTicketHandler } from "./fabricas/ticket.js";
 import { crearMembresiaHandler } from "./fabricas/membresia.js";
 
 export * from "./estado.js";
+export * from "./analitica.js";
 export * from "./utilidades.js";
 export * from "./fabricas/usuario.js";
 export * from "./fabricas/servicio.js";
@@ -108,6 +110,9 @@ export function createMockPrisma() {
     },
     async $queryRaw() {
       return [];
+    },
+    async $queryRawUnsafe(sql: string, ...params: unknown[]) {
+      return consultarVistasAnalitica(state, sql, params);
     },
     categoriaServicio: servicioHandlers.categoriaServicio,
     servicio: servicioHandlers.servicio,

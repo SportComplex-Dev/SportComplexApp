@@ -44,6 +44,23 @@ function createFakeDb(opts?: { withRaw?: boolean }) {
       async findUnique({ where }: any) {
         return disps.get(where.id) ?? null;
       },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const d of disps.values()) {
+          if (where.id !== undefined && d.id !== where.id) continue;
+          if (
+            where.cuposOcupados?.gte !== undefined &&
+            d.cuposOcupados < where.cuposOcupados.gte
+          ) continue;
+          if (data.cuposOcupados?.decrement !== undefined) {
+            d.cuposOcupados -= data.cuposOcupados.decrement;
+          } else if (data.cuposOcupados !== undefined) {
+            d.cuposOcupados = data.cuposOcupados;
+          }
+          count++;
+        }
+        return { count };
+      },
       async update({ where, data }: any) {
         const d = disps.get(where.id);
         if (!d) throw new Error("disp not found");
@@ -60,8 +77,9 @@ function createFakeDb(opts?: { withRaw?: boolean }) {
     },
   };
 
+  tx.$queryRaw = async () => [{ acquired: true }];
+
   if (withRaw) {
-    tx.$queryRaw = async () => [{ acquired: true }];
     tx.$executeRaw = async (_q: unknown, ..._args: unknown[]) => {
       // Simula GREATEST(0, ocupados - cantidad): el repo pasa cantidad e id
       // vía template; como el fake no interpola, el fallback ORM no se usa

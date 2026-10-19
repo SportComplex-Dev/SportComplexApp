@@ -13,8 +13,8 @@ import type { ClienteDb, TxDb } from "../tipos-db";
  *   fila, exactamente una gana (`count === 1`); la otra ve `count === 0` y no
  *   libera cupos de nuevo. Correr el job dos veces no altera el resultado.
  * - Seguro ante solapamiento: además del guard condicional, se intenta un
- *   `pg_try_advisory_xact_lock` best-effort dentro de la transacción (solo en
- *   Postgres real; en mocks/tests se ignora y la corrección la da el guard).
+ *   `pg_try_advisory_xact_lock` best-effort dentro de la transacción. Si otro
+ *   corredor tiene el lock, la corrida se omite (`skippedDueToLock`).
  * - No decrementa bajo cero: `GREATEST(0, cupos_ocupados - cantidad)`.
  * - Rendimiento: usa el índice parcial
  *   `reserva_expira_ttl_idx ON reserva(expira_en) WHERE estado='PENDIENTE_PAGO'`
@@ -96,26 +96,15 @@ export async function expireReservasVencidas(
 
   // 2. Transacción: lock best-effort + updates condicionales por fila.
   await db.$transaction(async (tx: TxDb) => {
-    // Advisory lock solo en Postgres real; en mocks $queryRaw no existe o falla.
-    try {
-      if (typeof tx.$queryRaw === "function") {
-        const rows = await tx.$queryRaw<
-          Array<{ acquired: boolean }>
-        >`SELECT pg_try_advisory_xact_lock(hashtext(${EXPIRE_ADVISORY_LOCK_KEY})) AS acquired`;
-        if (rows?.[0]?.acquired === false) {
-          throw Object.assign(new Error("EXPIRE_LOCK_BUSY"), {
-            code: "EXPIRE_LOCK_BUSY",
-          });
-        }
-      }
-    } catch (err: unknown) {
-      if (
-        err instanceof Error &&
-        (err as { code?: string }).code === "EXPIRE_LOCK_BUSY"
-      ) {
-        throw err;
-      }
-      // Ignorar: mock/test sin $queryRaw o sin pg_advisory.
+    // Serializa corredores del job. `pg_try_advisory_xact_lock` no bloquea:
+    // devuelve false si otro proceso ya tiene el lock.
+    const lockRows = await tx.$queryRaw<
+      Array<{ acquired: boolean }>
+    >`SELECT pg_try_advisory_xact_lock(hashtext(${EXPIRE_ADVISORY_LOCK_KEY})) AS acquired`;
+    if (lockRows?.[0]?.acquired === false) {
+      throw Object.assign(new Error("EXPIRE_LOCK_BUSY"), {
+        code: "EXPIRE_LOCK_BUSY",
+      });
     }
 
     for (const v of vencidas) {
@@ -137,39 +126,19 @@ export async function expireReservasVencidas(
       if (count !== 1) continue; // Ya expirada por corrida concurrente.
 
       // Liberar cupos sin bajar de cero.
-      let released = false;
-      if (typeof tx.$executeRaw === "function") {
-        try {
-          await tx.$executeRaw`UPDATE "disponibilidad" SET "cupos_ocupados" = GREATEST(0, "cupos_ocupados" - ${v.cantidadCupos}) WHERE id = ${v.disponibilidadId}`;
-          released = true;
-        } catch {
-          released = false;
-        }
-      }
-      if (!released && tx.disponibilidad) {
-        try {
-          if (typeof tx.disponibilidad.findUnique === "function") {
-            const disp = await tx.disponibilidad.findUnique({
-              where: { id: v.disponibilidadId },
-            });
-            const cur =
-              (disp?.cuposOcupados as number | undefined) ??
-              v.cantidadCupos;
-            await tx.disponibilidad.update({
-              where: { id: v.disponibilidadId },
-              data: { cuposOcupados: Math.max(0, cur - v.cantidadCupos) },
-            });
-          } else {
-            await tx.disponibilidad.update({
-              where: { id: v.disponibilidadId },
-              data: { cuposOcupados: { decrement: v.cantidadCupos } },
-            });
-          }
-        } catch {
-          // Si el mock no soporta disponibilidad, la reserva ya quedó
-          // expirada (idempotente); el cupo se reconcilia en la próxima
-          // corrida contra Postgres real.
-        }
+      const decremented = await tx.disponibilidad.updateMany({
+        where: {
+          id: v.disponibilidadId,
+          cuposOcupados: { gte: v.cantidadCupos },
+        },
+        data: { cuposOcupados: { decrement: v.cantidadCupos } },
+      });
+      if (decremented.count === 0) {
+        // Datos inconsistentes (cupos < cantidad): se satura en cero.
+        await tx.disponibilidad.updateMany({
+          where: { id: v.disponibilidadId },
+          data: { cuposOcupados: 0 },
+        });
       }
 
       expiredCount += 1;
