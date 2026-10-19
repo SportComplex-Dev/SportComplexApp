@@ -7,3 +7,4 @@ export * from './cart/BookingSummaryModal';
 export * from './checkout/PaymentMethodSelector';
 export * from './checkout/StripePaymentForm';
 export * from './checkout/ReservationModal';
+export * from './SlotPicker';
