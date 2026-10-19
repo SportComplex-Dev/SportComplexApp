@@ -87,6 +87,8 @@ function CheckoutContent() {
   const [holdError, setHoldError] = useState<ErrorReserva | null>(null)
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
+  // Debe declararse antes de cualquier early-return: React #310 (hooks variables entre renders).
+  const [isRedirectingToStripe, setIsRedirectingToStripe] = useState(false)
 
   // Soporte para enlace alternativo / contingencia de taquilla (SRS §11.1 Riesgo 2)
   const sessionId = searchParams.get('session_id') || searchParams.get('reservaId')
@@ -375,8 +377,6 @@ function CheckoutContent() {
       },
     })
   }
-
-  const [isRedirectingToStripe, setIsRedirectingToStripe] = useState(false)
 
   const handleRedirectToStripe = async () => {
     if (!activeDraft || !item || paymentBlocked) return
