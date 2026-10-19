@@ -70,3 +70,6 @@ export function normalizeAnalyticsQuery(raw: AnalyticsQueryInput): NormalizedAna
     period,
   };
 }
+
+// TSK-BE-27 / SCRUM-212 — Re-exportación para consumidores de analytics
+export { adminBookingsQuerySchema, type AdminBookingsQuery } from "./booking.schema.ts";

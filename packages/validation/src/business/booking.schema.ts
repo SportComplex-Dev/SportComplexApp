@@ -45,3 +45,34 @@ export type BookingRequest = z.infer<typeof bookingRequestSchema>;
 export type CartCheckoutRequest = z.infer<typeof cartCheckoutSchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 export type PosCheckoutRequest = z.infer<typeof posCheckoutSchema>;
+
+// TSK-BE-27 / SCRUM-212 — Filtros de consulta administrativa de reservas
+export const adminBookingsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: z
+      .enum([
+        "CONFIRMADA",
+        "PENDIENTE",
+        "PENDIENTE_PAGO",
+        "EXPIRADA",
+        "CANCELADA_ADMINISTRATIVA",
+        "CANCELADA_PAGO",
+        "CANCELADA",
+      ])
+      .optional(),
+    serviceId: z.coerce.number().int().positive().optional(),
+    dateFrom: z.iso.date().optional(),
+    dateTo: z.iso.date().optional(),
+    search: z.string().trim().max(100).optional(),
+  })
+  .refine(
+    (data) => !data.dateFrom || !data.dateTo || data.dateFrom <= data.dateTo,
+    {
+      message: "dateFrom must be earlier than or equal to dateTo",
+      path: ["dateTo"],
+    },
+  );
+
+export type AdminBookingsQuery = z.infer<typeof adminBookingsQuerySchema>;
