@@ -49,10 +49,15 @@ export async function authorizeApiRequest(
   dependencies: AuthorizationDependencies = {},
 ): Promise<ApiAuthorization> {
   try {
-    const authenticateOverride =
-      dependencies.authenticate ?? getAuthenticateOverride();
+    // Puente de pruebas: si el entorno de test instaló un proveedor de sesión,
+    // se respeta y no se consultan los claims del proxy ni Supabase.
+    const sessionBridge = getAuthenticateOverride();
+    const authenticateOverride = dependencies.authenticate ?? sessionBridge;
 
-    if (!authenticateOverride) {
+    // Claims validados por el proxy (fuente de verdad en producción): el proxy
+    // borra los headers que envía el cliente y reinyecta los verificados.
+    // Tienen prioridad porque cubren tanto NextAuth como Supabase.
+    if (!sessionBridge) {
       const requestHeaders = await headers();
       const userId = requestHeaders.get("x-sc-authenticated-user-id");
       const role = normalizeRole(requestHeaders.get("x-sc-authenticated-role"));
@@ -70,7 +75,7 @@ export async function authorizeApiRequest(
     const authenticate = authenticateOverride ?? auth;
     let session = await authenticate();
     if (
-      !authenticateOverride &&
+      !sessionBridge &&
       !session?.user?.id &&
       isSupabaseAuthConfigured()
     ) {

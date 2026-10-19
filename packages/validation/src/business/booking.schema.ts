@@ -10,6 +10,16 @@ export const bookingRequestSchema = z.object({
   canal: z.enum(["ONLINE", "TAQUILLA"]).optional(),
 });
 
+/**
+ * Lock de checkout: acepta los datos de la franja o un `reservationId` ya
+ * bloqueado. Reutilizar el hold existente evita el solapamiento del titular
+ * (el mismo horario ya está en `PENDIENTE_PAGO`) y deja una sola reserva por
+ * intento de pago, igual que el flujo del POS.
+ */
+export const bookingLockRequestSchema = bookingRequestSchema.extend({
+  reservationId: z.string().uuid().optional(),
+});
+
 const cartItemSchema = z.object({
   serviceId: z.coerce.number().int().positive(),
   startTime: z.iso.datetime(),
@@ -73,6 +83,7 @@ export const posCheckoutSchema = z.object({
 });
 
 export type BookingRequest = z.infer<typeof bookingRequestSchema>;
+export type BookingLockRequest = z.infer<typeof bookingLockRequestSchema>;
 export type CartCheckoutRequest = z.infer<typeof cartCheckoutSchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 export type PosCheckoutRequest = z.infer<typeof posCheckoutSchema>;
