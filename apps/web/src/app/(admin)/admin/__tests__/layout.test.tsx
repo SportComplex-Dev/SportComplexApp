@@ -12,6 +12,7 @@ import {
   AdminMobileDrawer,
   type AdminNavItem,
 } from '@/components/layout/admin-mobile-drawer'
+import { UserMenu } from '@/components/layout/user-menu'
 import {
   Home,
   Ticket,
@@ -146,8 +147,6 @@ test('TSK-FE-36 / HU-40: Verificación de soporte responsive en sidebar de admin
     'El sidebar estático de escritorio debe tener clases "hidden md:flex" para ocultarse en < 768px',
   )
 })
-
-import { UserMenu } from '@/components/layout/user-menu'
 
 test('FIX-ADMIN: UserMenu garantiza sesión de respaldo en sidebar y muestra datos de Administrador', () => {
   const html = renderToStaticMarkup(
