@@ -282,9 +282,9 @@ export default function AdminTournamentsPage() {
       </section>
 
       {/* Consola de Filtros con Accesibilidad WCAG */}
-      <section className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <section className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Input de Búsqueda */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[180px]">
           <label htmlFor="admin-search-tournament" className="sr-only">
             Buscar torneo por título
           </label>
@@ -300,7 +300,7 @@ export default function AdminTournamentsPage() {
         </div>
 
         {/* Filtro por Categoría / Deporte */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="admin-category-filter" className="sr-only">
             Filtrar por deporte o categoría
           </label>
@@ -308,7 +308,7 @@ export default function AdminTournamentsPage() {
             id="admin-category-filter"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1 sm:flex-initial"
           >
             <option value="todas">Todos los deportes</option>
             {categories.map((c) => (
@@ -326,7 +326,7 @@ export default function AdminTournamentsPage() {
             id="admin-status-filter"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1 sm:flex-initial"
           >
             <option value="todos">Todos los estados</option>
             <option value="BORRADOR">Borrador</option>

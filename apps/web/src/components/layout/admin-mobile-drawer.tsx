@@ -80,7 +80,7 @@ export function AdminMobileDrawer({
   return (
     <div
       id="admin-mobile-drawer"
-      className="admin-drawer-portal fixed inset-0 z-50 md:hidden"
+      className="admin-drawer-portal fixed inset-0 z-50 lg:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Menú de administración"

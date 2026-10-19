@@ -221,12 +221,12 @@ export function AdminMembershipsView({
 
       {/* Tabs y Buscador */}
       <Card className="p-4 sm:p-5 border-border bg-card shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-border">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 pb-4 border-b border-border">
           {/* Tabs Segmentados */}
           <div
             role="tablist"
             aria-label="Segmentos de membresías"
-            className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl overflow-x-auto shrink-0 scrollbar-none"
+            className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl overflow-x-auto shrink-0 scrollbar-none max-w-full"
           >
             <button
               type="button"
@@ -287,7 +287,7 @@ export function AdminMembershipsView({
           </div>
 
           {/* Buscador en tiempo real */}
-          <div className="relative w-full lg:w-72 shrink-0">
+          <div className="relative w-full xl:w-72 shrink-0">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"

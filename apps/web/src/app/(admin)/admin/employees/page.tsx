@@ -172,17 +172,17 @@ export default function AdminEmployeesPage() {
   return (
     <div className="admin-page-container space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--line)]">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-[var(--line)]">
+        <div className="min-w-0 flex-1">
           <div className="eyebrow text-[#557b53] dark:text-[#9ee285]">SEGURIDAD & ROLES (RF-18 / RN-10)</div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ink)]">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ink)] break-words">
             Personal y Roles Operativos
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--subtle)] mt-1">
+          <p className="text-xs sm:text-sm text-[var(--subtle)] mt-1 break-words">
             Gestión de usuarios internos, asignación de permisos de taquilla o acceso y control de bajas lógicas sin borrado físico.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={fetchEmployees}
@@ -223,7 +223,7 @@ export default function AdminEmployeesPage() {
       <EmployeeStats stats={stats} />
 
       {/* Filtros y Búsqueda */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-3 rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between p-3 rounded-xl border border-[var(--line)] bg-[var(--surface)]">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)]" />
           <Input
