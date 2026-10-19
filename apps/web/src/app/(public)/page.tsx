@@ -14,9 +14,7 @@ import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { usePublicCatalog } from "@sportcomplex/features-booking";
-
-const ASSETS_BASE = process.env.NEXT_PUBLIC_ASSETS_BASE_URL || "";
-const asset = (p: string) => (ASSETS_BASE ? `${ASSETS_BASE}${p}` : p);
+import { getAssetUrl } from "@sportcomplex/core/assets";
 
 const categoryMeta: Record<string, {
   name: string;
@@ -37,21 +35,21 @@ const categoryMeta: Record<string, {
     description: "Carriles y nado libre",
     icon: "pool",
     tone: "blue",
-    image: asset("/catalogo/categoria-piscinas.webp"),
+    image: getAssetUrl("/catalogo/categoria-piscinas.webp"),
   },
   gimnasio: {
     name: "Gimnasio",
     description: "Entrena a tu ritmo",
     icon: "gym",
     tone: "orange",
-    image: asset("/catalogo/categoria-gimnasio.webp"),
+    image: getAssetUrl("/catalogo/categoria-gimnasio.webp"),
   },
   "zona-humeda": {
     name: "Zona húmeda",
     description: "Sauna, turco y jacuzzi",
     icon: "wellness",
     tone: "purple",
-    image: asset("/catalogo/categoria-zona-humeda.webp"),
+    image: getAssetUrl("/catalogo/categoria-zona-humeda.webp"),
   },
 };
 
@@ -117,7 +115,7 @@ export default function HomePage() {
               description: `Servicios de ${nombre.toLowerCase()}`,
               icon: "court" as const,
               tone: "lime",
-image: asset("/catalogo/categoria-canchas.webp"),
+image: getAssetUrl("/catalogo/categoria-canchas.webp"),
             };
             const from = minPrice(catalog, slug as CategorySlug);
             return (

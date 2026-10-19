@@ -1,7 +1,5 @@
 import { mapaIdServicio, obtenerIdBd, type SlugServicio } from '@sportcomplex/seed';
-
-const ASSETS_BASE = process.env.NEXT_PUBLIC_ASSETS_BASE_URL || "";
-const asset = (p: string) => (ASSETS_BASE ? `${ASSETS_BASE}${p}` : p);
+import { getAssetUrl } from '../assets';
 
 export type CategorySlug = 'canchas' | 'piscinas' | 'gimnasio' | 'zona-humeda';
 export type CategoryIcon = 'court' | 'pool' | 'gym' | 'wellness';
@@ -29,7 +27,7 @@ export const serviceCategories: ServiceCategory[] = [
     icon: 'court',
     tone: 'lime',
     unit: 'hora',
-    image: asset('/catalogo/categoria-canchas.webp'),
+    image: getAssetUrl('/catalogo/categoria-canchas.webp'),
     tagline: 'Instalaciones de alto nivel',
     highlight: 'Césped sintético, polvo de ladrillo y pistas de pádel panorámicas con iluminación nocturna.',
   },
@@ -41,7 +39,7 @@ export const serviceCategories: ServiceCategory[] = [
     icon: 'pool',
     tone: 'blue',
     unit: 'entrada',
-    image: asset('/catalogo/categoria-piscinas.webp'),
+    image: getAssetUrl('/catalogo/categoria-piscinas.webp'),
     tagline: 'Espacios acuáticos climatizados',
     highlight: 'Carriles semiolímpicos de entrenamiento y zona recreativa infantil.',
   },
@@ -53,7 +51,7 @@ export const serviceCategories: ServiceCategory[] = [
     icon: 'gym',
     tone: 'orange',
     unit: 'sesión',
-    image: asset('/catalogo/categoria-gimnasio.webp'),
+    image: getAssetUrl('/catalogo/categoria-gimnasio.webp'),
     tagline: 'Fuerza, rendimiento y bienestar',
     highlight: 'Equipamiento biomecánico de última generación y zonas de entrenamiento funcional.',
   },
@@ -65,7 +63,7 @@ export const serviceCategories: ServiceCategory[] = [
     icon: 'wellness',
     tone: 'purple',
     unit: 'acceso',
-    image: asset('/catalogo/categoria-zona-humeda.webp'),
+    image: getAssetUrl('/catalogo/categoria-zona-humeda.webp'),
     tagline: 'Recuperación y relajación integral',
     highlight: 'Circuito de sauna seco, baño turco aromatizado y jacuzzis de hidromasaje.',
   },
@@ -102,7 +100,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 4,
     status: 'Disponible',
-    image: asset('/catalogo/tenis-cancha-1.webp'),
+    image: getAssetUrl('/catalogo/tenis-cancha-1.webp'),
   },
   {
     id: 'tenis-cancha-2',
@@ -114,7 +112,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 4,
     status: 'Disponible',
-    image: asset('/catalogo/tenis-cancha-2.webp'),
+    image: getAssetUrl('/catalogo/tenis-cancha-2.webp'),
   },
   {
     id: 'padel-cancha-1',
@@ -126,7 +124,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Laureles',
     capacity: 4,
     status: 'Disponible',
-    image: asset('/catalogo/padel-cancha-1.webp'),
+    image: getAssetUrl('/catalogo/padel-cancha-1.webp'),
   },
   {
     id: 'futbol-5-cancha-1',
@@ -138,7 +136,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 10,
     status: 'Mantenimiento',
-    image: asset('/catalogo/futbol-5-cancha-1.webp'),
+    image: getAssetUrl('/catalogo/futbol-5-cancha-1.webp'),
   },
   {
     id: 'futbol-5-cancha-2',
@@ -150,7 +148,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Laureles',
     capacity: 10,
     status: 'Disponible',
-    image: asset('/catalogo/futbol-5-cancha-2.webp'),
+    image: getAssetUrl('/catalogo/futbol-5-cancha-2.webp'),
   },
   {
     id: 'piscina-nado-libre',
@@ -162,7 +160,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Laureles',
     capacity: 6,
     status: 'Disponible',
-    image: asset('/catalogo/piscina-nado-libre.webp'),
+    image: getAssetUrl('/catalogo/piscina-nado-libre.webp'),
     poolType: 'PUBLICA',
   },
   {
@@ -175,7 +173,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 2,
     status: 'Disponible',
-    image: asset('/catalogo/piscina-carril-entrenamiento.webp'),
+    image: getAssetUrl('/catalogo/piscina-carril-entrenamiento.webp'),
     poolType: 'PRIVADA',
   },
   {
@@ -188,7 +186,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Laureles',
     capacity: 8,
     status: 'Disponible',
-    image: asset('/catalogo/piscina-infantil.webp'),
+    image: getAssetUrl('/catalogo/piscina-infantil.webp'),
   },
   {
     id: 'gimnasio-sesion-individual',
@@ -200,7 +198,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Laureles',
     capacity: 1,
     status: 'Disponible',
-    image: asset('/catalogo/gimnasio-sesion-individual.webp'),
+    image: getAssetUrl('/catalogo/gimnasio-sesion-individual.webp'),
   },
   {
     id: 'gimnasio-funcional',
@@ -212,7 +210,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 1,
     status: 'Disponible',
-    image: asset('/catalogo/gimnasio-funcional.webp'),
+    image: getAssetUrl('/catalogo/gimnasio-funcional.webp'),
   },
   {
     id: 'zona-humeda-sauna',
@@ -224,7 +222,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 6,
     status: 'Disponible',
-    image: asset('/catalogo/zona-humeda-sauna.webp'),
+    image: getAssetUrl('/catalogo/zona-humeda-sauna.webp'),
   },
   {
     id: 'zona-humeda-turco-jacuzzi',
@@ -236,7 +234,7 @@ export const initialCatalog: CatalogItem[] = [
     sede: 'Poblado',
     capacity: 6,
     status: 'Disponible',
-    image: asset('/catalogo/zona-humeda-turco-jacuzzi.webp'),
+    image: getAssetUrl('/catalogo/zona-humeda-turco-jacuzzi.webp'),
   },
 ];
 
