@@ -325,12 +325,12 @@
         }
       }
     },
-    "/api/admin/bookings/{id}/cancel": {
-      "patch": {
+    "/api/admin/bookings": {
+      "get": {
         "tags": [
           "Admin"
         ],
-        "summary": "PATCH /api/admin/bookings/{id}/cancel",
+        "summary": "GET /api/admin/bookings",
         "responses": {
           "200": {
             "description": "OK"
@@ -347,12 +347,12 @@
         }
       }
     },
-    "/api/admin/bookings": {
-      "get": {
+    "/api/admin/bookings/{id}/cancel": {
+      "patch": {
         "tags": [
           "Admin"
         ],
-        "summary": "GET /api/admin/bookings",
+        "summary": "PATCH /api/admin/bookings/{id}/cancel",
         "responses": {
           "200": {
             "description": "OK"
