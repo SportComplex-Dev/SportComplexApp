@@ -63,6 +63,23 @@ test("QR: signing and verification", () => {
   assert.equal(parseTicketQrPayload(`${TICKET_QR_PREFIX}:not-uuid:${signature}`), null);
 });
 
+test("QR: consolidated ticket signature is bound to its full access window", () => {
+  const secret = "test-secret-key-32-chars-minimum!";
+  const ticketId = newTicketId();
+  const window = {
+    start: new Date("2026-10-25T19:00:00.000Z"),
+    end: new Date("2026-10-25T21:00:00.000Z"),
+  };
+  const signature = signTicket(ticketId, secret, window);
+
+  assert.equal(verifyTicketSignature(ticketId, signature, secret, window), true);
+  assert.equal(verifyTicketSignature(ticketId, signature, secret), false);
+  assert.equal(verifyTicketSignature(ticketId, signature, secret, {
+    start: window.start,
+    end: new Date("2026-10-25T22:00:00.000Z"),
+  }), false);
+});
+
 test("Token: verification code, Argon2id hashing and expiration", async () => {
   const code = generateVerificationCode();
   assert.equal(code.length, VERIFICATION_CODE_LENGTH);

@@ -1,5 +1,6 @@
-import { validateBotTicket, verifyTicketSignature } from "@sportcomplex/core";
+import { validateBotTicket } from "@sportcomplex/core";
 import { getTicketForScan, TicketError } from "@sportcomplex/db";
+import { verifyTicketSignature } from "@sportcomplex/security";
 import { botTicketQuerySchema } from "@sportcomplex/validation";
 import { fail, ok } from '@sportcomplex/shared/lib';
 import { authorizeBotApiKey } from "@/lib/api/bot-api-auth";
@@ -22,13 +23,23 @@ export async function handleBotTicketValidation(request: Request, now = new Date
   if (!qrSecret) {
     return fail("QR_NOT_CONFIGURED", "Falta QR_HMAC_SECRET.", 503);
   }
-  if (!verifyTicketSignature(parsed.data.ticketId, parsed.data.signature, qrSecret)) {
-    return fail("INVALID_SIGNATURE", "Firma del QR inválida.", 400);
-  }
-
   try {
     const ticket = await getTicketForScan(parsed.data.ticketId);
-    const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
+    const signedWindow = ticket.inicioValidez && ticket.finValidez
+      ? { start: ticket.inicioValidez, end: ticket.finValidez }
+      : undefined;
+    if (!verifyTicketSignature(parsed.data.ticketId, parsed.data.signature, qrSecret, signedWindow)) {
+      return fail("INVALID_SIGNATURE", "Firma del QR inválida.", 400);
+    }
+    const { start, end } = signedWindow ?? getTicketAccessWindow(ticket.reserva.disponibilidad);
+    const date = start.toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+    const time = (instant: Date) => new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Bogota",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).format(instant);
     const validation = validateBotTicket({
       now,
       start,
@@ -47,12 +58,22 @@ export async function handleBotTicketValidation(request: Request, now = new Date
         id: ticket.reserva.disponibilidad.servicio.id,
         nombre: ticket.reserva.disponibilidad.servicio.nombre,
       },
-      fecha: ticket.reserva.disponibilidad.fecha.toISOString().slice(0, 10),
-      horaInicio: ticket.reserva.disponibilidad.franja.horaInicio.toISOString().slice(11, 19),
-      horaFin: ticket.reserva.disponibilidad.franja.horaFin.toISOString().slice(11, 19),
+      fecha: date,
+      horaInicio: time(start),
+      horaFin: time(end),
     });
   } catch (error: unknown) {
     if (error instanceof TicketError) {
+      // Los tickets con ventana requieren leer la fila antes de verificar la
+      // firma. Para un UUID inexistente, no exponer si el boleto existe:
+      // conserva la respuesta genérica cuando no es una firma legacy válida.
+      if (error.code === "TICKET_NOT_FOUND" && !verifyTicketSignature(
+        parsed.data.ticketId,
+        parsed.data.signature,
+        qrSecret,
+      )) {
+        return fail("INVALID_SIGNATURE", "Firma del QR inválida.", 400);
+      }
       return fail(error.code, error.message, error.status);
     }
     console.error("Error en GET /api/v1/bot/validate-ticket:", error);

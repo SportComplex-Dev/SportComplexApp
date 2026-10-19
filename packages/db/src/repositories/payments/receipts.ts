@@ -4,11 +4,10 @@ import type { ClienteDb } from "../tipos-db";
 /**
  * TSK-BE-19 — Datos del comprobante en PDF (HU-19 / RF-17 / RNF-05).
  *
- * ÚNICA lectura de `RESERVA` para el endpoint `GET /api/pdf/receipt`: trae
- * en una sola consulta el membrete de negocio (servicio + franja), el titular
- * y el boleto. Se seleccionan campos explícitos — nunca `pago` ni `membresia` —
- * para que ni el `stripe_payment_intent_id` ni el id de pago viajen al bundle
- * del navegador (criterio de aceptación de TSK-BE-19).
+ * Lectura de `RESERVA` para el endpoint `GET /api/pdf/receipt`: trae el membrete
+ * de negocio, el titular y el boleto. Para un ticket consolidado consulta además
+ * las filas asociadas al mismo pago y suma sus importes. Se seleccionan campos
+ * explícitos — nunca `pago` ni `membresia` — y `pagoId` se elimina del DTO.
  */
 
 export class ReceiptError extends Error {
@@ -28,6 +27,8 @@ export interface ReceiptTicket {
   estado: "EMITIDO" | "USADO";
   emitidoEn: Date;
   usadoEn: Date | null;
+  inicioValidez: Date | null;
+  finValidez: Date | null;
 }
 
 export interface ReceiptData {
@@ -49,6 +50,28 @@ export interface ReceiptData {
   ticketQr: ReceiptTicket | null;
 }
 
+function sumAmounts(values: unknown[]): string | null {
+  const amounts = values.filter((value) => value != null).map((value) => String(value));
+  if (amounts.length === 0) return null;
+
+  const parts = amounts.map((amount) => {
+    const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(amount);
+    if (!match) throw new Error("El pago contiene un monto inválido.");
+    return { negative: match[1] === "-", whole: match[2]!, fraction: match[3] ?? "" };
+  });
+  const scale = Math.max(2, ...parts.map(({ fraction }) => fraction.length));
+  const factor = 10n ** BigInt(scale);
+  const sum = parts.reduce((total, part) => {
+    const magnitude = BigInt(part.whole) * factor + BigInt(part.fraction.padEnd(scale, "0"));
+    return total + (part.negative ? -magnitude : magnitude);
+  }, 0n);
+  const negative = sum < 0n;
+  const absolute = negative ? -sum : sum;
+  const whole = absolute / factor;
+  const fraction = (absolute % factor).toString().padStart(scale, "0");
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
 /**
  * Carga la reserva con su disponibilidad, servicio, franja y titular, más el
  * boleto emitido si existe. Lanza `ReceiptError` (404) si la reserva no existe
@@ -62,6 +85,7 @@ export async function getReceiptReserva(
     where: { id: reservaId },
     select: {
       id: true,
+      pagoId: true,
       estado: true,
       canal: true,
       cantidadCupos: true,
@@ -84,6 +108,8 @@ export async function getReceiptReserva(
           estado: true,
           emitidoEn: true,
           usadoEn: true,
+          inicioValidez: true,
+          finValidez: true,
         },
       },
     },
@@ -100,5 +126,19 @@ export async function getReceiptReserva(
     );
   }
 
-  return reserva as ReceiptData;
+  let subtotal: unknown = reserva.subtotal;
+  let total: unknown = reserva.total;
+  if (reserva.pagoId && reserva.ticketQr?.inicioValidez && reserva.ticketQr.finValidez) {
+    const reservasDelPago = await db.reserva.findMany({
+      where: { pagoId: reserva.pagoId },
+      select: { subtotal: true, total: true },
+    });
+    subtotal = sumAmounts(reservasDelPago.map((item) => item.subtotal)) ?? subtotal;
+    total = sumAmounts(reservasDelPago.map((item) => item.total)) ?? total;
+  }
+
+  // pagoId se usa solo para consolidar los importes y nunca sale en el DTO.
+  const receipt = { ...reserva };
+  Reflect.deleteProperty(receipt, "pagoId");
+  return { ...receipt, subtotal, total } as ReceiptData;
 }
