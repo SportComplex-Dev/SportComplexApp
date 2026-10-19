@@ -36,6 +36,7 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 |---|---|
 | [features/auth.md](./features/auth.md) | Google OAuth, vinculación de cuentas, plan de backend de auth, fix de login, empleados/roles y reglas de borrado |
 | [features/recuperacion-contrasena.md](./features/recuperacion-contrasena.md) | Flujo de recuperación y restablecimiento de contraseña (`/forgot-password`, `/reset-password`), Zod y Suspense |
+| [features/pruebas-recuperacion-contrasena.md](./features/pruebas-recuperacion-contrasena.md) | Suite de pruebas automatizadas de seguridad de tokens, anti-enumeración y accesibilidad WCAG 2.2 (TSK-QA-05 / HU-38) |
 | [features/catalogo.md](./features/catalogo.md) | CRUD de categorías e instancias con unicidad y calendario propio |
 | [features/reservas.md](./features/reservas.md) | Franjas horarias y aforo, ventana de 15 días, bloqueo temporal en checkout, multirreserva y multi-servicio en la misma franja, historial con cursor |
 | [features/piscinas.md](./features/piscinas.md) | Motor de mantenimiento de piscinas, modalidad aforo concurrente/exclusividad |
