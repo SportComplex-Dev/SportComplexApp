@@ -26,6 +26,14 @@ export function crearClientePrisma(cadenaConexion?: string): PrismaClient {
 
 const globalForPrisma = globalThis as unknown as { __scPrisma?: PrismaClient };
 
+/**
+ * Composition root del cliente Prisma.
+ *
+ * `globalThis` evita abrir un pool nuevo en cada recarga de Next (HMR). Un
+ * entorno de ejecución (SSR, scripts, pruebas) puede instalar su propio
+ * cliente antes de importar los repositorios. Este módulo no consulta el
+ * entorno ni contiene lógica de pruebas.
+ */
 export const prisma =
   globalForPrisma.__scPrisma ?? crearClientePrisma();
 

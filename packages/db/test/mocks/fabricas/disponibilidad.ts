@@ -153,8 +153,23 @@ export function crearDisponibilidadHandler(state: MockState) {
       let count = 0;
       for (const disponibilidad of state.disponibilidades) {
         if (where.servicioId !== undefined && disponibilidad.servicioId !== where.servicioId) continue;
+        if (where.id !== undefined && where.id?.in === undefined && disponibilidad.id !== where.id) continue;
         if (where.id?.in !== undefined && !where.id.in.includes(disponibilidad.id)) continue;
-        Object.assign(disponibilidad, data);
+        if (
+          where.cuposOcupados?.gte !== undefined &&
+          disponibilidad.cuposOcupados < where.cuposOcupados.gte
+        ) continue;
+        if (data.cuposOcupados?.increment !== undefined) {
+          disponibilidad.cuposOcupados += data.cuposOcupados.increment;
+        } else if (data.cuposOcupados?.decrement !== undefined) {
+          disponibilidad.cuposOcupados -= data.cuposOcupados.decrement;
+        } else if (data.cuposOcupados !== undefined) {
+          disponibilidad.cuposOcupados = data.cuposOcupados;
+        }
+        if (data.bloqueadaMantenimiento !== undefined) {
+          disponibilidad.bloqueadaMantenimiento = data.bloqueadaMantenimiento;
+        }
+        if (data.cuposTotales !== undefined) disponibilidad.cuposTotales = data.cuposTotales;
         count++;
       }
       return { count };
