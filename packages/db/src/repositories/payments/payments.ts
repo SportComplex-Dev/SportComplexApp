@@ -260,7 +260,6 @@ async function restituirFranja(
   return true;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function procesarIntento(input: ProcesarPagoInput, db: ClienteDb): Promise<ProcesarPagoResultado> {
   const monto = normalizeMonto(input.monto);
 

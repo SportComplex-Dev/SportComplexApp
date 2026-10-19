@@ -35,7 +35,6 @@ export interface AttachPendingPagoInput {
   membresiaId?: number | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbLike = ClienteDb;
 
 function isP2002UniqueViolation(err: unknown): boolean {

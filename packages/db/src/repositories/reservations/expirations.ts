@@ -95,7 +95,6 @@ export async function expireReservasVencidas(
   let skippedDueToLock = false;
 
   // 2. Transacción: lock best-effort + updates condicionales por fila.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.$transaction(async (tx: TxDb) => {
     // Advisory lock solo en Postgres real; en mocks $queryRaw no existe o falla.
     try {

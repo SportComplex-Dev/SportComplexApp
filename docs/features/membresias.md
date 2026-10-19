@@ -228,8 +228,26 @@ La administración requiere auditar y monitorear los ingresos recurrentes y el e
 ### Verificación y Tests
 - `packages/features/admin/src/dashboard/admin-memberships-view.test.ts` (16 pruebas unitarias aprobadas).
 - `apps/web/src/app/(admin)/admin/memberships/__tests__/memberships-page.test.tsx` (Pruebas de render y accesibilidad).
+- `apps/web/src/app/(admin)/admin/__tests__/layout.test.tsx` (Suite automatizada de navegación canónica y segmentación de socios).
+
+---
+
+## Certificación de Navegación y Segmentación Canónica (TSK-QA-02 / HU-35 / RF-16)
+
+### Contexto
+Enlace canónico en el menú administrativo (`AdminLayout` y drawer móvil) y certificación mediante suite automatizada del aislamiento estricto de estados de membresía y distribución de los tres segmentos de socios.
+
+### Implementación
+- **Enlace Canónico**: `apps/web/src/app/(admin)/admin/layout.tsx` y `apps/web/src/components/layout/admin-mobile-drawer.tsx` vinculan canónicamente al ítem "Membresías" mediante `<Link href="/admin/memberships">`.
+- **Detección Activa**: Condición `href !== '/admin' && pathname.startsWith(href)` para preservar el resaltado visual accesible conforme a tokens AKROS Club.
+- **Navegación SPA**: Enrutamiento client-side sin recargas completas garantizando código de respuesta HTTP 200.
+
+### Matriz de Casos de Prueba (layout.test.tsx)
+1. **Renderizado y Navegación**: Valida que la navegación administrativa expone el enlace `href="/admin/memberships"`, sin rutas huérfanas ni enlaces rotos.
+2. **Aislamiento de Estados**: Verifica que ningún socio en estado `VENCIDA` o `CANCELADA` sea renderizado bajo ninguna circunstancia dentro de la pestaña de socios activos / vigentes.
+3. **Distribución en 3 Pestañas**: Comprueba la integridad y consistencia de los datos en los tres segmentos (`Activas`, `Sin Membresía`, `Histórico/Vencidas`) con sus respectivos badges y contadores.
 
 ## Trazabilidad
 
-> Ref histórica: HU-20 / HU-35 (RF-16) · tareas `TSK-BE-28` y `TSK-FE-29` · rama `feature/SC-217-admin-memberships-view` · Fase F3
+> Ref histórica: HU-20 / HU-35 (RF-16) · tareas `TSK-BE-28`, `TSK-FE-29` y `TSK-QA-02` · rama `test/tsk-qa-02-04-memberships-and-multislot-e2e` · Fase F3
 

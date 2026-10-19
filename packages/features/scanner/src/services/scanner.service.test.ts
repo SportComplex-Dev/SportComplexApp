@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildExpiredSlotDetails,
   parseTicketQr,
   ScannerServiceError,
   scannerService,
@@ -75,6 +76,115 @@ test("validateTicket normaliza WINDOW_EXPIRED al contrato de la pantalla", async
       windowPosition: "AFTER",
       ticketStatus: "EMITIDO",
       minutesFromBoundary: 28,
+    });
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("TSK-QA-04: buildExpiredSlotDetails gestiona ventanas multi-franja consolidadas [inicio, fin]", () => {
+  const multiSlotTicket = {
+    fecha: "2026-10-10",
+    horaInicio: "14:00:00",
+    horaFin: "16:00:00",
+    estado: "EMITIDO" as const,
+  };
+
+  // Escaneo posterior a la última franja (16:15 Bogotá = 21:15 UTC)
+  const afterDetails = buildExpiredSlotDetails(
+    multiSlotTicket,
+    "2026-10-10T21:15:00.000Z",
+  );
+  assert.equal(afterDetails.slotStart, "14:00");
+  assert.equal(afterDetails.slotEnd, "16:00");
+  assert.equal(afterDetails.windowPosition, "AFTER");
+  assert.equal(afterDetails.minutesFromBoundary, 15);
+  assert.equal(afterDetails.ticketStatus, "EMITIDO");
+
+  // Escaneo previo al inicio de la primera franja (13:40 Bogotá = 18:40 UTC)
+  const beforeDetails = buildExpiredSlotDetails(
+    multiSlotTicket,
+    "2026-10-10T18:40:00.000Z",
+  );
+  assert.equal(beforeDetails.slotStart, "14:00");
+  assert.equal(beforeDetails.slotEnd, "16:00");
+  assert.equal(beforeDetails.windowPosition, "BEFORE");
+  assert.equal(beforeDetails.minutesFromBoundary, 20);
+});
+
+test("TSK-QA-04: validateTicket soporta ticket multi-franja en rango [14:00, 16:00] y deniega con mensaje contractual al expirar", async () => {
+  const previousFetch = globalThis.fetch;
+
+  // 1. Escaneo válido dentro de la ventana multi-franja consolidada (slot 1 o slot 2)
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          access: "GRANTED",
+          resultado: "CONCEDIDO",
+          ticket: {
+            reservaId: "reserva-multi-1",
+            estado: "EMITIDO",
+            servicioNombre: "Cancha Tenis Principal",
+            fecha: "2026-10-10",
+            horaInicio: "14:00:00",
+            horaFin: "16:00:00",
+            titularNombre: "Socio VIP",
+          },
+        },
+        timestamp: "2026-10-10T19:30:00.000Z", // 14:30 Bogotá
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  try {
+    const grantedResult = await validateTicket("multi-ticket-uuid", "signature", 1);
+    assert.equal(grantedResult.isValid, true);
+    assert.equal(grantedResult.status, "VALID");
+    assert.equal(grantedResult.userName, "Socio VIP");
+    assert.equal(grantedResult.reservationId, "reserva-multi-1");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+
+  // 2. Escaneo denegado estrictamente tras concluir la última franja
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          access: "DENIED",
+          code: "WINDOW_EXPIRED",
+          resultado: "DENEGADO_HORARIO",
+          ticket: {
+            reservaId: "reserva-multi-1",
+            estado: "EMITIDO",
+            servicioNombre: "Cancha Tenis Principal",
+            fecha: "2026-10-10",
+            horaInicio: "14:00:00",
+            horaFin: "16:00:00",
+            titularNombre: "Socio VIP",
+          },
+          message: ACCESS_WINDOW_EXPIRED_MESSAGE,
+        },
+        timestamp: "2026-10-10T21:15:00.000Z", // 16:15 Bogotá
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  try {
+    const expiredResult = await validateTicket("multi-ticket-uuid", "signature", 1);
+    assert.equal(expiredResult.isValid, false);
+    assert.equal(expiredResult.status, "EXPIRED");
+    assert.equal(expiredResult.message, ACCESS_WINDOW_EXPIRED_MESSAGE);
+    assert.deepEqual(expiredResult.expiredDetails, {
+      slotStart: "14:00",
+      slotEnd: "16:00",
+      scannedAt: "2026-10-10T21:15:00.000Z",
+      windowPosition: "AFTER",
+      ticketStatus: "EMITIDO",
+      minutesFromBoundary: 15,
     });
   } finally {
     globalThis.fetch = previousFetch;

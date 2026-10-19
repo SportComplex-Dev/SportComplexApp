@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseTicketQr } from "@sportcomplex/shared/lib";
+import { ACCESS_WINDOW_EXPIRED_MESSAGE } from "@sportcomplex/core";
 import {
   type ScannerFlowState,
   type ScannedTicket,
   type ShiftOption,
   type RedeemTicketResponse,
   type VerifyResponseData,
+  type ExpiredSlotDetails,
 } from "../types";
-import { scannerService } from "../services";
+import { buildExpiredSlotDetails, scannerService } from "../services";
 import { useAudioFeedback } from "./useAudioFeedback";
 import {
   HttpError,
@@ -60,6 +62,16 @@ export function useScannerController() {
   const [zoneMismatch, setZoneMismatch] = useState<{
     message: string;
     ticketId: string;
+  } | null>(null);
+
+  // TSK-QA-04: pantalla y detalles de franja expirada (WINDOW_EXPIRED)
+  const [expiredSlot, setExpiredSlot] = useState<{
+    userName: string;
+    ticketId: string;
+    reservationId: string;
+    targetCourtName: string;
+    expiredDetails: ExpiredSlotDetails;
+    message: string;
   } | null>(null);
 
   const { activateAudio, playSuccess, playError } = useAudioFeedback(audioEnabled);
@@ -302,6 +314,7 @@ export function useScannerController() {
     setActiveShift(shift);
     setTicket(null);
     setIsModalOpen(false);
+    setExpiredSlot(null);
     setCameraToast(null);
     setFlowState("configuring-shift");
   }, []);
@@ -324,6 +337,7 @@ export function useScannerController() {
     setActiveShift(null);
     setTicket(null);
     setIsModalOpen(false);
+    setExpiredSlot(null);
     setFlowState("idle");
     setCameraToast(null);
     setModalMessage("Se debe validar el QR para confirmar acceso.");
@@ -409,13 +423,24 @@ export function useScannerController() {
           });
           setIsModalOpen(false);
         }
+        if (result.code === "WINDOW_EXPIRED" && result.ticket) {
+          setExpiredSlot({
+            userName: result.ticket.titularNombre,
+            ticketId: ticket.ticketId,
+            reservationId: result.ticket.reservaId,
+            targetCourtName: result.ticket.servicioNombre,
+            expiredDetails: buildExpiredSlotDetails(result.ticket, result.timestamp),
+            message: result.message ?? ACCESS_WINDOW_EXPIRED_MESSAGE,
+          });
+          setIsModalOpen(false);
+        }
         const message =
           result.code === "ALREADY_USED"
             ? "Boleto ya utilizado anteriormente."
             : result.code === "SERVICE_MISMATCH"
               ? (result.message ?? "El ticket pertenece a otro escenario deportivo.")
               : result.code === "WINDOW_EXPIRED"
-                ? (result.message ?? "Franja horaria vencida o no disponible.")
+                ? (result.message ?? ACCESS_WINDOW_EXPIRED_MESSAGE)
                 : (result.message ?? "El acceso fue denegado.");
         setStateAndMessage("access-denied", message);
         if (audioEnabled) {
@@ -464,6 +489,7 @@ export function useScannerController() {
     setTicket(null);
     setIsModalOpen(false);
     setZoneMismatch(null);
+    setExpiredSlot(null);
     setFlowState("scanning");
     setModalMessage("Escaneando siguiente QR...");
   }, []);
@@ -562,6 +588,8 @@ export function useScannerController() {
     isRedeeming,
     cameraToast,
     zoneMismatch,
+    expiredSlot,
+    setExpiredSlot,
     handleSelectShift,
     handleOpenCameraTurno,
     handleChangeShift,

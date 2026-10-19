@@ -170,7 +170,6 @@ export async function ejecutarLectura(
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return db.$transaction(async (tx: TxDb) => {
     let resultado: ResultadoLecturaValor = input.resultado;
     let canjeado = false;
