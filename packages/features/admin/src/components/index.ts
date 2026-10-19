@@ -7,4 +7,5 @@ export * from "./staff/EmployeeCreateModal";
 export * from "./staff/EmployeeDeactivateModal";
 export * from "./staff/EmployeeStats";
 export * from "./staff/EmployeeTable";
-
+export * from "./bookings/types";
+export * from "./bookings/AdminBookingsView";

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   categoryBySlug,
@@ -18,25 +18,71 @@ import {
   ServiceSelector,
   Cart,
   BookingSummaryModal,
+  usePublicCatalog,
   type CartItem,
   type DynamicTimeSlot,
 } from '@sportcomplex/features-booking';
 
 export default function BookPage() {
   const router = useRouter();
+  const { catalog } = usePublicCatalog();
   const [date, setDate] = useState(() => getBogotaDateAfter(1));
   const [timeSlots, setTimeSlots] = useState<DynamicTimeSlot[]>(() =>
     generateDynamicTimeSlots(getBogotaDateAfter(1)),
   );
   const [selectedSlot, setSelectedSlot] = useState<DynamicTimeSlot | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<DynamicTimeSlot[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<CategorySlug | 'todos'>('todos');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [message, setMessage] = useState('');
+  const [isMember, setIsMember] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
 
+  // Consultar membresía activa del usuario autenticado para aplicar el 30% de descuento (RN-08 / TSK-FE-31)
+  useEffect(() => {
+    let active = true;
+    fetch('/api/memberships')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { success?: boolean; data?: { membresiaActiva?: { estado?: string } | null } }) => {
+        if (!active || !data?.success || !data?.data) return;
+        const activeMembership = data.data.membresiaActiva;
+        if (activeMembership && activeMembership.estado === 'VIGENTE') {
+          setIsMember(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const cartServiceIds = useMemo(() => cart.map((item) => item.serviceId), [cart]);
+
+  // Servicio activo para alimentar el precio base y nombre en el selector continuo de franjas
+  const activeService = useMemo(() => {
+    if (cart.length > 0) {
+      const first = cart[0];
+      const found = catalog.find((s) => s.id === first?.serviceId);
+      return {
+        name: first?.serviceName ?? found?.name,
+        price: first?.price ?? found?.price ?? 48000,
+      };
+    }
+    if (selectedCategory !== 'todos') {
+      const catService = catalog.find(
+        (s) => s.category === selectedCategory && s.status === 'Disponible',
+      );
+      if (catService) return { name: catService.name, price: catService.price };
+    }
+    const defaultService = catalog.find((s) => s.status === 'Disponible');
+    return defaultService
+      ? { name: defaultService.name, price: defaultService.price }
+      : { name: undefined, price: 48000 };
+  }, [cart, selectedCategory, catalog]);
+
+  const basePricePerHour = activeService.price;
 
   function handleDateChange(newDate: string) {
     setDate(newDate);
@@ -54,7 +100,27 @@ export default function BookPage() {
     setMessage('');
   }
 
-  function handleSelectSlot(slot: DynamicTimeSlot) {
+  function handleSlotsChange(slots: DynamicTimeSlot[]) {
+    if (cart.length > 0 && selectedSlots.length > 0) {
+      const firstOld = selectedSlots[0]?.startTime;
+      const firstNew = slots[0]?.startTime;
+      if (firstOld !== firstNew) {
+        setMessage('Vacía el carrito antes de cambiar de horario para mantener los servicios en la misma franja.');
+        return;
+      }
+    }
+    setSelectedSlots(slots);
+    setSelectedSlot(slots.length > 0 && slots[0] ? slots[0] : null);
+    setMessage('');
+  }
+
+  function handleSelectSlot(slot: DynamicTimeSlot | null) {
+    if (!slot) {
+      setSelectedSlot(null);
+      setSelectedSlots([]);
+      setMessage('');
+      return;
+    }
     if (cart.length > 0 && selectedSlot?.startTime !== slot.startTime) {
       setMessage(
         'Vacía el carrito antes de cambiar de horario para mantener los servicios en la misma franja.',
@@ -239,11 +305,17 @@ export default function BookPage() {
             timeSlots={timeSlots}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSelectSlot}
+            selectedSlots={selectedSlots}
+            onSlotsChange={handleSlotsChange}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
             cartServiceIds={cartServiceIds}
             onAddService={handleAddService}
             disabledDateChange={cart.length > 0}
+            basePricePerHour={basePricePerHour}
+            isMember={isMember}
+            serviceName={activeService.name}
+            onValidationError={setMessage}
           />
 
           <Cart
