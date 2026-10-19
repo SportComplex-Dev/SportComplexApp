@@ -81,6 +81,7 @@ const KNOWN_REQUEST_SCHEMAS: Record<string, string> = {
   "/api/admin/services/categories": "CreateCategoriaInput",
   "/api/admin/services/categories/{id}": "UpdateCategoriaInput",
   "/api/admin/employees": "CreateEmployeeInput",
+  "/api/admin/bookings/{id}/cancel": "AdminBookingCancelInput",
   "/api/auth/login": "LoginInput",
   "/api/auth/register": "RegisterInput",
   "/api/auth/forgot-password": "ForgotPasswordInput",
@@ -124,6 +125,7 @@ const SCHEMA_EXPORTS: Record<string, string> = {
   BotTicketQuery: "botTicketQuerySchema",
   AnalyticsQueryInput: "analyticsQuerySchema",
   AdminBookingsQuery: "adminBookingsQuerySchema",
+  AdminBookingCancelInput: "adminBookingCancelSchema",
 };
 
 const SCHEMA_OVERRIDES: Record<string, unknown> = {

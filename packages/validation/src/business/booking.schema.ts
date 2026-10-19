@@ -76,3 +76,13 @@ export const adminBookingsQuerySchema = z
   );
 
 export type AdminBookingsQuery = z.infer<typeof adminBookingsQuerySchema>;
+
+export const adminBookingCancelSchema = z.object({
+  motivo: z.string()
+    .trim()
+    .min(10, 'El motivo de cancelación debe tener al menos 10 caracteres')
+    .max(500, 'El motivo de cancelación no puede exceder 500 caracteres'),
+  canceladoPor: z.string().uuid().optional(),
+});
+
+export type AdminBookingCancelInput = z.infer<typeof adminBookingCancelSchema>;

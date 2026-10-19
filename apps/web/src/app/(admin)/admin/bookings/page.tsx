@@ -106,6 +106,30 @@ export default function AdminBookingsPage() {
     })
   }, [filters, fetchBookings])
 
+  const handleCancelBooking = async (bookingId: string, motivo: string) => {
+    try {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo }),
+      })
+      const json = await res.json()
+
+      if (res.ok && json.success) {
+        notify('Reserva cancelada administrativamente y cupos liberados con éxito.', 'success')
+        fetchBookings(filters)
+      } else {
+        throw new Error(json.error?.message || 'Error al cancelar la reserva.')
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al procesar la anulación.'
+      notify(msg, 'error')
+      throw err
+    }
+  }
+
   const handleFiltersChange = (newFilters: Partial<AdminBookingFiltersState>) => {
     setFilters((prev) => ({
       ...prev,
@@ -124,6 +148,7 @@ export default function AdminBookingsPage() {
         availableServices={availableServices}
         onFiltersChange={handleFiltersChange}
         onRefresh={() => fetchBookings(filters)}
+        onCancelBooking={handleCancelBooking}
       />
     </div>
   )
