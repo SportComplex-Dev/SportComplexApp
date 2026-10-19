@@ -3,9 +3,10 @@ import {
   BookingError,
   compensateFailedCheckout,
   createBookingHold,
+  getPayableHoldForCheckout,
 } from "@sportcomplex/db";
 import { createStripeCheckoutSession, STRIPE_MIN_AMOUNT_COP } from "@sportcomplex/core";
-import { bookingRequestSchema } from "@sportcomplex/validation";
+import { bookingLockRequestSchema } from "@sportcomplex/validation";
 import { fail, created } from '@sportcomplex/shared/lib';
 
 /**
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     } catch {
       return fail("INVALID_PAYLOAD", "El cuerpo debe ser JSON válido.", 400);
     }
-    const parsed = bookingRequestSchema.safeParse(body);
+    const parsed = bookingLockRequestSchema.safeParse(body);
     if (!parsed.success) {
       return fail("VALIDATION_ERROR", "Datos de reserva inválidos.", 400, parsed.error.flatten());
     }
@@ -50,19 +51,37 @@ export async function POST(request: Request) {
     const canal = isStaff ? (parsed.data.canal ?? "TAQUILLA") : "ONLINE";
     const vendedorId = isStaff ? authorization.actor.id : null;
 
-    // TX1 — bloqueo transaccional + RESERVA PENDIENTE_PAGO con TTL 30 min (con 30% descuento si es socio).
-    const hold = await createBookingHold({
-      ...parsed.data,
-      userId: titularId,
-      canal,
-      vendedorId,
-    });
+    // Reutiliza el hold ya creado (el cliente bloqueó el horario al montar el
+    // checkout). Crear uno nuevo para la MISMA franja moría en
+    // `assertNoTitularOverlap` con 409 y el usuario nunca veía Stripe.
+    let hold;
+    let holdReused = false;
+    if (parsed.data.reservationId) {
+      hold = await getPayableHoldForCheckout({
+        reservaId: parsed.data.reservationId,
+        titularId,
+      });
+      holdReused = true;
+    } else {
+      // TX1 — bloqueo transaccional + RESERVA PENDIENTE_PAGO con TTL 30 min (con 30% descuento si es socio).
+      hold = await createBookingHold({
+        ...parsed.data,
+        userId: titularId,
+        canal,
+        vendedorId,
+      });
+    }
 
     const holdTotal = Number(hold.total);
     if (holdTotal < STRIPE_MIN_AMOUNT_COP) {
-      await compensateFailedCheckout(hold.id).catch((compErr) => {
-        console.error("Fallo compensando el bloqueo tras error de monto mínimo:", compErr);
-      });
+      // Con hold reutilizado NO se compensa: la reserva la creó el flujo del
+      // cliente y la comparte con el formulario de pago embebido; expirarla
+      // aquí dejaría el checkout sin ninguna vía de pago.
+      if (!holdReused) {
+        await compensateFailedCheckout(hold.id).catch((compErr) => {
+          console.error("Fallo compensando el bloqueo tras error de monto mínimo:", compErr);
+        });
+      }
       return fail(
         "AMOUNT_BELOW_STRIPE_MINIMUM",
         `El valor de la reserva ($${holdTotal.toLocaleString("es-CO")} COP) es inferior al mínimo permitido por Stripe ($${STRIPE_MIN_AMOUNT_COP.toLocaleString("es-CO")} COP).`,
@@ -88,9 +107,12 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       // Compensación: liberar el hold; nunca se crea PAGO.
-      await compensateFailedCheckout(hold.id).catch((compErr) => {
-        console.error("Fallo compensando el bloqueo tras error de Stripe:", compErr);
-      });
+      // Con hold reutilizado no se compensa (ver nota del mínimo de monto).
+      if (!holdReused) {
+        await compensateFailedCheckout(hold.id).catch((compErr) => {
+          console.error("Fallo compensando el bloqueo tras error de Stripe:", compErr);
+        });
+      }
       if (err instanceof Error && err.message.includes("STRIPE_NOT_CONFIGURED")) {
         return fail("STRIPE_NOT_CONFIGURED", "La pasarela de pago no está configurada.", 503);
       }

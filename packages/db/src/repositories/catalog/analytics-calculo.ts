@@ -1,8 +1,9 @@
 /**
  * Cálculo puro de la analítica gerencial (RF-21 / TSK-BE-24).
  *
- * Recibe las filas ya obtenidas por el repositorio —vistas `vw_kpi_*` en
- * producción, filas derivadas del estado en memoria en tests— y aplica las
+ * Recibe las filas ya obtenidas por el repositorio —agregaciones sobre las
+ * tablas transaccionales en producción, filas derivadas del estado en memoria
+ * en tests— y aplica las
  * reglas de agregación del dominio: agrupación diaria/semanal, porcentajes por
  * categoría y comparativa vendidos vs. usados.
  *
@@ -81,14 +82,14 @@ export interface AnalyticsData {
   filters: AnalyticsFilters;
 }
 
-/** Fila de `vw_kpi_daily_attendance` / consulta equivalente. */
+/** Fila de la agregación diaria de asistencia. */
 export interface AttendanceRow {
   fecha_uso: string;
   total_afluencia_tickets: bigint | number;
   usuarios_unicos_ingresados: bigint | number;
 }
 
-/** Fila de `vw_kpi_daily_revenue` / consulta equivalente. */
+/** Fila de la agregación diaria de ingresos. */
 export interface RevenueRow {
   fecha_pago: string;
   tipo_pago: string;
@@ -96,7 +97,7 @@ export interface RevenueRow {
   ingresos_totales: string | number;
 }
 
-/** Fila de `vw_kpi_category_performance` / consulta equivalente. */
+/** Fila de la agregación de desempeño por categoría. */
 export interface CategoryRow {
   categoria_id: number;
   categoria_nombre: string;
@@ -106,7 +107,7 @@ export interface CategoryRow {
   total_ingresos: string | number;
 }
 
-/** Fila de `vw_kpi_services_sold_vs_used` / consulta equivalente. */
+/** Fila de la agregación de vendidos vs. usados por servicio. */
 export interface ServiceRow {
   servicio_id: number;
   servicio_nombre: string;

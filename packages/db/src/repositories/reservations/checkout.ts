@@ -148,6 +148,54 @@ async function ensureReservaLinked(
 }
 
 /**
+ * Reutiliza un hold ya creado (`PENDIENTE_PAGO`) para generar la sesión de
+ * Stripe sin volver a bloquear el horario.
+ *
+ * Sin esto, el flujo del cliente creaba DOS reservas para la misma franja
+ * (una al montar el checkout y otra al pulsar "Ir a Stripe Checkout"), y la
+ * segunda moría en `assertNoTitularOverlap` con 409: el usuario nunca veía
+ * la redirección a Stripe. Con el hold reutilizado hay una sola reserva por
+ * intento de pago, igual que en el POS.
+ *
+ * @throws BookingError `RESERVATION_NOT_PAYABLE`(409) si la reserva no es
+ *   válida, no pertenece al titular o su TTL venció.
+ */
+export async function getPayableHoldForCheckout(
+  input: { reservaId: string; titularId: string },
+  db: DbLike = prisma,
+  now: Date = new Date(),
+) {
+  const reserva = await db.reserva.findFirst({
+    where: { id: input.reservaId, titularId: input.titularId },
+    include: { disponibilidad: { include: { servicio: true } } },
+  });
+
+  if (!reserva) {
+    throw new BookingError(
+      "La reserva no existe o no pertenece al usuario autenticado.",
+      "RESERVATION_NOT_PAYABLE",
+      409,
+    );
+  }
+  if (reserva.estado !== "PENDIENTE_PAGO") {
+    throw new BookingError(
+      "Esta reserva ya no está pendiente de pago.",
+      "RESERVATION_NOT_PAYABLE",
+      409,
+    );
+  }
+  if (!reserva.expiraEn || reserva.expiraEn <= now) {
+    throw new BookingError(
+      "El tiempo de reserva de 30 minutos ha finalizado.",
+      "HOLD_EXPIRED",
+      409,
+    );
+  }
+
+  return reserva;
+}
+
+/**
  * Compensación — Stripe falló después de TX1: liberar el hold para que no
  * quede bloqueo huérfano. Nunca crea `PAGO`.
  *

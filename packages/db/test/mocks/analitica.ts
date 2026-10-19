@@ -1,5 +1,5 @@
 /**
- * Derivación de las filas de las vistas `vw_kpi_*` a partir del estado en
+ * Derivación de las filas de las agregaciones analíticas a partir del estado en
  * memoria del doble de Prisma (`MockState`).
  *
  * Vive en `test/` a propósito: es código de pruebas. El repositorio de
@@ -171,7 +171,11 @@ function derivarServicios(state: MockState, startDate: string | null, endDate: s
  * Despacha el SQL de analítica al derivador correspondiente.
  *
  * `$queryRawUnsafe(sql, $1, $2)` recibe las fechas como parámetros; los
- * derivadores replican el `WHERE` de las vistas con zona America/Bogota.
+ * derivadores replican el `WHERE` de las agregaciones con zona America/Bogota.
+ *
+ * El repositorio consulta directamente las tablas transaccionales (no hay
+ * vistas `vw_kpi_*` en la base de datos), así que el despacho se hace por la
+ * tabla de origen de cada agregación.
  */
 export function consultarVistasAnalitica(
   state: MockState,
@@ -181,16 +185,20 @@ export function consultarVistasAnalitica(
   const startDate = (params[0] as string | null | undefined) ?? null;
   const endDate = (params[1] as string | null | undefined) ?? null;
 
-  if (sql.includes("vw_kpi_daily_attendance")) {
+  // Asistencia: tickets usados (JOIN reserva por el titular).
+  if (sql.includes("FROM ticket_qr t") && sql.includes("total_afluencia_tickets")) {
     return derivarAsistencia(state, startDate, endDate);
   }
-  if (sql.includes("vw_kpi_daily_revenue")) {
+  // Ingresos: pagos aprobados agrupados por día y tipo.
+  if (sql.includes("FROM pago p") && sql.includes("total_transacciones")) {
     return derivarIngresos(state, startDate, endDate);
   }
-  if (sql.includes("vw_kpi_category_performance") || sql.includes("FROM categoria_servicio cs")) {
+  // Categorías: reservas confirmadas por categoría.
+  if (sql.includes("FROM categoria_servicio cs")) {
     return derivarCategorias(state, startDate, endDate);
   }
-  if (sql.includes("vw_kpi_services_sold_vs_used") || sql.includes("WITH ventas AS")) {
+  // Servicios: cupos vendidos vs. usados.
+  if (sql.includes("WITH ventas AS")) {
     return derivarServicios(state, startDate, endDate);
   }
 

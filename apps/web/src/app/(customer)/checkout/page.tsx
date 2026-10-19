@@ -122,6 +122,14 @@ function CheckoutContent() {
     attendees: paramAttendees ? Math.max(1, parseInt(paramAttendees, 10)) : 1,
   } : null)
 
+  // Clave estable del borrador. Depender del OBJETO `activeDraft` re-dispara el
+  // efecto en cada render (el TTL reescribe el borrador con `expiresAt` y el
+  // catálogo rehidrata el store), lo que cancelaba la petición del hold en
+  // vuelo y dejaba la pantalla congelada en "Iniciando sesión segura de pago…".
+  const holdKey = activeDraft
+    ? `${activeDraft.itemId}|${activeDraft.date}|${activeDraft.time}|${activeDraft.attendees}`
+    : null
+
   // Timer & Cupo state (TSK-FE-09 / SCRUM-117)
   const [isExpired, setIsExpired] = useState(false)
 
@@ -141,6 +149,16 @@ function CheckoutContent() {
   const category = item ? categoryBySlug(item.category) : undefined
 
   const creatingRef = useRef(false)
+  // Montado en vivo: el hold NO debe descartarse porque el efecto se re-ejecute
+  // (p. ej. al rehidratarse el store del borrador). Solo se cancela al desmontar.
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
   useEffect(() => {
@@ -157,7 +175,6 @@ function CheckoutContent() {
     }
     if (currentDraft.expiresAt && currentDraft.expiresAt <= Date.now()) return
 
-    let cancelled = false
     async function createHold() {
       if (!currentDraft || !currentItem || creatingRef.current) return
       creatingRef.current = true
@@ -264,7 +281,7 @@ function CheckoutContent() {
         }
 
         const data = await res.json().catch(() => null)
-        if (cancelled) return
+        if (!mountedRef.current) return
 
         if (res.ok && data?.data?.id) {
           setReservationId(data.data.id)
@@ -274,7 +291,7 @@ function CheckoutContent() {
           creatingRef.current = false
         }
       } catch {
-        if (!cancelled) {
+        if (mountedRef.current) {
           setHoldError({
             tipo: 'servidor',
             titulo: 'No se pudo reservar el horario',
@@ -284,17 +301,14 @@ function CheckoutContent() {
           creatingRef.current = false
         }
       } finally {
-        if (!cancelled) {
+        if (mountedRef.current) {
           setIsCreatingReservation(false)
         }
       }
     }
 
     void createHold()
-    return () => {
-      cancelled = true
-    }
-  }, [activeDraft, item, reservationId, holdError, isExpired, authStatus])
+  }, [holdKey, item, reservationId, holdError, isExpired, authStatus])
 
   const handleExpire = useCallback(() => {
     setIsExpired(true)
@@ -394,6 +408,9 @@ function CheckoutContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Reutiliza el hold ya creado: bloquear dos veces la misma franja
+          // lo rechaza el backend por solapamiento del titular (409).
+          reservationId: reservationId ?? undefined,
           serviceId,
           startTime: interval.startTime,
           endTime: interval.endTime,
