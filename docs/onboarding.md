@@ -30,7 +30,7 @@ Env: copia `apps/web/.env.example` → `apps/web/.env.local` y pide valores real
 
 | Grupo | Variables | Notas |
 |---|---|---|
-| Supabase | `DATABASE_URL` (pooler IPv4, app), `DIRECT_URL` (directa IPv6, migraciones — falla con `P1001` si tu red no tiene IPv6: usa el pooler), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (solo servidor) | Proyecto dev ref `ouemmmwpygmizyvtcpuc`; prod `phyesjwtzrmrcvmtajay`. Nunca commitear secretos (ver [`infra/supabase-envs.md`](./infra/supabase-envs.md)) |
+| Supabase | `DATABASE_URL` (pooler IPv4, app), `DIRECT_URL` (directa IPv6, migraciones — falla con `P1001` si tu red no tiene IPv6: usa el pooler), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (solo servidor) | Proyecto prod ref `ouemmmwpygmizyvtcpuc`; dev/heredado `phyesjwtzrmrcvmtajay`. Nunca commitear secretos (ver [`infra/supabase-envs.md`](./infra/supabase-envs.md)) |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Solo claves `test` en local |
 | OAuth | `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google OAuth |
 | n8n | `N8N_WEBHOOK_BASE_URL` (`https://n8n.akros.lat` en prod), `N8N_AUTH_EMAIL_WEBHOOK_URL`, `N8N_CONTINGENCY_WEBHOOK_URL`, `N8N_CONTINGENCY_HMAC_SECRET` | Base única `n8n.akros.lat` |

@@ -1,22 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   clasificarReservas,
   fetchCustomerBookingHistory,
-  generarQRDataUrl,
   obtenerProximaReserva,
   type PortalTicket,
 } from '../utils/portal-utils'
-import type { Booking } from '@sportcomplex/core'
 
 export type CustomerPortalTabType = 'activas' | 'historial' | 'canceladas'
 
 export function useCustomerPortal(sessionName?: string, todayDate?: string) {
   const [activeTab, setActiveTab] = useState<CustomerPortalTabType>('activas')
   const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
-  const [printingTicket, setPrintingTicket] = useState<Booking | null>(null)
-  const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
   const [dbBookings, setDbBookings] = useState<PortalTicket[]>([])
 
   useEffect(() => {
@@ -54,19 +50,6 @@ export function useCustomerPortal(sessionName?: string, todayDate?: string) {
     }
   }, [activeTab, activeBookings, historyBookings, cancelledBookings])
 
-  const handlePrintTicket = useCallback(async (ticket: Booking) => {
-    try {
-      const qrUrl = await generarQRDataUrl(ticket.code, 260)
-      setPrintingQrUrl(qrUrl)
-    } catch {
-      setPrintingQrUrl(null)
-    }
-    setPrintingTicket(ticket)
-    setTimeout(() => {
-      window.print()
-    }, 200)
-  }, [])
-
   return {
     activeTab,
     setActiveTab,
@@ -77,8 +60,5 @@ export function useCustomerPortal(sessionName?: string, todayDate?: string) {
     currentTabItems,
     selectedTicket,
     setSelectedTicket,
-    printingTicket,
-    printingQrUrl,
-    handlePrintTicket,
   }
 }

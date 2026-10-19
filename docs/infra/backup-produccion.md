@@ -1,6 +1,6 @@
 # Backup y restauración de la BD de producción
 
-> Estado: vigente 2026-10-18.
+> Estado: vigente 2026-10-19.
 
 Pipeline automatizado para producir un backup íntegro y verificable de la BD de
 producción (PostgreSQL + roles + identidades de Supabase Auth), cifrado y
@@ -12,13 +12,17 @@ prueba).
 
 | Campo | Valor |
 |---|---|
-| Proyecto Supabase (producción) | `phyesjwtzrmrcvmtajay` |
+| Proyecto Supabase (producción) | `ouemmmwpygmizyvtcpuc` (o el que declare `BACKUP_PROJECT_REF` / `BACKUP_SUPABASE_URL`) |
 | Credenciales | `apps/web/.env.backup.local` (gitignored; ver `.env.example` §Backup) |
 | Script | `packages/db/scripts/backup-prod.mts` |
 | Comando | `pnpm --filter @sportcomplex/db backup all` |
 
-El script **aborta** si `BACKUP_DATABASE_URL` no apunta al proyecto de
-producción (guard por `PROJECT_REF`).
+El script **aborta** si `BACKUP_DATABASE_URL` no apunta al proyecto objetivo. El
+ref **no está hardcodeado**: se toma de `BACKUP_PROJECT_REF` o, en su defecto, del
+host de `BACKUP_SUPABASE_URL` / del usuario de `BACKUP_DATABASE_URL`; si no se puede
+determinar, aborta sin tocar nada. Para respaldar otro proyecto (p. ej. el heredado
+`phyesjwtzrmrcvmtajay`) basta apuntar las variables de `.env.backup.local` a ese
+proyecto.
 
 ## Cómo funciona
 

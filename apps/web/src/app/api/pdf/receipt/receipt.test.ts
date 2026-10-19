@@ -122,7 +122,7 @@ test("TSK-BE-19: devuelve membrete, reserva, servicio, titular y QR del servidor
   assert.equal(data.emision.generadoEn, NOW.toISOString());
   assert.equal(data.emision.destinatario, "PORTAL");
 
-  assert.equal(data.membrete.entidad, process.env.RECEIPT_ENTIDAD || "SportComplex — Complejo Deportivo");
+  assert.equal(data.membrete.entidad, process.env.RECEIPT_ENTIDAD || "Akros Latam");
   assert.equal(data.membrete.nit, process.env.RECEIPT_NIT ?? null);
 
   assert.equal(data.reserva.id, RESERVA_ID);
@@ -146,6 +146,36 @@ test("TSK-BE-19: devuelve membrete, reserva, servicio, titular y QR del servidor
   assert.equal(data.ticket?.emitidoEn, "2026-10-08T15:00:05.000Z");
   assert.equal(data.ticket?.usadoEn, null);
   assert.equal(data.qr?.dataUrl.startsWith("data:image/png;base64,"), true);
+});
+
+test("TSK-BE-31: el comprobante multihora muestra el total y la ventana de todas las franjas", async () => {
+  seed();
+  const primeraReserva = mock._state.reservas[0];
+  primeraReserva.subtotal = 45000;
+  primeraReserva.total = 45000;
+  mock._state.reservas.push({
+    ...primeraReserva,
+    id: "00000000-0000-4000-8000-0000000000ab",
+    subtotal: 45000,
+    total: 45000,
+  });
+  mock._state.tickets[0].inicioValidez = new Date("2026-10-10T15:00:00.000Z");
+  mock._state.tickets[0].finValidez = new Date("2026-10-10T17:00:00.000Z");
+
+  const data = await comprobante();
+  const qr = parseTicketQrPayload(data.qr!.payload)!;
+
+  assert.equal(data.reserva.subtotal, "90000.00");
+  assert.equal(data.reserva.total, "90000.00");
+  assert.equal(data.servicio.horaInicio, "10:00:00");
+  assert.equal(data.servicio.horaFin, "12:00:00");
+  assert.equal(
+    verifyTicketSignature(qr.ticketId, qr.signature, QR_SECRET, {
+      start: new Date("2026-10-10T15:00:00.000Z"),
+      end: new Date("2026-10-10T17:00:00.000Z"),
+    }),
+    true,
+  );
 });
 
 test("TSK-BE-19 (RF-13): el QR firmado en servidor supera verifyTicketSignature", async () => {

@@ -1,6 +1,6 @@
 # Assets multimedia — optimización y Supabase Storage
 
-> Estado: vigente 2026-10-18
+> Estado: vigente 2026-10-19
 
 Pipeline de imágenes de la plataforma (catálogo, hero, marca): conversión a
 WebP/AVIF con Sharp, publicación en un bucket público de Supabase Storage
@@ -48,8 +48,8 @@ Hallazgos relevantes del código:
 
 ### TSK-OPS-02 — Bucket y políticas públicas (1 SP) ✅
 
-Bucket `sportcomplex-assets` creado en producción (`phyesjwtzrmrcvmtajay`) y desarrollo
-(`ouemmmwpygmizyvtcpuc`) con `pnpm --filter @sportcomplex/db storage:setup --execute`:
+Bucket `sportcomplex-assets` aprovisionado en **cada** proyecto Supabase (producción y
+desarrollo) con `pnpm --filter @sportcomplex/db storage:setup --execute`:
 
 1. **Bucket** `public: true`, `file_size_limit` 5 MB, `allowed_mime_types`
    (`image/webp/avif/png/svg+xml`); idempotente.
@@ -69,8 +69,8 @@ Hero `.jpg` + `club-hero.png` + logos `.png/.svg` **fuera de alcance** (se queda
 1. **Subida** de 23 WebP a `catalogo/<slug>.webp` con
    `pnpm --filter @sportcomplex/db assets:upload --execute --verify`:
    - `cacheControl: "public, max-age=31536000, immutable"`, `x-upsert: true`.
-   - URLs finales: `https://phyesjwtzrmrcvmtajay.supabase.co/storage/v1/object/public/sportcomplex-assets/catalogo/<archivo>.webp`.
-2. **Variable base**: `NEXT_PUBLIC_ASSETS_BASE_URL` en `.env.example` + helper `asset(path)`.
+   - URLs finales: `{NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/sportcomplex-assets/catalogo/<archivo>.webp` (base derivada en runtime; sin ref de proyecto en el código).
+2. **Variable base**: `NEXT_PUBLIC_ASSETS_BASE_URL` (override opcional) en `.env.example`; si no está definida, el helper `asset(path)` deriva la base de `NEXT_PUBLIC_SUPABASE_URL` + `sportcomplex-assets`.
 3. **Referencias actualizadas** a URLs absolutas CDN:
    - `packages/seed/src/catalogo/imagenes.ts` (`mapaImagenesCatalogo`).
    - `packages/core/src/domain/catalog.ts` (4 categorías + 12 `initialCatalog`).
@@ -120,7 +120,9 @@ pnpm build
 ## Riesgos
 
 - **Romper dev local** sin acceso a Storage: los assets dejarán de servirse desde
-  `public/`. Mitigación: `NEXT_PUBLIC_ASSETS_BASE_URL` con fallback local en dev.
+  `public/`. Mitigación: cada entorno deriva la base de su propio
+  `NEXT_PUBLIC_SUPABASE_URL` (proyecto dev = su bucket); `NEXT_PUBLIC_ASSETS_BASE_URL`
+  permite apuntar a un CDN alterno sin tocar código.
 - **CSP**: si queda `img-src 'self'`, las imágenes del CDN se bloquean. Debe
   actualizarse junto con el ADR.
 - **Invalidación de caché**: `immutable, max-age=31536000` no se puede purgar; usar
@@ -136,6 +138,20 @@ pnpm build
 - **Build completo**: `pnpm build` → 62 páginas, 17 paquetes, 0 errores ✅.
 - **Regresión visual**: pendiente `pnpm test:e2e` (specs `01-public-navigation`, `06-visual-validations`).
 - **Guardarraíl**: `pnpm verificar:limites` (sin imports internos) ✅.
+
+## Actualización 2026-10-19 — CDN derivado y bucket espejo en producción
+
+- **Sin hardcode**: `packages/domain/src/assets.ts` deriva la base de
+  `NEXT_PUBLIC_SUPABASE_URL` + `sportcomplex-assets` (`NEXT_PUBLIC_ASSETS_BASE_URL`
+  queda como override opcional) y `apps/web/next.config.ts` deriva el `hostname` de
+  `remotePatterns` de la misma variable. Ver [ADR 008](../architecture/adrs/008-cdn-storage-assets.md).
+- **Bucket espejo**: el proyecto de producción (`ouemmmwpygmizyvtcpuc`) se aprovisionó
+  con `storage:setup --execute` y se replicaron los **23** WebP del catálogo
+  (~4.5 MB) con paridad por `nombre + size + eTag`; lectura anónima verificada con
+  `200`.
+- **Rutas sin cambios**: los paths (`/catalogo/<archivo>.webp`) siguen igual; solo
+  cambia la base, que ahora sale del entorno (rebuild para hornear el nuevo
+  `NEXT_PUBLIC_SUPABASE_URL`).
 
 ## Ref docs
 

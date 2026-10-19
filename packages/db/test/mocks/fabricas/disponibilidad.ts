@@ -22,6 +22,7 @@ export function crearDisponibilidadHandler(state: MockState) {
     async findMany({ where, include }: any = {}) {
       return state.disponibilidades
         .filter((d) => {
+          if (Array.isArray(where?.id?.in) && !where.id.in.includes(d.id)) return false;
           if (where?.servicioId !== undefined && d.servicioId !== where.servicioId) return false;
           if (where?.servicio?.estado !== undefined) {
             const service = state.servicios.find((item) => item.id === d.servicioId);

@@ -20,15 +20,18 @@
  *   pnpm backup dump | encrypt | verify | upload
  *
  * Variables (apps/web/.env.backup.local — gitignored):
- *   BACKUP_DATABASE_URL               pooler de sesión (:5432) de producción
+ *   BACKUP_DATABASE_URL               pooler de sesión (:5432) del proyecto
  *   BACKUP_SUPABASE_URL               https://<ref>.supabase.co
  *   BACKUP_SUPABASE_SERVICE_ROLE_KEY  service role (Admin API + Storage)
  *   BACKUP_GPG_PASSPHRASE             frase del .gpg (obligatoria salvo en dump)
  *   BACKUP_STORAGE_BUCKET             bucket destino (default: backups)
+ *   BACKUP_PROJECT_REF                ref objetivo (opcional: si falta, se deriva)
  *   BACKUP_PG_BIN / GPG_BIN           rutas opcionales a herramientas
  *
- * Salida: backups/<ISO con guiones>/ (gitignored). El host de la URL de BD
- * debe ser siempre el proyecto de producción; el script aborta si no coincide.
+ * Salida: backups/<ISO con guiones>/ (gitignored). El ref del proyecto no está
+ * hardcodeado: sale de BACKUP_PROJECT_REF o se deriva de BACKUP_SUPABASE_URL /
+ * BACKUP_DATABASE_URL, y el script aborta si BACKUP_DATABASE_URL no apunta a
+ * ese proyecto.
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -41,7 +44,6 @@ import { fileURLToPath } from "node:url";
 import { config as dotenvConfig } from "dotenv";
 import { Client } from "pg";
 
-const PROJECT_REF = "phyesjwtzrmrcvmtajay";
 const SUPABASE_ROLES = [
   "anon",
   "authenticated",
@@ -69,6 +71,31 @@ const ENV = {
   bucket: process.env.BACKUP_STORAGE_BUCKET || "backups",
 };
 
+/**
+ * Ref del proyecto Supabase a respaldar, sin literal hardcodeado.
+ * Prioridad: `BACKUP_PROJECT_REF` → host de `BACKUP_SUPABASE_URL` → host o
+ * usuario de `BACKUP_DATABASE_URL`. Devuelve "" si no se puede determinar
+ * (requireEnv aborta en ese caso).
+ */
+function resolveProjectRef(): string {
+  const explicit = (process.env.BACKUP_PROJECT_REF ?? "").trim();
+  if (explicit) return explicit;
+  const patterns = [
+    /^https?:\/\/([a-z0-9]{20})\.supabase\.(?:co|in)/i, // BACKUP_SUPABASE_URL
+    /@db\.([a-z0-9]{20})\.supabase\.(?:co|in)/i, // conexión directa
+    /\/\/postgres\.([a-z0-9]{20})[:@]/i, // pooler (usuario postgres.<ref>)
+  ];
+  for (const source of [ENV.supabaseUrl, ENV.databaseUrl]) {
+    for (const pattern of patterns) {
+      const found = source.match(pattern);
+      if (found) return found[1];
+    }
+  }
+  return "";
+}
+
+const PROJECT_REF = resolveProjectRef();
+
 function requireEnv(needsPassphrase: boolean): void {
   const required: Array<[string, string]> = [
     ["BACKUP_DATABASE_URL", ENV.databaseUrl],
@@ -81,8 +108,16 @@ function requireEnv(needsPassphrase: boolean): void {
     console.error(`Faltan variables en ${ENV_FILE}: ${missing.join(", ")}`);
     process.exit(1);
   }
+  if (!PROJECT_REF) {
+    console.error(
+      `No se pudo determinar el proyecto Supabase a respaldar: define BACKUP_PROJECT_REF (o revisa BACKUP_SUPABASE_URL / BACKUP_DATABASE_URL) en ${ENV_FILE}. Abortando.`,
+    );
+    process.exit(1);
+  }
   if (!ENV.databaseUrl.includes(PROJECT_REF)) {
-    console.error(`BACKUP_DATABASE_URL no apunta al proyecto de producción ${PROJECT_REF}. Abortando.`);
+    console.error(
+      `BACKUP_DATABASE_URL no apunta al proyecto objetivo ${PROJECT_REF} (de BACKUP_PROJECT_REF o derivado de BACKUP_SUPABASE_URL). Abortando.`,
+    );
     process.exit(1);
   }
 }

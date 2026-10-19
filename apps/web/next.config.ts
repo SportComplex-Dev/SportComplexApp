@@ -1,5 +1,20 @@
 import type { NextConfig } from "next";
 
+/**
+ * Host de Supabase Storage derivado de `NEXT_PUBLIC_SUPABASE_URL` (build-arg):
+ * nada de `<ref>.supabase.co` hardcodeado. Si la variable falta o es inválida
+ * se omite el patrón, de modo que solo se sirven assets locales.
+ */
+const SUPABASE_STORAGE_HOST: string | null = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
@@ -22,13 +37,15 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "phyesjwtzrmrcvmtajay.supabase.co",
-        pathname: "/storage/v1/object/public/sportcomplex-assets/**",
-      },
-    ],
+    remotePatterns: SUPABASE_STORAGE_HOST
+      ? [
+          {
+            protocol: "https",
+            hostname: SUPABASE_STORAGE_HOST,
+            pathname: "/storage/v1/object/public/sportcomplex-assets/**",
+          },
+        ]
+      : [],
   },
 };
 

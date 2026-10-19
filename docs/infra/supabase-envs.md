@@ -1,19 +1,19 @@
 # Entornos Supabase
 
-> Estado: vigente 2026-10-15
+> Estado: vigente 2026-10-19
 
 > No commitear secretos. Las claves (`SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DIRECT_URL`, `SEED_ADMIN_PASSWORD`) viven en GitHub Environment Secrets (`production`) y en el `.env` del VPS (modo `0600`). Nunca en git ni en este archivo.
 
-& Mantenimiento (SCRUM-208 / SCRUM-209)
+## Mantenimiento (SCRUM-208 / SCRUM-209)
 
 ### 1. Mapeo de Proyectos Supabase & Custodia de Credenciales
 - **Producción (`prod`):**
-  - Proyecto Supabase Ref: `phyesjwtzrmrcvmtajay`
-  - Uso: Base de datos oficial de producción (clientes reales, reservas y transacciones).
+  - Proyecto Supabase Ref: `ouemmmwpygmizyvtcpuc` (en el panel aparece como `SportComplex-Dev`).
+  - Uso: Base de datos oficial de producción (clientes, reservas y transacciones) desde la migración del 2026-10-19; incluye el bucket espejo `sportcomplex-assets`.
   - Custodia: Las credenciales (`SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DIRECT_URL`) residen en GitHub Environment Secrets (`production`) y en el `.env` del VPS (modo `0600`).
-- **Desarrollo (`develop`):**
-  - Proyecto Supabase Ref: `ouemmmwpygmizyvtcpuc` (`SportComplex-Dev`)
-  - Uso: Entorno aislado para integración y pruebas de desarrollo. Configurado en `packages/db/.env` o `apps/web/.env.local`.
+- **Desarrollo / heredado (`develop`):**
+  - Proyecto Supabase Ref: `phyesjwtzrmrcvmtajay`
+  - Uso: Entorno de integración y pruebas. Conserva los datos previos a la migración (10 usuarios en Auth, 12 reservas, 4 pagos al 2026-10-19). Configurado en `packages/db/.env` o `apps/web/.env.local`.
   - Custodia: Claves restringidas a desarrolladores autorizados en el almacén de secretos del equipo.
 
 ### 2. Backup Cifrado de Producción
@@ -21,7 +21,7 @@ Antes de cualquier ventana de mantenimiento o purga, generar el volcado binario 
 
 ```bash
 ## 1. Volcado binario (usar Session Pooler IPv4 si tu red no tiene IPv6):
-pg_dump "postgresql://postgres:PASSWORD@db.phyesjwtzrmrcvmtajay.supabase.co:5432/postgres" -Fc -f backup_prod_prod.dump
+pg_dump "postgresql://postgres:PASSWORD@db.<ref>.supabase.co:5432/postgres" -Fc -f backup_prod_prod.dump
 
 ## 2. Cifrado criptográfico con PBKDF2:
 openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -in backup_prod_prod.dump -out backup_prod_prod.dump.enc
@@ -48,7 +48,7 @@ pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --dry-run
 pnpm --filter @sportcomplex/db exec tsx scripts/purge-test-users.ts --execute
 
 ## Requisito previo: backup verificado de producción (TSK-BD-01),
-## ver docs/TSK-BD-01-backup-produccion.md.
+## ver infra/backup-produccion.md.
 ```
 
 ### 4. Bootstrap de Producción (`bootstrap:prod`)

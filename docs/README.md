@@ -36,12 +36,13 @@ Mapa de toda la documentación del monorepo, organizada por tema (no por tarea).
 |---|---|
 | [features/auth.md](./features/auth.md) | Google OAuth, vinculación de cuentas, plan de backend de auth, fix de login, empleados/roles y reglas de borrado |
 | [features/recuperacion-contrasena.md](./features/recuperacion-contrasena.md) | Flujo de recuperación y restablecimiento de contraseña (`/forgot-password`, `/reset-password`), Zod y Suspense |
+| [features/pruebas-recuperacion-contrasena.md](./features/pruebas-recuperacion-contrasena.md) | Suite de pruebas automatizadas de seguridad de tokens, anti-enumeración y accesibilidad WCAG 2.2 (TSK-QA-05 / HU-38) |
 | [features/catalogo.md](./features/catalogo.md) | CRUD de categorías e instancias con unicidad y calendario propio |
 | [features/reservas.md](./features/reservas.md) | Franjas horarias y aforo, ventana de 15 días, bloqueo temporal en checkout, multirreserva y multi-servicio en la misma franja, historial con cursor |
 | [features/piscinas.md](./features/piscinas.md) | Motor de mantenimiento de piscinas, modalidad aforo concurrente/exclusividad |
-| [features/control-acceso.md](./features/control-acceso.md) | Escáner QR (puesto de turno, modo consulta, resiliencia offline), denegación por discrepancia de zona, alertas de zona y franja vencida, validación de franja de ingreso |
+| [features/control-acceso.md](./features/control-acceso.md) | Escáner QR (puesto de turno, modo consulta, resiliencia offline), denegación por discrepancia de zona, validación de ventanas multi-franja y suite E2E (TSK-QA-04) |
 | [features/pagos-pos.md](./features/pagos-pos.md) | Idempotencia Stripe, webhooks de pago, canje en modo turno, cobro POS, comprobante PDF, interfaz POS cashless |
-| [features/membresias.md](./features/membresias.md) | Persistencia de membresías y catálogo de planes |
+| [features/membresias.md](./features/membresias.md) | Persistencia de membresías, catálogo de planes, enlace canónico en AdminLayout y suite de segmentación (TSK-QA-02) |
 | [features/torneos.md](./features/torneos.md) | Modelo de torneos, bloqueos, inscripciones, endpoints admin y bloqueo preventivo |
 | [features/chatbot-analitica.md](./features/chatbot-analitica.md) | Endpoints para chatbot y agregaciones analíticas |
 | [features/reglamentos.md](./features/reglamentos.md) | Reglamentos y marco normativo (`/rules`) |

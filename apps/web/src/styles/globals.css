@@ -3789,10 +3789,6 @@ button { cursor: pointer; }
   .no-print {
     display: none !important;
   }
-  .ticket-receipt {
-    box-shadow: none !important;
-    margin: 0 auto;
-  }
 }
 
 
@@ -5425,40 +5421,6 @@ button { cursor: pointer; }
   }
 }
 
-/* ==========================================================================
-   Impresión de Comprobante / Voucher PDF (RF-12 & RNF-05)
-   Encapsulado bajo .printing-thermal-receipt para evitar fuga global (CSS-01)
-   ========================================================================== */
-@media print {
-  body.printing-thermal-receipt {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  body.printing-thermal-receipt * {
-    visibility: hidden;
-  }
-  body.printing-thermal-receipt .printable-receipt,
-  body.printing-thermal-receipt .printable-receipt * {
-    visibility: visible;
-  }
-  body.printing-thermal-receipt .printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 58mm !important;
-    max-width: 58mm !important;
-    margin: 0 auto;
-    padding: 3mm 2mm;
-    background: #fff !important;
-    color: #000 !important;
-    font-family: 'Courier New', Courier, monospace;
-    box-sizing: border-box;
-  }
-  .no-print {
-    display: none !important;
-  }
-}
-
 /* ============================================================
    TSK-FE-36 / HU-40: Drawer colapsable en AdminLayout (Mobile)
    ============================================================ */
@@ -5523,8 +5485,32 @@ button { cursor: pointer; }
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-.admin-menu-trigger:active {
-  transform: scale(0.95);
+@media (min-width: 768px) {
+  .admin-menu-trigger {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-menu-trigger {
+    display: grid !important;
+  }
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-admin-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-menu-admin-topbar .user-dropdown {
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
 }
 
 .admin-drawer-portal {

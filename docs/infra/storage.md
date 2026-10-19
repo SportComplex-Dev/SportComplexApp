@@ -89,6 +89,12 @@ supabase.storage.from('private-assets').createSignedUrl(path, 3600)
 
 Variables ya definidas en `.env` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`). No se añaden `MINIO_*`.
 
+La base pública de assets **no** se hardcodea: el helper `@sportcomplex/core/assets`
+la deriva de `NEXT_PUBLIC_SUPABASE_URL` + `sportcomplex-assets`
+(`NEXT_PUBLIC_ASSETS_BASE_URL` es un override opcional). El bucket se aprovisiona
+por proyecto (`storage:setup`); el de producción se mantiene como **espejo** del
+catálogo (los mismos 23 objetos con el mismo `eTag`).
+
 ## 5. Verificación
 
 ```bash

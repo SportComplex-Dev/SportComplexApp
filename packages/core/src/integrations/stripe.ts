@@ -18,6 +18,9 @@ import { checkoutExpiresAt } from "../services/availability";
  * (30 min). Es también el TTL del hold `RESERVA.expira_en` (RN-04 revisada). */
 export const STRIPE_SESSION_MIN_TTL_MINUTES = 30 as const;
 
+/** Monto mínimo (COP) que cobra Stripe: equivale a ~0,50 USD; por debajo rechaza el pago. */
+export const STRIPE_MIN_AMOUNT_COP = 2000 as const;
+
 /** `expires_at` efectivo enviado a Stripe (segundos Unix). */
 function stripeSessionExpiresAtSec(from: Date): number {
   const minTtlMs = STRIPE_SESSION_MIN_TTL_MINUTES * 60 * 1000;

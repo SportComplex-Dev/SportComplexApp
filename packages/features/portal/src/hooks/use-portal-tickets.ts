@@ -8,7 +8,6 @@ import {
   generarQRDataUrl,
   sanitizeFilename,
   type PortalTicket,
-  type ReceiptApiResponse,
 } from '../utils/portal-utils'
 import type { TabType, UserTournamentItem, ToastKind } from '../types/portal'
 
@@ -18,11 +17,7 @@ export function usePortalTickets(
 ) {
   const [activeTab, setActiveTab] = useState<TabType>('activas')
   const [selectedTicket, setSelectedTicket] = useState<PortalTicket | null>(null)
-  const [printingTicket, setPrintingTicket] = useState<PortalTicket | null>(null)
-  const [printingReceipt, setPrintingReceipt] = useState<ReceiptApiResponse | null>(null)
-  const [printingQrUrl, setPrintingQrUrl] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [isPrinting, setIsPrinting] = useState<boolean>(false)
   const [dbBookings, setDbBookings] = useState<PortalTicket[]>([])
   const [userTournaments, setUserTournaments] = useState<UserTournamentItem[]>([])
 
@@ -91,62 +86,6 @@ export function usePortalTickets(
     }
   }, [])
 
-  const handlePrintTicket = useCallback(async (ticket: PortalTicket) => {
-    try {
-      setIsPrinting(true)
-      const receipt = await fetchReceiptData(ticket.id).catch(() => null)
-      const qrTarget = receipt?.qr?.payload || ticket.qrPayload || ticket.code
-      const qrUrl = receipt?.qr?.dataUrl || (await generarQRDataUrl(qrTarget, 260))
-      setPrintingQrUrl(qrUrl)
-      setPrintingReceipt(receipt)
-      setPrintingTicket(ticket)
-
-      let styleTag = document.getElementById('thermal-print-page-style')
-      if (!styleTag) {
-        styleTag = document.createElement('style')
-        styleTag.id = 'thermal-print-page-style'
-        styleTag.innerHTML = '@page { size: 58mm auto; margin: 0; }'
-        document.head.appendChild(styleTag)
-      }
-
-      document.body.classList.add('printing-thermal-receipt')
-
-      let cleanedUp = false
-      const cleanupPrintStyles = () => {
-        if (cleanedUp) return
-        cleanedUp = true
-        document.body.classList.remove('printing-thermal-receipt')
-        document.getElementById('thermal-print-page-style')?.remove()
-        setPrintingTicket(null)
-        setPrintingQrUrl(null)
-        setPrintingReceipt(null)
-        setIsPrinting(false)
-        window.removeEventListener('afterprint', handleAfterPrint)
-      }
-
-      const handleAfterPrint = () => {
-        cleanupPrintStyles()
-      }
-      window.addEventListener('afterprint', handleAfterPrint)
-
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          window.print()
-          setTimeout(cleanupPrintStyles, 2500)
-        }, 300)
-      })
-    } catch (err) {
-      console.error('Error al preparar impresión:', err)
-      document.body.classList.remove('printing-thermal-receipt')
-      document.getElementById('thermal-print-page-style')?.remove()
-      setPrintingTicket(null)
-      setPrintingQrUrl(null)
-      setPrintingReceipt(null)
-      setIsPrinting(false)
-      notify('Error al preparar el comprobante para impresión.', 'error')
-    }
-  }, [notify])
-
   const handleDownloadQr = useCallback(async (ticket: PortalTicket) => {
     if (downloadingId) return
     setDownloadingId(ticket.id)
@@ -190,13 +129,8 @@ export function usePortalTickets(
     currentTabItems,
     selectedTicket,
     setSelectedTicket,
-    printingTicket,
-    printingReceipt,
-    printingQrUrl,
     downloadingId,
-    isPrinting,
     handleOpenQrModal,
-    handlePrintTicket,
     handleDownloadQr,
   }
 }

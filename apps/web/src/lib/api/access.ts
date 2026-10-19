@@ -4,13 +4,14 @@ import {
   decideAccess,
   hasServiceMismatch,
   getTicketAccessWindow,
-  verifyTicketSignature,
 } from "@sportcomplex/core";
+import { verifyTicketSignature } from "@sportcomplex/security";
 import {
   ejecutarLectura,
   getAsignacionVigente,
   getServicioParaAccesoById,
   getTicketForScan,
+  TicketError,
   type ClienteDb,
   type ModoLecturaValor,
   type ResultadoLecturaValor,
@@ -19,9 +20,9 @@ import {
 export { getTicketAccessWindow, ACCESS_WINDOW_EXPIRED_MESSAGE };
 
 // TSK-BD-10 — orquestador del escáner (RF-13/RF-14/RF-15 · RN-05).
-// Orden fijo: 1) firma HMAC ANTES de tocar la BD → 2) cargar ticket →
-// 3) decideAccess() (core, puro) → 4) ejecutarLectura() en una transacción
-// (canje condicional + auditoría obligatoria).
+// Orden fijo: cargar ticket para obtener su ventana confiable → validar firma
+// HMAC (incluido el rango de tickets consolidados) → decidir acceso → canje
+// y auditoría en una transacción.
 // Vive fuera de la ruta para ser testeable sin sesión/auth.
 
 export type AccessDeniedCode =
@@ -100,14 +101,29 @@ export async function procesarEscaneo(
   input: EscaneoInput,
   options: EscaneoOptions,
 ): Promise<EscaneoResultado> {
-  // 1. Firma primero: nunca consultar la BD con un QR adulterado.
-  if (!verifyTicketSignature(input.ticketId, input.signature, options.qrSecret)) {
-    throw new AccessError("Firma del QR inválida.", "INVALID_SIGNATURE", 400);
-  }
-
+  // Trade-off TSK-BE-31: las firmas legacy se pueden prevalidar antes de DB,
+  // pero los tickets consolidados firman la ventana almacenada en la fila.
+  // Para distinguir ambos formatos compatibles, se carga la fila y luego se
+  // valida el HMAC. La ruta exige credenciales del lector; no se escribe ni
+  // registra una lectura hasta que la firma queda validada.
   const now = options.now ?? new Date();
   const db = options.db;
-  const ticket = await getTicketForScan(input.ticketId, db);
+  const legacySignatureValid = verifyTicketSignature(input.ticketId, input.signature, options.qrSecret);
+  let ticket;
+  try {
+    ticket = await getTicketForScan(input.ticketId, db);
+  } catch (error) {
+    if (error instanceof TicketError && !legacySignatureValid) {
+      throw new AccessError("Firma del QR inválida.", "INVALID_SIGNATURE", 400);
+    }
+    throw error;
+  }
+  const signedWindow = ticket.inicioValidez && ticket.finValidez
+    ? { start: ticket.inicioValidez, end: ticket.finValidez }
+    : undefined;
+  if (!verifyTicketSignature(input.ticketId, input.signature, options.qrSecret, signedWindow)) {
+    throw new AccessError("Firma del QR inválida.", "INVALID_SIGNATURE", 400);
+  }
 
   const ticketServiceId = ticket.reserva.disponibilidad.servicio.id;
   const ticketServiceName = ticket.reserva.disponibilidad.servicio.nombre;
@@ -122,7 +138,9 @@ export async function procesarEscaneo(
     ? `Acceso denegado: El tiquete pertenece a ${ticketServiceName} y se encuentra en ${stationService.nombre}`
     : undefined;
 
-  const { start, end } = getTicketAccessWindow(ticket.reserva.disponibilidad);
+  const { start, end } = signedWindow
+    ? { start: new Date(signedWindow.start), end: new Date(signedWindow.end) }
+    : getTicketAccessWindow(ticket.reserva.disponibilidad);
   const decision = decideAccess({
     now,
     start,
@@ -195,9 +213,9 @@ export async function procesarEscaneo(
       estado: salida.ticketEstado,
       servicioId: ticket.reserva.disponibilidad.servicio.id,
       servicioNombre: ticket.reserva.disponibilidad.servicio.nombre,
-      fecha: ticket.reserva.disponibilidad.fecha.toISOString().slice(0, 10),
-      horaInicio: ticket.reserva.disponibilidad.franja.horaInicio.toISOString().slice(11, 19),
-      horaFin: ticket.reserva.disponibilidad.franja.horaFin.toISOString().slice(11, 19),
+      fecha: start.toLocaleDateString("en-CA", { timeZone: "America/Bogota" }),
+      horaInicio: new Intl.DateTimeFormat("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(start),
+      horaFin: new Intl.DateTimeFormat("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(end),
       titularId: ticket.reserva.titular.id,
       titularNombre: ticket.reserva.titular.nombre,
     },

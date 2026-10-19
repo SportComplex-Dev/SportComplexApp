@@ -768,6 +768,33 @@ Cuando un servicio queda fuera de operación (mantenimiento imprevisto, fuerza m
 ### Testing
 `apps/web/src/app/(admin)/admin/incident/__tests__/incident-ui.test.ts` + `route.test.ts` (validación de motivo, preview, inhabilitación y errores 404/409).
 
+---
+
+## Validación de Ventanas Multi-Franja y Suite E2E (TSK-QA-04 / HU-26 / RF-13, RF-15)
+
+### Contexto
+Soporte auditado y certificado para tickets emitidos bajo reservas multi-franja continuas (TSK-BE-31 / intervalo `[inicioValidez, finValidez]`), permitiendo ingreso válido a lo largo del intervalo consolidado total `[horaInicio_primera, horaFin_ultima]` y denegando estrictamente el acceso tras concluir la última franja.
+
+### Implementación y Auditoría
+- **Controlador de Escáner y Normalización**:
+  - `packages/features/scanner/src/hooks/useScannerController.ts`: Soporta el manejo de `WINDOW_EXPIRED`, alimentando `buildExpiredSlotDetails` con el rango consolidado y fijando el mensaje contractual `ACCESS_WINDOW_EXPIRED_MESSAGE` (`"Acceso denegado: Franja horaria vencida"`).
+  - `packages/features/scanner/src/services/scannerService.ts`: `validateTicket` normaliza la respuesta multi-franja conservando el boleto en estado `EMITIDO` y mapeando los minutos de distancia respecto a la frontera de validez.
+  - `apps/web/src/app/(staff)/scanner/page.tsx`: Monta `ExpiredSlotScreen` ante expiraciones de ventana en modo turno y expone `ManualEntryCard` para simulaciones de prueba.
+
+### Matriz de Pruebas Unitarias (`scanner.service.test.ts`)
+- `buildExpiredSlotDetails` con ventana 14:00–16:00:
+  - Intento posterior (16:15): Posición `AFTER`, cálculo exacto de 15 minutos fuera de la franja.
+  - Intento previo (13:40): Posición `BEFORE`, 20 minutos previos a la apertura.
+- `validateTicket` multi-franja:
+  - Lectura dentro de franja 1 y franja 2: Estado `VALID` con acceso concedido.
+  - Lectura concluida la franja 2: Estado `EXPIRED` con mensaje contractual y detalles de franja.
+
+### Especificación E2E Playwright (`e2e/multislot-booking.spec.ts`)
+1. **Reserva Multi-Franja**: Selección de 2 horas contiguas en `/portal/book` mediante `SlotPicker`, comprobando el cálculo de subtotal continuo y resumen reactivo.
+2. **Checkout Cashless**: Emisión de tiquete QR consolidado `SC1:<uuid>:<hmac>`.
+3. **Canje Concedido**: Escaneo en `/scanner` dentro del bloque horario (franja 1 y franja 2), confirmando estado `GRANTED` y feedback positivo.
+4. **Denegación Contractual Expirada**: Escaneo con hora posterior al cierre de la última franja, validando la pantalla modal `ExpiredSlotScreen` (`role="alertdialog"`) con el mensaje `"Acceso denegado: Franja horaria vencida"`.
+
 ## Trazabilidad
 
-> Ref histórica: HU-15/16/17 (RF-13/14/15 / RN-05/06) · SCRUM-130 · ramas de escáner QR (puesto de turno, consulta, alertas)
+> Ref histórica: HU-15/16/17 (RF-13/14/15 / RN-05/06) · HU-26 · tareas `TSK-BE-31`, `TSK-FE-31` y `TSK-QA-04` · rama `test/tsk-qa-02-04-memberships-and-multislot-e2e`

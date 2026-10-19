@@ -42,7 +42,7 @@ export const createEmployeeSchema = z.object({
   password: z.string().min(8, 'La contraseña temporal debe contener al menos 8 caracteres').max(72),
 })
 
-// TSK-FE-33 / TSK-BE-32: Recuperación y restablecimiento de contraseña
+// TSK-FE-33 / TSK-BE-32 / TSK-QA-05: Recuperación y restablecimiento de contraseña
 export const forgotPasswordSchema = z.object({
   email: z
     .string()

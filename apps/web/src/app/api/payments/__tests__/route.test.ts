@@ -500,3 +500,27 @@ test("TSK-BE-18 API: webhook rechaza metadata POS incompleta o de varias reserva
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "INVALID_POS_METADATA");
 });
+
+test("TSK-BE-31 API: checkout.session.completed pagado confirma la reserva usando su payment_intent", async () => {
+  seedReserva({ id: "reserva-session-completed" });
+  const payload = buildEventPayload({
+    id: "evt_checkout_session_completed",
+    type: "checkout.session.completed",
+    object: {
+      id: "cs_test_completed",
+      object: "checkout.session",
+      payment_intent: "pi_checkout_session_completed",
+      payment_status: "paid",
+      amount_total: 7500000,
+      metadata: { bookingId: "reserva-session-completed", userId: "user-1" },
+    },
+  });
+
+  const response = await postWebhook(payload, signPayload(payload));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.estado, "APROBADO");
+  assert.equal(mock._state.pagos.at(-1)?.stripePaymentIntentId, "pi_checkout_session_completed");
+  assert.equal(mock._state.reservas.find((r: any) => r.id === "reserva-session-completed")?.estado, "CONFIRMADA");
+});

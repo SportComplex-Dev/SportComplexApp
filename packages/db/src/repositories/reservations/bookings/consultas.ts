@@ -75,16 +75,31 @@ export async function getBookableAvailability(serviceId: number, date: string, n
       orderBy: { id: "asc" },
     });
 
-    const result = [];
-    for (const item of availability) {
-      await lockAvailability(tx, item.id);
-      await releaseExpiredHolds(tx, item.id, now);
-      const refreshed = await tx.disponibilidad.findUnique({
-        where: { id: item.id },
-        include: { servicio: true, franja: true },
-      });
-      if (!refreshed) continue;
+    // Limpieza perezosa de holds vencidos: solo se bloquean las franjas que
+    // los tienen (una consulta para encontrarlas). Bloquear y releer cada
+    // franja una por una superaba el timeout de 5 s de la transacción con la
+    // latencia de Supabase y dejaba vacía la disponibilidad (POS incluido).
+    const ids = availability.map(({ id }) => id);
+    const conVencidos = await tx.reserva.findMany({
+      where: { disponibilidadId: { in: ids }, estado: "PENDIENTE_PAGO", expiraEn: { lte: now } },
+      select: { disponibilidadId: true },
+      distinct: ["disponibilidadId"],
+    });
+    for (const { disponibilidadId } of conVencidos) {
+      await lockAvailability(tx, disponibilidadId);
+      await releaseExpiredHolds(tx, disponibilidadId, now);
+    }
+    const vigentes =
+      conVencidos.length === 0
+        ? availability
+        : await tx.disponibilidad.findMany({
+            where: { id: { in: ids } },
+            include: { servicio: true, franja: true },
+            orderBy: { id: "asc" },
+          });
 
+    const result = [];
+    for (const refreshed of vigentes) {
       const slotStart = new Date(
         `${date}T${refreshed.franja.horaInicio.toISOString().slice(11, 19)}-05:00`,
       );

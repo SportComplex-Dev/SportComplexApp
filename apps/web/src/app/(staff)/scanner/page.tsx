@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, QrCode } from "lucide-react";
+import { AlertTriangle, LogOut, QrCode, User } from "lucide-react";
 import { Badge, Button, Card, CardContent } from "@sportcomplex/ui";
 import {
   ConsultationResultCard,
@@ -14,6 +14,7 @@ import {
   ScannerCameraView,
   ManualEntryCard,
   ShiftScannerView,
+  ExpiredSlotScreen,
 } from "@sportcomplex/features-scanner";
 import { useOptionalApp } from "@/components/layout/app-provider";
 
@@ -21,6 +22,13 @@ export default function ScannerPage() {
   const c = useScannerController();
   const app = useOptionalApp();
   const session = app?.session;
+  const logout = app?.logout;
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as unknown as { __scannerScanTurno?: (payload: string) => void }).__scannerScanTurno = c.handleScanTurno;
+    }
+  }, [c.handleScanTurno]);
 
   return (
     <main data-scanner-theme={c.theme} className="min-h-screen bg-[var(--app-bg)] text-[var(--ink)] p-4 sm:p-6 lg:p-8">
@@ -45,7 +53,24 @@ export default function ScannerPage() {
                 <span className={`size-2 rounded-full ${c.isOnline ? "bg-emerald-500" : "bg-amber-500"}`} />
                 {c.isOnline ? "En línea" : "Sin conexión"}
               </span>
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+                <User className="size-3.5 text-[#123e30] dark:text-[#c9ef75]" />
+                <span>{session?.name || "Lector Portería"}</span>
+              </div>
               <Badge variant="admin">Staff Portería</Badge>
+              {logout && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  aria-label="Cerrar sesión"
+                  title="Cerrar sesión"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                  data-testid="scanner-logout-button"
+                >
+                  <LogOut className="size-3.5" />
+                  <span className="hidden sm:inline">Cerrar sesión</span>
+                </button>
+              )}
             </div>
           </div>
           <p className="text-sm text-[var(--subtle)]">
@@ -102,6 +127,7 @@ export default function ScannerPage() {
           <div className="space-y-6">
             <ScannerHeader
               activeShift={c.activeShift} audioEnabled={c.audioEnabled} theme={c.theme}
+              employeeName={session?.name || "Lector Portería"} onLogout={logout}
               onToggleAudio={c.toggleAudio} onToggleTheme={c.toggleTheme} onChangeShift={c.handleChangeShift}
             />
             <ShiftScannerView
@@ -111,6 +137,15 @@ export default function ScannerPage() {
               onToggleFacingMode={c.toggleFacingMode} onOpenCamera={c.handleOpenCameraTurno}
               onScan={c.handleScanTurno} onCameraError={c.handleCameraErrorTurno}
             />
+            <div className="max-w-4xl mx-auto">
+              <ManualEntryCard
+                showManualInput={c.showManualInput} setShowManualInput={c.setShowManualInput}
+                manualPayload={c.manualPayload} setManualPayload={c.setManualPayload}
+                manualTicketId={c.manualTicketId} setManualTicketId={c.setManualTicketId}
+                manualSignature={c.manualSignature} setManualSignature={c.setManualSignature}
+                consultationLoading={c.isRedeeming} onSubmit={c.handleManualSubmit}
+              />
+            </div>
             <TicketValidationModal
               isOpen={c.isModalOpen} state={c.flowState} ticket={c.ticket} message={c.modalMessage}
               employeeName={session?.name ?? ""} isRedeeming={c.isRedeeming} isOnline={c.isOnline}
@@ -120,6 +155,20 @@ export default function ScannerPage() {
               <ZoneMismatchScreen
                 message={c.zoneMismatch.message} ticketId={c.zoneMismatch.ticketId}
                 postServiceName={c.activeShift.courtName} onContinue={c.handleScanNextTurno}
+              />
+            )}
+            {c.expiredSlot && (
+              <ExpiredSlotScreen
+                userName={c.expiredSlot.userName}
+                ticketId={c.expiredSlot.ticketId}
+                reservationId={c.expiredSlot.reservationId}
+                targetCourtName={c.expiredSlot.targetCourtName}
+                expiredDetails={c.expiredSlot.expiredDetails}
+                message={c.expiredSlot.message}
+                onContinue={() => {
+                  c.setExpiredSlot(null);
+                  c.handleScanNextTurno();
+                }}
               />
             )}
           </div>
