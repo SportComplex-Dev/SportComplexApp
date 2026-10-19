@@ -3919,6 +3919,7 @@ button { cursor: pointer; }
 /* 1. Eyebrows (Todos los encabezados de sección y badges superiores) */
 .eyebrow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   color: var(--brand-green-text, #4b7652);
@@ -4211,11 +4212,14 @@ button { cursor: pointer; }
   font-weight: 800;
   letter-spacing: -0.04em;
   margin: 8px 0 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: block;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .welcome-row h1 svg {
+  display: inline-block;
+  vertical-align: -0.15em;
+  margin-left: 6px;
   color: var(--brand-accent);
 }
 .welcome-row p {
@@ -5442,6 +5446,14 @@ button { cursor: pointer; }
   }
   .welcome-row > div:first-child {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .welcome-row h1 {
+    font-size: clamp(22px, 5.5vw, 26px) !important;
+    line-height: 1.25 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
   }
   .welcome-row .calendar-shortcut {
     width: 100%;

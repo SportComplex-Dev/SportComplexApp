@@ -205,15 +205,15 @@ function MembershipPortalContent() {
       <main className="section-shell app-page no-print pb-16">
         {/* Encabezado del Portal de Membresías */}
         <div className="welcome-row mb-8">
-          <div>
-            <div className="eyebrow flex items-center gap-2">
-              <Crown size={14} className="text-[#c9ef75]" />
-              <span>MEMBRESÍAS Y BENEFICIOS EXCLUSIVOS</span>
+          <div className="min-w-0 max-w-full">
+            <div className="eyebrow flex flex-wrap items-center gap-2">
+              <Crown size={14} className="text-[#c9ef75] shrink-0" />
+              <span className="break-words">MEMBRESÍAS Y BENEFICIOS EXCLUSIVOS</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 mb-2 break-words">
               Membresías con <span className="text-[#c9ef75]">30 % de Descuento</span> Permanente
             </h1>
-            <p className="text-[var(--subtle)] text-sm max-w-2xl leading-relaxed">
+            <p className="text-[var(--subtle)] text-sm max-w-2xl leading-relaxed break-words">
               Disfruta de la mejor experiencia deportiva con tarifas preferenciales en todas tus reservas
               de canchas, pistas y acceso total al complejo deportivo. Tarifas transparentes sin cargos ocultos.
             </p>
@@ -261,8 +261,8 @@ function MembershipPortalContent() {
               </div>
 
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                  <div className="flex items-center gap-2.5 mb-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5 mb-2">
                     <Badge variant="success" className="text-xs font-bold px-3 py-1 bg-[#c9ef75] text-[#091b13]">
                       MEMBRESÍA {membresiaActiva.estado}
                     </Badge>
@@ -270,7 +270,7 @@ function MembershipPortalContent() {
                       PLAN #{membresiaActiva.plan?.id ?? membresiaActiva.id}
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-1">
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-1 break-words">
                     {membresiaActiva.plan?.nombre || 'Plan de Membresía Activo'}
                   </h2>
                   <p className="text-xs sm:text-sm text-[#d1fae5] max-w-xl">

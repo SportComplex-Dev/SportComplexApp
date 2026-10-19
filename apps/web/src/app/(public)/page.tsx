@@ -84,7 +84,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="hero-location">
-          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> Abierto hoy hasta las 11:00 p. m.
+          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> Abierto hasta las 11:00 p. m.
         </div>
         <div className="hero-scroll">
           DESLIZA PARA EXPLORAR <span />
