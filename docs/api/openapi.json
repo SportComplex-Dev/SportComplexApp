@@ -1399,6 +1399,28 @@
         }
       }
     },
+    "/api/pdf/receipt/file": {
+      "get": {
+        "tags": [
+          "Portal"
+        ],
+        "summary": "GET /api/pdf/receipt/file",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
+          }
+        }
+      }
+    },
     "/api/pdf/receipt": {
       "get": {
         "tags": [
@@ -1449,6 +1471,28 @@
                 "$ref": "#/components/schemas/PosCheckoutRequest"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/pos/tickets/lookup": {
+      "get": {
+        "tags": [
+          "POS"
+        ],
+        "summary": "GET /api/pos/tickets/lookup",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error (Zod)"
+          },
+          "401": {
+            "description": "Session requerida (proxy perimetral)"
+          },
+          "403": {
+            "description": "Rol no autorizado (RBAC)"
           }
         }
       }
@@ -1623,50 +1667,6 @@
           "Webhooks"
         ],
         "summary": "POST /api/webhooks",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
-    "/api/pdf/receipt/file": {
-      "get": {
-        "tags": [
-          "Portal"
-        ],
-        "summary": "GET /api/pdf/receipt/file",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Validation error (Zod)"
-          },
-          "401": {
-            "description": "Session requerida (proxy perimetral)"
-          },
-          "403": {
-            "description": "Rol no autorizado (RBAC)"
-          }
-        }
-      }
-    },
-    "/api/pos/tickets/lookup": {
-      "get": {
-        "tags": [
-          "POS"
-        ],
-        "summary": "GET /api/pos/tickets/lookup",
         "responses": {
           "200": {
             "description": "OK"
