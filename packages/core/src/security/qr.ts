@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-export { signTicket, verifyTicketSignature } from "@sportcomplex/security";
+export { signTicket, verifyTicketSignature } from "@sportcomplex/security/qr";
 
 // RNF-03 + ARCHITECTURE §8.2: QR = UUIDv4 + HMAC-SHA256 del servidor.
 export function newTicketId(): string {
