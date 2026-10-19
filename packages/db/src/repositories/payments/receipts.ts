@@ -138,6 +138,7 @@ export async function getReceiptReserva(
   }
 
   // pagoId se usa solo para consolidar los importes y nunca sale en el DTO.
-  const { pagoId: _pagoId, ...receipt } = reserva;
+  const receipt = { ...reserva };
+  Reflect.deleteProperty(receipt, "pagoId");
   return { ...receipt, subtotal, total } as ReceiptData;
 }
