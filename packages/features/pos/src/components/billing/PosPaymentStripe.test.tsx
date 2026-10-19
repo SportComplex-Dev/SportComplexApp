@@ -31,7 +31,7 @@ const baseProps = {
   isMember: false,
   isProcessing: false,
   processStep: '',
-  onProcessPayment: noop,
+  isTestMode: true,
   onGenerateAltLink: noop,
 }
 
@@ -41,9 +41,19 @@ test('PosPaymentStripe: renders totals and charge actions', () => {
   assert.ok(html.includes('Cobro Stripe (Cashless)'), 'Debe mostrar el título de cobro')
   assert.ok(html.includes('TOTAL A COBRAR'), 'Debe mostrar el total a cobrar')
   assert.ok(html.includes('Cancha Sintética 7'), 'Debe mostrar el servicio en el desglose')
-  assert.ok(html.includes('Cobrar con Tarjeta Stripe'), 'Debe ofrecer el cobro con tarjeta')
-  assert.ok(html.includes('Enlace Alternativo'), 'Debe ofrecer el enlace alternativo')
+  assert.ok(html.includes('Cobrar con QR'), 'Debe ofrecer el cobro con QR desde el celular')
+  assert.equal(html.match(/<button/g)?.length, 1, 'Debe haber un único botón de cobro')
+  assert.ok(!html.includes('Cobrar con tarjeta'), 'No debe ofrecer el datáfono virtual')
+  assert.ok(html.includes('no se realizan cobros reales'), 'Debe aclarar que es el modo de pruebas')
+  assert.ok(!html.includes('Contactless'), 'No debe prometer un datáfono físico')
   assert.ok(html.includes('Cero Efectivo'), 'Debe mostrar el badge cashless')
+})
+
+test('PosPaymentStripe: sin modo test no muestra el aviso de pruebas', () => {
+  const html = renderToStaticMarkup(<PosPaymentStripe {...baseProps} isTestMode={false} />)
+
+  assert.ok(!html.includes('no se realizan cobros reales'))
+  assert.ok(html.includes('id="btn-pos-alt-link"'))
 })
 
 test('PosPaymentStripe: shows member discount line when isMember', () => {

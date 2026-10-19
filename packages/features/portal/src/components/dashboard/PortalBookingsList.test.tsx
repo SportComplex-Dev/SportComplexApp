@@ -15,7 +15,6 @@ test('PortalBookingsList: empty state renders empty message when tickets array i
       cancelledBookings={[]}
       currentTabItems={[]}
       onOpenQR={() => {}}
-      onPrintTicket={() => {}}
       onSelectCode={() => {}}
     />
   )
@@ -70,7 +69,6 @@ test('PortalBookingsList: renders list of tickets verifying codes, services, dat
       cancelledBookings={[]}
       currentTabItems={tickets}
       onOpenQR={() => {}}
-      onPrintTicket={() => {}}
       onSelectCode={() => {}}
     />
   )
@@ -87,6 +85,6 @@ test('PortalBookingsList: renders list of tickets verifying codes, services, dat
 
   // Verifies actions
   assert.ok(html.includes('Ver QR de Acceso'), 'Must render QR action button')
-  assert.ok(html.includes('PDF'), 'Must render PDF print button')
+  assert.ok(html.includes('/api/pdf/receipt/file?'), 'Must render PDF download link')
   assert.ok(html.includes('Pase Digital'), 'Must render digital pass link')
 })

@@ -158,7 +158,7 @@ test("TSK-FE-18 UI (SEC-01 / PCI-DSS): PosPaymentStripe NO contiene campos plano
       isMember: true,
       isProcessing: false,
       processStep: "",
-      onProcessPayment: () => {},
+      isTestMode: true,
       onGenerateAltLink: () => {},
     }),
   );
@@ -169,13 +169,13 @@ test("TSK-FE-18 UI (SEC-01 / PCI-DSS): PosPaymentStripe NO contiene campos plano
   assert.ok(!html.includes("placeholder=\"MM/AA\""));
 
   // Verificación de interfaz segura con Stripe
-  assert.ok(html.includes("Dat\u00e1fono Digital Stripe"));
+  assert.ok(html.includes("Cobro con QR Stripe"));
   assert.ok(html.includes("PCI-DSS Seguro"));
-  assert.ok(html.includes("Cobrar con Tarjeta Stripe"));
+  assert.ok(html.includes("Cobrar con QR"));
   assert.ok(html.includes("56.000"));
 });
 
-test("TSK-FE-18 UI (TEST-01 / RNF-05): PosVoucherModal renderiza comprobante imprimible con QR y membrete", () => {
+test("TSK-FE-18 UI (TEST-01 / RNF-05): PosVoucherModal renderiza el resumen de la venta", () => {
   const dummyBooking: Booking = {
     id: "book-12345",
     code: "AKR-POS-9988",
@@ -197,17 +197,14 @@ test("TSK-FE-18 UI (TEST-01 / RNF-05): PosVoucherModal renderiza comprobante imp
     React.createElement(PosVoucherModal, {
       booking: dummyBooking,
       sellerName: "Andrés Muñoz",
-      receiptQrUrl: "data:image/png;base64,dummy_qr_code",
-      onPrint: () => {},
+      comprobante: null,
+      printer: { status: "lista", transport: "usb", available: ["usb"], deviceName: null, error: null, pair: async () => {}, print: async () => true },
       onNextSale: () => {},
     }),
   );
 
-  assert.ok(html.includes("AKROS SPORTCOMPLEX"));
   assert.ok(html.includes("AKR-POS-9988"));
   assert.ok(html.includes("Carlos Santana"));
-  assert.ok(html.includes("id=\"pos-print-voucher\""));
-  assert.ok(html.includes("Imprimir Comprobante"));
   assert.ok(html.includes("Nueva Venta"));
 });
 
@@ -226,7 +223,7 @@ test("TSK-FE-18 UI (SRS §11.1 Riesgo 2 / ARCH-03): PosAltLinkModal renderiza en
     }),
   );
 
-  assert.ok(html.includes("Enlace de Pago Alternativo"));
+  assert.ok(html.includes("Cobro con QR"));
   assert.ok(html.includes("Escanear con la c\u00e1mara del celular"));
   assert.ok(html.includes("id=\"pos-alt-link-input\""));
   assert.ok(html.includes("btn-copy-alt-link"));
@@ -254,8 +251,8 @@ test("TSK-FE-18 UI (ARCH-02 / BLOQUEANTE 2): PosVoucherModal muestra indicador d
     React.createElement(PosVoucherModal, {
       booking: pendingBooking,
       sellerName: "Andrés Muñoz",
-      receiptQrUrl: null,
-      onPrint: () => {},
+      comprobante: null,
+      printer: { status: "lista", transport: "usb", available: ["usb"], deviceName: null, error: null, pair: async () => {}, print: async () => true },
       onNextSale: () => {},
     }),
   );

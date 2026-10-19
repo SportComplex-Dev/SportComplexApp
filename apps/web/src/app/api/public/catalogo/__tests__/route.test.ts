@@ -57,6 +57,25 @@ test("API: GET /api/public/catalogo retorna solo servicios ACTIVO con categorias
   assert.equal(categoria.nombre, "Canchas");
 });
 
+test("#115: cada servicio trae la ruta real de su imagen (mapa canónico o su categoría)", async () => {
+  mock._state.servicios.push({
+    id: 3,
+    categoriaId: 1,
+    nombre: "Cancha de Tenis Polvo de Ladrillo",
+    capacidadMaxima: 4,
+    tarifa: 45000,
+    modalidad: "EXCLUSIVA",
+    tipoPiscina: null,
+    estado: "ACTIVO",
+  });
+  const body = await (await catalogoRoute.GET()).json();
+  const conSlug = body.data.servicios.find((s: any) => s.id === 1);
+  assert.ok(conSlug.imagen.endsWith("/catalogo/futbol-5-cancha-1.webp"));
+  const sinSlug = body.data.servicios.find((s: any) => s.id === 3);
+  assert.equal(sinSlug.slug, undefined);
+  assert.ok(sinSlug.imagen.endsWith("/catalogo/categoria-canchas.webp"), "Nunca 'cancha-de-tenis-polvo-de-ladrillo.webp'");
+});
+
 test("API: GET /api/public/catalogo responde 500 con error controlado si la BD falla", async () => {
   const original = mock.categoriaServicio.findMany;
   mock.categoriaServicio.findMany = async () => {

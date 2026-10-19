@@ -208,7 +208,6 @@ sport-complex/
 │   │   │   ├── components/            # Primitivas: forms/ (Button, Input, ActionButton),
 │   │   │   │                          # dialogs/ (Modal, ConfirmDialog, Dialog),
 │   │   │   │                          # display/ (Card, Badge)
-│   │   │   ├── templates/             # ticket-receipt (comprobante para impresión PDF)
 │   │   │   └── lib/                   # cn (classnames)
 │   │   ├── package.json
 │   │   └── tsconfig.json

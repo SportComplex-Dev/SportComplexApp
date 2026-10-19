@@ -3,6 +3,7 @@ import {
   applyMembershipDiscount,
   createPosPaymentIntent,
   createStripeCheckoutSession,
+  STRIPE_MIN_AMOUNT_COP,
 } from "@sportcomplex/core";
 import type {
   PosAuthorizationResult,
@@ -238,6 +239,27 @@ export function createPosCheckoutPostHandler(
           };
         }
 
+        // Cálculo financiero: antes de tocar franja, cupos o reserva, para no
+        // dejar un hold colgado si Stripe no puede cobrar el monto.
+        const tarifaUnit = Number(servicio.tarifa);
+        const subtotalBruto = tarifaUnit * input.cantidadCupos;
+        const totalCents = applyMembershipDiscount(subtotalBruto * 100, esSocioReal);
+        const totalFinal = Math.round(totalCents / 100);
+        const subtotal = Math.round(totalFinal / 1.19);
+        const iva = totalFinal - subtotal;
+        const descuentoMonto = subtotalBruto - totalFinal;
+
+        if (totalFinal < STRIPE_MIN_AMOUNT_COP) {
+          return {
+            ok: false,
+            response: fail(
+              "AMOUNT_BELOW_MINIMUM",
+              `El monto mínimo para cobrar con tarjeta es $${STRIPE_MIN_AMOUNT_COP.toLocaleString("es-CO")}.`,
+              422,
+            ),
+          };
+        }
+
         // Resolver la franja horaria y disponibilidad específica (PERF-02)
         let disponibilidad: PosDisponibilidadRecord | null = null;
 
@@ -343,15 +365,6 @@ export function createPosCheckoutPostHandler(
           data: { cuposOcupados: { increment: input.cantidadCupos } },
         });
 
-        // Cálculo financiero
-        const tarifaUnit = Number(servicio.tarifa);
-        const subtotalBruto = tarifaUnit * input.cantidadCupos;
-        const totalCents = applyMembershipDiscount(subtotalBruto * 100, esSocioReal);
-        const totalFinal = Math.round(totalCents / 100);
-        const subtotal = Math.round(totalFinal / 1.19);
-        const iva = totalFinal - subtotal;
-        const descuentoMonto = subtotalBruto - totalFinal;
-
         // Crear reserva en estado PENDIENTE_PAGO vinculada a vendedor y canal TAQUILLA
         const reserva = await tx.reserva.create({
           data: {
@@ -403,8 +416,10 @@ export function createPosCheckoutPostHandler(
                 subtotal: totalFinal,
               },
             ],
-            successUrl: `${appUrl}/portal/tickets?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${appUrl}/checkout?cancelled=${reserva.id}`,
+            // El cliente de mostrador paga desde su celular sin sesión: vuelve a
+            // una página pública; el ticket lo imprime la taquilla.
+            successUrl: `${appUrl}/pago-taquilla?estado=ok`,
+            cancelUrl: `${appUrl}/pago-taquilla?estado=cancelado`,
           });
         } catch (err: unknown) {
           if (err instanceof Error && err.message.includes("STRIPE_NOT_CONFIGURED")) {

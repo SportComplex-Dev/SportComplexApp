@@ -7,7 +7,6 @@ import { PageHeading } from '@/components/layout/page-heading'
 import { useApp } from '@/components/layout/app-provider'
 import { useLastCode } from '@sportcomplex/shared/lib'
 import {
-  PrintableReceipt,
   usePortalTickets,
   TicketQrModal,
   TournamentCard,
@@ -23,8 +22,7 @@ export default function TicketsPage() {
   const {
     activeTab, setActiveTab, activeBookings, historyBookings, cancelledBookings,
     userTournaments, currentTabItems, selectedTicket, setSelectedTicket,
-    printingTicket, printingReceipt, printingQrUrl, downloadingId, isPrinting,
-    handleOpenQrModal, handlePrintTicket, handleDownloadQr,
+    downloadingId, handleOpenQrModal, handleDownloadQr,
   } = usePortalTickets(session?.name, notify)
 
   const tabs: [TabType, string, number, typeof Trophy | undefined][] = [
@@ -36,7 +34,7 @@ export default function TicketsPage() {
 
   return (
     <>
-      <main className="section-shell app-page no-print">
+      <main className="section-shell app-page">
         <Link href="/portal" className="calendar-shortcut mb-6 inline-flex text-xs py-2 px-3 gap-1.5"><ArrowLeft size={14} /> Volver a Mi Portal</Link>
         <PageHeading
           eyebrow="BILLETERA DIGITAL (RF-10 / RF-12)"
@@ -105,7 +103,7 @@ export default function TicketsPage() {
                     {userTournaments.map((t) => (
                       <TournamentCard
                         key={t.id} tournament={t} sessionName={session?.name}
-                        onOpenQR={setSelectedTicket} onPrint={handlePrintTicket}
+                        onOpenQR={setSelectedTicket}
                       />
                     ))}
                   </div>
@@ -127,8 +125,8 @@ export default function TicketsPage() {
                 <div className="grid gap-3">
                   {currentTabItems.map((b) => (
                     <TicketListItem
-                      key={b.id} booking={b} isPrinting={isPrinting} downloadingId={downloadingId}
-                      onOpenQR={handleOpenQrModal} onDownloadQR={handleDownloadQr} onPrint={handlePrintTicket}
+                      key={b.id} booking={b} downloadingId={downloadingId}
+                      onOpenQR={handleOpenQrModal} onDownloadQR={handleDownloadQr}
                       onSelectCode={setLastCode}
                     />
                   ))}
@@ -140,10 +138,9 @@ export default function TicketsPage() {
       </main>
 
       <TicketQrModal
-        ticket={selectedTicket} downloading={downloadingId === selectedTicket?.id} printing={isPrinting}
-        onClose={() => setSelectedTicket(null)} onDownloadQr={handleDownloadQr} onPrintTicket={handlePrintTicket}
+        ticket={selectedTicket} downloading={downloadingId === selectedTicket?.id}
+        onClose={() => setSelectedTicket(null)} onDownloadQr={handleDownloadQr}
       />
-      <PrintableReceipt ticket={printingTicket} qrDataUrl={printingQrUrl} receiptData={printingReceipt} />
     </>
   )
 }

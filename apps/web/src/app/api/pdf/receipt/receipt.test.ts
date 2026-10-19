@@ -122,7 +122,7 @@ test("TSK-BE-19: devuelve membrete, reserva, servicio, titular y QR del servidor
   assert.equal(data.emision.generadoEn, NOW.toISOString());
   assert.equal(data.emision.destinatario, "PORTAL");
 
-  assert.equal(data.membrete.entidad, process.env.RECEIPT_ENTIDAD || "SportComplex — Complejo Deportivo");
+  assert.equal(data.membrete.entidad, process.env.RECEIPT_ENTIDAD || "Akros Latam");
   assert.equal(data.membrete.nit, process.env.RECEIPT_NIT ?? null);
 
   assert.equal(data.reserva.id, RESERVA_ID);

@@ -250,6 +250,9 @@ importers:
       '@sportcomplex/features-tournament':
         specifier: workspace:*
         version: link:../../packages/features/tournament
+      '@sportcomplex/printing':
+        specifier: workspace:*
+        version: link:../../packages/printing
       '@sportcomplex/security':
         specifier: workspace:*
         version: link:../../packages/security
@@ -671,18 +674,15 @@ importers:
       '@sportcomplex/features-booking':
         specifier: workspace:*
         version: link:../booking
+      '@sportcomplex/printing':
+        specifier: workspace:*
+        version: link:../../printing
       '@sportcomplex/ui':
         specifier: workspace:*
         version: link:../../ui
       '@sportcomplex/validation':
         specifier: workspace:*
         version: link:../../validation
-      '@stripe/react-stripe-js':
-        specifier: 3.1.1
-        version: 3.1.1(@stripe/stripe-js@5.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
-      '@stripe/stripe-js':
-        specifier: 5.0.0
-        version: 5.0.0
       lucide-react:
         specifier: ^1.52.0
         version: 1.52.0(@types/react@19.0.10)(react@19.0.0)
@@ -806,6 +806,28 @@ importers:
       react-dom:
         specifier: 19.0.0
         version: 19.0.0(react@19.0.0)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/printing:
+    dependencies:
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
+    devDependencies:
+      '@sportcomplex/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 22.13.10
+        version: 22.13.10
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
       tsx:
         specifier: ^4.23.15
         version: 4.23.15

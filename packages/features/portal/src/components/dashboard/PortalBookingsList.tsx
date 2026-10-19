@@ -2,10 +2,11 @@
 
 import type { ReactNode } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
-import { ArrowRight, Download, Printer, QrCode, Ticket } from 'lucide-react'
-import { formatDate, formatMoney, type Booking } from '@sportcomplex/core'
+import { ArrowRight, QrCode, Ticket } from 'lucide-react'
+import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { AccessWindowIndicator } from '../passes/AccessWindowIndicator'
+import { ReceiptPdfLink } from '../passes/ReceiptPdfLink'
 import type { PortalTicket } from '../../utils/portal-utils'
 
 function Link({
@@ -30,7 +31,6 @@ export interface PortalBookingsListProps {
   cancelledBookings: PortalTicket[]
   currentTabItems: PortalTicket[]
   onOpenQR: (booking: PortalTicket) => void
-  onPrintTicket: (ticket: Booking) => void
   onSelectCode: (code: string) => void
 }
 
@@ -42,7 +42,6 @@ export function PortalBookingsList({
   cancelledBookings,
   currentTabItems,
   onOpenQR,
-  onPrintTicket,
   onSelectCode,
 }: PortalBookingsListProps) {
   const shouldReduceMotion = useReducedMotion()
@@ -201,14 +200,7 @@ export function PortalBookingsList({
                           >
                             <QrCode size={15} /> Ver QR de Acceso
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onPrintTicket(booking)}
-                            className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-                            title="Descargar comprobante en PDF"
-                          >
-                            <Download size={14} /> PDF
-                          </button>
+                          <ReceiptPdfLink reservaId={booking.id} label="PDF" />
                           <Link
                             href="/confirmation"
                             onClick={() => onSelectCode(booking.code)}
@@ -220,13 +212,7 @@ export function PortalBookingsList({
                       )}
                       {!isConfirmed && (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => onPrintTicket(booking)}
-                            className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-                          >
-                            <Printer size={14} /> Recibo
-                          </button>
+                          <ReceiptPdfLink reservaId={booking.id} label="Recibo" />
                           <Link href="/services" className="calendar-shortcut text-xs py-2 px-3">
                             Reservar de nuevo <ArrowRight size={13} />
                           </Link>

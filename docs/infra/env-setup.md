@@ -89,12 +89,14 @@ No bloquean el login ni el arranque; solo las features que las usan.
 | `NEXT_PUBLIC_APP_URL` | Enlaces/redirects | `http://localhost:3000` en local |
 | `QR_HMAC_SECRET` | QR de tickets | Genera 64 hex: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `STRIPE_SECRET_KEY` | Pagos (sandbox) | Stripe Dashboard → Developers → API keys |
-| `STRIPE_WEBHOOK_SECRET` | Webhook Stripe | `stripe listen` o Dashboard → Webhooks |
+| `STRIPE_WEBHOOK_SECRET` | Webhook Stripe (confirma reservas y emite el pase) | Local: `stripe listen --forward-to localhost:3000/api/payments` imprime el `whsec_`. Producción: Dashboard (modo test) → Webhooks → `/api/payments` con `payment_intent.succeeded` y `payment_intent.payment_failed` |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Pagos (cliente) | Stripe Dashboard → API keys |
 | `NAGER_DATE_BASE_URL` | Festivos | Tiene default en código: `https://date.nager.at/api/v3` |
 | `N8N_CONTINGENCY_WEBHOOK_URL` | Contingencia n8n | Instancia n8n del equipo |
 | `N8N_CONTINGENCY_HMAC_SECRET` | Firma de contingencia | ≥32 chars aleatorios |
 | `N8N_AUTH_EMAIL_WEBHOOK_URL` | Envío de código de verificación | Instancia n8n del equipo |
+| `N8N_RESERVATION_QR_WEBHOOK_URL` | Correo del ticket con QR tras el pago (online y taquilla) | `https://n8n.akros.lat/webhook/reservas/despacho-qr` (workflow `despacho-correo-qr` activo) |
+| `N8N_RESERVATION_QR_HMAC_SECRET` | Firma opcional del correo del ticket | ≥32 chars aleatorios (el workflow actual no la verifica) |
 | `BOT_API_KEY` | API del bot (`/api/v1/bot/*`) | ≥32 chars aleatorios |
 | `CRON_SECRET` | Job de expiración (`/api/cron/*`) | Secreto propio del job |
 | `EXPIRE_BATCH_SIZE` | Tamaño de lote del job TTL | `500` por defecto |
@@ -157,6 +159,8 @@ curl -i -X POST http://localhost:3000/api/auth \
 | Se queda en `/login` tras un 200 | Rol no resuelto por el middleware | Ver [`../features/auth.md`](../features/auth.md) |
 | `422/401 Invalid API key` en logs del server | Key de Supabase corrupta o de otro proyecto | Re-copia desde el panel (no desde chat) |
 | Cambié `.env.local` y no toma los cambios | Next.js cachea env al arrancar / `.next` viejo | Reinicia `pnpm dev`; si persiste, borra `apps/web/.next` |
+| Consola: *"You may test your Stripe.js integration over HTTP. However, live Stripe.js integrations must use HTTPS."* | Aviso informativo de Stripe.js al cargarse sobre `http://` (incluido `http://localhost`) | No bloquea el pago en desarrollo: el flujo funciona igual con claves `test`. Desaparece con HTTPS (producción detrás de Caddy) |
+| Pagué en Stripe pero la reserva sigue `PENDIENTE_PAGO` / el POS sigue esperando | El webhook no llega a `/api/payments` o su firma no coincide | Local: `stripe listen --forward-to localhost:3000/api/payments` y su `whsec_` en `STRIPE_WEBHOOK_SECRET` (reinicia `pnpm dev`). Producción: endpoint del dashboard (modo test) y su secreto en `APPS_WEB_ENV` |
 
 > Regla de oro: **cambiar `.env.local` exige reiniciar el dev server.**
 

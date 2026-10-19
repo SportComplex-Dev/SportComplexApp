@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, Clock3,
   Lock, ShieldCheck, AlertCircle, Loader2,
@@ -14,10 +15,13 @@ import {
   CheckoutTimer,
   isPaymentBlocked,
   calculateRemainingSeconds,
+  clasificarErrorReserva,
+  resolverServiceIdReserva,
   usePublicCatalog,
   PaymentMethodSelector,
   pollPaymentConfirmation,
   resolvePaymentOutcome,
+  type ErrorReserva,
 } from '@sportcomplex/features-booking'
 import { categoryIcons } from '@/components/brand/category-icons'
 import { useApp } from '@/components/layout/app-provider'
@@ -72,13 +76,15 @@ function CheckoutContent() {
     searchParams.get('bookingId')
 
   const { session, notify } = useApp()
+  // `session` es null mientras carga: el estado real de la sesión lo da `status`.
+  const { status: authStatus } = useSession()
   const { catalog, loading: catalogLoading } = usePublicCatalog()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
 
   const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
-  const [holdError, setHoldError] = useState<string | null>(null)
+  const [holdError, setHoldError] = useState<ErrorReserva | null>(null)
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
 
@@ -136,10 +142,18 @@ function CheckoutContent() {
 
   // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
   useEffect(() => {
-    if (reservationId || holdError || creatingRef.current) return
+    if (reservationId || holdError || creatingRef.current || isExpired) return
     const currentDraft = activeDraft
     const currentItem = item
     if (!currentDraft || !currentItem) return
+    // Sesión y borrador vigentes ANTES de pedir el hold: sin sesión de cliente
+    // la API responde 401 y el borrador vencido ya liberó su cupo (issue #115).
+    if (authStatus === 'loading') return
+    if (authStatus === 'unauthenticated') {
+      setHoldError(clasificarErrorReserva(401, null))
+      return
+    }
+    if (currentDraft.expiresAt && currentDraft.expiresAt <= Date.now()) return
 
     let cancelled = false
     async function createHold() {
@@ -150,16 +164,34 @@ function CheckoutContent() {
 
       const interval = parseSlotInterval(currentDraft.date, currentDraft.time)
       if (!interval) {
-        setHoldError('El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.')
+        setHoldError({
+          tipo: 'datos',
+          titulo: 'No se pudo reservar el horario',
+          mensaje: 'El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.',
+        })
         setIsCreatingReservation(false)
         creatingRef.current = false
         return
       }
 
       try {
-        const serviceId = resolveCatalogServiceId(currentItem)
-        if (!serviceId || serviceId <= 0) {
-          setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
+        // El `id` del catálogo es el slug; la API exige `servicio.id` numérico (#114).
+        // Primero el id exacto que trae la API (`dbId`); si falta, la heurística
+        // por slug/nombre de `resolveCatalogServiceId` (TSK-FE-38).
+        let serviceId = resolverServiceIdReserva(currentItem)
+        if (serviceId === null) {
+          try {
+            serviceId = resolveCatalogServiceId(currentItem) || null
+          } catch {
+            serviceId = null
+          }
+        }
+        if (serviceId === null) {
+          setHoldError({
+            tipo: 'datos',
+            titulo: 'No se pudo reservar el horario',
+            mensaje: 'No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.',
+          })
           setIsCreatingReservation(false)
           creatingRef.current = false
           return
@@ -177,20 +209,23 @@ function CheckoutContent() {
           }),
         })
 
-        const data = await res.json()
+        const data = await res.json().catch(() => null)
         if (cancelled) return
 
         if (res.ok && data?.data?.id) {
           setReservationId(data.data.id)
         } else {
-          const errMsg = data?.error?.message || 'No se pudo reservar el cupo temporal en el horario seleccionado. Puede que ya no haya disponibilidad o la franja no sea válida.'
-          setHoldError(errMsg)
+          setHoldError(clasificarErrorReserva(res.status, data))
           setReservationId(null)
           creatingRef.current = false
         }
       } catch {
         if (!cancelled) {
-          setHoldError('Error de conexión al intentar bloquear la disponibilidad. Por favor vuelve a seleccionar el horario.')
+          setHoldError({
+            tipo: 'servidor',
+            titulo: 'No se pudo reservar el horario',
+            mensaje: 'Error de conexión al intentar bloquear la disponibilidad. Por favor vuelve a seleccionar el horario.',
+          })
           setReservationId(null)
           creatingRef.current = false
         }
@@ -205,7 +240,7 @@ function CheckoutContent() {
     return () => {
       cancelled = true
     }
-  }, [activeDraft, item, reservationId, holdError])
+  }, [activeDraft, item, reservationId, holdError, isExpired, authStatus])
 
   const handleExpire = useCallback(() => {
     setIsExpired(true)
@@ -361,15 +396,24 @@ function CheckoutContent() {
           ) : holdError ? (
             <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-center">
               <AlertCircle className="mx-auto size-7 text-destructive mb-2" />
-              <p className="font-bold text-destructive text-base">No se pudo reservar el horario</p>
-              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">{holdError}</p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
-              >
-                Volver a seleccionar horario <ArrowRight size={14} />
-              </button>
+              <p className="font-bold text-destructive text-base">{holdError.titulo}</p>
+              <p className="mt-1 text-xs text-subtle max-w-md mx-auto">{holdError.mensaje}</p>
+              {holdError.tipo === 'sesion' ? (
+                <Link
+                  href="/login?next=/checkout"
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
+                >
+                  Iniciar sesión <ArrowRight size={14} />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
+                >
+                  Volver a seleccionar horario <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           ) : isCreatingReservation ? (
             <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-6 text-center text-sm">

@@ -23,6 +23,7 @@
     "@sportcomplex/features-scanner": "workspace:*",
     "@sportcomplex/features-tournament": "workspace:*",
     "@sportcomplex/features-pos": "workspace:*",
+    "@sportcomplex/printing": "workspace:*",
     "@sportcomplex/security": "workspace:*",
     "@sportcomplex/shared": "workspace:*",
     "@sportcomplex/ui": "workspace:*",

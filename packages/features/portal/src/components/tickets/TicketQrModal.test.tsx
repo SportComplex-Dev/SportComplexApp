@@ -31,7 +31,6 @@ test('TicketQrModal: returns null when ticket is null (closed state)', () => {
     <TicketQrModal
       ticket={null}
       onClose={() => {}}
-      onPrintTicket={() => {}}
     />
   )
 
@@ -44,7 +43,6 @@ test('TicketQrModal: renders ticket details, QR, access window and actions when 
       ticket={mockTicket}
       onClose={() => {}}
       onDownloadQr={() => {}}
-      onPrintTicket={() => {}}
     />
   )
 
@@ -62,36 +60,34 @@ test('TicketQrModal: renders ticket details, QR, access window and actions when 
 
   // Actions
   assert.ok(html.includes('Descargar Imagen QR (PNG)'), 'Debe tener botón de descarga de imagen QR')
-  assert.ok(html.includes('Imprimir Recibo (58mm)'), 'Debe tener botón para imprimir recibo térmico')
+  assert.ok(html.includes('Descargar PDF'), 'Debe ofrecer el comprobante en PDF')
+  assert.ok(!html.includes('Imprimir'), 'El cliente no imprime: eso es del operador en taquilla')
 
   // Security hint
   assert.ok(html.includes('Pase transferible sin biometría'), 'Debe incluir leyenda de pase transferible')
 })
 
-test('TicketQrModal: disables buttons during download or printing', () => {
+test('TicketQrModal: disables download while it is in progress', () => {
   const html = renderToStaticMarkup(
     <TicketQrModal
       ticket={mockTicket}
       downloading={true}
-      printing={true}
       onClose={() => {}}
       onDownloadQr={() => {}}
-      onPrintTicket={() => {}}
     />
   )
 
   assert.ok(html.includes('disabled=""'), 'Los botones deben deshabilitarse durante acciones en curso')
 })
 
-test('TicketQrModal: print-only variant omits download action (dashboard usage)', () => {
+test('TicketQrModal: dashboard variant omits PNG download but keeps the PDF', () => {
   const html = renderToStaticMarkup(
     <TicketQrModal
       ticket={mockTicket}
       onClose={() => {}}
-      onPrintTicket={() => {}}
     />
   )
 
-  assert.ok(html.includes('Imprimir / PDF'), 'Debe mostrar acción de impresión del dashboard')
+  assert.ok(html.includes('Descargar PDF'), 'Debe ofrecer el PDF también en el dashboard')
   assert.ok(!html.includes('Descargar Imagen QR'), 'No debe mostrar descarga cuando se omite onDownloadQr')
 })

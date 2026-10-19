@@ -289,6 +289,18 @@ test("TSK-BE-08: piscina privada de aforo configurado 30 bloquea la franja compl
   );
 });
 
+test("TSK-BE-05: consultar disponibilidad libera los holds vencidos y devuelve los cupos", async () => {
+  const slot = addAforoSlot(10);
+  const hold = await createBookingHold(requestFor(slot, 3));
+
+  const vigente = await getBookableAvailability(slot.serviceId, slot.date);
+  assert.equal(vigente[0].cuposDisponibles, 7);
+
+  const trasVencer = await getBookableAvailability(slot.serviceId, slot.date, new Date(hold.expiraEn));
+  assert.equal(trasVencer[0].cuposDisponibles, 10);
+  assert.equal(mock._state.reservas.find((r: { id: string }) => r.id === hold.id)?.estado, "EXPIRADA");
+});
+
 test("SCRUM-163: createBookingHoldCart éxito con 2+ servicios distintos", async () => {
   const slot1 = addAforoSlot(10);
   const slot2 = addAforoSlot(15);

@@ -3789,10 +3789,6 @@ button { cursor: pointer; }
   .no-print {
     display: none !important;
   }
-  .ticket-receipt {
-    box-shadow: none !important;
-    margin: 0 auto;
-  }
 }
 
 
@@ -5422,40 +5418,6 @@ button { cursor: pointer; }
     font-size: 13px !important;
     font-weight: 650;
     border-radius: 9px;
-  }
-}
-
-/* ==========================================================================
-   Impresión de Comprobante / Voucher PDF (RF-12 & RNF-05)
-   Encapsulado bajo .printing-thermal-receipt para evitar fuga global (CSS-01)
-   ========================================================================== */
-@media print {
-  body.printing-thermal-receipt {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  body.printing-thermal-receipt * {
-    visibility: hidden;
-  }
-  body.printing-thermal-receipt .printable-receipt,
-  body.printing-thermal-receipt .printable-receipt * {
-    visibility: visible;
-  }
-  body.printing-thermal-receipt .printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 58mm !important;
-    max-width: 58mm !important;
-    margin: 0 auto;
-    padding: 3mm 2mm;
-    background: #fff !important;
-    color: #000 !important;
-    font-family: 'Courier New', Courier, monospace;
-    box-sizing: border-box;
-  }
-  .no-print {
-    display: none !important;
   }
 }
 

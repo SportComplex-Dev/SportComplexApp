@@ -1,5 +1,5 @@
 export * from './passes/QrGraphic'
-export * from './passes/PrintableReceipt'
+export * from './passes/ReceiptPdfLink'
 export * from './passes/AccessWindowIndicator'
 export * from './dashboard/PortalBookingsList'
 export * from './dashboard/UpcomingBookingCard'
