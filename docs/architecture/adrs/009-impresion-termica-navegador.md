@@ -1,4 +1,4 @@
-# ADR 008: Impresión térmica de tickets en taquilla desde el navegador (Bluetooth o USB)
+# ADR 009: Impresión térmica de tickets en taquilla desde el navegador (Bluetooth o USB)
 
 - **Título y Estado**: Aprobado — enmienda RNF-05 / Decisión 3 del SRS
 - **Fecha y Autores**: 2026-10-18 — SportComplex

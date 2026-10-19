@@ -2,7 +2,7 @@
 
 > Estado: vigente 2026-10-19
 
-Configuración, una sola vez por caja, para que el POS (`/pos`) imprima tickets en la **DIG-ISH58** (58 mm, ESC/POS) desde el navegador, por **Bluetooth** o por **USB**. La decisión está en el [ADR 008](../architecture/adrs/008-impresion-termica-navegador.md).
+Configuración, una sola vez por caja, para que el POS (`/pos`) imprima tickets en la **DIG-ISH58** (58 mm, ESC/POS) desde el navegador, por **Bluetooth** o por **USB**. La decisión está en el [ADR 009](../architecture/adrs/009-impresion-termica-navegador.md).
 
 ## Requisitos
 

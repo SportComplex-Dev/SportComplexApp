@@ -22,7 +22,7 @@ test("perimeter role policy grants only the configured role groups", () => {
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt", "Cliente"), true);
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt", "Empleado_Vendedor"), true);
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt", "Empleado_Lector"), false);
-  // Ticket térmico (ADR 008): el PDF lo descargan cliente y personal; la
+  // Ticket térmico (ADR 009): el PDF lo descargan cliente y personal; la
   // búsqueda para reimprimir es solo de taquilla.
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt/file", "Cliente"), true);
   assert.equal(isRoleAllowedForPath("/api/pdf/receipt/file", "Empleado_Lector"), false);

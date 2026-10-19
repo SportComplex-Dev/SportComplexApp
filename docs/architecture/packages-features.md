@@ -17,7 +17,7 @@ real en `cells-mailbox/*/inbox/001-contrato.json` (v1-corrected-2026-10-14).
 | `@sportcomplex/features-admin` | 8 componentes planos (SlotCapacityEditor, Dashboard*, Employee*), 2 suites migradas | `ui`, `core` | 12 |
 | `@sportcomplex/shared` | `qr-client`, `use-network-resilience`, `api-response`, `contingency-webhook`, `persistent-state`, `stores` | `core` (solo tipos) | 6 |
 | `@sportcomplex/ui` | Primitivas planas: Button, Card, Dialog, Badge, Input, Modal, ActionButton, ConfirmDialog, `cn` | `lucide-react`, `motion` | 17 |
-| `@sportcomplex/printing` | Ticket térmico 58 mm: bitmap 384 pt (Thermal Sans Mono), ESC/POS `GS v 0`, PDF 58 mm, vista previa, maqueta del comprobante y transportes Web Bluetooth (`./bluetooth`) y WebUSB (`./webusb`) — ADR 008 | `qrcode` | 28 |
+| `@sportcomplex/printing` | Ticket térmico 58 mm: bitmap 384 pt (Thermal Sans Mono), ESC/POS `GS v 0`, PDF 58 mm, vista previa, maqueta del comprobante y transportes Web Bluetooth (`./bluetooth`) y WebUSB (`./webusb`) — ADR 009 | `qrcode` | 28 |
 
 DAG: `ui` ← `shared` ← `booking` ← `pos`; `tournament` ← `portal` (+`booking`); `printing` (hoja, sin `@sportcomplex/*`) ← `pos` y `apps/web`.
 

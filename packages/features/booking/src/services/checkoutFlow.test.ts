@@ -213,6 +213,11 @@ test("clasificarErrorReserva (#115): distingue sesión, datos y disponibilidad p
   assert.equal(cupo.tipo, "disponibilidad");
   assert.equal(cupo.mensaje, "No hay cupos suficientes.");
   assert.equal(clasificarErrorReserva(404, { error: { code: "SLOT_NOT_FOUND" } }).tipo, "disponibilidad");
+  assert.equal(
+    clasificarErrorReserva(409, { error: { code: "TITULAR_RESERVATION_OVERLAP" } }).tipo,
+    "disponibilidad",
+    "una reserva propia que se solapa es conflicto de disponibilidad",
+  );
 
   assert.equal(clasificarErrorReserva(500, null).tipo, "servidor");
 });

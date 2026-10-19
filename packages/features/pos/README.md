@@ -6,7 +6,7 @@
 
 Punto de venta cashless presencial: 9 componentes, `usePosSession`, `useThermalPrinter`, `posCheckout` (deps inyectadas), `receipt`, `ticketReprint`, types. Rol Vendedor/Admin.
 
-Es el **único** lugar donde se imprimen tickets: `useThermalPrinter` envía el ticket de 58 mm a la DIG-ISH58 por Bluetooth o USB, la que empareje el operador (`@sportcomplex/printing`), `PosTicketPreview` lo muestra 1:1 y `PosReprintPanel` imprime reservas ya hechas a partir del QR del pase ([ADR 008](../../../docs/architecture/adrs/008-impresion-termica-navegador.md)).
+Es el **único** lugar donde se imprimen tickets: `useThermalPrinter` envía el ticket de 58 mm a la DIG-ISH58 por Bluetooth o USB, la que empareje el operador (`@sportcomplex/printing`), `PosTicketPreview` lo muestra 1:1 y `PosReprintPanel` imprime reservas ya hechas a partir del QR del pase ([ADR 009](../../../docs/architecture/adrs/009-impresion-termica-navegador.md)).
 
 ## Estructura / Exports
 

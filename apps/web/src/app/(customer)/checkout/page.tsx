@@ -9,7 +9,7 @@ import {
   Lock, ShieldCheck, AlertCircle, Loader2,
 } from 'lucide-react'
 import {
-  calculateBookingPrice, categoryBySlug, formatDate, formatMoney,
+  calculateBookingPrice, categoryBySlug, formatDate, formatMoney, resolveCatalogServiceId,
 } from '@sportcomplex/core'
 import {
   CheckoutTimer,
@@ -176,7 +176,16 @@ function CheckoutContent() {
 
       try {
         // El `id` del catálogo es el slug; la API exige `servicio.id` numérico (#114).
-        const serviceId = resolverServiceIdReserva(currentItem)
+        // Primero el id exacto que trae la API (`dbId`); si falta, la heurística
+        // por slug/nombre de `resolveCatalogServiceId` (TSK-FE-38).
+        let serviceId = resolverServiceIdReserva(currentItem)
+        if (serviceId === null) {
+          try {
+            serviceId = resolveCatalogServiceId(currentItem) || null
+          } catch {
+            serviceId = null
+          }
+        }
         if (serviceId === null) {
           setHoldError({
             tipo: 'datos',

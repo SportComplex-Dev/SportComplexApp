@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { CatalogItem } from '@sportcomplex/core'
+import { getAssetUrl } from "@sportcomplex/core/assets";
 
 export interface PublicCategory {
   id: number
@@ -85,9 +86,9 @@ export function usePublicCatalog(): PublicCatalogData {
               price: Number(s.tarifa) || 0,
               capacity: s.capacidadMaxima || 1,
               status: s.estado === 'ACTIVO' ? 'Disponible' : 'Mantenimiento',
-              // La ruta la resuelve el servidor con el mapa canónico de imágenes;
+              // La URL la resuelve el servidor con el mapa canónico de imágenes;
               // armarla desde el nombre daba 404 (issue #115).
-              image: s.imagen ?? `/images/catalogo/categoria-${catSlug}.webp`,
+              image: s.imagen ?? getAssetUrl(`/catalogo/categoria-${catSlug}.webp`),
             }
             if (s.tipoPiscina) {
               item.poolType = s.tipoPiscina as 'PUBLICA' | 'PRIVADA'

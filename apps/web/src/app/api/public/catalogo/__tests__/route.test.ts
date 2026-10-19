@@ -70,10 +70,10 @@ test("#115: cada servicio trae la ruta real de su imagen (mapa canónico o su ca
   });
   const body = await (await catalogoRoute.GET()).json();
   const conSlug = body.data.servicios.find((s: any) => s.id === 1);
-  assert.equal(conSlug.imagen, "/images/catalogo/futbol-5-cancha-1.webp");
+  assert.ok(conSlug.imagen.endsWith("/catalogo/futbol-5-cancha-1.webp"));
   const sinSlug = body.data.servicios.find((s: any) => s.id === 3);
   assert.equal(sinSlug.slug, undefined);
-  assert.equal(sinSlug.imagen, "/images/catalogo/categoria-canchas.webp", "Nunca 'cancha-de-tenis-polvo-de-ladrillo.webp'");
+  assert.ok(sinSlug.imagen.endsWith("/catalogo/categoria-canchas.webp"), "Nunca 'cancha-de-tenis-polvo-de-ladrillo.webp'");
 });
 
 test("API: GET /api/public/catalogo responde 500 con error controlado si la BD falla", async () => {

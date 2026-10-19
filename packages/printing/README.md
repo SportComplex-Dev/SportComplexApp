@@ -14,7 +14,7 @@ Todo el ticket, texto y QR, se dibuja en **un único bitmap de 384 puntos** (The
 | PDF de 58 mm (0,125 mm por punto) | `ticketPdf` | `GET /api/pdf/receipt/file` |
 | RGBA para `<canvas>` | `ticketRgba` | `PosTicketPreview` |
 
-No usa React ni depende de otros `@sportcomplex/*`, y corre igual en el navegador y en Node. Decisión en el [ADR 008](../../docs/architecture/adrs/008-impresion-termica-navegador.md).
+No usa React ni depende de otros `@sportcomplex/*`, y corre igual en el navegador y en Node. Decisión en el [ADR 009](../../docs/architecture/adrs/009-impresion-termica-navegador.md).
 
 ## Estructura / Exports
 

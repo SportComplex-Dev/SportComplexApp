@@ -1346,7 +1346,7 @@ Antes de crear la reserva, el checkout rechaza montos por debajo de **$2.000 COP
 
 ---
 
-## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05 · ADR 008)
+## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05 · ADR 009)
 
 - **Quién imprime:** solo el operador (`Empleado_Vendedor` / `Administrador`) desde `/pos`. El cliente no imprime: descarga el PDF desde su portal (`GET /api/pdf/receipt/file?destinatario=PORTAL`).
 - **Dispositivo:** impresora térmica ESC/POS de **58 mm** (DIG-ISH58, 384 puntos por línea), emparejada desde Chrome/Edge por **Bluetooth (Web Bluetooth/BLE)** o por **USB (WebUSB)**, la que tenga la caja. La configuración de la caja está en [impresora-termica.md](../infra/impresora-termica.md).
