@@ -8,12 +8,15 @@ import {
   PosVoucherModal,
   PosAltLinkModal,
   PosHeader,
+  PosReprintPanel,
   usePosSession,
+  useThermalPrinter,
 } from '@sportcomplex/features-pos'
 
 export default function PosPage() {
   const { session, notify } = useApp()
   const pos = usePosSession({ notify })
+  const printer = useThermalPrinter()
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] text-[var(--ink)] pb-16">
@@ -49,10 +52,10 @@ export default function PosPage() {
               currentService={pos.currentService} subtotalBruto={pos.subtotalBruto}
               descuentoMonto={pos.descuentoMonto} subtotalNeto={pos.subtotalNeto}
               ivaMonto={pos.ivaMonto} totalFinal={pos.totalFinal} isMember={pos.isMember}
-              isProcessing={pos.isProcessing} processStep={pos.processStep}
-              onProcessPayment={pos.handleProcessStripePayment}
+              isProcessing={pos.isProcessing} processStep={pos.processStep} isTestMode={pos.isStripeTestMode}
               onGenerateAltLink={pos.handleGenerateAltLink}
             />
+            <PosReprintPanel printer={printer} notify={notify} />
           </div>
         </div>
       </div>
@@ -60,13 +63,14 @@ export default function PosPage() {
       {pos.confirmedBooking && (
         <PosVoucherModal
           booking={pos.confirmedBooking} sellerName={session?.name}
-          receiptQrUrl={pos.receiptQrUrl} onPrint={() => window.print()}
+          comprobante={pos.receiptComprobante} printer={printer}
           onNextSale={pos.handleResetForNextSale}
         />
       )}
 
       <PosAltLinkModal
-        isOpen={pos.isAltLinkModalOpen} onClose={() => pos.setIsAltLinkModalOpen(false)}
+        isOpen={pos.isAltLinkModalOpen} onClose={pos.handleCloseAltLink}
+        waiting={pos.isAwaitingPayment} testMode={pos.isStripeTestMode}
         altLinkUrl={pos.altLinkUrl} altLinkQrUrl={pos.altLinkQrUrl}
         copiedLink={pos.copiedLink} onCopyLink={pos.handleCopyLink}
       />

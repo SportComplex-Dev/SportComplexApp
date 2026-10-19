@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@sportcomplex/ui'
-import { CreditCard, Smartphone, ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { Smartphone, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { formatMoney, type CatalogItem } from '@sportcomplex/core'
 
 export interface PosPaymentStripeProps {
@@ -14,7 +14,8 @@ export interface PosPaymentStripeProps {
   isMember: boolean
   isProcessing: boolean
   processStep: string
-  onProcessPayment: () => void
+  /** Claves de prueba de Stripe: no se realizan cobros reales. */
+  isTestMode: boolean
   onGenerateAltLink: () => void
 }
 
@@ -28,7 +29,7 @@ export function PosPaymentStripe({
   isMember,
   isProcessing,
   processStep,
-  onProcessPayment,
+  isTestMode,
   onGenerateAltLink,
 }: PosPaymentStripeProps) {
   return (
@@ -77,7 +78,7 @@ export function PosPaymentStripe({
         <div className="flex flex-col gap-3 p-3 rounded-lg border border-[#c9ef75]/30 bg-[#c9ef75]/5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold flex items-center gap-1.5 text-[var(--ink)]">
-              <CreditCard size={15} className="text-[#123e30] dark:text-[#c9ef75]" /> Datáfono Digital Stripe
+              <Smartphone size={15} className="text-[#123e30] dark:text-[#c9ef75]" /> Cobro con QR Stripe
             </span>
             <span className="text-[10px] text-[#5e8b48] font-medium flex items-center gap-1">
               <ShieldCheck size={12} /> PCI-DSS Seguro
@@ -85,51 +86,37 @@ export function PosPaymentStripe({
           </div>
 
           <p className="text-[11px] text-[var(--subtle)] leading-relaxed">
-            El cobro se procesa mediante tokenización directa con Stripe. No se almacenan números de tarjeta (PAN) ni códigos de seguridad en la aplicación (Cumplimiento PCI-DSS / SEC-01).
+            El cliente escanea el QR y paga desde su celular en Stripe. La taquilla nunca ve ni guarda números de tarjeta (PAN) ni códigos de seguridad (PCI-DSS / SEC-01).
           </p>
 
           <div className="flex items-center gap-2 text-[11px] text-[#123e30] dark:text-[#c9ef75] bg-white/40 dark:bg-black/20 p-2 rounded border border-[var(--line)]">
             <CheckCircle2 size={14} className="shrink-0 text-[#5e8b48]" />
-            <span>Terminal activo · Modo Contactless / Chip virtual listo</span>
+            <span>
+              {isTestMode
+                ? 'Modo de pruebas de Stripe · no se realizan cobros reales'
+                : 'El ticket se habilita al confirmarse el pago'}
+            </span>
           </div>
         </div>
 
-        {/* Botón de Cobro Directo con Tarjeta */}
+        {/* Único cobro: el cliente paga desde su celular (Stripe Checkout) */}
         <Button
-          id="btn-process-pos-payment"
+          id="btn-pos-alt-link"
           variant="brand"
           size="lg"
-          onClick={onProcessPayment}
+          onClick={onGenerateAltLink}
           disabled={isProcessing || !currentService}
           className="w-full text-xs font-bold gap-2"
           type="button"
         >
           {isProcessing ? (
-            <span>{processStep || 'Procesando pago Stripe...'}</span>
+            <span>{processStep || 'Generando el QR de pago...'}</span>
           ) : (
             <>
-              <CreditCard size={16} /> Cobrar con Tarjeta Stripe · {formatMoney(totalFinal)}
+              <Smartphone size={16} /> Cobrar con QR · {formatMoney(totalFinal)}
             </>
           )}
         </Button>
-
-        {/* Mitigación del Riesgo 2 de SRS §11.1: Enlace de Pago Alternativo */}
-        <div className="pt-2 border-t border-[var(--line)]">
-          <Button
-            id="btn-pos-alt-link"
-            variant="outline"
-            size="sm"
-            onClick={onGenerateAltLink}
-            disabled={isProcessing || !currentService}
-            className="w-full text-xs gap-1.5"
-            type="button"
-          >
-            <Smartphone size={14} /> Enlace Alternativo / QR Móvil
-          </Button>
-          <p className="text-[10px] text-[var(--subtle)] text-center mt-1">
-            Para clientes con autenticación 3DS móvil o fallas de datáfono físico (SRS §11.1).
-          </p>
-        </div>
       </CardContent>
     </Card>
   )

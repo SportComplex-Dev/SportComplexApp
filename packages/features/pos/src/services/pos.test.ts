@@ -309,6 +309,39 @@ test("POS API (SEC-02 / ARCH-01): venta presencial emite PaymentIntent y crea re
   assert.ok(json.data.paymentIntent.id.startsWith("pi_test_"));
 });
 
+test("POS API: rechaza montos bajo el mínimo de Stripe sin crear reserva ni ocupar cupos", async () => {
+  resetDb();
+  mock._state.servicios[0].tarifa = 50;
+  (globalThis as any).__scAuthSession = {
+    user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
+  };
+
+  for (const paymentMode of ["stripe_card", "stripe_link"]) {
+    const res = await POST(
+      new Request("http://localhost:3000/api/pos/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceId: 10,
+          date: "2026-10-15",
+          slotTime: "08:00 - 09:00",
+          cantidadCupos: 1,
+          clienteNombre: "Carlos Santana",
+          clienteDocumento: "1020304050",
+          clienteEmail: "carlos@akros.test",
+          paymentMode,
+        }),
+      }),
+    );
+    assert.equal(res.status, 422);
+    const json = await res.json();
+    assert.equal(json.error.code, "AMOUNT_BELOW_MINIMUM");
+    assert.equal(json.error.message, "El monto mínimo para cobrar con tarjeta es $2.000.");
+  }
+  assert.equal(mock._state.reservas.length, 0, "No debe quedar un hold colgado");
+  assert.equal(mock._state.disponibilidades.length, 0, "No debe crear franja ni ocupar cupos");
+});
+
 test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo compatible con /checkout", async () => {
   resetDb();
   (globalThis as any).__scAuthSession = {
@@ -348,18 +381,22 @@ test("POS API (SRS §11.1 Riesgo 2 / ARCH-03): genera enlace de pago alternativo
 
 test("POS API (ARCH-03): genera sesión real de Stripe Checkout cuando createCheckoutSession está inyectado", async () => {
   resetDb();
+  let sesionPedida: any;
   (globalThis as any).__scAuthSession = {
     user: { id: VENDEDOR_ID, email: "vendedor@akros.test", role: "Empleado_Vendedor" },
   };
 
   const handlerConStripe = createPosCheckoutPostHandler({
     createPaymentIntent: mockCreatePaymentIntent as any,
-    createCheckoutSession: (async () => ({
+    createCheckoutSession: (async (params: any) => {
+      sesionPedida = params;
+      return {
       sessionId: "cs_test_pos_alt_999",
       url: "https://checkout.stripe.com/c/pay/cs_test_pos_alt_999",
       paymentIntentId: null,
       expiresAt: new Date(Date.now() + 30 * 60_000),
-    })) as any,
+      };
+    }) as any,
   });
 
   const req = new Request("http://localhost:3000/api/pos/checkout", {
@@ -384,6 +421,9 @@ test("POS API (ARCH-03): genera sesión real de Stripe Checkout cuando createChe
   assert.equal(json.data.booking.paymentMode, "stripe_link");
   assert.equal(json.data.booking.stripeCheckoutSessionId, "cs_test_pos_alt_999");
   assert.equal(json.data.alternativePaymentUrl, "https://checkout.stripe.com/c/pay/cs_test_pos_alt_999");
+  // El cliente paga desde su celular sin sesión: vuelve a la página pública.
+  assert.ok(sesionPedida.successUrl.endsWith("/pago-taquilla?estado=ok"));
+  assert.ok(sesionPedida.cancelUrl.endsWith("/pago-taquilla?estado=cancelado"));
 });
 
 test("POS API (ARCH-02): rechaza el código QR apócrifo SC1:AKR-POS-XXXX:AKROS_POS_VERIFIED y valida el QR oficial firmado por el servidor", async () => {

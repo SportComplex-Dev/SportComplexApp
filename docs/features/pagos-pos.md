@@ -1324,33 +1324,55 @@ El flujo de pago respeta la arquitectura empresarial definida en **TSK-BE-18** y
 
 ---
 
-## 3. Mitigación de Riesgos y Contingencia (SRS §11.1)
+## 3. Cobro en taquilla: QR desde el celular
 
-Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en smartphone) o hay fallas en el datáfono virtual de mostrador:
-1. El vendedor presiona **"Enlace Alternativo / QR Móvil"**.
-2. El sistema genera dinámicamente una sesión oficial de Stripe Checkout (`createStripeCheckoutSession`) con URL cifrada de pago directo (`https://checkout.stripe.com/...`) o enlace compatible de contingencia.
-3. El cliente escanea el código QR desde su celular, completando el pago de forma segura sin manipulación de números de tarjeta en texto plano (cumplimiento estricto de PCI-DSS SAQ A).
+> El proyecto es semiacadémico: **producción usa claves de prueba de Stripe** (`sk_test_`/`pk_test_`) a propósito. No hay cobros reales; la demo usa las tarjetas de prueba de Stripe.
+
+El POS tiene **un único botón de cobro, "Cobrar con QR"**:
+1. Crea la reserva y una Stripe Checkout Session, y muestra su QR.
+2. El cliente lo escanea y paga desde su celular en `checkout.stripe.com`. En modo test se usa `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC; el modal lo indica.
+3. El POS **espera la confirmación del webhook** (`esperarPagoTaquilla` consulta `GET /api/pdf/receipt?destinatario=POS` hasta que exista el QR). Al confirmarse, abre el voucher con la vista previa del ticket y **"Imprimir ticket"**.
+4. La espera dura hasta el vencimiento del hold (30 min) o hasta que el operador pulse *"Cancelar cobro"*.
+5. Al pagar o cancelar, el celular vuelve a la página pública `/pago-taquilla?estado=ok|cancelado`, porque el cliente de mostrador no tiene sesión.
+6. Si Stripe Checkout falla, el servidor devuelve el enlace de contingencia `/checkout?...` (ARCH-03).
+
+El antiguo "datáfono virtual" (confirmar con `pm_card_visa` desde la taquilla) se retiró de la UI: cobraba sin que el cliente hiciera nada y no servía para la demo.
+
+Antes de crear la reserva, el checkout rechaza montos por debajo de **$2.000 COP** (`STRIPE_MIN_AMOUNT_COP`, mínimo de Stripe): `422 AMOUNT_BELOW_MINIMUM`, sin dejar holds colgados.
+
+**Requisito para la demo:** el webhook debe llegar a `/api/payments` con los eventos `payment_intent.succeeded` y `payment_intent.payment_failed`:
+- **Local:** `stripe listen --forward-to localhost:3000/api/payments`, y su `whsec_` en `STRIPE_WEBHOOK_SECRET`.
+- **Producción:** endpoint del webhook en el dashboard de Stripe (modo test) apuntando a `https://<dominio>/api/payments`, y `NEXT_PUBLIC_APP_URL` con el dominio público para la redirección del celular.
 
 ---
 
-## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05)
+## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05 · ADR 008)
 
-- **Dispositivos soportados:** Impresoras térmicas de tickets ESC/POS estándar de **58 mm** y **80 mm**, así como impresoras láser/inyección para exportación en formato carta o PDF.
-- **Acción:** `window.print()` estilizado con medios `@media print` para ajustar márgenes, tipografía monoespaciada compacta y contraste de código QR de 260px.
-- **Contenido del Comprobante:**
-  - Membrete: Razón social, NIT, dirección y canal TAQUILLA.
-  - Código alfanumérico de reserva (ej. `AKR-POS-XXXX-XXXX`).
-  - Datos de titular y vendedor responsable.
-  - Desglose contable: Tarifa base, descuento socio (30%), IVA (19%) y total pagado.
-  - Código QR de torniquete óptico firmado con secreto HMAC del servidor (`QR_HMAC_SECRET`).
+- **Quién imprime:** solo el operador (`Empleado_Vendedor` / `Administrador`) desde `/pos`. El cliente no imprime: descarga el PDF desde su portal (`GET /api/pdf/receipt/file?destinatario=PORTAL`).
+- **Dispositivo:** impresora térmica ESC/POS de **58 mm** (DIG-ISH58, 384 puntos por línea), emparejada desde Chrome/Edge por **Bluetooth (Web Bluetooth/BLE)** o por **USB (WebUSB)**, la que tenga la caja. La configuración de la caja está en [impresora-termica.md](../infra/impresora-termica.md).
+- **Render (`@sportcomplex/printing`):** el ticket completo, incluido el QR, se dibuja en un único bitmap de 384 puntos con la tipografía Thermal Sans Mono 24. Ese bitmap sale por tres caminos:
+  - la vista previa 1:1 del POS (`PosTicketPreview`)
+  - los bytes `GS v 0` en bandas de 64 filas, con 64 NUL + `ESC @` antes, avance y corte parcial
+  - el PDF de 58 mm (`/api/pdf/receipt/file`)
+- **Datos:** salen de `GET /api/pdf/receipt?destinatario=POS`; el navegador no inventa membrete, NIT ni QR. Contenido:
+  - Membrete (`RECEIPT_ENTIDAD`, `RECEIPT_NIT`, `RECEIPT_DIRECCION`, `RECEIPT_TELEFONO`, `RECEIPT_CORREO`)
+  - Número de comprobante (8 primeros del UUID de la reserva)
+  - Fecha y hora de emisión (Bogotá)
+  - Titular
+  - Servicio, modalidad, fecha, franja y cupos
+  - Subtotal, descuento de socio y TOTAL
+  - Canal y estado
+  - QR firmado (`SC1:<uuid>:<hmac>`) que valida el escáner
+  - Pie (`RECEIPT_PIE`)
+- **Reimpresión:** el panel *"Imprimir ticket de una reserva"* del POS acepta el QR escaneado del pase (se verifica la firma) o el UUID del boleto o de la reserva (`GET /api/pos/tickets/lookup`). Así se entrega en papel una reserva hecha online.
+- **Respaldo:** si el navegador no soporta Web Bluetooth ni WebUSB, o la impresora falla, el operador descarga el mismo ticket en PDF (`destinatario=POS`).
 
 ---
 
-## 5. Limitación Operativa del Datáfono Virtual (ARCH-REG-02)
+## 5. Tarjeta presente (ARCH-REG-02)
 
-- El cobro presencial en `pos/page.tsx` confirma el `PaymentIntent` con el método sintético `pm_card_visa`, válido **únicamente con claves de prueba de Stripe (`pk_test_...`)**.
-- Con claves de producción (`pk_live_...`) la aplicación **rechaza el cargo mock** y mantiene la reserva en `PENDIENTE_PAGO`; el operador debe completar el cobro mediante el enlace de Stripe Checkout de contingencia.
-- La captura de tarjetas físicas reales en producción requiere integrar Stripe Terminal SDK o Stripe Elements (fuera del alcance de TSK-FE-18).
+- La taquilla no captura tarjetas: el cliente paga desde su celular con Stripe Checkout.
+- Cobrar tarjetas físicas exigiría Stripe Terminal, que **no está disponible en Colombia** (y Stripe no abre cuentas para negocios colombianos). No aplica mientras el proyecto opere en modo de pruebas.
 
 ## Trazabilidad
 
