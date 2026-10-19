@@ -28,7 +28,7 @@ export function CatalogFilters({
 }: CatalogFiltersProps) {
   return (
     <section className="demo-card mb-6 p-4">
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
         {/* Pestañas de categoría (Tabs) */}
         <div className="flex items-center gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar por categoría">
           <motion.button
@@ -70,8 +70,8 @@ export function CatalogFilters({
         </div>
 
         {/* Buscador y filtro de estado */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 md:w-56">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[160px] sm:w-56">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
             <input
               type="text"
@@ -85,7 +85,7 @@ export function CatalogFilters({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="py-1.5 px-2.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface)] text-ink outline-none focus:border-brand-accent"
+            className="py-1.5 px-2.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface)] text-ink outline-none focus:border-brand-accent flex-1 sm:flex-initial"
           >
             <option value="todos">Todos los estados</option>
             <option value="Disponible">Disponibles</option>

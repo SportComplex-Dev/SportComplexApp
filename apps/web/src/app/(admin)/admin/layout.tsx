@@ -61,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <main className={`admin-shell club-app ${dark ? 'dark' : ''}`}>
-      <aside className="admin-sidebar hidden md:flex">
+      <aside className="admin-sidebar hidden lg:flex">
         <div className="admin-brand">
           <Link href="/admin" aria-label="Ir al resumen">
             <Brand />
@@ -112,10 +112,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <section className="admin-main">
         <header className="admin-topbar">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
-              className="admin-icon-button admin-menu-trigger md:hidden"
+              className="admin-icon-button admin-menu-trigger lg:hidden shrink-0"
               aria-label="Abrir menú de navegación"
               aria-expanded={isDrawerOpen}
               aria-controls="admin-mobile-drawer"
@@ -124,14 +124,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Menu size={18} />
             </button>
-            <div className="admin-crumb">
-              <span>Altura Club</span>
-              <ChevronRight size={14} />
-              <b>{active}</b>
+            <div className="admin-crumb flex items-center gap-1.5 sm:gap-2 text-xs min-w-0">
+              <span className="hidden sm:inline text-subtle truncate">Altura Club</span>
+              <ChevronRight size={13} className="hidden sm:inline text-subtle shrink-0" />
+              <b className="truncate text-ink">{active}</b>
             </div>
           </div>
-          <div className="admin-top-actions">
-            <span className="admin-today hidden sm:inline-flex">
+          <div className="admin-top-actions flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <span className="admin-today hidden lg:inline-flex items-center gap-1.5 text-xs text-subtle">
               <CalendarDays size={14} />{' '}
               {today ? formatDate(today, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''}
             </span>
@@ -141,15 +141,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
               onClick={() => setDark(!dark)}
             >
-              {dark ? <Sun size={17} /> : <Moon size={17} />}
+              {dark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
             <button
               type="button"
-              className="admin-icon-button"
+              className="admin-icon-button hidden sm:grid"
               aria-label="Buscar"
               onClick={() => notify('La búsqueda estará disponible pronto.')}
             >
-              <Search size={17} />
+              <Search size={16} />
             </button>
             <button
               type="button"
@@ -157,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               aria-label="Notificaciones"
               onClick={() => notify('No tienes notificaciones nuevas')}
             >
-              <Activity size={17} />
+              <Activity size={16} />
               <i />
             </button>
             <button
@@ -168,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={() => logout()}
               data-testid="admin-topbar-logout-button"
             >
-              <LogOut size={17} />
+              <LogOut size={16} />
             </button>
             <UserMenu variant="admin-topbar" />
           </div>
