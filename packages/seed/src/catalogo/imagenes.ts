@@ -1,5 +1,5 @@
 import type { SlugServicio } from "./mapa-ids.js";
-import { getCatalogoAssetUrl } from "@sportcomplex/core";
+import { getCatalogoAssetUrl } from "@sportcomplex/domain";
 
 /**
  * Mapa canónico de URLs CDN de imágenes (Supabase Storage).

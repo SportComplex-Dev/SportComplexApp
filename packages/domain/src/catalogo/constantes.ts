@@ -1,5 +1,5 @@
 import type { CategoriaServicio } from "./tipos.js";
-import { getAssetUrl } from "@sportcomplex/core/assets";
+import { getAssetUrl } from "../assets.js";
 
 export const sedes = ["Poblado", "Laureles"] as const;
 
