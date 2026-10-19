@@ -225,6 +225,33 @@ test('TSK-QA-02 (HU-35 / RF-16): Renderizado y navegación del enlace canónico 
 
   // 2. Renderizar drawer móvil con pathname en /admin/memberships
   const drawerHtml = renderToStaticMarkup(
+    <AppProvider>
+      <AdminMobileDrawer
+        isOpen={true}
+        onClose={() => {}}
+        navigation={mockNavigation}
+        pathname="/admin/memberships"
+      />
+    </AppProvider>,
+  )
+
+  // Debe renderizar la etiqueta <a> de Next.js <Link> apuntando a /admin/memberships
+  assert.ok(
+    drawerHtml.includes('href="/admin/memberships"'),
+    'El sidebar/drawer debe renderizar un enlace SPA <Link> a /admin/memberships',
+  )
+  assert.ok(
+    !drawerHtml.includes('href="/admin/memberships#"'),
+    'El enlace a membresías no debe contener sufijos huérfanos o hashes',
+  )
+
+  // Verificar que la clase activa se asigna correctamente en /admin/memberships
+  assert.ok(
+    drawerHtml.includes('bg-[#eff4e9]') || drawerHtml.includes('font-bold'),
+    'La ruta /admin/memberships activa debe tener estilos de resaltado de navegación',
+  )
+})
+
 // ============================================================================
 // TSK-QA-01 / HU-25: Integración en AdminLayout y soporte de reservas
 // ============================================================================
@@ -256,26 +283,18 @@ test('TSK-QA-01 / HU-25: El menú lateral marca activa la opción Reservas al en
         isOpen={true}
         onClose={() => {}}
         navigation={mockNavigation}
-        pathname="/admin/memberships"
         pathname="/admin/bookings"
       />
     </AppProvider>,
   )
 
-  // Debe renderizar la etiqueta <a> de Next.js <Link> apuntando a /admin/memberships
   assert.ok(
-    drawerHtml.includes('href="/admin/memberships"'),
-    'El sidebar/drawer debe renderizar un enlace SPA <Link> a /admin/memberships',
+    htmlDrawer.includes('href="/admin/bookings"'),
+    'Debe contener el enlace /admin/bookings',
   )
   assert.ok(
-    !drawerHtml.includes('href="/admin/memberships#"'),
-    'El enlace a membresías no debe contener sufijos huérfanos o hashes',
-  )
-
-  // Verificar que la clase activa se asigna correctamente en /admin/memberships
-  assert.ok(
-    drawerHtml.includes('bg-[#eff4e9]') || drawerHtml.includes('font-bold'),
-    'La ruta /admin/memberships activa debe tener estilos de resaltado de navegación',
+    htmlDrawer.includes('bg-[#eff4e9]') || htmlDrawer.includes('font-bold'),
+    'Debe marcar activa la opción de Reservas al encontrarse en la ruta /admin/bookings',
   )
 })
 
@@ -371,14 +390,6 @@ test('TSK-QA-02 (HU-35 / RF-16): Segmentación consistente en 3 pestañas (Activ
     noneTabHtml.includes('Valeria Restrepo (Vigente)'),
     false,
     'La pestaña Sin Membresía no debe contener al socio activo',
-  )
-  assert.ok(
-    htmlDrawer.includes('href="/admin/bookings"'),
-    'Debe contener el enlace /admin/bookings',
-  )
-  assert.ok(
-    htmlDrawer.includes('bg-[#eff4e9]') || htmlDrawer.includes('font-bold'),
-    'Debe marcar activa la opción de Reservas al encontrarse en la ruta /admin/bookings',
   )
 })
 
