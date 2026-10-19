@@ -29,13 +29,18 @@ export default function ForgotPasswordPage() {
     try {
       // 2. Llamada fetch POST a /api/auth/forgot-password
       // Manejado gracefully si el backend no está disponible o responde error
-      await fetch('/api/auth/forgot-password', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       }).catch(() => null)
 
-      // 3. Confirmación visible siempre para seguridad
+      if (res && res.status === 429) {
+        setError('Demasiados intentos. Por favor espera unos minutos antes de intentar de nuevo.')
+        return
+      }
+
+      // 3. Confirmación visible siempre para seguridad (prevención de enumeración de cuentas)
       setSubmitted(true)
     } catch {
       // Graceful fallback sin romper la UI

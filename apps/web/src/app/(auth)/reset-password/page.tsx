@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -54,6 +54,15 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current)
+      }
+    }
+  }, [])
 
   // Medidor de robustez Zod
   const strength = useMemo(() => {
@@ -132,7 +141,7 @@ export const ResetPasswordContent: React.FC<ResetPasswordContentProps> = functio
       // 3. Éxito: notificación y redirección a /login
       setSuccess(true)
       setToastMessage('Contraseña actualizada exitosamente')
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         if (router) {
           router.push('/login')
         }
