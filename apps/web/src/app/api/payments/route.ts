@@ -6,9 +6,10 @@ import {
   parseInvoiceEventData,
   stripeAmountToMonto,
 } from "@sportcomplex/core";
-import { ok, fail } from "@/lib/api-response";
-import { sendContingencyWebhook } from "@/lib/contingency-webhook";
+import { ok, fail } from '@sportcomplex/shared/lib';
+import { sendContingencyWebhook } from '@sportcomplex/shared/lib';
 import { clearPendingSubscriptionCheckout } from "@/app/api/memberships/subscribe/route";
+import { dispatchReservationTicketsEmail } from "@/app/api/payments/email-dispatch";
 
 // RF-09 / RF-16 / RF-17 — Stripe webhook con firma + idempotencia (TSK-BD-09 / TSK-BE-20).
 // Endpoint a registrar en el dashboard de Stripe:
@@ -18,6 +19,7 @@ import { clearPendingSubscriptionCheckout } from "@/app/api/memberships/subscrib
 // → siempre 200 si el evento fue procesado o ignorado.
 
 const EVENTOS_PROCESABLES = new Set([
+  "checkout.session.completed",
   "payment_intent.succeeded",
   "payment_intent.payment_failed",
   "invoice.paid",
@@ -119,7 +121,21 @@ export async function POST(request: Request) {
     }
   }
 
-  const intent = event.data.object as Stripe.PaymentIntent;
+  const checkoutSession = event.type === "checkout.session.completed"
+    ? event.data.object as Stripe.Checkout.Session
+    : null;
+  if (checkoutSession && checkoutSession.payment_status !== "paid") {
+    return ok({ received: true, ignored: true, reason: "CHECKOUT_NOT_PAID" });
+  }
+
+  const intent = checkoutSession ? null : event.data.object as Stripe.PaymentIntent;
+  const metadata = checkoutSession?.metadata ?? intent?.metadata;
+  const paymentIntentId = checkoutSession
+    ? typeof checkoutSession.payment_intent === "string"
+      ? checkoutSession.payment_intent
+      : checkoutSession.payment_intent?.id
+    : intent?.id;
+  const paymentAmount = checkoutSession?.amount_total ?? intent?.amount ?? 0;
   const {
     userId,
     bookingId,
@@ -127,7 +143,7 @@ export async function POST(request: Request) {
     membershipId,
     vendedorId,
     serviceId,
-  } = parsePaymentIntentMetadata(intent.metadata);
+  } = parsePaymentIntentMetadata(metadata ?? {});
   const effectiveBookingIds =
     bookingIds && bookingIds.length > 0
       ? bookingIds
@@ -136,7 +152,7 @@ export async function POST(request: Request) {
         : [];
   const hasBookings = effectiveBookingIds.length > 0;
 
-  if (!intent.id || !userId || (!hasBookings && !membershipId)) {
+  if (!paymentIntentId || !userId || (!hasBookings && !membershipId)) {
     // Evento sin nuestro metadato (otro flujo de Stripe): no es procesable.
     return ok({ received: true, ignored: true, reason: "MISSING_METADATA" });
   }
@@ -154,11 +170,11 @@ export async function POST(request: Request) {
 
   try {
     const resultado = await procesarPagoWebhook({
-      stripePaymentIntentId: intent.id,
+      stripePaymentIntentId: paymentIntentId,
       usuarioId: userId,
-      monto: stripeAmountToMonto(intent.amount ?? 0),
+      monto: stripeAmountToMonto(paymentAmount),
       estado:
-        event.type === "payment_intent.succeeded" ? "APROBADO" : "FALLIDO",
+        event.type === "payment_intent.payment_failed" ? "FALLIDO" : "APROBADO",
       tipo: hasBookings ? "RESERVA" : "MEMBRESIA",
       ...(hasBookings
         ? {
@@ -177,13 +193,13 @@ export async function POST(request: Request) {
       // a Stripe ni revierte la cancelación de la reserva ya aplicada.
       void sendContingencyWebhook({
         evento: "payment_intent.payment_failed",
-        paymentIntentId: intent.id,
+        paymentIntentId,
         usuarioId: userId,
         reservaId: effectiveBookingIds[0] ?? bookingId ?? null,
         membresiaId: membershipId ?? null,
         reservaEstado: resultado.reservaEstado,
         franjaRestituida: resultado.franjaRestituida,
-        monto: stripeAmountToMonto(intent.amount ?? 0),
+        monto: stripeAmountToMonto(paymentAmount),
       })
         .then((webhook) => {
           if (!webhook.sent) {
@@ -197,6 +213,30 @@ export async function POST(request: Request) {
           console.error("Error al despachar alerta de pago fallido a n8n:", err);
         });
     }
+
+    // TSK-BE-34 (HU-39 / RF-10): Disparo desacoplado de email con comprobante y QR tras confirmación.
+    // Fire-and-forget: fallos en n8n/correo no revierten la reserva ni retrasan el HTTP 200 a Stripe.
+    const confirmadas = resultado.reservasConfirmadas;
+    if (
+      resultado.estado === "APROBADO" &&
+      resultado.reservaConfirmada &&
+      !resultado.duplicado &&
+      confirmadas &&
+      confirmadas.length > 0
+    ) {
+      // ticketReservaId solo se informa para el QR único consolidado; los
+      // demás carritos deben despachar un comprobante por cada reserva pagada.
+      const ticketReservaIds = resultado.ticketReservaId
+        ? [resultado.ticketReservaId]
+        : confirmadas;
+      void dispatchReservationTicketsEmail(ticketReservaIds).catch((err) => {
+        console.error(
+          "Error al despachar correo de comprobante y QR a n8n:",
+          err,
+        );
+      });
+    }
+
     // Reintentos de Stripe quedan en 200 con duplicado=true: nada se duplica.
     return ok({ received: true, ...resultado });
   } catch (error: unknown) {

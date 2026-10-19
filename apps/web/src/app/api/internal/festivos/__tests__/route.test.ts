@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 Reflect.set(process.env, "NODE_ENV", "test");
 process.env.INTERNAL_API_KEY = "test-internal-key";
 
-const { createFestivosPostHandler } = await import("../route.js");
+const { createFestivosPostHandler } = await import("@/app/api/internal/festivos/route");
 
 const validBody = {
   festivos: [

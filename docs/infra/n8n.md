@@ -1,5 +1,6 @@
-## Goal Description
-Guía interna para **crear, inicializar y mantener** nuestra instancia de n8n en el VPS compartido. Todo corre dentro de `~/SportComplexApp` en la red privada `sportcomplex-net`; el tráfico externo entra por Caddy (`n8n.akros.lat`).
+# n8n en VPS
+> Estado: vigente 2026-10-15
+Guía interna para **crear, inicializar y mantener** nuestra instancia de n8n en el VPS dedicado. Todo corre dentro de `~/SportComplexApp` en la red privada `sportcomplex-net`; el tráfico externo entra por Caddy (`n8n.akros.lat`).
 
 ## 0. Cómo viajan los workflows
 Los flujos n8n viven versionados en el repo:
@@ -35,9 +36,10 @@ El servicio n8n en `docker/docker-compose.yml` los monta de solo lectura:
    for id in $IDS; do sudo docker compose run --rm n8n publish:workflow --id="$id"; done
    sudo docker compose up -d n8n
    ```
-6. **Cero credenciales guardadas en n8n.** Política vigente: los workflows llaman por HTTP usando keys desde `$env`, nunca credenciales almacenadas (las del JSON de dev no existen en prod y rompen import/publish). Hoy:
-   - Emails (6 workflows): `POST https://api.resend.com/emails` con header `Authorization: Bearer {{ $env.RESEND_API_KEY }}`. La key llega por `docker/.env` (la escribe el deploy desde el secret `RESEND_API_KEY`).
+6. **Cero credenciales guardadas en n8n.** Política vigente: los workflows llaman por HTTP usando keys desde `$env`, nunca credenciales almacenadas (las del JSON de dev no existen en prod y rompen import/publish). Requiere `N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"` en `docker/docker-compose.yml` para que n8n evalúe `$env` en expresiones y nodos de código. Hoy:
+   - Emails (7 workflows): `POST https://api.resend.com/emails` con header `Authorization: Bearer {{ $env.RESEND_API_KEY }}`. La key llega por `docker/.env` (la escribe el deploy desde el secret `RESEND_API_KEY`).
    - Festivos: `POST http://web:3000/api/internal/festivos` con header `x-internal-key: {{ $env.INTERNAL_API_KEY }}` (ver `apps/web/src/app/api/internal/festivos/route.ts`). La key vive en `APPS_WEB_ENV` y el deploy la propaga a `docker/.env`.
+   - Restablecimiento de contraseña: `POST /webhook/auth-password-reset` valida firma HMAC SHA-256 (`X-SportComplex-Signature`) usando `N8N_PASSWORD_RESET_HMAC_SECRET`. La key vive en `APPS_WEB_ENV` y el deploy la propaga a `docker/.env`.
    Sin estas env vars los flujos fallan al ejecutar aunque estén activos.
 7. Prueba de humo: abrir el workflow de webhook de prueba, pulsar **Execute**, copiar la *Test URL* (`https://n8n.akros.lat/webhook-test/...`) y abrirla — debe responder 200.
 
@@ -59,7 +61,8 @@ El import por CLI no sobrescribe workflows cuyo `id` ya existe (falla con "alrea
 ## 3. Operación del día a día
 
 ```bash
-# Ver estado y logs
+# n8n en VPS
+> Estado: vigente 2026-10-15
 cd ~/SportComplexApp/docker
 sudo docker compose ps
 sudo docker compose logs -f n8n

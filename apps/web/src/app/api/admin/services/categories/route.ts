@@ -1,5 +1,5 @@
-import { fail, ok, created } from "@/lib/api-response";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { fail, ok, created } from '@sportcomplex/shared/lib';
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { createCategoriaSchema } from "@sportcomplex/validation";
 import { createCategoria, getCategorias } from "@sportcomplex/db";
 

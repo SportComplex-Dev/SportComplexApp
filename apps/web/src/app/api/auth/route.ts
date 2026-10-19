@@ -1,9 +1,9 @@
-import { ok, fail } from '@/lib/api-response'
+import { ok, fail } from '@sportcomplex/shared/lib'
 import { prisma } from '@sportcomplex/db'
 import { loginSchema } from '@sportcomplex/validation'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'
-import { verifySecret } from '@sportcomplex/core/src/security/token'
-import { normalizeRole, signScSessionToken } from '@/lib/session'
+import { verifySecret } from '@sportcomplex/security'
+import { normalizeRole, signScSessionToken } from '@/lib/auth/session'
 import { authGateFor } from '@/lib/auth/auth-gate'
 import { resolveAppUserByEmail } from '@/lib/auth/resolve-app-user'
 import { findSupabaseUserByEmail } from '@/lib/supabase/admin'
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       },
     })
 
-    // Cookies de sesión para middleware perimetral (session.ts) y cliente
+    // Cookies de sesión para proxy perimetral (session.ts) y cliente
     response.headers.append('Set-Cookie', `sc-session=${JSON.stringify(sessionData)}; Path=/; SameSite=Lax; Max-Age=86400`)
     response.headers.append('Set-Cookie', `sc-role=${role}; Path=/; SameSite=Lax; Max-Age=86400`)
     response.headers.append('Set-Cookie', `sc-status=${user.estado}; Path=/; SameSite=Lax; Max-Age=86400`)

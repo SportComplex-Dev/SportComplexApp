@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { botTicketQuerySchema } from "../src/bot.schema.ts";
+import { botTicketQuerySchema } from "../src/platform/bot.schema.ts";
 
 test("botTicketQuerySchema accepts a UUID and SHA-256 hex signature", () => {
   assert.equal(

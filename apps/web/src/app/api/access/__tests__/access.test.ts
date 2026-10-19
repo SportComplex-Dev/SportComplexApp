@@ -5,17 +5,17 @@ import assert from "node:assert/strict";
 const SECRET = "test-qr-secret";
 process.env.QR_HMAC_SECRET = SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Importar el orquestador DESPUÉS de inyectar el mock de Prisma.
-const { procesarEscaneo, AccessError } = await import("../../../../lib/access");
-const { handleAccess } = await import("../route");
+const { procesarEscaneo, AccessError } = await import("@/lib/api/access");
+const { handleAccess } = await import("@/app/api/access/route");
 const { TicketError } = await import("@sportcomplex/db");
 const { signTicket } = await import("@sportcomplex/core");
+const { signTicket: signTicketWithWindow } = await import("@sportcomplex/security");
 
 const CODIGO = "9f0d6f4e-0000-4000-8000-0000000000ff";
 const EMPLEADO = "lector-1";
@@ -136,7 +136,7 @@ function scan(postServiceId: number | null, signature?: string) {
   );
 }
 
-test("TSK-BD-10 API: firma HMAC inválida se rechaza ANTES de tocar la BD (400, 0 auditorías)", async () => {
+test("TSK-BD-10 API: firma HMAC inválida se rechaza con 400 y sin crear auditorías", async () => {
   seed();
   await assert.rejects(
     () => scan(1, "firma-adulterada"),
@@ -147,10 +147,46 @@ test("TSK-BD-10 API: firma HMAC inválida se rechaza ANTES de tocar la BD (400, 
   assert.equal(mock._state.tickets[0].estado, "EMITIDO");
 });
 
-test("TSK-BE-11 (CRITERIO): UUID alterado con firma válida de otro código se rechaza sin tocar la BD", async () => {
+test("TSK-BE-31: ticket consolidado autoriza el acceso durante la ventana completa firmada", async () => {
   seed();
-  // UUID con formato válido pero distinto del que firmó el QR: la firma ya no
-  // corresponde. Debe fallar en la verificación HMAC, ANTES de consultar la BD.
+  const start = new Date("2026-10-10T15:00:00.000Z");
+  const end = new Date("2026-10-10T17:00:00.000Z");
+  mock._state.tickets[0].inicioValidez = start;
+  mock._state.tickets[0].finValidez = end;
+  const signature = signTicketWithWindow(CODIGO, SECRET, { start, end });
+
+  const result = await procesarEscaneo(
+    { ticketId: CODIGO, signature, postServiceId: 1 },
+    { empleadoId: EMPLEADO, qrSecret: SECRET, now: new Date("2026-10-10T16:30:00.000Z") },
+  );
+
+  assert.equal(result.access, "GRANTED");
+  assert.equal(result.ticket.horaInicio, "10:00:00");
+  assert.equal(result.ticket.horaFin, "12:00:00");
+});
+
+test("TSK-BE-31: modificar la ventana persistida invalida la firma HMAC del ticket", async () => {
+  seed();
+  const start = new Date("2026-10-10T15:00:00.000Z");
+  const signedEnd = new Date("2026-10-10T17:00:00.000Z");
+  mock._state.tickets[0].inicioValidez = start;
+  mock._state.tickets[0].finValidez = new Date("2026-10-10T18:00:00.000Z");
+
+  await assert.rejects(
+    () => procesarEscaneo(
+      { ticketId: CODIGO, signature: signTicketWithWindow(CODIGO, SECRET, { start, end: signedEnd }), postServiceId: 1 },
+      { empleadoId: EMPLEADO, qrSecret: SECRET, now: ADENTRO },
+    ),
+    (error: unknown) => error instanceof AccessError && error.code === "INVALID_SIGNATURE",
+  );
+  assert.equal(mock._state.lecturas.length, 0);
+});
+
+test("TSK-BE-11: UUID alterado se rechaza sin escribir; el formato con ventana requiere leer la fila antes del HMAC", async () => {
+  seed();
+  // UUID con formato válido pero distinto del que firmó el QR. Por compatibilidad
+  // con tickets de ventana, el escáner consulta la fila antes de validar el HMAC;
+  // una firma inválida nunca crea auditoría ni modifica el ticket.
   const alterado = "9f0d6f4e-0000-4000-8000-00000000beef";
   await assert.rejects(
     () =>

@@ -1,0 +1,45 @@
+{
+  "name": "@sportcomplex/printing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./webusb": {
+      "types": "./dist/webusb.d.ts",
+      "default": "./dist/webusb.js"
+    },
+    "./bluetooth": {
+      "types": "./dist/bluetooth.d.ts",
+      "default": "./dist/bluetooth.js"
+    }
+  },
+  "files": [
+    "dist",
+    "fonts/LICENSE.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "lint": "eslint .",
+    "fonts:generate": "tsx scripts/bdf-to-ts.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@sportcomplex/config": "workspace:*",
+    "@types/node": "22.13.10",
+    "@types/qrcode": "^1.5.6",
+    "tsx": "^4.23.15",
+    "typescript": "5.7.3"
+  }
+}

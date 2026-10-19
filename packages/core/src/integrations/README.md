@@ -1,6 +1,7 @@
 # Integraciones Externas
+> Estado: vigente 2026-10-15
 
-## `email.ts` — Despacho de Código de Verificación (seam TSK-AU-01)
+## `email.ts` — Despacho de Código de Verificación (ref. histórica TSK-AU-01)
 
 ### Propósito
 Enviar el código de 6 dígitos **en claro** al servicio de correo mediante el webhook de n8n. Como el hash Argon2id es irreversible, el código solo existe en memoria del proceso durante la petición: debe despacharse antes de finalizar `register`/`resend`.

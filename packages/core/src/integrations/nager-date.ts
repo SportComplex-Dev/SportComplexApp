@@ -1,9 +1,11 @@
 import ky from "ky";
+import type * as DbModule from "@sportcomplex/db";
 
-async function getDbFns() {
+async function getDbFns(): Promise<typeof DbModule | null> {
   if (typeof window !== "undefined") return null;
   try {
-    return await import("@sportcomplex/db");
+    const dbPkg = "@sportcomplex/db";
+    return (await import(/* webpackIgnore: true */ dbPkg)) as typeof DbModule;
   } catch {
     return null;
   }
@@ -64,7 +66,7 @@ export const dbHolidayCacheStore: HolidayCacheStore = {
       const db = await getDbFns();
       if (!db) return [];
       const records = await db.findFestivosByYear(year);
-      return records.map((r) => normalizeToNagerHoliday(r));
+      return (records as Array<{ fecha: Date | string; nombre: string; anio?: number }>).map((r) => normalizeToNagerHoliday(r));
     } catch (error) {
       console.warn(
         `[nager-date] Fallo al consultar tabla FESTIVO en DB para el año ${year}:`,

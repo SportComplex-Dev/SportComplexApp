@@ -1,9 +1,18 @@
 # Repositorios `packages/db`
+> Estado: vigente 2026-10-16
 
-## `verification-tokens.ts` — Acceso a Datos TokenVerificacion
+## `access/password-reset.ts` — Persistencia de restablecimiento
+
+- `findPasswordResetUserByEmail(email)`: busca una cuenta no eliminada para emitir el enlace.
+- `findPasswordResetUser(userId, email)`: vuelve a validar identidad y devuelve `passwordHash` para comprobar la versión del token.
+- `updatePasswordHash(userId, passwordHash)`: persiste el hash Argon2id nuevo en el campo existente `usuario.password_hash`.
+
+No agrega tablas ni columnas y no requiere migración.
+
+## `access/verification-tokens.ts` — Acceso a Datos TokenVerificacion
 
 ### Propósito
-Provee CRUD tipado y mínimo para `TokenVerificacion` usado por flujos de auth (TSK-BE-03).
+Provee CRUD tipado y mínimo para `TokenVerificacion` usado por flujos de auth (ref. histórica TSK-BE-03).
 
 ### Referencia de Esquema (`prisma/schema.prisma`)
 ```prisma
@@ -33,7 +42,7 @@ model TokenVerificacion {
 
 #### Crear en registro / reenvío
 ```typescript
-import { createToken } from "@sportcomplex/db/repositories/verification-tokens";
+import { createToken } from "@sportcomplex/db/repositories/access/verification-tokens";
 
 const token = await createToken(
   usuario.id,
@@ -44,7 +53,7 @@ const token = await createToken(
 
 #### Buscar último para rate limit / verificar
 ```typescript
-import { findLatestByUsuarioId } from "@sportcomplex/db/repositories/verification-tokens";
+import { findLatestByUsuarioId } from "@sportcomplex/db/repositories/access/verification-tokens";
 
 const latest = await findLatestByUsuarioId(usuarioId);
 // Retorna null si no existe token sin usar
@@ -52,7 +61,7 @@ const latest = await findLatestByUsuarioId(usuarioId);
 
 #### Invalidar en verificación / reenvío
 ```typescript
-import { markUsed } from "@sportcomplex/db/repositories/verification-tokens";
+import { markUsed } from "@sportcomplex/db/repositories/access/verification-tokens";
 
 await markUsed(token.id); // Soft delete — preserva rastro de auditoría
 ```
@@ -63,7 +72,7 @@ await markUsed(token.id); // Soft delete — preserva rastro de auditoría
 - **Índice implícito en `(usuario_id, creado_en)`** — vía `orderBy: { creadoEn: 'desc' }` + `where: { usadoEn: null }`
 - **Cascade delete en Usuario** — tokens eliminados cuando se borra el usuario
 
-## `availability.ts` — TSK-BD-07 Reserva transaccional (Overbooking = 0)
+## `reservations/availability.ts` — reserva transaccional (Overbooking = 0)
 
 ### Propósito
 Único camino que **ocupa cupos** (`cupos_ocupados`) sobre `disponibilidad`.
@@ -104,12 +113,12 @@ esperado `1 éxito + (N-1) SLOT_NO_CAPACITY/409` y `cupos_ocupados` final `+1`.
 ### Auditoría
 Regla: **ningún camino que modifique `cupos_ocupados` puede omitir `FOR UPDATE`**;
 todo ese write debe reutilizar `reserveDisponibilidad`. Otros writes permitidos
-(sin tocar el contador) viven en `services.ts`: aprovisionamiento de calendario
+(sin tocar el contador) viven en `catalog/services.ts`: aprovisionamiento de calendario
 (`upsert` con `update: {}`, solo crea filas con `cuposOcupados: 0`) y limpieza
 admin (`deleteMany` con guarda `reservas: { none: {} }` o sin reservas activas).
 No agregar otro `SELECT/UPDATE` de `disponibilidad` que toque `cupos_ocupados`
-sin `FOR UPDATE`. `bookings.ts` queda solo como alias de compatibilidad que
-re-exporta este módulo.
+sin `FOR UPDATE`. `reservations/bookings/` queda como el módulo que
+re-exporta este comportamiento.
 
 ### Guía Backend (Next.js API route)
 
@@ -168,9 +177,9 @@ Reglas frontend:
 
 ---
 
-## Módulo: Torneos y Boletos de Entrada (`tournaments.ts`)
+## Módulo: Torneos y Boletos de Entrada (`catalog/tournaments.ts`)
 
-Gestión de catálogo, inscripción atómica, verificación de pagos y control de acceso seguro para torneos deportivos (TSK-BD-12, TSK-BE-25, TSK-BE-26).
+Gestión de catálogo, inscripción atómica, verificación de pagos y control de acceso seguro para torneos deportivos (ref. histórica TSK-BD-12, TSK-BE-25, TSK-BE-26).
 
 ### Contratos de Repositorio
 

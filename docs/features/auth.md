@@ -1,4 +1,29 @@
-# TSK-BE-02 — Google OAuth y vinculación de cuentas
+# Autenticación y cuentas
+> Estado: vigente 2026-10-16
+
+## Recuperación de contraseña
+
+`POST /api/auth/forgot-password` normaliza y valida el correo y responde siempre con
+HTTP 200 y el mismo mensaje. Para cuentas existentes genera un token firmado HMAC
+SHA-256 con vencimiento de 15 minutos y lo despacha al webhook configurado en
+`N8N_PASSWORD_RESET_WEBHOOK_URL`. El enlace se construye con `NEXT_PUBLIC_APP_URL`.
+La firma del token requiere `AUTH_RESET_TOKEN_SECRET` (mínimo 32 caracteres). El payload de
+correo contiene `tipo: password_reset`, `correo`, `nombre`, `enlaceRestablecimiento`
+y `expiraEnMinutos`; el request se firma en `X-SportComplex-Signature` con el secreto
+compartido `N8N_PASSWORD_RESET_HMAC_SECRET`.
+
+`POST /api/auth/reset-password` valida el token y la nueva contraseña, aplica Argon2id
+y actualiza `usuario.password_hash` con Argon2id. Si la cuenta tiene identidad en
+Supabase Auth, también actualiza allí la contraseña. El token queda invalidado tras
+el primer cambio al vincular su validez con la versión actual del hash local. No se
+requiere tabla adicional: el esquema actual ya contiene `password_hash`.
+
+```bash
+pnpm --filter web test src/app/api/auth/forgot-password
+```
+
+Los enlaces vencidos o adulterados se rechazan con HTTP 400. La respuesta de solicitud
+no revela si la cuenta existe.
 
 ## Requisitos y persistencia
 
@@ -56,7 +81,7 @@ SELECT id, correo, google_sub, nombre, avatar_url, estado, rol_id
 FROM usuario
 WHERE lower(correo) = lower('juan@example.com');
 ```
-# Plan de Auth — BACKEND
+## Plan de Auth — BACKEND
 
 > **Tipo:** Arreglo del flujo de autenticación existente (no es una user story nueva).
 > **Objetivo:** que el login con **Supabase Auth** funcione de punta a punta, usando la tabla
@@ -105,11 +130,11 @@ Arquitectura objetivo:
 
 - Login con Supabase: `apps/web/src/app/api/auth/route.ts:27-33`.
 - Cliente SSR de Supabase: `apps/web/src/lib/supabase/server.ts`.
-- Verificación de sesión Supabase en middleware: `apps/web/src/middleware.ts:21-51`.
-- Mapeo Supabase → `usuario` (por correo, fallback): `apps/web/src/middleware.ts:205-224`
-  y `apps/web/src/lib/api-auth.ts:86-139`.
-- Extracción de cookies de sesión Supabase: `apps/web/src/lib/session.ts:91-140`.
-- Autorización de APIs vía headers `x-sc-authenticated-*`: `apps/web/src/lib/api-auth.ts:63-75`.
+- Verificación de sesión Supabase en middleware: `apps/web/src/proxy.ts:21-51`.
+- Mapeo Supabase → `usuario` (por correo, fallback): `apps/web/src/proxy.ts:205-224`
+  y `apps/web/src/lib/api/api-auth.ts:86-139`.
+- Extracción de cookies de sesión Supabase: `apps/web/src/lib/auth/session.ts:91-140`.
+- Autorización de APIs vía headers `x-sc-authenticated-*`: `apps/web/src/lib/api/api-auth.ts:63-75`.
 - Flujo de registro + verificación por código de 6 dígitos: `apps/web/src/app/api/auth/register/route.ts`,
   `apps/web/src/app/api/auth/verify/route.ts`.
 - Google vía NextAuth (paralelo): `apps/web/src/auth.ts`, `apps/web/src/auth.config.ts`,
@@ -125,7 +150,7 @@ Arquitectura objetivo:
    `usuario` con `password_hash`; quien se registra no podrá loguearse por Supabase.
 3. **Rol tomado de `user_metadata`.** `auth/route.ts:36-39` usa `user_metadata.role`
    (default `Cliente`) en vez de `usuario.rol` → un admin puede ser redirigido a `/portal` y
-   bloqueado (`apps/web/src/lib/route-access.ts:16`).
+   bloqueado (`apps/web/src/lib/auth/route-access.ts:16`).
 4. **Enlace por correo frágil.** Sin columna que persista el UID de Supabase; `correo` es
    UNIQUE case-sensitive mientras Auth normaliza a minúsculas.
 5. **`password_hash` legacy con bcrypt.** El verificador usa Argon2id
@@ -152,7 +177,7 @@ Arquitectura objetivo:
 - Mantener `signInWithPassword` como ruta primaria (`:27-33`).
 - **Eliminar** el rol desde `user_metadata` (`:36-39`). Tras autenticar, resolver `usuario`
   por `supabaseUid` (si D2=a) o por `correo` `mode: 'insensitive'`, incluyendo `rol`.
-- Devolver `role = normalizeRole(user.rol.nombre)` (`apps/web/src/lib/session.ts:23`).
+- Devolver `role = normalizeRole(user.rol.nombre)` (`apps/web/src/lib/auth/session.ts:23`).
 - Aplicar estado: `PENDIENTE` → `ACCOUNT_PENDING` (redirige a `/verify`); `!== 'ACTIVO'` o
   `deletedAt` → `ACCOUNT_INACTIVE`.
 - La rama local con `password_hash` (`:55-83`): fallback **estricto** — si `isSupabaseAuthConfigured()` es verdadero, solo habilitarlo si `AUTH_ALLOW_LOCAL_FALLBACK=true` y el correo **no** existe en Supabase Auth; fallar cerrado ante errores de la Admin API. Cuando no esté configurado, solo fallback contra BD local (Argon2id).
@@ -173,9 +198,9 @@ Arquitectura objetivo:
 - Resolver el rol del usuario autenticado vía `supabase.auth.getUser()` + tabla `usuario`.
 
 ### 5.5 Enlace robusto (si D2=a)
-- `apps/web/src/middleware.ts:205-224`: buscar primero por `supabaseUid`, luego por correo
+- `apps/web/src/proxy.ts:205-224`: buscar primero por `supabaseUid`, luego por correo
   `insensitive`.
-- `apps/web/src/lib/api-auth.ts:119-139`: misma estrategia.
+- `apps/web/src/lib/api/api-auth.ts:119-139`: misma estrategia.
 
 ### 5.6 Google (según D1)
 - **(a) unificar:** mover Google a Supabase Auth y retirar NextAuth (`auth.ts`,
@@ -205,9 +230,9 @@ Arquitectura objetivo:
   → `/admin/dashboard` sin rebote; `/api/admin/*` autoriza.
 - Un registro nuevo queda en Supabase Auth **y** en `usuario` (`PENDIENTE`), va a `/verify`, y
   tras verificar entra.
-- Cliente/Vendedor/Lector caen en su `ROLE_HOME` (`apps/web/src/lib/session.ts:12`).
+- Cliente/Vendedor/Lector caen en su `ROLE_HOME` (`apps/web/src/lib/auth/session.ts:12`).
 - Los overrides de desarrollo (`?role=`, `sc-role`, `sc-session`) siguen inactivos en producción
-  (`apps/web/src/middleware.ts:133-138`, `apps/web/src/lib/session.ts:232`).
+  (`apps/web/src/proxy.ts:133-138`, `apps/web/src/lib/auth/session.ts:232`).
 
 ---
 
@@ -243,8 +268,8 @@ Arquitectura objetivo:
 - **Doble sesión** (NextAuth + Supabase) si no se unifica Google (D1): puede causar
   inconsistencias en middleware. Preferir (a).
 - Cambiar el login toca el camino crítico: actualizar **ambos** formularios
-  (`apps/web/src/app/(auth)/login/page.tsx` y `apps/web/src/components/auth-form.tsx`).
-# Login — arreglo, validación y estado (RBAC + fallback local)
+  (`apps/web/src/app/(auth)/login/page.tsx` y `@sportcomplex/ui`).
+## Login — arreglo, validación y estado (RBAC + fallback local)
 
 > Documento de cierre de la incidencia **"el login responde 200 pero el usuario se queda en `/login`"**
 > y de la habilitación de las cuentas con `password_hash` legacy (Argon2id/bcrypt) mediante un
@@ -286,8 +311,8 @@ Arquitectura objetivo:
 
 | Archivo | Cambio clave |
 |---|---|
-| `apps/web/src/middleware.ts` | **Fix del rol** vía `normalizeEmbeddedRole` (acepta objeto y array). Fetch robusto a Supabase REST con `.ilike("correo", …)` (email case-insensitive). Resolución de la sesión con `await extractSession(req)` (ya no solo dev). Redirección por `ROLE_HOME`. |
-| `apps/web/src/lib/session.ts` | `signScSessionToken` / `verifyScSessionToken` (HMAC-SHA256 con `AUTH_SECRET`, Web Crypto, TTL 24h, formato `payload.sig`). `extractSession` pasa a ser **async** y **verifica la firma** del `sc-token`. |
+| `apps/web/src/proxy.ts` | **Fix del rol** vía `normalizeEmbeddedRole` (acepta objeto y array). Fetch robusto a Supabase REST con `.ilike("correo", …)` (email case-insensitive). Resolución de la sesión con `await extractSession(req)` (ya no solo dev). Redirección por `ROLE_HOME`. |
+| `apps/web/src/lib/auth/session.ts` | `signScSessionToken` / `verifyScSessionToken` (HMAC-SHA256 con `AUTH_SECRET`, Web Crypto, TTL 24h, formato `payload.sig`). `extractSession` pasa a ser **async** y **verifica la firma** del `sc-token`. |
 | `apps/web/src/app/api/auth/route.ts` | `buildLegacySession(email, password)`: fallback **estricto** (solo si el correo **no** existe en Supabase Auth), valida Argon2id vía `verifySecret`, aplica `authGateFor` y emite la cookie `sc-token` (`HttpOnly; SameSite=Lax; Max-Age=86400`). |
 | `apps/web/src/app/api/auth/register/route.ts` | Ajustes del alta para no duplicar identidades y respetar el nuevo flujo. |
 | `apps/web/src/app/api/auth/verify/route.ts` | Bloqueo de cuentas `PENDIENTE` (`ACCOUNT_PENDING`). |
@@ -395,9 +420,9 @@ Arquitectura objetivo:
 1. Migrar (o resetear) las **56 cuentas `CLIENTE`** restantes a Supabase Auth.
 2. Cuando no queden cuentas con `password_hash` activas → `AUTH_ALLOW_LOCAL_FALLBACK="false"`.
 3. Endurecer: rotación de `AUTH_SECRET`, expiración/refresh del `sc-token` y rate limiting en `/api/auth`.
-# HU-21.DB — Restricciones de integridad y reglas de borrado para empleados
+## HU-21.DB — Restricciones de integridad y reglas de borrado para empleados
 
-> Rama de trabajo: Backend · Responsable: Ingeniería de Datos y Backend · Fecha de implementación: 2026-10-09
+> Ref histórica: Backend · Responsable: Ingeniería de Datos y Backend · Fecha de implementación: 2026-10-09
 > Alcance: restricciones de integridad en `packages/db` y controles de acceso/baja lógica en API.
 
 ## 1. Qué se hizo y por qué
@@ -453,7 +478,7 @@ Mapeo HU → esquema real (no existen modelos literales `Empleado/Venta/Escaneo`
 
 La tarea Backend complementa este blindaje con:
 
-- RBAC actualizado en `middleware.ts`, consultando el rol y estado actuales
+- RBAC actualizado en `proxy.ts`, consultando el rol y estado actuales
   de la cuenta en DB para que una baja surta efecto en la siguiente solicitud.
 - Autorización repetida dentro de los Route Handlers protegidos; no se confía
   únicamente en el proxy.
@@ -466,12 +491,12 @@ La tarea Backend complementa este blindaje con:
 ## 4. Verificación (cómo reproducir)
 
 ```bash
-# Desde packages/db
+## Desde packages/db
 npx prisma validate --schema prisma/schema.prisma   # schema válido
 npx tsx --test test/hu21-empleado-integridad.test.ts # 4/4 pass
 npm test        # 54/54 pass (suite completa)
 npm run typecheck  # limpio
-# CA-02 manual: rg "onDelete:" prisma/schema.prisma (ver tabla §2)
+## CA-02 manual: rg "onDelete:" prisma/schema.prisma (ver tabla §2)
 ```
 
 ## 5. Notas de despliegue (leer antes del merge)
@@ -491,7 +516,7 @@ npm run typecheck  # limpio
 
 ---
 
-# TSK-FE-21: Administración de Empleados y Roles Operativos
+## TSK-FE-21: Administración de Empleados y Roles Operativos
 
 ## 1. Identificación y Alcance
 - **Ticket Jira:** TSK-FE-21 / SCRUM-141 (Historia de Usuario HU-21 / Requerimiento RF-18 / RN-10)
@@ -501,7 +526,7 @@ npm run typecheck  # limpio
 ---
 
 ## 2. Arquitectura de Componentes (Modularización ARC-01)
-El panel monolítico original fue refactorizado en subcomponentes especializados bajo `apps/web/src/components/admin/employees/`:
+El panel monolítico original fue refactorizado en subcomponentes especializados bajo `packages/features/admin/src/components/staff/`:
 
 1. **`AdminEmployeesPage` (`apps/web/src/app/(admin)/admin/employees/page.tsx`):**
    - Controlador de estado y orquestador principal.
@@ -537,3 +562,8 @@ El panel monolítico original fue refactorizado en subcomponentes especializados
 - Validación de esquemas con Zod (`createEmployeeSchema`).
 - Pruebas unitarias de repositorio en `packages/db/src/repositories/employees.test.ts`.
 - Pruebas de integración frontend en `apps/web/src/app/(admin)/admin/employees/__tests__/employees-ui.test.ts`.
+
+## Trazabilidad
+
+> Ref histórica: HU-21 (RF-18 / RN-10) · SCRUM-141 · ramas de auth (OAuth, verificación, empleados y roles)
+> Recuperación y restablecimiento de contraseñas: ver [recuperacion-contrasena.md](./recuperacion-contrasena.md) (TSK-FE-33 / HU-38 / RF-01)

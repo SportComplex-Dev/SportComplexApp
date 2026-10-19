@@ -9,14 +9,13 @@ const STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
 process.env.STRIPE_SECRET_KEY = STRIPE_SECRET_KEY;
 process.env.STRIPE_WEBHOOK_SECRET = STRIPE_WEBHOOK_SECRET;
 
-const { createMockPrisma } = await import(
-  "../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
 // Import route handler DESPUÉS de inyectar el mock de Prisma.
-const paymentsRoute = await import("../route");
+const paymentsRoute = await import("@/app/api/payments/route");
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -206,7 +205,7 @@ test("TSK-BE-10 API: pago fallido cancela la reserva y restituye la franja", asy
 });
 
 test("TSK-BE-10 API: /api/webhooks/stripe expone el mismo handler POST", async () => {
-  const alias = await import("../../webhooks/stripe/route");
+  const alias = await import("@/app/api/webhooks/stripe/route");
   assert.equal(typeof alias.POST, "function");
 });
 
@@ -500,4 +499,28 @@ test("TSK-BE-18 API: webhook rechaza metadata POS incompleta o de varias reserva
 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "INVALID_POS_METADATA");
+});
+
+test("TSK-BE-31 API: checkout.session.completed pagado confirma la reserva usando su payment_intent", async () => {
+  seedReserva({ id: "reserva-session-completed" });
+  const payload = buildEventPayload({
+    id: "evt_checkout_session_completed",
+    type: "checkout.session.completed",
+    object: {
+      id: "cs_test_completed",
+      object: "checkout.session",
+      payment_intent: "pi_checkout_session_completed",
+      payment_status: "paid",
+      amount_total: 7500000,
+      metadata: { bookingId: "reserva-session-completed", userId: "user-1" },
+    },
+  });
+
+  const response = await postWebhook(payload, signPayload(payload));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.estado, "APROBADO");
+  assert.equal(mock._state.pagos.at(-1)?.stripePaymentIntentId, "pi_checkout_session_completed");
+  assert.equal(mock._state.reservas.find((r: any) => r.id === "reserva-session-completed")?.estado, "CONFIRMADA");
 });

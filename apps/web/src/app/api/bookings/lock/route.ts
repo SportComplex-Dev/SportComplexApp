@@ -1,4 +1,4 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import {
   BookingError,
   compensateFailedCheckout,
@@ -6,7 +6,7 @@ import {
 } from "@sportcomplex/db";
 import { createStripeCheckoutSession } from "@sportcomplex/core";
 import { bookingRequestSchema } from "@sportcomplex/validation";
-import { fail, created } from "@/lib/api-response";
+import { fail, created } from '@sportcomplex/shared/lib';
 
 /**
  * TSK-BE-09 — POST /api/bookings/lock (HU-09 / RF-08 / RN-04 rev.).

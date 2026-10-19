@@ -1,7 +1,6 @@
-# TSK-BD-09 — Idempotencia de pagos con Stripe (HU-10 / RF-09)
+# Pagos y POS
+> Estado: vigente 2026-10-15
 
-> Rama de trabajo: `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe`
-> Responsable: Milton Ortega · 3 pts · Fase F2 · Componente: Database & Analytics · Depende de `TSK-BD-06`
 > Sprint: SP1 - Core & Reservas Cashless · Fecha de implementación: 2026-10-08
 
 ## 1. Qué se hizo y por qué
@@ -16,13 +15,14 @@ ninguna parte del sistema escribía en la tabla `PAGO` ni pasaba una reserva a
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments.ts` |
+| 1 | Repositorio de pagos: upsert transaccional + confirmación/activación condicional | `packages/db/src/repositories/payments/payments.ts` |
 | 2 | Export del repositorio en el paquete | `packages/db/src/index.ts` |
 | 3 | Webhook Stripe real: verificación de firma + procesamiento idempotente | `apps/web/src/app/api/payments/route.ts` |
 | 4 | Helpers de contrato de metadatos y monto | `packages/core/src/integrations/stripe.ts` (+ export en `packages/core/src/index.ts`) |
 | 5 | Test del criterio de aceptación a nivel repositorio (7 tests) | `packages/db/src/repositories/payments.test.ts` |
 | 6 | Test end-to-end del webhook con firma firmada (4 tests) | `apps/web/src/app/api/payments/__tests__/route.test.ts` |
 | 7 | Soporte de `pago`/`membresia` + `WHERE id` en el mock de Prisma | `packages/db/test/mock-prisma.ts` |
+| 8 | Disparo desacoplado de email con comprobante y QR en webhook Stripe (TSK-BE-34) | `apps/web/src/app/api/payments/email-dispatch.ts` |
 
 **No hubo migraciones nuevas**: el `UNIQUE (stripe_payment_intent_id)` ya vive
 en `migrations/20260930132534_init_sport_complex/migration.sql:270`
@@ -203,14 +203,14 @@ Flujo previsto:
 ## 5. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test        # 7 tests TSK-BD-09
 pnpm --filter web test                     # 4 tests TSK-BD-09 (webhook firmado)
 
-# End-to-end local con Stripe CLI
+## End-to-end local con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
 pnpm --filter web dev
-# ... crear un pago y reenviar el evento 2 veces desde el dashboard de Stripe
+## ... crear un pago y reenviar el evento 2 veces desde el dashboard de Stripe
 ```
 
 **Criterio de aceptación cubierto por:**
@@ -264,9 +264,9 @@ Contrato de respuesta extendido (200 procesado):
 
 > Nota: los conteos de pruebas de la §5 quedan actualizados a **8 tests** en
 > `@sportcomplex/db` y **6 tests** en `web` tras este anexo.
-# TSK-BD-09 + TSK-BD-10 — Idempotencia de pagos (Stripe) y canje de ticket con auditoría
+## TSK-BD-09 + TSK-BD-10 — Idempotencia de pagos (Stripe) y canje de ticket con auditoría
 
-> Rama de trabajo: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (hacia `develop`)
+> Ref histórica: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (hacia `develop`)
 > Tasks: **TSK-BD-09** (Idempotencia de pagos con Stripe · HU-10 / RF-09 · 3 pts)
 > y **TSK-BD-10** (Canje de ticket + auditoría de accesos · HU-14..17 / RF-13·14·15 / RN-05)
 > Sprint: SP1 - Core & Reservas Cashless · Fecha: 2026-10-08
@@ -290,13 +290,13 @@ vuelve a `EMITIDO` (RN-05) y el modo CONSULTA no lo altera nunca.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments.ts` |
-| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/tickets.ts` |
+| 1 | Repositorio de pagos idempotente (BD-09) | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | Repositorio de tickets: canje + auditoría transaccional (BD-10) | `packages/db/src/repositories/access/tickets.ts` |
 | 3 | Export de ambos repositorios | `packages/db/src/index.ts` |
 | 4 | Webhook Stripe real | `apps/web/src/app/api/payments/route.ts` |
-| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/access.ts` |
+| 5 | Orquestador del escáner (firma → decide → transacción) | `apps/web/src/lib/api/access.ts` |
 | 6 | Endpoint de escaneo (reemplaza stub 501) | `apps/web/src/app/api/access/route.ts` |
-| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/access.schema.ts` |
+| 7 | Fix `postServiceId` (`z.uuid()` → `z.coerce.number()`, era FK a `servicio.id Int`) | `packages/validation/src/platform/access.schema.ts` |
 | 8 | Helpers de metadatos/monto Stripe | `packages/core/src/integrations/stripe.ts` |
 | 9 | Tests: 7 BD-09 + 5 BD-10 (repo), 4 webhook, 8 escáner, 3 schema | ver §6 |
 
@@ -313,7 +313,7 @@ Escáner QR (content = ticket_qr.codigo_uuid) + firma HMAC + puesto (o null)
 POST /api/access ──► sesión + rol Administrador | Empleado_Lector  (401/403)
         │
         ▼
-procesarEscaneo()  (apps/web/src/lib/access.ts)
+procesarEscaneo()  (apps/web/src/lib/api/access.ts)
         │
         ├─ 1) verifyTicketSignature()  ← ANTES de la BD; mal QR → 400, 0 escrituras
         ├─ 2) getTicketForScan()       ← carga reserva + titular + servicio + franja
@@ -425,7 +425,7 @@ const salida = await ejecutarLectura({
 ```
 
 La decisión de negocio **no** vive en el repositorio: firma (`verifyTicketSignature`),
-ventana y servicio (`decideAccess`) van en el orquestador `lib/access.ts`.
+ventana y servicio (`decideAccess`) van en el orquestador `apps/web/src/lib/api/access.ts`.
 
 ### 3.4. Firmar un QR (contexto TSK-BD-06 / emisión de tickets)
 
@@ -475,7 +475,7 @@ El `404 TICKET_NOT_FOUND` y el `400 INVALID_SIGNATURE` son QRs inválidos/adulte
 ### 4.3. Roles (middleware)
 
 `/scanner/*` y `/api/access/*` ya exigen `Administrador | Empleado_Lector`
-(normalizados en `apps/web/src/lib/session.ts`); el endpoint además re-valida
+(normalizados en `apps/web/src/lib/auth/session.ts`); el endpoint además re-valida
 sesión y rol por capa propia (defensa en profundidad).
 
 ## 5. Variables de entorno y arranque
@@ -489,39 +489,39 @@ pnpm --filter web dev
 ## 6. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test        # 32 tests → 5 TSK-BD-10 + 7 TSK-BD-09
 pnpm --filter @sportcomplex/validation test # 13 tests → 3 access.schema
 pnpm --filter web test                     # 17 tests → 8 TSK-BD-10 + 4 webhook BD-09
 
-# Typecheck + lint
+## Typecheck + lint
 pnpm --filter @sportcomplex/db typecheck && pnpm --filter @sportcomplex/db lint
 pnpm --filter @sportcomplex/validation typecheck && pnpm --filter @sportcomplex/validation lint
 pnpm --filter @sportcomplex/core typecheck && pnpm --filter @sportcomplex/core lint
 pnpm --filter web typecheck && pnpm --filter web lint
 
-# BD-09 end-to-end con Stripe CLI
+## BD-09 end-to-end con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
-# ... y reenviar el mismo evento 2 veces: no duplica PAGO ni reservas
+## ... y reenviar el mismo evento 2 veces: no duplica PAGO ni reservas
 ```
 
 QA manual del escáner (con sesión de lector y `QR_HMAC_SECRET` definido):
 
 ```bash
-# firma de prueba
+## firma de prueba
 node -e "const{createHmac}=require('crypto');const id='9f0d6f4e-0000-4000-8000-0000000000ff';console.log(createHmac('sha256','change-me-64-hex').update(id).digest('hex'))"
 
 curl -X POST http://localhost:3000/api/access -H "Content-Type: application/json" \
   --cookie <sesión-del-lector> \
   -d '{"ticketId":"<codigo_uuid>","signature":"<hmac>","postServiceId":3}'
-# 1.ª vez: access=GRANTED/CONCEDIDO · 2.ª: DENIED/ALREADY_USED · sin puesto: modo CONSULTA
+## 1.ª vez: access=GRANTED/CONCEDIDO · 2.ª: DENIED/ALREADY_USED · sin puesto: modo CONSULTA
 ```
 
 ## 7. Para quien docketice en Jira (copiar/pegar)
 
 **Campos de las dos tasks:**
 
-- **Rama:** `feature/tsk-bd-09-10-pagos-y-canje-ticket` (reemplaza a
+> Ref histórica — Rama: `feature/tsk-bd-09-10-pagos-y-canje-ticket` (reemplaza a
   `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe`; PR #22 se cierra)
 - **Estado:** En Desarrollo → Resuelto al merge (revisar el flujo del equipo)
 - **Commits:** `fa6e25c` (feat: TSK-BD-09 idempotencia de pagos con Stripe),
@@ -595,7 +595,7 @@ siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
   hoy; en TURNO la auditoría queda con `asignacion_id = NULL` sin bloquear el
   canje. Si el negocio lo pide, es una task aparte.
 - Notificación al usuario al confirmar pago o al denegar acceso.
-# TSK-BE-10 — Webhook de Stripe firmado e idempotente + guía de integración Frontend
+## TSK-BE-10 — Webhook de Stripe firmado e idempotente + guía de integración Frontend
 
 - **Ticket:** [SCRUM-114] TSK-BE-10 · **Historia:** HU-10 (RF-09)
 - **Microcelda:** Backend / Frontend
@@ -612,12 +612,12 @@ siempre lleno, proponer al backlog una task para el alta de `ASIGNACION_PUESTO`.
 
 | # | Cambio | Archivo |
 |---|--------|---------|
-| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments.ts` |
-| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments.ts` |
+| 1 | `payment_intent.succeeded` → reserva `CONFIRMADA` **+ emisión del `TICKET_QR` (`EMITIDO`)** en la misma transacción | `packages/db/src/repositories/payments/payments.ts` |
+| 2 | `payment_intent.payment_failed` → reserva `PENDIENTE_PAGO → CANCELADA_PAGO` **+ restitución de la franja** (`cupos_ocupados -= cantidad`) | `packages/db/src/repositories/payments/payments.ts` |
 | 3 | Nuevo estado de reserva `CANCELADA_PAGO` | `packages/db/prisma/schema.prisma` + migración `20261009120000_reserva_cancelada_pago_enum` |
 | 4 | Alerta de pago fallido (n8n, *fire-and-forget*) | `apps/web/src/app/api/payments/route.ts` |
 | 5 | Alias de ruta `/api/webhooks/stripe` (reexporta el handler canónico) | `apps/web/src/app/api/webhooks/stripe/route.ts` |
-| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments.ts` |
+| 6 | Campos nuevos en la respuesta del webhook: `ticketQrEmitido`, `franjaRestituida` | `packages/db/src/repositories/payments/payments.ts` |
 
 Garantías de idempotencia (se conservan): `UNIQUE(stripe_payment_intent_id)` en
 `PAGO`, updates condicionales de estado y emisión del QR protegida por
@@ -878,16 +878,16 @@ Al obtener `CONFIRMADA`, el comprobante ya trae `ticket` y `qr`:
 ## 5. Cómo probarlo
 
 ```bash
-# Unit + integración (mock de Prisma, sin BD real)
+## Unit + integración (mock de Prisma, sin BD real)
 pnpm --filter @sportcomplex/db test     # incluye: emisión de QR y cancelación+restitución (TSK-BE-10)
 pnpm --filter web test                  # webhook firmado + alias /api/webhooks/stripe
 
-# End-to-end local con Stripe CLI
+## End-to-end local con Stripe CLI
 stripe listen --forward-to localhost:3000/api/payments
 pnpm --filter web dev
 stripe trigger payment_intent.succeeded          # reserva → CONFIRMADA + QR
 stripe trigger payment_intent.payment_failed     # reserva → CANCELADA_PAGO + franja liberada
-# Reenviar el mismo evento 2 veces: duplicado=true, sin duplicar pago/ticket.
+## Reenviar el mismo evento 2 veces: duplicado=true, sin duplicar pago/ticket.
 ```
 
 ---
@@ -915,7 +915,7 @@ Sin `STRIPE_SECRET_KEY` o `STRIPE_WEBHOOK_SECRET`, el webhook responde
 - **UI de checkout/POS con Stripe Elements**: tarea FE pendiente
   (`portal/book/page.tsx` y `(staff)/pos/page.tsx`).
 - **Notificación al usuario** (email/push) al confirmar: flujo aparte (n8n).
-# TSK-BE-14 — Endpoint de canje en modo turno
+## TSK-BE-14 — Endpoint de canje en modo turno
 
 `POST /api/access/redeem`
 
@@ -1067,7 +1067,7 @@ Content-Type: application/json
   - Control de acceso por rol y estado de usuario (401 / 403).
   - Ticket inexistente (404) y falta de variable de entorno (503).
   - Canje sin turno asignado previo (best-effort, audita `asignacionId = null`).
-# TSK-BE-18: Cobro desde el POS con Stripe en tiempo real
+## TSK-BE-18: Cobro desde el POS con Stripe en tiempo real
 
 - **Historia:** HU-18 (RF-17)
 - **Fase:** F3
@@ -1154,7 +1154,7 @@ servidor deriva el total de `RESERVA.total`.
 ## Persistencia y base de datos
 
 Esta tarea **sí modifica explícitamente la lógica de persistencia** en
-`packages/db/src/repositories/payments.ts`: cuando el webhook acepta el pago,
+`packages/db/src/repositories/payments/payments.ts`: cuando el webhook acepta el pago,
 actualiza `RESERVA.vendedor_id` con el empleado del POS y `RESERVA.canal` con
 `TAQUILLA`, además de confirmar la reserva y asociar el pago.
 
@@ -1169,7 +1169,7 @@ Se reutilizan `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET`, ya descritas en
 frontend. La confirmación, el QR y la idempotencia del webhook se apoyan en
 [`TSK-BE-10`](#tsk-be-10--webhook-de-stripe-firmado-e-idempotente--guía-de-integración-frontend) y
 [`TSK-BD-09`](#tsk-bd-09--idempotencia-de-pagos-con-stripe-hu-10--rf-09).
-# TSK-BE-19 — Endpoint de datos del comprobante
+## TSK-BE-19 — Endpoint de datos del comprobante
 
 `GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS`
 
@@ -1181,8 +1181,8 @@ Devuelve la **estructura de datos** del comprobante (membrete, reserva, servicio
 
 Todo se arma en el servidor, incluida la firma HMAC del QR y la imagen PNG:
 
-- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
-- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/lib/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
+- La lectura de datos es `getReceiptReserva` (`packages/db/src/repositories/payments/receipts.ts`) con `select` explícito: **no** incluye `pago` ni `membresia`, así que `stripe_payment_intent_id` y `pagoId` nunca salen del backend.
+- El QR se firma con `QR_HMAC_SECRET` en `apps/web/src/app/api/pdf/receipt/receipt.ts` y se entrega ya firmado (`payload`) y rasterizado (`dataUrl`, generado con `qrcode` en el servidor). El secreto no aparece en ninguna rama de la respuesta.
 - El membrete viene de variables de entorno (`RECEIPT_*`), no de la base de datos ni de cabeceras del navegador.
 - La respuesta se marca `Cache-Control: no-store` (el estado del boleto puede cambiar).
 - La prueba `TSK-BE-19 (CRITERIO)` serializa la respuesta y falla si aparece el secreto QR, una clave `sk_test/sk_live`, un `postgresql://`, un `service role` o cualquier `pagoId`.
@@ -1261,7 +1261,7 @@ Checklist:
 
 ## Para quien docketice en Jira (copiar/pegar)
 
-- **Rama:** `feature/tsk-be-19-endpoint-de-datos-del-comprobante` → `develop`
+> Ref histórica — Rama: `feature/tsk-be-19-endpoint-de-datos-del-comprobante` → `develop`
 - **Estado:** En Desarrollo → Resuelto al merge
 - **Task:** TSK-BE-19 (Endpoint de datos del comprobante · HU-19 / RF-17 / RNF-05 · 1 pt) — depende de TSK-BE-13
 - **Jira:** SCRUM-135
@@ -1324,30 +1324,56 @@ El flujo de pago respeta la arquitectura empresarial definida en **TSK-BE-18** y
 
 ---
 
-## 3. Mitigación de Riesgos y Contingencia (SRS §11.1)
+## 3. Cobro en taquilla: QR desde el celular
 
-Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en smartphone) o hay fallas en el datáfono virtual de mostrador:
-1. El vendedor presiona **"Enlace Alternativo / QR Móvil"**.
-2. El sistema genera dinámicamente una sesión oficial de Stripe Checkout (`createStripeCheckoutSession`) con URL cifrada de pago directo (`https://checkout.stripe.com/...`) o enlace compatible de contingencia.
-3. El cliente escanea el código QR desde su celular, completando el pago de forma segura sin manipulación de números de tarjeta en texto plano (cumplimiento estricto de PCI-DSS SAQ A).
+> El proyecto es semiacadémico: **producción usa claves de prueba de Stripe** (`sk_test_`/`pk_test_`) a propósito. No hay cobros reales; la demo usa las tarjetas de prueba de Stripe.
+
+El POS tiene **un único botón de cobro, "Cobrar con QR"**:
+1. Crea la reserva y una Stripe Checkout Session, y muestra su QR.
+2. El cliente lo escanea y paga desde su celular en `checkout.stripe.com`. En modo test se usa `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC; el modal lo indica.
+3. El POS **espera la confirmación del webhook** (`esperarPagoTaquilla` consulta `GET /api/pdf/receipt?destinatario=POS` hasta que exista el QR). Al confirmarse, abre el voucher con la vista previa del ticket y **"Imprimir ticket"**.
+4. La espera dura hasta el vencimiento del hold (30 min) o hasta que el operador pulse *"Cancelar cobro"*.
+5. Al pagar o cancelar, el celular vuelve a la página pública `/pago-taquilla?estado=ok|cancelado`, porque el cliente de mostrador no tiene sesión.
+6. Si Stripe Checkout falla, el servidor devuelve el enlace de contingencia `/checkout?...` (ARCH-03).
+
+El antiguo "datáfono virtual" (confirmar con `pm_card_visa` desde la taquilla) se retiró de la UI: cobraba sin que el cliente hiciera nada y no servía para la demo.
+
+Antes de crear la reserva, el checkout rechaza montos por debajo de **$2.000 COP** (`STRIPE_MIN_AMOUNT_COP`, mínimo de Stripe): `422 AMOUNT_BELOW_MINIMUM`, sin dejar holds colgados.
+
+**Requisito para la demo:** el webhook debe llegar a `/api/payments` con los eventos `payment_intent.succeeded` y `payment_intent.payment_failed`:
+- **Local:** `stripe listen --forward-to localhost:3000/api/payments`, y su `whsec_` en `STRIPE_WEBHOOK_SECRET`.
+- **Producción:** endpoint del webhook en el dashboard de Stripe (modo test) apuntando a `https://<dominio>/api/payments`, y `NEXT_PUBLIC_APP_URL` con el dominio público para la redirección del celular.
 
 ---
 
-## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05)
+## 4. Especificaciones de Impresión de Comprobante Térmico (RNF-05 · ADR 009)
 
-- **Dispositivos soportados:** Impresoras térmicas de tickets ESC/POS estándar de **58 mm** y **80 mm**, así como impresoras láser/inyección para exportación en formato carta o PDF.
-- **Acción:** `window.print()` estilizado con medios `@media print` para ajustar márgenes, tipografía monoespaciada compacta y contraste de código QR de 260px.
-- **Contenido del Comprobante:**
-  - Membrete: Razón social, NIT, dirección y canal TAQUILLA.
-  - Código alfanumérico de reserva (ej. `AKR-POS-XXXX-XXXX`).
-  - Datos de titular y vendedor responsable.
-  - Desglose contable: Tarifa base, descuento socio (30%), IVA (19%) y total pagado.
-  - Código QR de torniquete óptico firmado con secreto HMAC del servidor (`QR_HMAC_SECRET`).
+- **Quién imprime:** solo el operador (`Empleado_Vendedor` / `Administrador`) desde `/pos`. El cliente no imprime: descarga el PDF desde su portal (`GET /api/pdf/receipt/file?destinatario=PORTAL`).
+- **Dispositivo:** impresora térmica ESC/POS de **58 mm** (DIG-ISH58, 384 puntos por línea), emparejada desde Chrome/Edge por **Bluetooth (Web Bluetooth/BLE)** o por **USB (WebUSB)**, la que tenga la caja. La configuración de la caja está en [impresora-termica.md](../infra/impresora-termica.md).
+- **Render (`@sportcomplex/printing`):** el ticket completo, incluido el QR, se dibuja en un único bitmap de 384 puntos con la tipografía Thermal Sans Mono 24. Ese bitmap sale por tres caminos:
+  - la vista previa 1:1 del POS (`PosTicketPreview`)
+  - los bytes `GS v 0` en bandas de 64 filas, con 64 NUL + `ESC @` antes, avance y corte parcial
+  - el PDF de 58 mm (`/api/pdf/receipt/file`)
+- **Datos:** salen de `GET /api/pdf/receipt?destinatario=POS`; el navegador no inventa membrete, NIT ni QR. Contenido:
+  - Membrete (`RECEIPT_ENTIDAD`, `RECEIPT_NIT`, `RECEIPT_DIRECCION`, `RECEIPT_TELEFONO`, `RECEIPT_CORREO`)
+  - Número de comprobante (8 primeros del UUID de la reserva)
+  - Fecha y hora de emisión (Bogotá)
+  - Titular
+  - Servicio, modalidad, fecha, franja y cupos
+  - Subtotal, descuento de socio y TOTAL
+  - Canal y estado
+  - QR firmado (`SC1:<uuid>:<hmac>`) que valida el escáner
+  - Pie (`RECEIPT_PIE`)
+- **Reimpresión:** el panel *"Imprimir ticket de una reserva"* del POS acepta el QR escaneado del pase (se verifica la firma) o el UUID del boleto o de la reserva (`GET /api/pos/tickets/lookup`). Así se entrega en papel una reserva hecha online.
+- **Respaldo:** si el navegador no soporta Web Bluetooth ni WebUSB, o la impresora falla, el operador descarga el mismo ticket en PDF (`destinatario=POS`).
 
 ---
 
-## 5. Limitación Operativa del Datáfono Virtual (ARCH-REG-02)
+## 5. Tarjeta presente (ARCH-REG-02)
 
-- El cobro presencial en `pos/page.tsx` confirma el `PaymentIntent` con el método sintético `pm_card_visa`, válido **únicamente con claves de prueba de Stripe (`pk_test_...`)**.
-- Con claves de producción (`pk_live_...`) la aplicación **rechaza el cargo mock** y mantiene la reserva en `PENDIENTE_PAGO`; el operador debe completar el cobro mediante el enlace de Stripe Checkout de contingencia.
-- La captura de tarjetas físicas reales en producción requiere integrar Stripe Terminal SDK o Stripe Elements (fuera del alcance de TSK-FE-18).
+- La taquilla no captura tarjetas: el cliente paga desde su celular con Stripe Checkout.
+- Cobrar tarjetas físicas exigiría Stripe Terminal, que **no está disponible en Colombia** (y Stripe no abre cuentas para negocios colombianos). No aplica mientras el proyecto opere en modo de pruebas.
+
+## Trazabilidad
+
+> Ref histórica: HU-10 (RF-09) · rama `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe` · depende de esquema base de pagos

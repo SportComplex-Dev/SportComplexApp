@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 const mock = createMockPrisma();
 (globalThis as unknown as { __scPrisma: unknown }).__scPrisma = mock;
 
-const { handleLockCart } = await import("../route");
+const { handleLockCart, clearLockCartIdempotencyCache } = await import("@/app/api/bookings/lock-cart/route");
 
 function tomorrowBogota(): string {
   const now = new Date();
@@ -193,6 +193,50 @@ test("POST /api/bookings/lock-cart: éxito 201 crea holds y devuelve URL de Stri
   assert.equal(mock._state.reservas[1].estado, "PENDIENTE_PAGO");
 });
 
+test("POST /api/bookings/lock-cart: bloquea franjas continuas y sincroniza su vencimiento con Stripe", async () => {
+  seedSlots();
+  const date = tomorrowBogota();
+  const diaSemana = mock._state.franjas[0].diaSemana;
+  mock._state.franjas.push({
+    id: 3,
+    servicioId: 1,
+    diaSemana,
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 11)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 12)),
+  });
+  mock._state.disponibilidades.push({
+    id: 3n,
+    servicioId: 1,
+    franjaId: 3,
+    fecha: new Date(`${date}T00:00:00.000Z`),
+    cuposTotales: 10,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+
+  const req = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      serviceId: 1,
+      franjas: [
+        { inicio: new Date(`${date}T10:00:00-05:00`).toISOString(), fin: new Date(`${date}T11:00:00-05:00`).toISOString() },
+        { inicio: new Date(`${date}T11:00:00-05:00`).toISOString(), fin: new Date(`${date}T12:00:00-05:00`).toISOString() },
+      ],
+    }),
+  });
+  let stripeExpiresAt: number | undefined;
+  const stripeWithCapturedExpiry = async (input: { now?: Date }) => {
+    stripeExpiresAt = Math.floor((input.now ?? new Date()).getTime() / 1000) * 1000 + 30 * 60_000;
+    return fakeStripeCheckout();
+  };
+  const res = await handleLockCart(req, authenticatedAsClient, stripeWithCapturedExpiry);
+  assert.equal(res.status, 201);
+  assert.equal(mock._state.reservas.length, 2);
+  assert.equal(mock._state.reservas[0].expiraEn.getTime(), stripeExpiresAt);
+  assert.equal(mock._state.reservas[1].expiraEn.getTime(), stripeExpiresAt);
+});
+
 test("POST /api/bookings/lock-cart: error definitivo de Stripe ejecuta compensación de todas las reservas", async () => {
   seedSlots();
   const req = new Request("http://localhost:3000/api/bookings/lock-cart", {
@@ -239,4 +283,126 @@ test("POST /api/bookings/lock-cart: timeout simulado de Stripe NO compensa (mant
   assert.equal(mock._state.reservas[1].estado, "PENDIENTE_PAGO");
   assert.equal(mock._state.disponibilidades[0].cuposOcupados, 1);
   assert.equal(mock._state.disponibilidades[1].cuposOcupados, 2);
+});
+
+test("POST /api/bookings/lock-cart: petición repetida con la misma Idempotency-Key devuelve la misma respuesta sin generar múltiples bloqueos en DB (TSK-BE-36 / SCRUM-251)", async () => {
+  clearLockCartIdempotencyCache();
+  seedSlots();
+  const idemKey = "idem-test-key-lock-cart-1";
+
+  const req1 = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idemKey,
+    },
+    body: validCartBody(),
+  });
+
+  const res1 = await handleLockCart(req1, authenticatedAsClient, fakeStripeCheckout);
+  assert.equal(res1.status, 201);
+  const json1 = await res1.json();
+  assert.equal(json1.success, true);
+  assert.equal(json1.data.reservas.length, 2);
+  assert.equal(mock._state.reservas.length, 2);
+
+  const req2 = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idemKey,
+    },
+    body: validCartBody(),
+  });
+
+  const res2 = await handleLockCart(req2, authenticatedAsClient, fakeStripeCheckout);
+  assert.equal(res2.status, 201);
+  assert.equal(res2.headers.get("x-idempotent-replayed"), "true");
+  const json2 = await res2.json();
+  assert.equal(json2.success, true);
+  assert.equal(json2.data.checkout.sessionId, json1.data.checkout.sessionId);
+  assert.equal(json2.data.reservas.length, 2);
+
+  // Criterio de Aceptación Clave: NO se generaron múltiples bloqueos en la base de datos
+  assert.equal(mock._state.reservas.length, 2);
+  assert.equal(mock._state.disponibilidades[0].cuposOcupados, 1);
+  assert.equal(mock._state.disponibilidades[1].cuposOcupados, 2);
+});
+
+test("POST /api/bookings/lock-cart: peticiones concurrentes con la misma Idempotency-Key no generan duplicados en DB (TSK-BE-36 / SCRUM-251)", async () => {
+  clearLockCartIdempotencyCache();
+  seedSlots();
+  const idemKey = "idem-test-key-concurrent";
+
+  const delayedStripeCheckout = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    return fakeStripeCheckout();
+  };
+
+  const req1 = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idemKey,
+    },
+    body: validCartBody(),
+  });
+
+  const req2 = new Request("http://localhost:3000/api/bookings/lock-cart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idemKey,
+    },
+    body: validCartBody(),
+  });
+
+  const [res1, res2] = await Promise.all([
+    handleLockCart(req1, authenticatedAsClient, delayedStripeCheckout),
+    handleLockCart(req2, authenticatedAsClient, delayedStripeCheckout),
+  ]);
+
+  assert.equal(res1.status, 201);
+  assert.equal(res2.status, 201);
+
+  const json1 = await res1.json();
+  const json2 = await res2.json();
+  assert.equal(json1.data.checkout.sessionId, json2.data.checkout.sessionId);
+
+  // Criterio de Aceptación Clave: Exactamente 2 reservas creadas, 0 duplicados en concurrencia
+  assert.equal(mock._state.reservas.length, 2);
+  assert.equal(mock._state.disponibilidades[0].cuposOcupados, 1);
+  assert.equal(mock._state.disponibilidades[1].cuposOcupados, 2);
+});
+
+test("POST /api/bookings/lock-cart: tras expiración de clave se re-ejecuta la transacción contra la DB (TSK-BE-36)", async () => {
+  const { IdempotencyCache } = await import("@sportcomplex/shared/lib");
+  const shortTtlCache = new IdempotencyCache(30);
+  seedSlots();
+  const idemKey = "idem-test-key-expiry";
+
+  const makeReq = () =>
+    new Request("http://localhost:3000/api/bookings/lock-cart", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idemKey,
+      },
+      body: validCartBody(),
+    });
+
+  const res1 = await handleLockCart(makeReq(), authenticatedAsClient, fakeStripeCheckout, shortTtlCache);
+  assert.equal(res1.status, 201);
+  assert.equal(mock._state.reservas.length, 2);
+
+  // Esperar a que expire la clave en el caché
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  // Al expirar la clave, la nueva solicitud no devuelve el 201 cacheado sino que
+  // re-ejecuta la lógica de reserva en la DB (detectando conflicto 409 por la reserva ya activa)
+  const res2 = await handleLockCart(makeReq(), authenticatedAsClient, fakeStripeCheckout, shortTtlCache);
+  assert.equal(res2.status, 409);
+  assert.equal(res2.headers.get("x-idempotent-replayed"), null);
+  const json2 = await res2.json();
+  assert.equal(json2.success, false);
 });

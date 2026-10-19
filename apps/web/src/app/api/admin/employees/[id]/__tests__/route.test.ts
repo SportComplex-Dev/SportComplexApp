@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 const empleadoId = "00000000-0000-4000-8000-000000000011";
@@ -11,7 +11,7 @@ const db = createMockPrisma();
   __scAuthSession: { user: { id: string } };
 }).__scAuthSession = { user: { id: adminId } };
 
-const route = await import("../route");
+const route = await import("@/app/api/admin/employees/[id]/route");
 
 function seedAccounts() {
   db._state.usuarios.length = 0;

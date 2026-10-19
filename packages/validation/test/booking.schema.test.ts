@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { availabilityQuerySchema, bookingRequestSchema, posCheckoutSchema } from "../src/booking.schema.ts";
+import { availabilityQuerySchema, bookingRequestSchema, cartCheckoutSchema, posCheckoutSchema } from "../src/business/booking.schema.ts";
 
 test("bookingRequestSchema accepts integer service IDs and defaults to one seat", () => {
   const parsed = bookingRequestSchema.safeParse({
@@ -40,6 +40,49 @@ test("availabilityQuerySchema validates service and calendar date", () => {
     availabilityQuerySchema.safeParse({ serviceId: "0", date: "2026-02-30" }).success,
     false,
   );
+});
+
+test("cartCheckoutSchema normalizes ordered continuous slots for one service", () => {
+  const parsed = cartCheckoutSchema.safeParse({
+    serviceId: 12,
+    franjas: [
+      { inicio: "2026-10-20T15:00:00.000Z", fin: "2026-10-20T16:00:00.000Z" },
+      { inicio: "2026-10-20T16:00:00.000Z", fin: "2026-10-20T17:00:00.000Z" },
+    ],
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.mode, "continuous");
+    assert.deepEqual(parsed.data.items.map(({ startTime, endTime, serviceId }) => ({ serviceId, startTime, endTime })), [
+      { serviceId: 12, startTime: "2026-10-20T15:00:00.000Z", endTime: "2026-10-20T16:00:00.000Z" },
+      { serviceId: 12, startTime: "2026-10-20T16:00:00.000Z", endTime: "2026-10-20T17:00:00.000Z" },
+    ]);
+  }
+});
+
+test("cartCheckoutSchema rejects gaps, overlaps, and out-of-order continuous slots", () => {
+  const first = { inicio: "2026-10-20T15:00:00.000Z", fin: "2026-10-20T16:00:00.000Z" };
+  for (const second of [
+    { inicio: "2026-10-20T16:01:00.000Z", fin: "2026-10-20T17:00:00.000Z" },
+    { inicio: "2026-10-20T15:30:00.000Z", fin: "2026-10-20T16:30:00.000Z" },
+    { inicio: "2026-10-20T14:00:00.000Z", fin: "2026-10-20T15:00:00.000Z" },
+  ]) {
+    assert.equal(cartCheckoutSchema.safeParse({ serviceId: 12, franjas: [first, second] }).success, false);
+  }
+});
+
+test("cartCheckoutSchema keeps the legacy multi-item cart input", () => {
+  const parsed = cartCheckoutSchema.safeParse({
+    items: [
+      { serviceId: 1, startTime: "2026-10-20T15:00:00.000Z", endTime: "2026-10-20T16:00:00.000Z" },
+      { serviceId: 2, startTime: "2026-10-20T15:00:00.000Z", endTime: "2026-10-20T16:00:00.000Z" },
+    ],
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.mode, "cart");
+    assert.equal(parsed.data.items[0]?.cantidadCupos, 1);
+  }
 });
 
 test("posCheckoutSchema (TSK-FE-18 / RF-17): acepta cobro cashless con tarjeta y enlace alternativo", () => {

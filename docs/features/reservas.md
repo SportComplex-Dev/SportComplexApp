@@ -1,7 +1,6 @@
-# TSK-BE-05 — Aforo máximo y generación de franjas horarias
+# Reservas
+> Estado: vigente 2026-10-15
 
-> Historia: HU-05 (RF-04) · Fase F1 · Backend
-> Dependencia: TSK-BE-04
 
 ## Alcance implementado
 
@@ -30,11 +29,11 @@ Los bloqueos vencidos se marcan `EXPIRADA` y liberan cupos dentro de la transacc
 
 ## Archivos y pruebas
 
-- Lógica de generación y actualización: `packages/db/src/repositories/services.ts`
-- Consulta de disponibilidad y bloqueo transaccional: `packages/db/src/repositories/bookings.ts`
+- Lógica de generación y actualización: `packages/db/src/repositories/catalog/services.ts`
+- Consulta de disponibilidad y bloqueo transaccional: `packages/db/src/repositories/reservations/bookings/`
 - API de disponibilidad y bloqueo: `apps/web/src/app/api/bookings/route.ts`
-- Validación de franjas: `packages/validation/src/service.schema.ts`
-- Validación de solicitudes de reserva: `packages/validation/src/booking.schema.ts`
+- Validación de franjas: `packages/validation/src/business/service.schema.ts`
+- Validación de solicitudes de reserva: `packages/validation/src/business/booking.schema.ts`
 - Pruebas del repositorio: `packages/db/test/services.repository.test.ts`
 - Pruebas de aforo concurrente y TTL: `packages/db/test/bookings.repository.test.ts`
 - Pruebas de validación: `packages/validation/test/service.schema.test.ts`
@@ -48,10 +47,10 @@ Verificación realizada:
 - `pnpm --filter web typecheck`
 
 El script estándar de pruebas de `@sportcomplex/validation` usa `node --experimental-strip-types`; en un entorno cuyo Node no tenga soporte para esa opción, ejecutar las pruebas con `tsx`. El typecheck de `web` puede reportar imports de rutas antiguas ausentes en `.next/types/validator.ts`; esos diagnósticos son independientes de esta implementación.
-# TSK-BE-06 — Validación de la ventana máxima de 15 días en servidor
+## TSK-BE-06 — Validación de la ventana máxima de 15 días en servidor
 
-> Historia: HU-06 (RF-05) · Fase F1 · Backend · SCRUM-101
-> Dependencia: TSK-BD-07
+> Ref histórica: HU-06 (RF-05) · Fase F1 · Backend · SCRUM-101
+> Ref histórica: TSK-BD-07
 
 ## Alcance implementado
 
@@ -70,19 +69,19 @@ Es validado de forma end-to-end en `packages/db/test/bookings.repository.test.ts
 
 ## Implementación y errores
 
-- `packages/db/src/repositories/bookings.ts`: `BookingError(OUTSIDE_BOOKING_WINDOW, 400)` con el mensaje contractual. Las franjas ya iniciadas conservan `SLOT_IN_PAST` (409) y las de fin ≤ inicio `VALIDATION_ERROR` (400).
-- `packages/db/src/repositories/availability.ts`: `SLOT_OUT_OF_WINDOW` cambia de 422 a **400** con el mismo mensaje contractual. El comentario JSDoc refleja el nuevo mapeo (`404/400/409`).
+- `packages/db/src/repositories/reservations/bookings/`: `BookingError(OUTSIDE_BOOKING_WINDOW, 400)` con el mensaje contractual. Las franjas ya iniciadas conservan `SLOT_IN_PAST` (409) y las de fin ≤ inicio `VALIDATION_ERROR` (400).
+- `packages/db/src/repositories/reservations/availability.ts`: `SLOT_OUT_OF_WINDOW` cambia de 422 a **400** con el mismo mensaje contractual. El comentario JSDoc refleja el nuevo mapeo (`404/400/409`).
 - `@sportcomplex/core` depende de `@sportcomplex/db` (no al revés), por lo que el mensaje contractual se declara también en `db` para mantener el validador accesible en ambos lados sin romper el grafo de dependencias.
 
 ## Compatibilidad con TSK-BE-09
 
-- No se modificó `CHECKOUT_TTL_MINUTES` (30 min de BE-09), `packages/db/src/repositories/checkout.ts` ni `apps/web/src/app/api/bookings/lock/route.ts`.
+- No se modificó `CHECKOUT_TTL_MINUTES` (30 min de BE-09), `packages/db/src/repositories/reservations/checkout.ts` ni `apps/web/src/app/api/bookings/lock/route.ts`.
 - Único conflicto de merge esperado: `packages/core/src/services/availability.ts` (import y línea `checkoutExpiresAt`); se resuelve conservando el TTL de 30 min de BE-09 y las nuevas funciones de ventana.
 
 ## Archivos y pruebas
 
 - Validador central: `packages/core/src/services/availability.ts`
-- Aplicación en repositorios: `packages/db/src/repositories/bookings.ts`, `packages/db/src/repositories/availability.ts`
+- Aplicación en repositorios: `packages/db/src/repositories/reservations/bookings/`, `packages/db/src/repositories/reservations/availability.ts`
 - Tests unitarios del dominio: `packages/core/src/services/booking-window.test.ts`
 - Test de aceptación: `packages/db/test/bookings.repository.test.ts`
 
@@ -93,9 +92,9 @@ Verificación realizada:
 - `pnpm --filter @sportcomplex/core typecheck`
 - `pnpm --filter @sportcomplex/db typecheck`
 - `pnpm --filter @sportcomplex/validation test` (sin cambios, se mantiene verde)
-# TSK-BE-09 — Bloqueo temporal de franja en el checkout
+## TSK-BE-09 — Bloqueo temporal de franja en el checkout
 
-> Historia: HU-09 (RF-08 / RN-04, revisada: TTL 30 min) · Fase F2 · Backend · SCRUM-113
+> Ref histórica: HU-09 (RF-08 / RN-04, revisada: TTL 30 min) · Fase F2 · Backend · SCRUM-113
 > Dependencias: TSK-BD-07 (reserva transaccional), TSK-BD-08 (job de expiración TTL)
 
 ## Alcance implementado (opción C aprobada)
@@ -131,7 +130,7 @@ webhook").
 **Punto de integración RF-09:** el webhook `checkout.session.completed` /
 `payment_intent.succeeded` localizará la reserva por
 `checkout.session.metadata.bookingId` y llamará a
-`attachPendingPagoToReserva` (`packages/db/src/repositories/checkout.ts`) con el
+`attachPendingPagoToReserva` (`packages/db/src/repositories/reservations/checkout.ts`) con el
 `pi_...` real — creando el `PAGO` idempotentemente (UNIQUE + captura de
 `P2002`) y ejecutando `PENDIENTE_PAGO → CONFIRMADA`.
 
@@ -175,9 +174,9 @@ ventana huérfana. Pendiente reflejar el cambio en SCRUM-113 y FE-09 en Jira
 ## Archivos y pruebas
 
 - Checkout Session (params puros + cliente inyectable): `packages/core/src/integrations/stripe.ts`
-- Compensación + helper de asociación (RF-09): `packages/db/src/repositories/checkout.ts`
-- TX1 (existente, reutilizado): `packages/db/src/repositories/bookings.ts` (`createBookingHold`)
-- Job de expiración (existente, sin cambios): `packages/db/src/repositories/expirations.ts` + `packages/db/src/jobs/expire.ts` + `apps/web/src/app/api/cron/expire-reservas/route.ts`
+- Compensación + helper de asociación (RF-09): `packages/db/src/repositories/reservations/checkout.ts`
+- TX1 (existente, reutilizado): `packages/db/src/repositories/reservations/bookings/` (`createBookingHold`)
+- Job de expiración (existente, sin cambios): `packages/db/src/repositories/reservations/expirations.ts` + `packages/db/src/jobs/expire.ts` + `apps/web/src/app/api/cron/expire-reservas/route.ts`
 - Endpoint exclusivo de checkout: `apps/web/src/app/api/bookings/lock/route.ts` (`POST /api/bookings` existente queda intacto)
 - Constantes de dominio: `packages/core/src/domain/index.ts` (`CHECKOUT_TTL_MINUTES = 30`), `packages/core/src/services/availability.ts`
 - Pruebas Stripe (puras, sin SDK): `packages/core/src/integrations/stripe.test.ts`
@@ -212,9 +211,9 @@ fallan con `amount_too_small` al crear la sesión.
 | Fecha fuera de la ventana de 15 días | 400 | `OUTSIDE_BOOKING_WINDOW` |
 | `STRIPE_SECRET_KEY` ausente | 503 | `STRIPE_NOT_CONFIGURED` |
 | Fallo creando la sesión de Stripe (hold compensado) | 502 | `CHECKOUT_STRIPE_FAILED` |
-# TSK-BE-12 — Regla de multirreserva concurrente
+## TSK-BE-12 — Regla de multirreserva concurrente
 
-> Historia: HU-12 (RF-11 / RN-07) · Fase F2 · Backend · SCRUM-120
+> Ref histórica: HU-12 (RF-11 / RN-07) · Fase F2 · Backend · SCRUM-120
 > Dependencias: `TSK-BE-09` (bloqueo temporal de franja)
 
 ## Regla implementada
@@ -232,7 +231,7 @@ categorías o instancias distintas, el solapamiento horario es válido.
 
 ## Dónde vive
 
-`packages/db/src/repositories/bookings.ts` → `assertNoTitularOverlap(tx, ...)`, invocada dentro
+`packages/db/src/repositories/reservations/bookings/` → `assertNoTitularOverlap(tx, ...)`, invocada dentro
 de la misma transacción de `createBookingHold` que hace el `SELECT ... FOR UPDATE` sobre
 `DISPONIBILIDAD`. No se crea ni se modifica ninguna migración: el filtro usa el índice
 existente `reserva(titular_id, estado)` y la relación `disponibilidad → franja_horaria`.
@@ -255,7 +254,7 @@ de API.
 
 ## Archivos y pruebas
 
-- Regla: `packages/db/src/repositories/bookings.ts` (`assertNoTitularOverlap`)
+- Regla: `packages/db/src/repositories/reservations/bookings/` (`assertNoTitularOverlap`)
 - Pruebas: `packages/db/test/bookings.repository.test.ts` (4 casos TSK-BE-12)
 - Soporte de mock: `packages/db/test/mock-prisma.ts` (filtro por relación `disponibilidad`,
   `estado: { in: [...] }` y `select` anidado en `reserva.findMany`)
@@ -274,7 +273,8 @@ activa por servicio y la prueba mediría unicidad de titular en lugar de aforo.
 Para completar el criterio de aceptación de frontend en **TSK-FE-12** (*"dos servicios distintos en la misma franja o diferente franja se pueden seleccionar y pagar juntos"*), se definió **TSK-BE-12b**:
 - **Alcance**: Soporte transaccional en backend para recibir lotes de reservas (`items: Array<BookingRequest>`).
 - **Transacción Atómica**: Bloqueo atómico (*all-or-nothing*) de todas las franjas seleccionadas, validando aforos, mantenimiento y la regla de no-solapamiento (`assertNoTitularOverlap`) entre los ítems y las reservas previas.
-- **Stripe Checkout Consolidado**: Creación de una única sesión de Stripe Checkout con múltiples `line_items` y registro de los identificadores de reserva en los metadatos para confirmación conjunta en el webhook RF-09.# TSK-BE-13 — Historial de reservas con cursor
+- **Stripe Checkout Consolidado**: Creación de una única sesión de Stripe Checkout con múltiples `line_items` y registro de los identificadores de reserva en los metadatos para confirmación conjunta en el webhook RF-09.
+## TSK-BE-13 — Historial de reservas con cursor
 
 ## Endpoint
 
@@ -294,7 +294,7 @@ El modelo `Reserva` declara el índice compuesto `@@index([titularId, estado, cr
 
 ---
 
-# TSK-FE-12: Selección Múltiple de Servicios en la Misma Franja
+## TSK-FE-12: Selección Múltiple de Servicios en la Misma Franja
 
 ## 1. Trazabilidad y Requerimientos de Negocio
 - **Identificador de Tarea:** `TSK-FE-12` (SCRUM Frontend / Monorepo `apps/web`)
@@ -365,10 +365,10 @@ El modelo `Reserva` declara el índice compuesto `@@index([titularId, estado, cr
 ---
 
 ## 4. Archivos Creados y Modificados
-- `apps/web/src/app/(customer)/portal/book/cart-utils.ts`: Lógica pura de carrito, cálculo de totales, generador de slots y constructores de payload.
-- `apps/web/src/app/(customer)/portal/book/components/service-selector.tsx`: Componente selector dinámico de franjas y catálogo.
-- `apps/web/src/app/(customer)/portal/book/components/cart.tsx`: Componente de carrito reactivo con badges y total acumulado.
-- `apps/web/src/app/(customer)/portal/book/components/booking-summary-modal.tsx`: Modal accesible de confirmación multi-servicio.
+- `packages/features/booking/src/services/cartUtils.ts`: Lógica pura de carrito, cálculo de totales, generador de slots y constructores de payload.
+- `packages/features/booking/src/components/catalog/ServiceSelector.tsx`: Componente selector dinámico de franjas y catálogo.
+- `packages/features/booking/src/components/cart/Cart.tsx`: Componente de carrito reactivo con badges y total acumulado.
+- `packages/features/booking/src/components/cart/BookingSummaryModal.tsx`: Modal accesible de confirmación multi-servicio.
 - `apps/web/src/app/(customer)/portal/book/page.tsx`: Coordinador del portal de reservas con integración completa de endpoints.
 - `apps/web/package.json`: Soporte para ejecutar archivos `.test.tsx` en el comando `test`.
 - `apps/web/src/app/(customer)/portal/book/__tests__/multi-service-cart.test.tsx`: Suite completa de pruebas automatizadas.
@@ -394,7 +394,7 @@ La suite en `multi-service-cart.test.tsx` verifica:
 
 ---
 
-# Reporte Técnico: Diagnóstico de Error en Selección Múltiple y Checkout Conjunto (TSK-FE-12)
+## Reporte Técnico: Diagnóstico de Error en Selección Múltiple y Checkout Conjunto (TSK-FE-12)
 
 **Fecha:** 11 de octubre de 2026  
 **Módulos Afectados:** Frontend (`apps/web`), Backend (`packages/db`), Base de Datos (`PostgreSQL/Prisma`)  
@@ -458,7 +458,7 @@ Respuesta HTTP 404: "Ítem 1 (servicio 1): la franja solicitada no existe."
 
 La arquitectura de conexión entre `TSK-FE-12` y `TSK-BE-12b` **es correcta y cumple los contratos de la plataforma**:
 
-- **Contrato de esquema Zod:** Cumple con `cartCheckoutSchema` en `packages/validation/src/booking.schema.ts` (fechas ISO UTC válidas, cantidad mínima de 2 ítems, tipos numéricos correctos).
+- **Contrato de esquema Zod:** Cumple con `cartCheckoutSchema` en `packages/validation/src/business/booking.schema.ts` (fechas ISO UTC válidas, cantidad mínima de 2 ítems, tipos numéricos correctos).
 - **Enrutamiento:** Conmuta automáticamente entre `POST /api/bookings/lock` (reserva única) y `POST /api/bookings/lock-cart` (carrito multi-servicio).
 - **Manejo de Stripe:** Espera y captura `data.checkout.url` para redirigir a la pasarela de pagos.
 - **Manejo de Errores:** Extrae e imprime strings legibles de error evitando fallas de renderizado en React.
@@ -483,3 +483,7 @@ Para solucionar el problema de raíz y dejar la funcionalidad operativa de extre
 
 ---
 *Reporte generado como artefacto de auditoría para el equipo de desarrollo SportComplex.*
+
+## Trazabilidad
+
+> Ref histórica: HU-05 (RF-04) · Fase F1 · dependencia: bloqueo temporal de franja y reserva transaccional

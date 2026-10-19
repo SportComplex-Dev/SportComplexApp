@@ -12,7 +12,7 @@ export function isSupabaseAdminConfigured(): boolean {
 
 /**
  * Cliente Supabase REST reutilizable. Si no se pasa `apiKey`, usa la service role.
- * Permite compartir la misma fábrica entre la Admin API y el middleware (que puede
+ * Permite compartir la misma fábrica entre la Admin API y el proxy (que puede
  * operar con la anon key cuando no hay service role disponible).
  */
 export function createSupabaseRestClient(apiKey?: string): SupabaseClient {
@@ -159,4 +159,16 @@ export async function confirmSupabaseUserEmail(email: string): Promise<boolean> 
   } catch {
     return false;
   }
+}
+
+/** Actualiza la credencial de Supabase si la cuenta local también tiene identidad Auth. */
+export async function updateSupabasePasswordByEmail(email: string, password: string): Promise<boolean> {
+  if (!isSupabaseAdminConfigured()) return false;
+  const result = await findSupabaseUserByEmail(email);
+  if (result.error) throw result.error;
+  const userId = result.data?.user?.id;
+  if (!userId) return false;
+  const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(userId, { password });
+  if (error) throw error;
+  return true;
 }

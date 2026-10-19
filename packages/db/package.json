@@ -3,19 +3,42 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./src/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma"
+  ],
   "scripts": {
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "db:studio": "prisma studio --schema prisma/schema.prisma",
     "db:seed": "prisma db seed",
-    "build": "tsc --noEmit",
+    "bootstrap:prod": "tsx prisma/bootstrap-prod.ts",
+    "build": "tsc --declaration --outDir dist",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "db:expire": "tsx src/jobs/expire.ts",
     "smoke:be09": "tsx scripts/smoke-be09.mts",
+    "backup": "tsx scripts/backup-prod.mts",
+    "storage:setup": "tsx scripts/setup-storage-assets.mts",
+    "assets:upload": "tsx scripts/upload-assets-storage.mts",
+    "purge:test-users": "tsx scripts/purge-test-users.ts",
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },
@@ -29,6 +52,7 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "@sportcomplex/config": "workspace:*",
     "@types/node": "22.13.10",
     "dotenv": "^18.0.5",

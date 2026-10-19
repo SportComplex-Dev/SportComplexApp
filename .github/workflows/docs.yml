@@ -1,0 +1,50 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages (dist/ para OpenAPI)
+        run: pnpm build
+      - name: Construir @sportcomplex/seed (forzar rebuild para exports catalogo)
+        run: pnpm --filter @sportcomplex/seed run build
+      - name: Generate OpenAPI documentation
+        run: pnpm docs:openapi
+
+      - name: Check documentation coverage
+        run: pnpm docs:check
+
+      - name: Upload API documentation artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: api-docs
+          path: docs/api/
+          retention-days: 30

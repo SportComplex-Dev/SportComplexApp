@@ -116,17 +116,20 @@ test.describe("Flujo 6: Validaciones Visuales, Diseño Responsivo y Tokens de Te
   test("6.6 Captura de evidencia visual de páginas principales", async ({ page }) => {
     // Captura landing page
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(500);
     await page.screenshot({ path: "test-results/visual-snapshots/landing-page.png", fullPage: false });
 
     // Captura catálogo de servicios
     await page.goto("/services");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(500);
     await page.screenshot({ path: "test-results/visual-snapshots/services-catalog.png", fullPage: false });
 
     // Captura formulario de inicio de sesión con estilos completos
     await page.goto("/login");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(500);
     await page.screenshot({ path: "test-results/visual-snapshots/login-screen.png", fullPage: false });
   });
 });

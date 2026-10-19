@@ -6,6 +6,21 @@ on:
   pull_request:
 
 jobs:
+  check-hotfix:
+    name: Enforcement hotfix/* o develop -> main
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar rama hotfix
+        run: |
+          head_ref="${{ github.head_ref }}"
+          if [[ "$head_ref" == hotfix/* || "$head_ref" == develop ]]; then
+            echo "Rama $head_ref permitida hacia main"
+            exit 0
+          fi
+          echo "::error::Solo ramas hotfix/* o develop pueden mergearse a main (recibido: $head_ref)"
+          exit 1
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -16,10 +31,19 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 12.6.0
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm --filter web build
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+      - name: Construir paquetes (dist/ para paths y OpenAPI)
+        run: pnpm build
+      - name: Construir @sportcomplex/seed (forzar rebuild para exports catalogo)
+        run: pnpm --filter @sportcomplex/seed run build
+      - name: Verificar limites arquitectonicos
+        run: pnpm verificar:limites
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Tests unitarios
+        run: pnpm test
       - name: Validar Docker Compose
         run: docker compose -f docker/docker-compose.yml config --quiet

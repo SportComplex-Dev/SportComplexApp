@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { GET } from "../route";
+import { GET } from "@/app/api/holidays/route";
 
 // TSK-FE-07: Pruebas del endpoint de festivos nacionales con Cache-Aside (SCRUM-105)
 

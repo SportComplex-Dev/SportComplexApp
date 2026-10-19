@@ -130,6 +130,7 @@ model Usuario {
   correo       String        @unique @db.VarChar(150)
   passwordHash String?       @map("password_hash") @db.VarChar(255)
   googleSub    String?       @unique @map("google_sub") @db.VarChar(100)
+  clienteStripeId String?    @unique @map("stripe_customer_id") @db.VarChar(100)
   estado       EstadoUsuario @default(PENDIENTE)
   deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
   creadoEn     DateTime      @default(now()) @map("creado_en") @db.Timestamptz
@@ -307,13 +308,15 @@ model Reserva {
 
 // 11. TICKET_QR
 model TicketQr {
-  id         String       @id @default(uuid()) @db.Uuid
-  reservaId  String       @unique @map("reserva_id") @db.Uuid
-  codigoUuid String       @unique @default(uuid()) @map("codigo_uuid") @db.Uuid
-  usadoPor   String?      @map("usado_por") @db.Uuid
-  estado     EstadoTicket
-  emitidoEn  DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
-  usadoEn    DateTime?    @map("usado_en") @db.Timestamptz
+  id            String       @id @default(uuid()) @db.Uuid
+  reservaId     String       @unique @map("reserva_id") @db.Uuid
+  codigoUuid    String       @unique @default(uuid()) @map("codigo_uuid") @db.Uuid
+  inicioValidez DateTime?    @map("inicio_validez") @db.Timestamptz
+  finValidez    DateTime?    @map("fin_validez") @db.Timestamptz
+  usadoPor      String?      @map("usado_por") @db.Uuid
+  estado        EstadoTicket
+  emitidoEn     DateTime     @default(now()) @map("emitido_en") @db.Timestamptz
+  usadoEn       DateTime?    @map("usado_en") @db.Timestamptz
 
   reserva        Reserva         @relation(fields: [reservaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   empleadoLector Usuario?        @relation("TicketUsadoPor", fields: [usadoPor], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -426,6 +429,7 @@ model Torneo {
   cuposOcupados     Int          @default(0) @map("cupos_ocupados")
   precioInscripcion Decimal      @default(0.00) @map("precio_inscripcion") @db.Decimal(12, 2)
   estado            EstadoTorneo @default(BORRADOR)
+  eliminadoEn       DateTime?    @map("deleted_at") @db.Timestamptz
   creadoEn          DateTime     @default(now()) @map("creado_en") @db.Timestamptz
   actualizadoEn     DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz
 
@@ -436,6 +440,7 @@ model Torneo {
   inscripciones InscripcionTorneo[]
 
   @@index([fechaInicio, estado])
+  @@index([eliminadoEn])
   @@map("torneo")
 }
 
@@ -467,6 +472,7 @@ model InscripcionTorneo {
   ticketUsadoEn    DateTime?               @map("ticket_usado_en") @db.Timestamptz
   ticketUsadoPor   String?                 @map("ticket_usado_por") @db.Uuid
   creadoEn         DateTime                @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn    DateTime                @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
 
   torneo   Torneo   @relation(fields: [torneoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Cascade)

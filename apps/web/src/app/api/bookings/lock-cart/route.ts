@@ -1,12 +1,19 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth/auth";
 import {
   BookingError,
   compensateFailedCheckout,
   createBookingHoldCart,
+  createContinuousBookingHoldCart,
 } from "@sportcomplex/db";
 import { createStripeCheckoutSession } from "@sportcomplex/core";
 import { cartCheckoutSchema } from "@sportcomplex/validation";
-import { fail, created } from "@/lib/api-response";
+import { fail, created, IdempotencyCache } from '@sportcomplex/shared/lib';
+
+export const lockCartIdempotencyCache = new IdempotencyCache(10_000);
+
+export function clearLockCartIdempotencyCache(): void {
+  lockCartIdempotencyCache.clear();
+}
 
 /**
  * SCRUM-163 / TSK-BE-12b — POST /api/bookings/lock-cart (HU-12 / RF-11 / RN-07).
@@ -54,6 +61,7 @@ export async function handleLockCart(
   request: Request,
   authenticate: () => Promise<LockCartSession> = auth,
   stripeCheckout: typeof createStripeCheckoutSession = createStripeCheckoutSession,
+  idempotencyCache: IdempotencyCache = lockCartIdempotencyCache,
 ) {
   try {
     const session = await authenticate();
@@ -64,68 +72,84 @@ export async function handleLockCart(
       return fail("FORBIDDEN", "Solo una cuenta de cliente activa puede reservar en línea.", 403);
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return fail("INVALID_PAYLOAD", "El cuerpo debe ser JSON válido.", 400);
-    }
+    const userId = session.user.id;
+    const headerKey =
+      request.headers.get("idempotency-key")?.trim() ||
+      request.headers.get("x-idempotency-key")?.trim();
+    const cacheKey = headerKey ? `lock-cart:${userId}:${headerKey}` : null;
 
-    const parsed = cartCheckoutSchema.safeParse(body);
-    if (!parsed.success) {
-      return fail("VALIDATION_ERROR", "Datos de carrito inválidos.", 400, parsed.error.flatten());
-    }
+    return await idempotencyCache.execute(
+      cacheKey,
+      async () => {
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return fail("INVALID_PAYLOAD", "El cuerpo debe ser JSON válido.", 400);
+        }
 
-    // TX1 — bloqueo transaccional atómico multi-ítem + RESERVAS PENDIENTE_PAGO con TTL 30 min.
-    const cartResult = await createBookingHoldCart({
-      items: parsed.data.items,
-      userId: session.user.id,
-    });
+        const parsed = cartCheckoutSchema.safeParse(body);
+        if (!parsed.success) {
+          return fail("VALIDATION_ERROR", "Datos de carrito inválidos.", 400, parsed.error.flatten());
+        }
 
-    // Stripe Checkout Session consolidada (fuera de cualquier transacción).
-    let checkout;
-    try {
-      checkout = await stripeCheckout({
-        reservaIds: cartResult.bookings.map((b) => b.id),
-        userId: session.user.id,
-        total: cartResult.total,
-        items: cartResult.bookings.map((b) => ({
-          reservaId: b.id,
-          servicioNombre: b.disponibilidad.servicio.nombre,
-          cantidadCupos: b.cantidadCupos,
-          subtotal: Number(b.total),
-        })),
-      });
-    } catch (err) {
-      // CA-4: Timeout o error de red incierto: NO compensar; confiar en TTL 30 min + job TSK-BD-08.
-      if (isUncertainStripeError(err)) {
-        console.warn("Stripe timeout o resultado incierto: no se liberan holds, delegando al TTL (CA-4):", err);
-        return fail("CHECKOUT_STRIPE_TIMEOUT", "Tiempo de espera agotado al conectar con Stripe. La reserva se mantiene temporalmente.", 504);
-      }
+        // TX1 — bloqueo transaccional atómico multi-ítem + RESERVAS PENDIENTE_PAGO con TTL 30 min.
+        const createHoldCart = parsed.data.mode === "continuous"
+          ? createContinuousBookingHoldCart
+          : createBookingHoldCart;
+        const cartResult = await createHoldCart({
+          items: parsed.data.items,
+          userId,
+        });
 
-      // CA-3: Error definitivo (card_declined, config, etc.): liberar TODOS los holds del carrito.
-      await Promise.all(
-        cartResult.bookings.map((b) =>
-          compensateFailedCheckout(b.id).catch((compErr) => {
-            console.error(`Fallo compensando reserva ${b.id} tras error de Stripe:`, compErr);
-          }),
-        ),
-      );
-      if (err instanceof Error && err.message.includes("STRIPE_NOT_CONFIGURED")) {
-        return fail("STRIPE_NOT_CONFIGURED", "La pasarela de pago no está configurada.", 503);
-      }
-      console.error("Error creando Checkout Session para carrito:", err);
-      return fail("CHECKOUT_STRIPE_FAILED", "No se pudo iniciar el pago con Stripe.", 502);
-    }
+        // Stripe Checkout Session consolidada (fuera de cualquier transacción).
+        let checkout;
+        try {
+          checkout = await stripeCheckout({
+            reservaIds: cartResult.bookings.map((b) => b.id),
+            userId,
+            total: cartResult.total,
+            // Comparte el mismo vencimiento de 30 minutos guardado en cada hold.
+            now: new Date(cartResult.expiresAt.getTime() - 30 * 60_000),
+            items: cartResult.bookings.map((b) => ({
+              reservaId: b.id,
+              servicioNombre: b.disponibilidad.servicio.nombre,
+              cantidadCupos: b.cantidadCupos,
+              subtotal: Number(b.total),
+            })),
+          });
+        } catch (err) {
+          // CA-4: Timeout o error de red incierto: NO compensar; confiar en TTL 30 min + job TSK-BD-08.
+          if (isUncertainStripeError(err)) {
+            console.warn("Stripe timeout o resultado incierto: no se liberan holds, delegando al TTL (CA-4):", err);
+            return fail("CHECKOUT_STRIPE_TIMEOUT", "Tiempo de espera agotado al conectar con Stripe. La reserva se mantiene temporalmente.", 504);
+          }
 
-    return created({
-      reservas: cartResult.bookings,
-      checkout: {
-        sessionId: checkout.sessionId,
-        url: checkout.url,
-        expiresAt: checkout.expiresAt,
+          // CA-3: Error definitivo (card_declined, config, etc.): liberar TODOS los holds del carrito.
+          await Promise.all(
+            cartResult.bookings.map((b) =>
+              compensateFailedCheckout(b.id).catch((compErr) => {
+                console.error(`Fallo compensando reserva ${b.id} tras error de Stripe:`, compErr);
+              }),
+            ),
+          );
+          if (err instanceof Error && err.message.includes("STRIPE_NOT_CONFIGURED")) {
+            return fail("STRIPE_NOT_CONFIGURED", "La pasarela de pago no está configurada.", 503);
+          }
+          console.error("Error creando Checkout Session para carrito:", err);
+          return fail("CHECKOUT_STRIPE_FAILED", "No se pudo iniciar el pago con Stripe.", 502);
+        }
+
+        return created({
+          reservas: cartResult.bookings,
+          checkout: {
+            sessionId: checkout.sessionId,
+            url: checkout.url,
+            expiresAt: checkout.expiresAt,
+          },
+        });
       },
-    });
+    );
   } catch (error: unknown) {
     if (error instanceof BookingError) {
       return fail(error.code, error.message, error.status);

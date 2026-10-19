@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { getSession, signIn } from 'next-auth/react'
-import { roleHome, type Role } from '@sportcomplex/core/src/domain/index'
+import { roleHome, type Role } from '@sportcomplex/domain'
 import { loginSchema } from '@sportcomplex/validation'
 import { Input } from '@sportcomplex/ui'
-import { Brand } from '@/components/brand'
-import { ThemeToggle, useThemeToggle } from '@/components/theme-toggle'
-import { ActionButton } from '@/components/action-button'
-import { GoogleMark } from '@/components/google-mark'
-import { useApp } from '@/components/app-provider'
+import { Brand } from '@/components/brand/brand'
+import { ThemeToggle, useThemeToggle } from '@/components/layout/theme-toggle'
+import { ActionButton } from '@sportcomplex/ui'
+import { GoogleMark } from '@/components/brand/google-mark'
+import { useOptionalApp } from '@/components/layout/app-provider'
 
 const supportedRoles: Role[] = ['Administrador', 'Empleado_Vendedor', 'Empleado_Lector', 'Cliente']
 
@@ -21,23 +21,39 @@ function getUserRole(role: unknown): Role {
 }
 
 function getSafeNextPath() {
-  const path = new URLSearchParams(window.location.search).get('next')
-  if (!path || !path.startsWith('/')) return null
-  return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+  const params = new URLSearchParams(window.location.search)
+  const path = params.get('redirect') || params.get('next')
+  if (!path || !path.startsWith('/') || path.startsWith('//')) return null
+  try {
+    return new URL(path, window.location.origin).origin === window.location.origin ? path : null
+  } catch {
+    return null
+  }
 }
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { login: syncLogin } = useApp()
+  let router: ReturnType<typeof useRouter> | null = null
+  try {
+    router = useRouter()
+  } catch {
+    // Fallback defensivo para entornos de prueba sin RouterContext
+  }
+  const app = useOptionalApp()
+  const syncLogin = app?.login
   const { dark, toggleTheme } = useThemeToggle()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(false)
+  const [registerHref, setRegisterHref] = useState('/register')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const safeRedirect = getSafeNextPath()
+    if (safeRedirect) {
+      setRegisterHref(`/register?redirect=${encodeURIComponent(safeRedirect)}`)
+    }
     const authError = params.get('error')
     if (
       authError === 'google' ||
@@ -59,8 +75,8 @@ export default function LoginPage() {
 
       if (session?.user) {
         const role = getUserRole(session.user.role)
-        router.replace(getSafeNextPath() ?? roleHome[role])
-        router.refresh()
+        router?.replace(getSafeNextPath() ?? roleHome[role])
+        router?.refresh()
         return
       }
 
@@ -112,8 +128,8 @@ export default function LoginPage() {
 
       if (!res.ok || !result?.success) {
         if (result?.error?.code === 'ACCOUNT_PENDING') {
-          router.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
-          router.refresh()
+          router?.push(`/verify?email=${encodeURIComponent(parsed.data.email)}`)
+          router?.refresh()
           return
         }
         setError(result?.error?.message || 'Correo o contraseña incorrectos.')
@@ -123,10 +139,10 @@ export default function LoginPage() {
       // 3. Redirección: ?next= si es una ruta interna segura; si no, el inicio del rol
       const role: Role = result.data.user.role
       if (result.data.user) {
-        syncLogin(result.data.user.email, result.data.user.name, result.data.user.role)
+        syncLogin?.(result.data.user.email, result.data.user.name, result.data.user.role)
       }
-      router.push(getSafeNextPath() ?? roleHome[role])
-      router.refresh()
+      router?.push(getSafeNextPath() ?? roleHome[role])
+      router?.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.')
     } finally {
@@ -195,7 +211,12 @@ export default function LoginPage() {
                 />
               </label>
               <label>
-                Contraseña
+                <div className="flex items-center justify-between">
+                  <span>Contraseña</span>
+                  <Link href="/forgot-password" className="forgot-link text-xs">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
                 <Input
                   type="password"
                   value={password}
@@ -221,7 +242,10 @@ export default function LoginPage() {
             </form>
 
             <div className="auth-switch">
-              ¿Aún no tienes cuenta? <Link href="/register">Regístrate</Link>
+              ¿Aún no tienes cuenta?{' '}
+              <Link href={registerHref}>
+                Regístrate
+              </Link>
             </div>
           </div>
         </div>

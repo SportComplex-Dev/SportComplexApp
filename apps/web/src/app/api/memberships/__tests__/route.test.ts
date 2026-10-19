@@ -4,14 +4,13 @@ import assert from "node:assert/strict";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 
-const { createMockPrisma } = await import(
-  "../../../../../../../packages/db/test/mock-prisma"
+const { createMockPrisma } = await import("@db-test/mock-prisma"
 );
 const mock = createMockPrisma();
 (globalThis as any).__scPrisma = mock;
 
-const membershipsRoute = await import("../route");
-const subscribeRoute = await import("../subscribe/route");
+const membershipsRoute = await import("@/app/api/memberships/route");
+const subscribeRoute = await import("@/app/api/memberships/subscribe/route");
 
 test("GET /api/memberships retorna lista de planes activos", async () => {
   const res = await membershipsRoute.GET();

@@ -1,8 +1,19 @@
-# TSK-BD-11 — Persistencia de membresías y catálogo de planes (HU-20 / RF-16)
+# Membresías
+> Estado: vigente 2026-10-16
 
-> Rama de trabajo: `feature/tsk-bd-11-persistencia-membresias-catalogo`
-> Responsable: Milton Ortega · 3 pts · Fase F0 · Depende de `TSK-BD-06`
-> Fecha de implementación: 2026-10-05
+## Segmentación administrativa
+
+`GET /api/admin/memberships` requiere rol Administrador y devuelve tres grupos de
+clientes: `active` (membresía `VIGENTE` con renovación al día o futura en fecha
+Bogotá), `none` (sin historial) y `expired` (historial compuesto únicamente por
+estados `VENCIDA` o `CANCELADA`). Los objetos exponen solo `id`, `nombre` y, para
+miembros activos, fechas de inicio y fin; no se incluyen correo ni credenciales.
+
+La BD llama al modelo `Membresia` y almacena `proximaRenovacion` como fecha de
+fin; el endpoint usa ese campo porque el esquema vigente no tiene `fecha_fin` ni
+una tabla `usuario_membresia`. `newMembersLast30Days` cuenta clientes cuya
+primera membresía inició en los últimos 30 días. `renewalPercentage` es el
+porcentaje de clientes con historial que registran dos o más membresías.
 
 ## 1. Qué se hizo y por qué
 
@@ -139,19 +150,19 @@ await prisma.planMembresia.create({
 ## 3. Comandos (desde la raíz del monorepo)
 
 ```bash
-# Regenerar el cliente tras tocar schema.prisma (obligatorio tras el @map nuevo)
+## Regenerar el cliente tras tocar schema.prisma (obligatorio tras el @map nuevo)
 pnpm --filter @sportcomplex/db db:generate
 
-# Aplicar migraciones pendientes (desarrollo local)
+## Aplicar migraciones pendientes (desarrollo local)
 pnpm --filter @sportcomplex/db db:migrate
 
-# Desplegar en CI / VPS (sin reset, solo aplica lo pendiente)
+## Desplegar en CI / VPS (sin reset, solo aplica lo pendiente)
 pnpm --filter @sportcomplex/db db:migrate:deploy
 
-# Seeds: roles + catálogo SEMANAL/MENSUAL/ANUAL con 30 %
+## Seeds: roles + catálogo SEMANAL/MENSUAL/ANUAL con 30 %
 pnpm --filter @sportcomplex/db db:seed
 
-# Verificación rápida del índice y el CHECK
+## Verificación rápida del índice y el CHECK
 psql "$DATABASE_URL" -c "SELECT indexname FROM pg_indexes WHERE indexname = 'membresia_usuario_vigente_uniq';"
 psql "$DATABASE_URL" -c "SELECT conname FROM pg_constraint WHERE conname = 'plan_membresia_descuento_pct_check';"
 ```
@@ -175,13 +186,12 @@ transacciones con `ROLLBACK` (sin datos residuales):
 
 ## Portal de membresías con descuento en reservas (PR #71, HU-20 / RF-16)
 
-> Estado: vigente
 
 ### Contexto
 El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el socio ve planes, su membresía activa y se suscribe. El 30 % de descuento en reservas es el beneficio central que hay que transparentar antes del cobro.
 
 ### Cómo funciona
-- **Planes**: `PlanMembresiaDTO` con periodicidad `SEMANAL | MENSUAL | ANUAL`, precio y `descuentoPct` (`apps/web/src/components/portal/membership-utils.ts`). La membresía activa del usuario es `VIGENTE | VENCIDA | CANCELADA`.
+- **Planes**: `PlanMembresiaDTO` con periodicidad `SEMANAL | MENSUAL | ANUAL`, precio y `descuentoPct` (`packages/features/portal/src/utils/membership-utils.ts`). La membresía activa del usuario es `VIGENTE | VENCIDA | CANCELADA`.
 - **Desglose** (`calcularDesglosePlan`): respeta la tarifa autoritativa de la DB/Stripe y muestra precio original, monto de descuento y precio final. El plan `MENSUAL` se marca `popular`; el `ANUAL` muestra ahorro ("hasta 2 meses vs mensualidad").
 - **Suscripción**: `iniciarSuscripcionStripe(planId)` hace `POST /api/memberships/subscribe` y redirige al Checkout de Stripe (`successUrl`/`cancelUrl` de vuelta al portal con `?success=true&plan_id=`). Respuestas de error tipadas (`UNAUTHORIZED`, `SUBSCRIBE_ERROR`, `NETWORK_ERROR`).
 - **Beneficios por periodicidad** (`BENEFICIOS_POR_PERIODICIDAD`): acceso a gimnasio/piscina/zona húmeda según plan, pases de invitado, QR para torniquetes, reserva preferente (48 h–15 días según plan).
@@ -191,4 +201,53 @@ El portal (`apps/web/src/app/(customer)/portal/membership/page.tsx`) es donde el
 - `descuentoPct` cae a `30` por defecto si la DB trae nulo: el beneficio nunca desaparece por dato faltante.
 
 ### Testing
-`apps/web/src/components/portal/__tests__/membership-utils.test.ts` (cálculo de desglose, formato, flujos de suscripción y errores).
+`packages/features/portal/src/utils/__tests__/membership-utils.test.ts` (cálculo de desglose, formato, flujos de suscripción y errores).
+
+---
+
+## Consola de Membresías en Administración (TSK-FE-29 / HU-35)
+
+### Contexto
+La administración requiere auditar y monitorear los ingresos recurrentes y el estado de la base de socios del complejo deportivo desde una interfaz dedicada en `/admin/memberships`.
+
+### Cómo funciona
+- **Componente**: `AdminMembershipsView` (`packages/features/admin/src/dashboard/AdminMembershipsView.tsx` y re-exportado en `components/dashboard`).
+- **Vista Web**: `apps/web/src/app/(admin)/admin/memberships/page.tsx` conectado al contrato `GET /api/admin/memberships`.
+- **Pestañas Interactivas (Segmentación en Memoria)**:
+  - **Activas**: Clientes con membresía vigente (`estado = VIGENTE` y `proximaRenovacion >= now`). Muestra contador reactivo y fechas de inicio/renovación.
+  - **Sin Membresía**: Clientes registrados en el sistema sin registros en la tabla de membresías (público potencial).
+  - **Histórico**: Clientes cuyo historial está compuesto por membresías vencidas o canceladas.
+- **KPIs de Retención y Fidelización**:
+  - `Socios Activos`: Conteo total de clientes al día con membresía.
+  - `Tasa de Renovación`: Porcentaje histórico de clientes que han renovado o tenido más de una membresía.
+  - `Nuevos del Mes`: Altas registradas en los últimos 30 días.
+  - `Sin Membresía`: Conteo de clientes libres/ocasionales.
+- **Búsqueda en Tiempo Real**: Input de filtrado instantáneo en memoria por nombre del cliente o identificador (ID).
+- **Zona Horaria y Resiliencia**: Manejo de fechas normalizado a `America/Bogota` (COT) y manejo de estados de carga y error con botón de refresco interactivo.
+
+### Verificación y Tests
+- `packages/features/admin/src/dashboard/admin-memberships-view.test.ts` (16 pruebas unitarias aprobadas).
+- `apps/web/src/app/(admin)/admin/memberships/__tests__/memberships-page.test.tsx` (Pruebas de render y accesibilidad).
+- `apps/web/src/app/(admin)/admin/__tests__/layout.test.tsx` (Suite automatizada de navegación canónica y segmentación de socios).
+
+---
+
+## Certificación de Navegación y Segmentación Canónica (TSK-QA-02 / HU-35 / RF-16)
+
+### Contexto
+Enlace canónico en el menú administrativo (`AdminLayout` y drawer móvil) y certificación mediante suite automatizada del aislamiento estricto de estados de membresía y distribución de los tres segmentos de socios.
+
+### Implementación
+- **Enlace Canónico**: `apps/web/src/app/(admin)/admin/layout.tsx` y `apps/web/src/components/layout/admin-mobile-drawer.tsx` vinculan canónicamente al ítem "Membresías" mediante `<Link href="/admin/memberships">`.
+- **Detección Activa**: Condición `href !== '/admin' && pathname.startsWith(href)` para preservar el resaltado visual accesible conforme a tokens AKROS Club.
+- **Navegación SPA**: Enrutamiento client-side sin recargas completas garantizando código de respuesta HTTP 200.
+
+### Matriz de Casos de Prueba (layout.test.tsx)
+1. **Renderizado y Navegación**: Valida que la navegación administrativa expone el enlace `href="/admin/memberships"`, sin rutas huérfanas ni enlaces rotos.
+2. **Aislamiento de Estados**: Verifica que ningún socio en estado `VENCIDA` o `CANCELADA` sea renderizado bajo ninguna circunstancia dentro de la pestaña de socios activos / vigentes.
+3. **Distribución en 3 Pestañas**: Comprueba la integridad y consistencia de los datos en los tres segmentos (`Activas`, `Sin Membresía`, `Histórico/Vencidas`) con sus respectivos badges y contadores.
+
+## Trazabilidad
+
+> Ref histórica: HU-20 / HU-35 (RF-16) · tareas `TSK-BE-28`, `TSK-FE-29` y `TSK-QA-02` · rama `test/tsk-qa-02-04-memberships-and-multislot-e2e` · Fase F3
+

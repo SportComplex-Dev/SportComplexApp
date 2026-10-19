@@ -1,13 +1,13 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 import { BookingError, createBookingHold, getBookableAvailability } from "@sportcomplex/db";
 import { availabilityQuerySchema, bookingRequestSchema } from "@sportcomplex/validation";
-import { created, fail, ok } from "@/lib/api-response";
+import { created, fail, ok } from '@sportcomplex/shared/lib';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parsed = availabilityQuerySchema.safeParse({
-    serviceId: searchParams.get("serviceId"),
-    date: searchParams.get("date"),
+    serviceId: searchParams.get("serviceId") || searchParams.get("servicioId"),
+    date: searchParams.get("date") || searchParams.get("fecha"),
   });
   if (!parsed.success) {
     return fail("VALIDATION_ERROR", "Servicio o fecha inválidos.", 400, parsed.error.flatten());

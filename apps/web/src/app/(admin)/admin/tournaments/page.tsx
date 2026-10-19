@@ -14,50 +14,19 @@ import {
   Loader2,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeading } from '@/components/page-heading'
-import { ActionButton } from '@/components/action-button'
-import { ConfirmDialog } from '@/components/modal'
-import { useApp } from '@/components/app-provider'
+import { PageHeading } from '@/components/layout/page-heading'
+import { ActionButton } from '@sportcomplex/ui'
+import { ConfirmDialog } from '@sportcomplex/ui'
+import { useApp } from '@/components/layout/app-provider'
 import {
   TournamentStatusBadge,
-  type EstadoTorneoTipo,
-} from '@/components/admin/tournaments/tournament-status-badge'
-import { TournamentFormModal } from '@/components/admin/tournaments/tournament-form-modal'
-import { TournamentDetailModal } from '@/components/admin/tournaments/tournament-detail-modal'
+  TournamentFormModal,
+  TournamentDetailModal,
+  calculateTournamentKPIs,
+  type TorneoAdminItem,
+} from '@sportcomplex/features-tournament'
 
-export interface TorneoAdminItem {
-  id: string
-  titulo: string
-  descripcion: string | null
-  categoriaId: number
-  categoria?: { id: number; nombre: string }
-  nivel: string
-  fechaInicio: string
-  fechaFin: string
-  cuposTotales: number
-  cuposOcupados: number
-  precioInscripcion: number | string
-  estado: EstadoTorneoTipo
-  bloqueos?: Array<{
-    id: number
-    servicioId: number
-    horaInicio: string
-    horaFin: string
-    servicio?: { nombre: string }
-  }>
-  _count?: { inscripciones: number }
-}
-
-export function calculateTournamentKPIs(tournamentsList: TorneoAdminItem[]) {
-  const total = tournamentsList.length
-  const abiertas = tournamentsList.filter((t) => t.estado === 'INSCRIPCIONES_ABIERTAS').length
-  const enCurso = tournamentsList.filter((t) => t.estado === 'EN_CURSO').length
-  const inscripciones = tournamentsList.reduce(
-    (acc, t) => acc + (t.cuposOcupados ?? t._count?.inscripciones ?? 0),
-    0
-  )
-  return { total, abiertas, enCurso, inscripciones }
-}
+export { calculateTournamentKPIs, type TorneoAdminItem }
 
 const PAGE_SIZE = 10
 

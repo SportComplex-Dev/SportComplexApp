@@ -1,10 +1,10 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import {
   analyticsQuerySchema,
   normalizeAnalyticsQuery,
 } from "@sportcomplex/validation";
 import { getAnalytics } from "@sportcomplex/db";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 /**
  * GET /api/admin/analytics

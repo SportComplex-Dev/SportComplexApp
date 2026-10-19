@@ -47,6 +47,7 @@ pnpm dev
 ```
 
 Variables: copiar `apps/web/.env.example` a `apps/web/.env.local`.
+Guía paso a paso (de dónde obtener cada valor, reset de admin, troubleshooting): `docs/infra/env-setup.md`.
 Infra local (n8n) sin dominios: ver [`docs/infra/local-dev.md`](./docs/infra/local-dev.md).
 
 ## Convenciones
@@ -59,9 +60,17 @@ Infra local (n8n) sin dominios: ver [`docs/infra/local-dev.md`](./docs/infra/loc
 
 ## Despliegue VPS
 
-* Producción en VPS compartido, edge único con Caddy, imágenes en GHCR y deploy por GitHub Actions en `main`.
+* Producción en VPS dedicado, edge único con Caddy, imágenes en GHCR y deploy por GitHub Actions en `main`.
 * Detalles:
   * Arquitectura de contenedores: [`docs/infra/docker.md`](./docs/infra/docker.md)
   * Proxy y dominios: [`docs/infra/caddy.md`](./docs/infra/caddy.md)
   * Pipeline (CI/CD, secrets, `.env` vía secrets): [`docs/infra/ci-cd.md`](./docs/infra/ci-cd.md)
   * Aprovisionamiento del VPS: [`docs/infra/vps-provisioning.md`](./docs/infra/vps-provisioning.md)
+
+## Entornos Supabase
+
+- `prod` (ref `ouemmmwpygmizyvtcpuc`) y `develop` (ref `phyesjwtzrmrcvmtajay`, heredado con los datos históricos): credenciales solo en secrets del environment `production` / `.env` local, nunca en git.
+- Backup cifrado: `pg_dump -Fc` + `openssl enc -aes-256-cbc -pbkdf2 -iter 100000`; custodiar el `.enc` y destruir el plano.
+- Ventana domingos 02:00–04:00 COT; purga de usuarios de prueba con scripts `purge-test-users` (dry-run primero).
+- Bootstrap prod idempotente con `SEED_ADMIN_PASSWORD` (soporta `--rotate-password`).
+- Detalle completo: [docs/infra/supabase-envs.md](./docs/infra/supabase-envs.md).

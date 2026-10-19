@@ -1,0 +1,27 @@
+{
+  "extends": "./packages/config/typescript/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@sportcomplex/ui": ["packages/ui/src/index.ts"],
+      "@sportcomplex/shared": ["packages/shared/src/index.ts"],
+      "@sportcomplex/feature-booking": ["packages/features/booking/src/index.ts"],
+      "@sportcomplex/feature-tournament": ["packages/features/tournament/src/index.ts"],
+      "@sportcomplex/feature-pos": ["packages/features/pos/src/index.ts"],
+      "@sportcomplex/feature-scanner": ["packages/features/scanner/src/index.ts"],
+      "@sportcomplex/feature-portal": ["packages/features/portal/src/index.ts"],
+      "@sportcomplex/feature-admin": ["packages/features/admin/src/index.ts"],
+      "@sportcomplex/domain": ["packages/domain/src/index.ts"],
+      "@sportcomplex/seed": ["packages/seed/src/index.ts"],
+      "@sportcomplex/application": ["packages/application/src/index.ts"],
+      "@sportcomplex/security": ["packages/security/src/index.ts"],
+      "@sportcomplex/db": ["packages/db/src/index.ts"],
+      "@sportcomplex/validation": ["packages/validation/src/index.ts"],
+      "@sportcomplex/core": ["packages/core/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "packages/features/*/src/**/*"
+  ]
+}

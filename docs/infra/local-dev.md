@@ -1,4 +1,5 @@
-## Goal Description
+# Desarrollo local
+> Estado: vigente 2026-10-15
 Guía interna para **levantar la infraestructura en entorno local** (Development). En nuestras máquinas no usamos Caddy ni dominios reales (`akros.lat`), sino que exponemos los puertos directamente en `localhost`. Storage siempre contra Supabase (proyecto dev), nunca MinIO local.
 
 ## 1. Archivo Docker Compose para Desarrollo
@@ -28,7 +29,8 @@ services:
 ## 2. Preparación Local
 ```bash
 mkdir -p ./docker/dev_data/n8n
-# Si estamos en Linux/Mac:
+# Desarrollo local
+> Estado: vigente 2026-10-15
 sudo chown -R 1000:1000 ./docker/dev_data/n8n
 ```
 

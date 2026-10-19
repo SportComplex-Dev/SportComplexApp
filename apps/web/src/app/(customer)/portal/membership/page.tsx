@@ -21,17 +21,18 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { useApp } from '@/components/app-provider'
+import { useApp } from '@/components/layout/app-provider'
 import {
   calcularDesglosePlan,
+  evaluateMembershipPurchaseAccess,
   iniciarSuscripcionStripe,
   type MembresiaActivaDTO,
   type PlanDisplayBreakdown,
   type PlanMembresiaDTO,
-} from '@/components/portal/membership-utils'
+} from '@sportcomplex/features-portal'
 
 function MembershipPortalContent() {
-  const { notify } = useApp()
+  const { session, ready, notify } = useApp()
   const searchParams = useSearchParams()
 
   const [loading, setLoading] = useState(true)
@@ -43,6 +44,7 @@ function MembershipPortalContent() {
 
   const isSuccessUrl = searchParams.get('success') === 'true'
   const isCancelledUrl = searchParams.get('cancelled') === 'true'
+  const planIdParam = searchParams.get('planId') || searchParams.get('plan_id')
 
   // Cargar catálogo de planes y membresía del usuario desde GET /api/memberships
   const fetchMembershipData = async () => {
@@ -76,6 +78,21 @@ function MembershipPortalContent() {
     fetchMembershipData()
   }, [])
 
+  // Auto-seleccionar el plan si viene en la query string tras login o redirección
+  useEffect(() => {
+    if (!planIdParam || loading || planes.length === 0) return
+    const parsedId = Number(planIdParam)
+    const matchedPlan = planes.find(
+      (p) =>
+        p.id === parsedId ||
+        p.periodicidad.toLowerCase() === planIdParam.toLowerCase() ||
+        p.nombre.toLowerCase().includes(planIdParam.toLowerCase())
+    )
+    if (matchedPlan && (!membresiaActiva || membresiaActiva.estado !== 'VIGENTE')) {
+      setSelectedPlanForModal(matchedPlan)
+    }
+  }, [planIdParam, loading, planes, membresiaActiva])
+
   // Notificar al usuario tras retornar de Stripe Checkout y sincronizar estado si el webhook tarda
   useEffect(() => {
     if (isSuccessUrl) {
@@ -106,11 +123,56 @@ function MembershipPortalContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedPlanForModal])
 
+  // Validar sesión y rol antes de permitir comprar / iniciar modal de suscripción
+  const handleSelectPlan = (plan: PlanDisplayBreakdown) => {
+    const access = evaluateMembershipPurchaseAccess({
+      session,
+      planId: plan.id,
+      hasVigenteMembership: membresiaActiva?.estado === 'VIGENTE',
+    })
+
+    if (!access.allowed) {
+      if (access.status === 'UNAUTHENTICATED' && access.redirectUrl) {
+        notify(access.message || 'Inicia sesión o regístrate para adquirir tu plan de membresía.', 'info')
+        window.location.href = access.redirectUrl
+        return
+      }
+      if (access.status === 'FORBIDDEN_ROLE') {
+        notify(access.message || 'La adquisición de membresías está habilitada exclusivamente para clientes.', 'error')
+        return
+      }
+      if (access.status === 'ACTIVE_MEMBERSHIP') {
+        notify(access.message || 'Ya posees una membresía VIGENTE en el club.', 'info')
+        return
+      }
+    }
+
+    // Cliente autenticado: avanza fluidamente al checkout
+    setSelectedPlanForModal(plan)
+  }
+
   // Iniciar el flujo de checkout recurrente en Stripe
   const handleSubscribe = async (plan: PlanDisplayBreakdown) => {
-    if (membresiaActiva?.estado === 'VIGENTE') {
-      notify('Ya posees una membresía VIGENTE en el club.', 'info')
-      return
+    const access = evaluateMembershipPurchaseAccess({
+      session,
+      planId: plan.id,
+      hasVigenteMembership: membresiaActiva?.estado === 'VIGENTE',
+    })
+
+    if (!access.allowed) {
+      if (access.status === 'UNAUTHENTICATED' && access.redirectUrl) {
+        notify(access.message || 'Inicia sesión para suscribirte a una membresía.', 'info')
+        window.location.href = access.redirectUrl
+        return
+      }
+      if (access.status === 'FORBIDDEN_ROLE') {
+        notify(access.message || 'La adquisición de membresías está habilitada exclusivamente para clientes.', 'error')
+        return
+      }
+      if (access.status === 'ACTIVE_MEMBERSHIP') {
+        notify(access.message || 'Ya posees una membresía VIGENTE en el club.', 'info')
+        return
+      }
     }
 
     setSubscribingPlanId(plan.id)
@@ -123,7 +185,8 @@ function MembershipPortalContent() {
       setSubscribingPlanId(null)
       if (result.errorCode === 'UNAUTHORIZED') {
         notify('Inicia sesión para suscribirte a una membresía.', 'info')
-        window.location.href = `/login?redirect=${encodeURIComponent('/portal/membership')}`
+        const targetUrl = `/portal/membership?planId=${plan.id}`
+        window.location.href = `/login?redirect=${encodeURIComponent(targetUrl)}`
       } else if (result.errorCode === 'DUPLICATE_ACTIVE_MEMBERSHIP') {
         notify('Ya cuentas con una membresía activa vigente.', 'error')
         fetchMembershipData()
@@ -156,6 +219,25 @@ function MembershipPortalContent() {
             </p>
           </div>
         </div>
+
+        {/* Banner informativo para visitantes públicos no autenticados */}
+        {ready && !session && (
+          <div className="mb-6 p-4 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 text-[var(--ink)]">
+              <Info size={18} className="text-[#c9ef75] shrink-0" />
+              <span>
+                <strong>Consulta pública habilitada:</strong> Puedes explorar libremente todos los beneficios. Al dar clic en
+                «Suscribirme», podrás iniciar sesión o registrarte y continuaremos tu compra de inmediato.
+              </span>
+            </div>
+            <Link
+              href={`/login?redirect=${encodeURIComponent('/portal/membership')}`}
+              className="inline-flex items-center gap-1 font-bold text-[#557b53] dark:text-[#c9ef75] hover:underline whitespace-nowrap"
+            >
+              ¿Ya eres socio? Iniciar sesión <ArrowRight size={13} />
+            </Link>
+          </div>
+        )}
 
         {/* Banner de retorno de Stripe */}
         {isSuccessUrl && (
@@ -336,7 +418,8 @@ function MembershipPortalContent() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setSelectedPlanForModal(plan)}
+                          data-testid="subscribe-plan-btn"
+                          onClick={() => handleSelectPlan(plan)}
                           disabled={isSubscribingThis}
                           className={
                             plan.popular
@@ -428,8 +511,17 @@ function MembershipPortalContent() {
             <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--line)] text-[11px] text-[var(--subtle)] mb-5 flex items-start gap-2">
               <Info size={15} className="text-[#c9ef75] shrink-0 mt-0.5" />
               <span>
-                Al continuar serás transferido a Stripe Checkout para registrar tu método de pago con total seguridad.
-                La tarifa de renovación periódica es de {selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}.
+                {!session ? (
+                  <>
+                    Inicia sesión o regístrate para formalizar tu suscripción. Al continuar, preservaremos tu selección
+                    del {selectedPlanForModal.nombre} ({selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}).
+                  </>
+                ) : (
+                  <>
+                    Al continuar serás transferido a Stripe Checkout para registrar tu método de pago con total seguridad.
+                    La tarifa de renovación periódica es de {selectedPlanForModal.precioFormateado} por {selectedPlanForModal.periodicidadLabel.toLowerCase()}.
+                  </>
+                )}
               </span>
             </div>
 
@@ -450,7 +542,15 @@ function MembershipPortalContent() {
                   handleSubscribe(plan)
                 }}
               >
-                <CreditCard size={14} /> Proceder a Stripe
+                {!session ? (
+                  <>
+                    Iniciar sesión para continuar <ArrowRight size={13} />
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={14} /> Proceder a Stripe
+                  </>
+                )}
               </button>
             </div>
           </div>

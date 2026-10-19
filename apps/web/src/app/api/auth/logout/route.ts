@@ -1,4 +1,4 @@
-import { ok } from '@/lib/api-response'
+import { ok } from '@sportcomplex/shared/lib'
 import { createSupabaseServerClient, isSupabaseAuthConfigured } from '@/lib/supabase/server'
 
 const COOKIES_TO_EXPIRE = [

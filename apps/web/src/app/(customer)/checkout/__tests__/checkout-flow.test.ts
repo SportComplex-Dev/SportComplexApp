@@ -4,7 +4,7 @@ import {
   pollPaymentConfirmation,
   resolvePaymentOutcome,
   type VerificationState,
-} from "../checkout-flow";
+} from "@sportcomplex/features-booking";
 
 test("pollPaymentConfirmation: retorna confirmed=false y bookingCode=null si reservationId es nulo", async () => {
   const result = await pollPaymentConfirmation({

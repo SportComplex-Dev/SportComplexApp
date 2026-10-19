@@ -1,0 +1,29 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "SportComplex API Reference",
+  "entryPoints": [
+    "packages/ui/src/index.ts",
+    "packages/shared/src/index.ts",
+    "packages/features/booking/src/index.ts",
+    "packages/features/tournament/src/index.ts",
+    "packages/features/pos/src/index.ts",
+    "packages/features/scanner/src/index.ts",
+    "packages/features/portal/src/index.ts",
+    "packages/features/admin/src/index.ts",
+    "packages/domain/src/index.ts",
+    "packages/seed/src/index.ts",
+    "packages/application/src/index.ts",
+    "packages/security/src/index.ts",
+    "packages/db/src/index.ts",
+    "packages/validation/src/index.ts",
+    "packages/core/src/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "out": "docs/api",
+  "tsconfig": "tsconfig.typedoc.json",
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "categorizeByGroup": true,
+  "skipErrorChecking": true
+}

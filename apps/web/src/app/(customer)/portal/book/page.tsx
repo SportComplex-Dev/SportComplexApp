@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   categoryBySlug,
@@ -9,34 +9,94 @@ import {
 } from '@sportcomplex/core';
 import {
   buildLockCartPayload,
+  buildContinuousLockCartPayload,
   buildSingleLockPayload,
+  calculateMultiSlotPricing,
   generateDynamicTimeSlots,
   getBogotaDateAfter,
   getNumericServiceId,
   resolveCheckoutRedirection,
   validateCanAddToCart,
+  ServiceSelector,
+  Cart,
+  BookingSummaryModal,
+  usePublicCatalog,
   type CartItem,
   type DynamicTimeSlot,
-} from './cart-utils';
-import { ServiceSelector } from './components/service-selector';
-import { Cart } from './components/cart';
-import { BookingSummaryModal } from './components/booking-summary-modal';
+} from '@sportcomplex/features-booking';
 
 export default function BookPage() {
   const router = useRouter();
+  const { catalog } = usePublicCatalog();
   const [date, setDate] = useState(() => getBogotaDateAfter(1));
   const [timeSlots, setTimeSlots] = useState<DynamicTimeSlot[]>(() =>
     generateDynamicTimeSlots(getBogotaDateAfter(1)),
   );
   const [selectedSlot, setSelectedSlot] = useState<DynamicTimeSlot | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<DynamicTimeSlot[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<CategorySlug | 'todos'>('todos');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [message, setMessage] = useState('');
+  const [isMember, setIsMember] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
 
+  // Consultar membresía activa del usuario autenticado para aplicar el 30% de descuento (RN-08 / TSK-FE-31)
+  useEffect(() => {
+    let active = true;
+    fetch('/api/memberships')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { success?: boolean; data?: { membresiaActiva?: { estado?: string } | null } }) => {
+        if (!active || !data?.success || !data?.data) return;
+        const activeMembership = data.data.membresiaActiva;
+        if (activeMembership && activeMembership.estado === 'VIGENTE') {
+          setIsMember(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const cartServiceIds = useMemo(() => cart.map((item) => item.serviceId), [cart]);
+
+  // Servicio activo para alimentar el precio base y nombre en el selector continuo de franjas
+  const activeService = useMemo(() => {
+    if (cart.length > 0) {
+      const first = cart[0];
+      const found = catalog.find((s) => s.id === first?.serviceId);
+      return {
+        name: first?.serviceName ?? found?.name,
+        price: first?.price ?? found?.price ?? 48000,
+      };
+    }
+    if (selectedCategory !== 'todos') {
+      const catService = catalog.find(
+        (s) => s.category === selectedCategory && s.status === 'Disponible',
+      );
+      if (catService) return { name: catService.name, price: catService.price };
+    }
+    const defaultService = catalog.find((s) => s.status === 'Disponible');
+    return defaultService
+      ? { name: defaultService.name, price: defaultService.price }
+      : { name: undefined, price: 48000 };
+  }, [cart, selectedCategory, catalog]);
+
+  const basePricePerHour = activeService.price;
+
+  const displayCart = useMemo(() => {
+    if (cart.length !== 1 || selectedSlots.length < 2) return cart;
+    const item = cart[0]!;
+    const lastSlot = [...selectedSlots].sort((a, b) => a.startTime.localeCompare(b.startTime)).at(-1);
+    if (!lastSlot) return cart;
+    return [{
+      ...item,
+      endTime: lastSlot.endTime,
+      price: calculateMultiSlotPricing(basePricePerHour, selectedSlots.length, isMember).total,
+    }];
+  }, [cart, selectedSlots, basePricePerHour, isMember]);
 
   function handleDateChange(newDate: string) {
     setDate(newDate);
@@ -54,7 +114,27 @@ export default function BookPage() {
     setMessage('');
   }
 
-  function handleSelectSlot(slot: DynamicTimeSlot) {
+  function handleSlotsChange(slots: DynamicTimeSlot[]) {
+    if (cart.length > 0 && selectedSlots.length > 0) {
+      const sameSelection = slots.length === selectedSlots.length &&
+        slots.every((slot, index) => slot.startTime === selectedSlots[index]?.startTime);
+      if (!sameSelection) {
+        setMessage('Vacía el carrito antes de cambiar las franjas seleccionadas.');
+        return;
+      }
+    }
+    setSelectedSlots(slots);
+    setSelectedSlot(slots.length > 0 && slots[0] ? slots[0] : null);
+    setMessage('');
+  }
+
+  function handleSelectSlot(slot: DynamicTimeSlot | null) {
+    if (!slot) {
+      setSelectedSlot(null);
+      setSelectedSlots([]);
+      setMessage('');
+      return;
+    }
     if (cart.length > 0 && selectedSlot?.startTime !== slot.startTime) {
       setMessage(
         'Vacía el carrito antes de cambiar de horario para mantener los servicios en la misma franja.',
@@ -72,6 +152,11 @@ export default function BookPage() {
     }
 
     const numericId = getNumericServiceId(service.id);
+
+    if (selectedSlots.length > 1 && cart.length > 0) {
+      setMessage('Una reserva de varias horas continuas solo puede incluir un servicio.');
+      return;
+    }
 
     const validation = validateCanAddToCart(cart, {
       serviceId: service.id,
@@ -110,6 +195,7 @@ export default function BookPage() {
   function handleClearCart() {
     setCart([]);
     setSelectedSlot(null);
+    setSelectedSlots([]);
     setMessage('');
     setCheckoutError('');
   }
@@ -130,12 +216,17 @@ export default function BookPage() {
     setCheckoutError('');
 
     try {
-      const isMulti = cart.length >= 2;
-      const endpoint = isMulti ? '/api/bookings/lock-cart' : '/api/bookings/lock';
+      const isContinuous = cart.length === 1 && selectedSlots.length >= 2;
+      const isMultiService = cart.length >= 2;
+      const endpoint = isContinuous || isMultiService
+        ? '/api/bookings/lock-cart'
+        : '/api/bookings/lock';
 
-      const payload = isMulti
-        ? buildLockCartPayload(cart, date)
-        : buildSingleLockPayload(cart[0], date);
+      const payload = isContinuous
+        ? buildContinuousLockCartPayload(cart[0]!.numericServiceId, selectedSlots, date)
+        : isMultiService
+          ? buildLockCartPayload(cart, date)
+          : buildSingleLockPayload(cart[0]!, date);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -226,7 +317,7 @@ export default function BookPage() {
               Elige tu espacio. <span className="text-[#c9ef75]">Arma tu plan.</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-5 text-white/75">
-              Selecciona una fecha y franja; después combina dos o más servicios distintos que quieras en el mismo horario y págalos juntos.
+              Selecciona una franja o varias horas consecutivas para un servicio. También puedes combinar servicios distintos en una misma franja.
             </p>
           </div>
         </header>
@@ -239,15 +330,21 @@ export default function BookPage() {
             timeSlots={timeSlots}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSelectSlot}
+            selectedSlots={selectedSlots}
+            onSlotsChange={handleSlotsChange}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
             cartServiceIds={cartServiceIds}
             onAddService={handleAddService}
             disabledDateChange={cart.length > 0}
+            basePricePerHour={basePricePerHour}
+            isMember={isMember}
+            serviceName={activeService.name}
+            onValidationError={setMessage}
           />
 
           <Cart
-            cart={cart}
+            cart={displayCart}
             onRemoveService={handleRemoveService}
             onClearCart={handleClearCart}
             onReviewSelection={handleReviewSelection}
@@ -260,7 +357,7 @@ export default function BookPage() {
       <BookingSummaryModal
         isOpen={reviewOpen}
         onClose={() => setReviewOpen(false)}
-        cart={cart}
+        cart={displayCart}
         onProceedToPayment={handleProceedToPayment}
         isProcessing={isProcessingPayment}
         checkoutError={checkoutError}

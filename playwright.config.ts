@@ -3,8 +3,17 @@ import fs from "node:fs";
 
 const isCI = !!process.env.CI;
 const systemChromium = "/usr/bin/chromium";
-const hasSystemChromium = process.platform === "linux" && fs.existsSync(systemChromium);
-const chromiumExecutable = process.env.CHROMIUM_PATH || (hasSystemChromium ? systemChromium : undefined);
+const winChromium = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const hasSystemChromium =
+  (process.platform === "linux" && fs.existsSync(systemChromium)) ||
+  (process.platform === "win32" && fs.existsSync(winChromium));
+const chromiumExecutable =
+  process.env.CHROMIUM_PATH ||
+  (process.platform === "win32" && fs.existsSync(winChromium)
+    ? winChromium
+    : hasSystemChromium
+      ? systemChromium
+      : undefined);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -62,7 +71,7 @@ export default defineConfig({
   webServer: {
     command: "node -e 'const fs=require(\"fs\"),path=require(\"path\"); const t=path.resolve(\"apps/web/.next/standalone/apps/web\"); try{fs.unlinkSync(path.join(t,\".next/static\"))}catch{} try{fs.unlinkSync(path.join(t,\"public\"))}catch{} if(fs.existsSync(\"apps/web/.next/static\")) fs.symlinkSync(path.resolve(\"apps/web/.next/static\"), path.join(t,\".next/static\")); if(fs.existsSync(\"apps/web/public\")) fs.symlinkSync(path.resolve(\"apps/web/public\"), path.join(t,\"public\"));' && PORT=3000 HOSTNAME=127.0.0.1 node apps/web/.next/standalone/apps/web/server.js",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: false,
+    reuseExistingServer: !isCI,
     timeout: 60 * 1000,
   },
 });

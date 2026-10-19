@@ -1,19 +1,19 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import {
   construirComprobante,
   validarSolicitudComprobante,
-} from "@/lib/receipt";
+} from "@/app/api/pdf/receipt/receipt";
 import { ReceiptError } from "@sportcomplex/db";
-import { authorizeApiRequest } from "@/lib/api-auth";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
 
 // TSK-BE-19 — GET /api/pdf/receipt?reservaId=<uuid>&destinatario=PORTAL|POS
 // RNF-05 · RF-17 · HU-19.
 //
 // Devuelve la ESTRUCTURA de datos del comprobante (membrete, reserva,
-// servicio, titular, QR) ya resuelta en el servidor: el navegador solo la
-// maqueta (plantilla `ticket-receipt` de @sportcomplex/ui) y la manda al
-// diálogo de impresión de PDF (RN-14). No devuelve PDF binario ni credenciales
-// de infraestructura: la firma HMAC del QR y el PNG se generan aquí y
+// servicio, titular, QR) ya resuelta en el servidor. El POS la convierte en
+// el ticket térmico (@sportcomplex/printing) y lo imprime por Bluetooth o USB; el PDF
+// de 58 mm se sirve en `/api/pdf/receipt/file`. No devuelve credenciales de
+// infraestructura: la firma HMAC del QR y el PNG se generan aquí y
 // `QR_HMAC_SECRET` nunca sale del servidor.
 //
 // Aislamiento (TSK-BE-13 como precedente): el cliente solo ve reservas cuyo

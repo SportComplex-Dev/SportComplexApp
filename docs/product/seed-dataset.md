@@ -1,11 +1,7 @@
 # Dataset Semilla Realista y Control de Calidad
+> Estado: vigente 2026-10-15
 
-- **Tarea ID:** TSK-BD-03
-- **Historia de Usuario:** Transversal (F0)
-- **Story Points:** 5 pts
-- **Responsable:** Leonardo
-- **Microcelda / Componente:** Database & Analytics
-- **Depende de:** TSK-BD-06
+> Ref histórica: TSK-BD-03 · transversal (F0) · 5 pts · depende de TSK-BD-06 · responsable: Leonardo
 - **Entorno / Motor:** PostgreSQL (Supabase)
 - **Zona Horaria Estándar:** `America/Bogota` (UTC-5)
 

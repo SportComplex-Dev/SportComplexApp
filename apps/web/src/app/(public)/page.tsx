@@ -1,30 +1,67 @@
-// RF-00 Landing institucional estática (SSG) conforme a ARCHITECTURE §4. LCP < 1.5s.
-export const dynamic = 'force-static';
+'use client';
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, MapPin, Star } from "lucide-react";
-import { formatMoney, minPrice, serviceCategories, initialCatalog } from "@sportcomplex/core";
-import { categoryIcons } from "@/components/category-icons";
-import { IconBox } from "@/components/icon-box";
-import { AthleticMarquee } from "@/components/athletic-marquee";
-import { SplashScreen } from "@/components/splash-screen";
+import { ArrowRight, MapPin } from "lucide-react";
+import { formatMoney, minPrice, type CategorySlug } from "@sportcomplex/core";
+import { categoryIcons } from "@/components/brand/category-icons";
+import { IconBox } from "@/components/brand/icon-box";
+import { SplashScreen } from "@/components/feedback/splash-screen";
 import { FacilityShowcase } from "@/components/home/facility-showcase";
-import { MembershipsSection } from "@/components/home/memberships-section";
 import { ClubEvents } from "@/components/home/club-events";
 import { LifestyleAndDigitalPass } from "@/components/home/lifestyle-and-digital-pass";
-import { TestimonialsSection } from "@/components/home/testimonials-section";
 import { FaqSection } from "@/components/home/faq-section";
 import { InstitutionalFooter } from "@/components/home/institutional-footer";
+import { HeroCarousel } from "@/components/home/hero-carousel";
+import { usePublicCatalog } from "@sportcomplex/features-booking";
+import { getAssetUrl } from "@sportcomplex/core/assets";
+
+const categoryMeta: Record<string, {
+  name: string;
+  description: string;
+  icon: 'court' | 'pool' | 'gym' | 'wellness';
+  tone: string;
+  image: string;
+}> = {
+  canchas: {
+    name: "Canchas",
+    description: "Fútbol, pádel y tenis",
+    icon: "court",
+    tone: "lime",
+    image: "/images/catalogo/categoria-canchas.webp",
+  },
+  piscinas: {
+    name: "Piscinas",
+    description: "Carriles y nado libre",
+    icon: "pool",
+    tone: "blue",
+    image: getAssetUrl("/catalogo/categoria-piscinas.webp"),
+  },
+  gimnasio: {
+    name: "Gimnasio",
+    description: "Entrena a tu ritmo",
+    icon: "gym",
+    tone: "orange",
+    image: getAssetUrl("/catalogo/categoria-gimnasio.webp"),
+  },
+  "zona-humeda": {
+    name: "Zona húmeda",
+    description: "Sauna, turco y jacuzzi",
+    icon: "wellness",
+    tone: "purple",
+    image: getAssetUrl("/catalogo/categoria-zona-humeda.webp"),
+  },
+};
 
 export default function HomePage() {
+  const { catalog, categories } = usePublicCatalog();
   return (
     <>
       <SplashScreen />
 
-      {/* Hero Cinematográfico */}
+      {/* Hero Cinematográfico con Carrusel Multideporte */}
       <section className="hero-wrap">
-        <div className="hero-image" />
+        <HeroCarousel />
         <div className="hero-content">
           <div className="eyebrow hero-eyebrow">
             <span className="live-dot" /> UN LUGAR PARA LLEGAR MÁS LEJOS
@@ -44,46 +81,15 @@ export default function HomePage() {
             <Link href="/services" className="action-button">
               Reserva tu espacio <ArrowRight size={17} />
             </Link>
-            <Link href="/services" className="hero-secondary">
-              Explorar servicios
-            </Link>
-            <Link href="/register" className="hero-secondary">
-              Hazte socio
-            </Link>
-          </div>
-          <div className="hero-proof">
-            <div className="avatar-stack">
-              <span>J</span>
-              <span>L</span>
-              <span>A</span>
-              <span>+</span>
-            </div>
-            <div>
-              <b>+2.400 personas</b>
-              <small>ya entrenan en Altura</small>
-            </div>
-            <span className="proof-divider" />
-            <div className="rating">
-              <span className="rating-stars" aria-label="Calificación 4.9 de 5">
-                {Array.from({ length: 5 }, (_, index) => (
-                  <Star key={index} size={11} fill="currentColor" />
-                ))}
-              </span>
-              <small>4.9 / 5</small>
-            </div>
           </div>
         </div>
         <div className="hero-location">
-          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> ☀️ 23°C{" "}
-          <span className="hero-location-dot" /> Abierto hoy hasta las 11:00 p. m.
+          <MapPin size={14} /> Medellín, Colombia <span className="hero-location-dot" /> Abierto hoy hasta las 11:00 p. m.
         </div>
         <div className="hero-scroll">
           DESLIZA PARA EXPLORAR <span />
         </div>
       </section>
-
-      {/* Novedades e Instalaciones en Vivo */}
-      <AthleticMarquee />
 
       {/* Sección 4: Showcase Interactivo de Instalaciones */}
       <FacilityShowcase />
@@ -103,15 +109,22 @@ export default function HomePage() {
         </div>
 
         <div className="category-grid">
-          {serviceCategories.map(({ slug, name, description, icon, tone, image }, index) => {
-            const from = minPrice(initialCatalog, slug);
+          {categories.map(({ slug, nombre }, index) => {
+            const meta = categoryMeta[slug] || {
+              name: nombre,
+              description: `Servicios de ${nombre.toLowerCase()}`,
+              icon: "court" as const,
+              tone: "lime",
+image: getAssetUrl("/catalogo/categoria-canchas.webp"),
+            };
+            const from = minPrice(catalog, slug as CategorySlug);
             return (
               <Link className="category-card" key={slug} href={`/services/${slug}`}>
                 <div className="category-media">
-                  {image && (
+                  {meta.image && (
                     <Image
-                      src={image}
-                      alt={name}
+                      src={meta.image}
+                      alt={nombre}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       className="category-img"
@@ -119,13 +132,13 @@ export default function HomePage() {
                   )}
                   <div className="category-media-overlay" />
                   <div className="category-badge-floating">
-                    <IconBox icon={categoryIcons[icon]} tone={tone} />
+                    <IconBox icon={categoryIcons[meta.icon]} tone={meta.tone} />
                   </div>
                   <span className="category-index-badge">0{index + 1}</span>
                 </div>
                 <div className="category-body">
-                  <h3>{name}</h3>
-                  <p>{description}</p>
+                  <h3>{nombre}</h3>
+                  <p>{meta.description}</p>
                   <div className="category-bottom">
                     <span>{from ? `Desde ${formatMoney(from)}` : "Próximamente"}</span>
                     <span className="round-arrow">
@@ -163,22 +176,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Sección 5: Membresías & Planes de Acceso */}
-      <MembershipsSection />
-
       {/* Sección 6: Agenda de Torneos & Vida en el Club */}
       <ClubEvents />
 
       {/* Sección 7 & 8: Tercer Tiempo (Lounge & Coworking) y Pase Digital QR */}
       <LifestyleAndDigitalPass />
 
-      {/* Sección 9: Testimonios de Atletas & Socios */}
-      <TestimonialsSection />
-
       {/* Sección 10: Preguntas Frecuentes y Políticas */}
       <FaqSection />
-
-      
 
       {/* Footer Institucional Completo */}
       <InstitutionalFooter />

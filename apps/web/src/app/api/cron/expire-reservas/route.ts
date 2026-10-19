@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api-response";
+import { ok, fail } from '@sportcomplex/shared/lib';
 import { expireReservasVencidas } from "@sportcomplex/db";
 
 /**

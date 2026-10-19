@@ -4,7 +4,7 @@ import {
   createTournamentSchema,
   updateTournamentSchema,
   tournamentQuerySchema,
-} from "../src/tournament.schema.ts";
+} from "../src/business/tournament.schema.ts";
 
 test("createTournamentSchema: valida torneo válido con bloqueos", () => {
   const input = {
@@ -135,7 +135,7 @@ test("tournamentQuerySchema: normaliza soloActivos como string 'false' y 'true'"
 });
 
 test("tournamentIdParamSchema: valida UUID v4 y rechaza IDs inválidos", async () => {
-  const { tournamentIdParamSchema } = await import("../src/tournament.schema.ts");
+  const { tournamentIdParamSchema } = await import("../src/business/tournament.schema.ts");
   const validUuid = "123e4567-e89b-12d3-a456-426614174000";
   assert.equal(tournamentIdParamSchema.safeParse(validUuid).success, true);
 
@@ -170,7 +170,7 @@ test("createTournamentSchema: rechaza bloqueos fuera del intervalo del torneo (V
 });
 
 test("registerTournamentSchema: valida nombrePareja opcional y datos de pago", async () => {
-  const { registerTournamentSchema } = await import("../src/tournament.schema.ts");
+  const { registerTournamentSchema } = await import("../src/business/tournament.schema.ts");
 
   // Válido vacío (inscripción individual en torneo gratuito)
   const emptyRes = registerTournamentSchema.safeParse({});

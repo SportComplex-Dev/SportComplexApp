@@ -1,0 +1,101 @@
+import ky from "ky";
+import { createHmac } from "node:crypto";
+
+/**
+ * Parámetros de entrada para el despacho del correo de verificación de cuenta.
+ */
+export interface VerificationCodeEmailParams {
+  /** Identificador único del usuario en base de datos (UUID). */
+  usuarioId?: string;
+  /** Destinatario del correo. */
+  to: string;
+  /** Nombre del usuario (personalización de plantilla HTML). */
+  nombre: string;
+  /** Código de 6 dígitos en claro (solo existe en memoria del proceso). */
+  code: string;
+  /** Fecha de expiración del token. */
+  expiraEn: Date;
+}
+
+/**
+ * Contrato del Payload HTTP POST enviado al webhook de n8n (TSK-AU-01).
+ *
+ * Formato en camelCase: `usuarioId`, `correo`, `nombre`, `codigoVerificacion`, `expiraEnMinutos`.
+ */
+export interface VerificationCodeWebhookPayload {
+  usuarioId?: string | undefined;
+  correo: string;
+  nombre: string;
+  codigoVerificacion: string;
+  expiraEnMinutos: number;
+}
+
+/**
+ * Despacha el código de verificación al webhook n8n de correo (TSK-AU-01).
+ *
+ * Disparo no bloqueante — fallos no revierten DB (RN-12, ARCHITECTURE §9.4).
+ * Si `N8N_AUTH_EMAIL_WEBHOOK_URL` no está configurada, no hace nada.
+ *
+ * @param {VerificationCodeEmailParams} params - Datos del destinatario, código, expiración y usuario.
+ * @returns {Promise<void>} Se resuelve siempre; los fallos solo se registran en logs.
+ */
+export async function sendVerificationCodeEmail(params: VerificationCodeEmailParams): Promise<void> {
+  const url = process.env.N8N_AUTH_EMAIL_WEBHOOK_URL;
+  if (!url) return;
+
+  const expiraEnMs = params.expiraEn.getTime() - Date.now();
+  const expiraEnMinutos = Math.max(1, Math.round(expiraEnMs / (60 * 1000)));
+
+  const payload: VerificationCodeWebhookPayload = {
+    usuarioId: params.usuarioId,
+    correo: params.to,
+    nombre: params.nombre,
+    codigoVerificacion: params.code,
+    expiraEnMinutos: expiraEnMinutos,
+  };
+
+  try {
+    await ky.post(url, {
+      json: payload,
+      timeout: 2500,
+      retry: 0,
+    });
+  } catch (error) {
+    // fire-and-forget: se registra en logs, el usuario puede reenviar código
+    console.warn("[email] verification code dispatch failed (non-blocking):", error instanceof Error ? error.message : error);
+  }
+}
+
+export async function sendPasswordResetEmail(params: { usuarioId: string; to: string; nombre: string; resetUrl: string }): Promise<void> {
+  const url = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+  if (!url) return;
+  const secret = process.env.N8N_PASSWORD_RESET_HMAC_SECRET;
+  if (!secret || secret.length < 32) {
+    console.warn("[email] password reset dispatch skipped: N8N_PASSWORD_RESET_HMAC_SECRET is not configured with at least 32 characters.");
+    return;
+  }
+
+  const payload = {
+    tipo: "password_reset",
+    usuarioId: params.usuarioId,
+    correo: params.to,
+    nombre: params.nombre,
+    enlaceRestablecimiento: params.resetUrl,
+    expiraEnMinutos: 15,
+  };
+  const body = JSON.stringify(payload);
+  const signature = createHmac("sha256", secret).update(body).digest("hex");
+  try {
+    await ky.post(url, {
+      body,
+      headers: {
+        "Content-Type": "application/json",
+        "X-SportComplex-Signature": `sha256=${signature}`,
+      },
+      timeout: 2500,
+      retry: 0,
+    });
+  } catch (error) {
+    console.warn("[email] password reset dispatch failed:", error instanceof Error ? error.message : error);
+  }
+}

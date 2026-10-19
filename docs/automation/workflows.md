@@ -1,4 +1,5 @@
 # Documentación de Workflows n8n - Complejo Deportivo
+> Estado: vigente 2026-10-15
 
 ## Descripción General
 
@@ -307,7 +308,7 @@ de Resend, incorporando reintentos automáticos para garantizar alta disponibili
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Código de Verificación OTP (TSK-AU-01)
+## Integración n8n - Código de Verificación OTP (TSK-AU-01)
 N8N_AUTH_CODE_WEBHOOK_URL="https://jafet123.app.n8n.cloud/webhook/auth/enviar-codigo"
 
 
@@ -390,11 +391,12 @@ genera y vincula el código QR de acceso (o token criptográfico de boletería),
 construye una plantilla HTML responsiva con el enlace directo al portal y
 despacha el correo electrónico mediante la API de Resend.
 
-- Identificador Jira: TSK-AU-03 (SCRUM-116)
-- Historia de Usuario: HU-11 (RF-10)
-- Fase del Proyecto: F2
+- Identificador Jira: TSK-AU-03 (SCRUM-116) / Disparador Backend: TSK-BE-34 (SCRUM-239)
+- Historia de Usuario: HU-11 / HU-39 (RF-10)
+- Fase del Proyecto: F2 / F3
+- Disparador en Backend: `apps/web/src/app/api/payments/route.ts` (alias `POST /api/webhooks/stripe`) vía `dispatchReservationTicketsEmail` (fire-and-forget tras confirmar el pago).
 - Criterio de Aceptación / SLA: El comprador recibe el correo con el código QR en
-  menos de 60 segundos y puede acceder a su boleto digital en el portal.
+  menos de 60 segundos y puede acceder a su boleto digital en el portal. Webhook responde HTTP 200 en < 2s.
 
 
 2. ESPECIFICACIÓN DEL WEBHOOK (ENDPOINT)
@@ -405,10 +407,10 @@ despacha el correo electrónico mediante la API de Resend.
 - Respond Mode: Using 'Respond to Webhook' Node
 
 - Endpoint Producción:
-  https://onebolivar.app.n8n.cloud/webhook/reservas/despacho-qr
+  https://n8n.akros.lat/webhook/reservas/despacho-qr
 
 - Endpoint Sandbox / Pruebas:
-  https://onebolivar.app.n8n.cloud/webhook-test/reservas/despacho-qr
+  https://n8n.akros.lat/webhook-test/reservas/despacho-qr
 
 - Encabezados Requeridos (Headers):
   Content-Type: application/json
@@ -416,8 +418,8 @@ despacha el correo electrónico mediante la API de Resend.
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Despacho de Código QR (TSK-AU-03)
-N8N_RESERVATION_QR_WEBHOOK_URL="https://onebolivar.app.n8n.cloud/webhook/reservas/despacho-qr"
+## Integración n8n - Despacho de Código QR (TSK-AU-03)
+N8N_RESERVATION_QR_WEBHOOK_URL="https://n8n.akros.lat/webhook/reservas/despacho-qr"
 NEXT_PUBLIC_APP_URL="https://akros.lat"
 
 
@@ -482,7 +484,7 @@ HTTP 200 OK
 
 7. PRUEBA DE INTEGRACIÓN VÍA CURL (CLI)
 --------------------------------------------------------------------------------
-curl -i -X POST https://onebolivar.app.n8n.cloud/webhook-test/reservas/despacho-qr \
+curl -i -X POST https://n8n.akros.lat/webhook-test/reservas/despacho-qr \
   -H "Content-Type: application/json" \
   -d '{
     "reservaId": "RES-AKROS-1024",
@@ -529,10 +531,10 @@ uno de los usuarios con reservas afectadas a través de la API de Resend.
 --------------------------------------------------------------------------------
 - Método HTTP: POST
 - Endpoint Producción:
-  https://onebolivar.app.n8n.cloud/webhook/contingencias/servicio
+  https://n8n.akros.lat/webhook/contingencias/servicio
 
 - Endpoint Sandbox / Pruebas:
-  https://onebolivar.app.n8n.cloud/webhook-test/contingencias/servicio
+  https://n8n.akros.lat/webhook-test/contingencias/servicio
 
 - Encabezados Requeridos (Headers):
   * Content-Type: application/json
@@ -545,8 +547,8 @@ uno de los usuarios con reservas afectadas a través de la API de Resend.
 
 3. VARIABLES DE ENTORNO EN EL BACKEND (.env)
 --------------------------------------------------------------------------------
-# Integración n8n - Contingencias Operativas (TSK-AU-05 / TSK-BE-22)
-N8N_CONTINGENCY_WEBHOOK_URL="https://onebolivar.app.n8n.cloud/webhook/contingencias/servicio"
+## Integración n8n - Contingencias Operativas (TSK-AU-05 / TSK-BE-22)
+N8N_CONTINGENCY_WEBHOOK_URL="https://n8n.akros.lat/webhook/contingencias/servicio"
 N8N_CONTINGENCY_HMAC_SECRET="akros_super_secret_contingency_key_32chars_min"
 
 
@@ -623,13 +625,13 @@ B. Firma HMAC Ausente o Inválida (HTTP 401 Unauthorized):
 7. PRUEBAS DE INTEGRACIÓN VÍA CURL (CLI)
 --------------------------------------------------------------------------------
 A. Simulación de Petición Válida (200 OK):
-curl -i -X POST https://onebolivar.app.n8n.cloud/webhook-test/contingencias/servicio \
+curl -i -X POST https://n8n.akros.lat/webhook-test/contingencias/servicio \
   -H "Content-Type: application/json" \
   -H "X-SportComplex-Signature: sha256=fdcc234db60b7da9b32f881fc7f66c6958ea9d325443eed7f5b42fae5dd8f7be" \
   -d '{"serviceId":1,"motivo":"Falla imprevista en fluido electrico","servicioNombre":"Cancha Sintetica Principal Futbol 7","afectados":[{"nombreUsuario":"Juan Esteban","emailUsuario":"jebolivar33@gmail.com","codigoReserva":"RES-AKROS-789","fecha":"2026-10-09","horario":"18:00 - 19:00"}]}'
 
 B. Simulación de Rechazo por Firma Inválida (401 Unauthorized):
-curl -i -X POST https://onebolivar.app.n8n.cloud/webhook-test/contingencias/servicio \
+curl -i -X POST https://n8n.akros.lat/webhook-test/contingencias/servicio \
   -H "Content-Type: application/json" \
   -H "X-SportComplex-Signature: sha256=0000000000000000000000000000000000000000000000000000000000000000" \
   -d '{"serviceId":1,"motivo":"Falla imprevista en fluido electrico","servicioNombre":"Cancha Sintetica Principal Futbol 7","afectados":[{"nombreUsuario":"Juan Esteban","emailUsuario":"jebolivar33@gmail.com","codigoReserva":"RES-AKROS-789","fecha":"2026-10-09","horario":"18:00 - 19:00"}]}'
@@ -669,10 +671,10 @@ de Resend.
 
 3. VARIABLES DE ENTORNO Y ENDPOINTS (BACKEND / N8N)
 --------------------------------------------------------------------------------
-# Endpoint real de analíticas expuesto por el backend y consumido por n8n:
+## Endpoint real de analíticas expuesto por el backend y consumido por n8n:
 BACKEND_ANALYTICS_API_URL="https://akros.lat/api/admin/analytics"
 
-# Destinatarios del reporte consolidado:
+## Destinatarios del reporte consolidado:
 ADMIN_REPORT_RECIPIENTS="gerencia@akros.lat,operaciones@akros.lat"
 
 
@@ -757,4 +759,14 @@ No se modificó el esquema ni se creó/aplicó una migración. `pnpm --filter we
 Para resolver la limitación de entrega cuando n8n se encuentra temporalmente inactivo o inaccesible (evitando que se pierda la notificación a los clientes afectados), se definió **TSK-BE-22b**:
 - **Alcance**: Cola persistente de salida (*Outbox pattern*) en base de datos basada en los registros de `inhabilitacion_servicio` con `webhook_enviado_en IS NULL` o cola dedicada.
 - **Worker/Job**: Proceso de reintentos periódicos con retroceso exponencial (*exponential backoff*), conservando la firma HMAC `X-SportComplex-Signature` hasta recibir HTTP 2xx de n8n o alcanzar el umbral de *dead-letter* (coordinado con TSK-AU-08 / SCRUM-147).
+
+---
+
+## Restablecimiento de Contraseña (`restablecimiento-contrasena.json`)
+
+- **Disparador**: Webhook HTTP POST en `/webhook/auth-password-reset` (`rawBody: true`).
+- **Seguridad**: Verificación HMAC-SHA256 en header `X-SportComplex-Signature` (`sha256=<hex>`) con el secreto compartido `N8N_PASSWORD_RESET_HMAC_SECRET`. Retorna 401 si la firma es inválida.
+- **Respuesta síncrona**: HTTP 200 `{ "ok": true, "mensaje": "Solicitud de restablecimiento recibida, despachando correo" }`.
+- **Despacho asíncrono**: Resend API (`POST https://api.resend.com/emails`) con `Authorization: Bearer {{ $env.RESEND_API_KEY }}`.
+- **Plantilla**: HTML Dark Mode institucional Akros con botón directo a `/reset-password?token=...` y texto de respaldo.
 

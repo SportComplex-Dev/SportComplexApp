@@ -1,5 +1,5 @@
-import { authorizeApiRequest } from "@/lib/api-auth";
-import { fail, ok } from "@/lib/api-response";
+import { authorizeApiRequest } from "@/lib/api/api-auth";
+import { fail, ok } from '@sportcomplex/shared/lib';
 import { deactivateEmployee, EmployeeError } from "@sportcomplex/db";
 import { z } from "zod";
 

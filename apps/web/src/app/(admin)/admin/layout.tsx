@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -11,6 +12,8 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  LogOut,
+  Menu,
   Moon,
   Search,
   ShieldCheck,
@@ -22,12 +25,12 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
-import { Brand } from '@/components/brand'
-import { UserMenu } from '@/components/user-menu'
-import { useApp } from '@/components/app-provider'
-import { useBookings } from '@/lib/stores'
-import { useToday } from '@/lib/persistent-state'
-import { ToastMessage } from '@/components/toast-message'
+import { Brand } from '@/components/brand/brand'
+import { UserMenu } from '@/components/layout/user-menu'
+import { useApp } from '@/components/layout/app-provider'
+import { useToday } from '@sportcomplex/shared/lib'
+import { ToastMessage } from '@/components/feedback/toast-message'
+import { AdminMobileDrawer } from '@/components/layout/admin-mobile-drawer'
 
 const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Resumen', icon: Home, href: '/admin' },
@@ -37,24 +40,28 @@ const navigation: { name: string; icon: LucideIcon; href: string }[] = [
   { name: 'Reservas', icon: CalendarDays, href: '/admin/bookings' },
   { name: 'Contingencias', icon: AlertTriangle, href: '/admin/incident' },
   { name: 'Membresías', icon: BadgeCheck, href: '/admin/memberships' },
-  { name: 'Configuración', icon: Activity, href: '/admin/settings' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { session, notify, toast, closeToast, dark, setDark } = useApp()
-  const [bookings] = useBookings()
+  const { notify, toast, closeToast, dark, setDark, logout } = useApp()
   const today = useToday()
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), [])
+  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), [])
 
   const active =
-    navigation.find((item) => pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href)))
-      ?.name ?? 'Catálogo'
-  const pending = bookings.filter((booking) => booking.status === 'Pendiente').length
-  const initials = session?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'AD'
+    navigation.find(
+      (item) =>
+        pathname === item.href ||
+        (item.href === '/admin' && pathname === '/admin/dashboard') ||
+        (item.href !== '/admin' && pathname.startsWith(item.href))
+    )?.name ?? 'Resumen'
+  const pending = 0
 
   return (
     <main className={`admin-shell club-app ${dark ? 'dark' : ''}`}>
-      <aside className="admin-sidebar">
+      <aside className="admin-sidebar hidden md:flex">
         <div className="admin-brand">
           <Link href="/admin" aria-label="Ir al resumen">
             <Brand />
@@ -75,7 +82,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="admin-nav-label">GESTIÓN</span>
           {navigation.map(({ name, icon: Icon, href }) => {
             const isCurrent =
-              pathname === href || (href === '/admin/catalog' && pathname === '/admin/services')
+              pathname === href ||
+              (href === '/admin' && pathname === '/admin/dashboard') ||
+              (href === '/admin/catalog' && pathname === '/admin/services') ||
+              (href !== '/admin' && pathname.startsWith(href))
             return (
               <Link key={href} href={href} className={isCurrent ? 'admin-nav-active' : ''}>
                 <Icon size={17} />
@@ -102,13 +112,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <section className="admin-main">
         <header className="admin-topbar">
-          <div className="admin-crumb">
-            <span>Altura Club</span>
-            <ChevronRight size={14} />
-            <b>{active}</b>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="admin-icon-button admin-menu-trigger md:hidden"
+              aria-label="Abrir menú de navegación"
+              aria-expanded={isDrawerOpen}
+              aria-controls="admin-mobile-drawer"
+              onClick={handleOpenDrawer}
+              data-testid="admin-mobile-menu-trigger"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="admin-crumb">
+              <span>Altura Club</span>
+              <ChevronRight size={14} />
+              <b>{active}</b>
+            </div>
           </div>
           <div className="admin-top-actions">
-            <span className="admin-today">
+            <span className="admin-today hidden sm:inline-flex">
               <CalendarDays size={14} />{' '}
               {today ? formatDate(today, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''}
             </span>
@@ -137,11 +160,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Activity size={17} />
               <i />
             </button>
-            <span className="admin-avatar">{initials}</span>
+            <button
+              type="button"
+              className="admin-icon-button logout-button"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              onClick={() => logout()}
+              data-testid="admin-topbar-logout-button"
+            >
+              <LogOut size={17} />
+            </button>
+            <UserMenu variant="admin-topbar" />
           </div>
         </header>
         <div className="admin-content">{children}</div>
       </section>
+
+      <AdminMobileDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        navigation={navigation}
+        pathname={pathname}
+        pending={pending}
+        onNotify={notify}
+      />
+
       <ToastMessage message={toast.message} kind={toast.kind} close={closeToast} />
     </main>
   )

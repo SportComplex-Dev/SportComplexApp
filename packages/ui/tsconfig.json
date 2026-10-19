@@ -1,5 +1,14 @@
 {
   "extends": "../config/typescript/base.json",
-  "compilerOptions": { "strict": true, "noEmit": true, "jsx": "react-jsx" },
-  "include": ["src"]
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "noEmit": false,
+    "strict": true,
+    "jsx": "react-jsx",
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src"],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.tsx", "src/**/*.test.ts"]
 }

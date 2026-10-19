@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMockPrisma } from "../../../../../../../../packages/db/test/mock-prisma";
+import { createMockPrisma } from "@db-test/mock-prisma";
 
 Reflect.set(process.env, "NODE_ENV", "test");
 process.env.BOT_API_KEY = "bot-api-test-secret";
@@ -9,8 +9,8 @@ process.env.QR_HMAC_SECRET = qrSecret;
 
 const mock = createMockPrisma();
 Reflect.set(globalThis, "__scPrisma", mock);
-const availabilityRoute = await import("../availability/route");
-const { handleBotTicketValidation } = await import("../validate-ticket/route");
+const availabilityRoute = await import("@/app/api/v1/bot/availability/route");
+const { handleBotTicketValidation } = await import("@/app/api/v1/bot/validate-ticket/route");
 const { signTicket } = await import("@sportcomplex/core");
 
 const ticketId = "9f0d6f4e-0000-4000-8000-000000000023";
@@ -202,6 +202,51 @@ test("bot ticket validation returns valid for an emitted ticket in its access wi
   assert.equal("motivo" in body.data, false);
   assert.deepEqual(mock._state.tickets[0], beforeTicket);
   assert.deepEqual(mock._state.lecturas, beforeLecturas);
+});
+
+test("bot ticket validation accepts and reports the full signed window of a consolidated ticket", async () => {
+  const date = seedData();
+  const start = new Date(`${date}T10:00:00-05:00`);
+  const end = new Date(`${date}T12:00:00-05:00`);
+  mock._state.tickets[0].inicioValidez = start;
+  mock._state.tickets[0].finValidez = end;
+  const signature = signTicket(ticketId, qrSecret, { start, end });
+
+  const response = await handleBotTicketValidation(
+    apiRequest(
+      `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
+    ),
+    new Date(`${date}T11:30:00-05:00`),
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.data.valido, true);
+  assert.equal(body.data.fecha, date);
+  assert.equal(body.data.horaInicio, "10:00:00");
+  assert.equal(body.data.horaFin, "12:00:00");
+});
+
+test("bot ticket validation rejects a consolidated QR if its stored window was changed", async () => {
+  const date = seedData();
+  const signedWindow = {
+    start: new Date(`${date}T10:00:00-05:00`),
+    end: new Date(`${date}T12:00:00-05:00`),
+  };
+  mock._state.tickets[0].inicioValidez = signedWindow.start;
+  mock._state.tickets[0].finValidez = new Date(`${date}T13:00:00-05:00`);
+  const signature = signTicket(ticketId, qrSecret, signedWindow);
+
+  const response = await handleBotTicketValidation(
+    apiRequest(
+      `http://localhost/api/v1/bot/validate-ticket?ticketId=${ticketId}&signature=${signature}`,
+    ),
+    new Date(`${date}T11:30:00-05:00`),
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(body.error.code, "INVALID_SIGNATURE");
 });
 
 test("bot ticket validation rejects cancelled reservations and inactive services", async () => {
