@@ -283,41 +283,145 @@ export function AdminBookingsView({
               <h3 className="font-bold text-sm text-[var(--ink)] flex items-center gap-2">
                 <Layers size={16} className="text-[#557b53]" /> Ocupación y Demanda por Servicio
               </h3>
-              <p className="text-xs text-[var(--subtle)]">
-                Distribución agregada de reservas para identificar canchas con alta demanda.
+              <p className="text-[11px] text-[var(--subtle)]">
+                Distribución de cupos reservados según la base de datos
               </p>
             </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-              {metrics.byService.length} Pistas con actividad
-            </span>
+            <Badge variant="secondary" className="text-xs">
+              {metrics.byService.length} Servicios
+            </Badge>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {metrics.byService.map((srv) => (
-              <div
-                key={srv.serviceId}
-                className="p-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)]/50 hover:bg-[var(--surface-soft)] transition-colors"
-              >
-                <div className="text-xs font-semibold text-[var(--ink)] truncate" title={srv.serviceName}>
-                  {srv.serviceName}
+            {metrics.byService.map((item) => {
+              const maxCount = Math.max(...metrics.byService.map((s) => s.count), 1)
+              const pct = Math.round((item.count / maxCount) * 100)
+
+              return (
+                <div
+                  key={item.serviceId}
+                  className="p-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)]/50"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-[var(--ink)] truncate max-w-[150px]" title={item.serviceName}>
+                      {item.serviceName}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      {item.count} res.
+                    </span>
+                  </div>
+                  <div className="w-full bg-[var(--line)] h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#557b53] dark:bg-[#8cd766] transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-baseline justify-between mt-2">
-                  <span className="text-lg font-black text-[var(--ink)]">{srv.count}</span>
-                  <span className="text-[10px] text-[var(--subtle)] font-medium">reservas</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* 4. Filtros Multifactoriales */}
-      <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--ink)]">
-            <Filter size={14} className="text-[#557b53]" /> Filtros de Auditoría
+      {/* 4. Barra de Filtros Reactivos */}
+      <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          {/* Búsqueda por texto */}
+          <div className="lg:col-span-2">
+            <label htmlFor={searchInputId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
+              Buscar Reserva
+            </label>
+            <div className="relative">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)]"
+              />
+              <input
+                id={searchInputId}
+                type="text"
+                placeholder="Nombre, correo o ID de reserva..."
+                value={filters.search}
+                onChange={(e) => onFiltersChange({ search: e.target.value, page: 1 })}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
+              />
+            </div>
           </div>
-          {(filters.search || filters.status || filters.serviceId || filters.dateFrom || filters.dateTo) && (
+
+          {/* Filtro por Estado */}
+          <div>
+            <label htmlFor={statusSelectId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
+              Estado
+            </label>
+            <select
+              id={statusSelectId}
+              value={filters.status}
+              onChange={(e) => onFiltersChange({ status: e.target.value, page: 1 })}
+              className="w-full px-3 py-2 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
+            >
+              <option value="">Todos los estados</option>
+              <option value="CONFIRMADA">Confirmada</option>
+              <option value="PENDIENTE_PAGO">Pendiente de Pago</option>
+              <option value="EXPIRADA">Expirada</option>
+              <option value="CANCELADA_ADMINISTRATIVA">Cancelada Administrativa</option>
+              <option value="CANCELADA_PAGO">Cancelada por Pago</option>
+            </select>
+          </div>
+
+          {/* Filtro por Servicio */}
+          <div>
+            <label htmlFor={serviceSelectId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
+              Servicio / Cancha
+            </label>
+            <select
+              id={serviceSelectId}
+              value={filters.serviceId}
+              onChange={(e) => onFiltersChange({ serviceId: e.target.value, page: 1 })}
+              className="w-full px-3 py-2 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
+            >
+              <option value="">Todos los servicios</option>
+              {availableServices.map((srv) => (
+                <option key={srv.id} value={srv.id.toString()}>
+                  {srv.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fechas */}
+          <div className="flex gap-2">
+            <div className="w-1/2">
+              <label htmlFor={dateFromId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
+                Desde
+              </label>
+              <input
+                id={dateFromId}
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => onFiltersChange({ dateFrom: e.target.value, page: 1 })}
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
+              />
+            </div>
+            <div className="w-1/2">
+              <label htmlFor={dateToId} className="block text-[11px] font-bold text-[var(--subtle)] uppercase mb-1">
+                Hasta
+              </label>
+              <input
+                id={dateToId}
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => onFiltersChange({ dateTo: e.target.value, page: 1 })}
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] outline-none focus:border-[#557b53]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Resumen de filtros activos */}
+        {(filters.search || filters.status || filters.serviceId || filters.dateFrom || filters.dateTo) && (
+          <div className="mt-3 pt-3 border-t border-[var(--line)] flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-[var(--subtle)]">
+              <Filter size={12} /> Filtros activos aplicados
+            </div>
             <button
               type="button"
               onClick={() =>
@@ -330,108 +434,12 @@ export function AdminBookingsView({
                   page: 1,
                 })
               }
-              className="text-[11px] font-semibold text-[#557b53] hover:underline cursor-pointer"
+              className="text-[#557b53] dark:text-[#9ee285] hover:underline font-semibold cursor-pointer"
             >
-              Limpiar filtros
+              Restablecer filtros
             </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Búsqueda por texto (Nombre, Email, UUID) */}
-          <div className="sm:col-span-2 relative">
-            <label htmlFor={searchInputId} className="block text-[10px] font-bold uppercase text-[var(--subtle)] mb-1">
-              Búsqueda por texto
-            </label>
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)] pointer-events-none"
-              />
-              <input
-                id={searchInputId}
-                type="text"
-                placeholder="Nombre de cliente, email o código UUID..."
-                value={filters.search}
-                onChange={(e) => onFiltersChange({ search: e.target.value, page: 1 })}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:ring-1 focus:ring-[#557b53]"
-              />
-            </div>
           </div>
-
-          {/* Filtro por Estado */}
-          <div>
-            <label htmlFor={statusSelectId} className="block text-[10px] font-bold uppercase text-[var(--subtle)] mb-1">
-              Estado Transaccional
-            </label>
-            <select
-              id={statusSelectId}
-              value={filters.status}
-              onChange={(e) =>
-                onFiltersChange({
-                  status: e.target.value as AdminBookingFiltersState['status'],
-                  page: 1,
-                })
-              }
-              className="w-full px-3 py-2 text-xs rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[#557b53]"
-            >
-              <option value="">Todos los estados</option>
-              <option value="CONFIRMADA">Confirmadas (Pagadas)</option>
-              <option value="PENDIENTE_PAGO">Pendiente Pago (Checkout TTL)</option>
-              <option value="EXPIRADA">Expiradas</option>
-              <option value="CANCELADA">Canceladas</option>
-              <option value="CANCELADA_ADMINISTRATIVA">Cancelada Administrativa</option>
-            </select>
-          </div>
-
-          {/* Filtro por Cancha / Servicio */}
-          <div>
-            <label htmlFor={serviceSelectId} className="block text-[10px] font-bold uppercase text-[var(--subtle)] mb-1">
-              Pista / Servicio
-            </label>
-            <select
-              id={serviceSelectId}
-              value={filters.serviceId}
-              onChange={(e) => onFiltersChange({ serviceId: e.target.value, page: 1 })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[#557b53]"
-            >
-              <option value="">Todas las pistas</option>
-              {availableServices.map((srv) => (
-                <option key={srv.id} value={srv.id.toString()}>
-                  {srv.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Rango de Fechas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-[var(--line)]">
-          <div>
-            <label htmlFor={dateFromId} className="block text-[10px] font-bold uppercase text-[var(--subtle)] mb-1">
-              Fecha Desde
-            </label>
-            <input
-              id={dateFromId}
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => onFiltersChange({ dateFrom: e.target.value, page: 1 })}
-              className="w-full px-3 py-1.5 text-xs rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[#557b53]"
-            />
-          </div>
-          <div>
-            <label htmlFor={dateToId} className="block text-[10px] font-bold uppercase text-[var(--subtle)] mb-1">
-              Fecha Hasta
-            </label>
-            <input
-              id={dateToId}
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => onFiltersChange({ dateTo: e.target.value, page: 1 })}
-              className="w-full px-3 py-1.5 text-xs rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[#557b53]"
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* 5. Tabla Reactiva de Alta Densidad (Full-Bleed con aire visual pl-6 / pr-6) */}
@@ -492,48 +500,41 @@ export function AdminBookingsView({
                   </tr>
                 ))
               ) : bookings.length === 0 ? (
-                // Empty state
+                // Empty State
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-[var(--subtle)]">
-                      <Sparkles size={32} className="mb-2 opacity-50" />
-                      <div className="font-semibold text-sm text-[var(--ink)]">No se encontraron reservas</div>
-                      <div className="text-xs mt-1">
-                        Intenta ajustar los filtros de fecha o búsqueda de clientes.
-                      </div>
-                    </div>
+                  <td colSpan={7} className="py-12 text-center text-[var(--subtle)]">
+                    <Sparkles size={28} className="mx-auto mb-2 text-[#557b53] opacity-50" />
+                    <p className="font-bold text-sm text-[var(--ink)]">No se encontraron reservas</p>
+                    <p className="text-xs mt-1">
+                      Intenta ajustar los filtros de búsqueda o el rango de fechas.
+                    </p>
                   </td>
                 </tr>
               ) : (
                 bookings.map((b) => {
-                  const titularNombre = b.titular?.nombre || 'Cliente General'
-                  const titularEmail = b.titular?.correo || 'Sin correo'
-                  const servicioNombre = b.disponibilidad?.servicio?.nombre || `Servicio #${b.disponibilidad?.servicioId}`
+                  const s = b.disponibilidad?.servicio
+                  const f = b.disponibilidad?.franja
                   const fechaStr = formatDateString(b.disponibilidad?.fecha)
-                  const franjaStr = `${formatSlotTime(b.disponibilidad?.franja?.horaInicio)} - ${formatSlotTime(
-                    b.disponibilidad?.franja?.horaFin
-                  )}`
+                  const horaInicio = f ? formatSlotTime(f.horaInicio) : '00:00'
+                  const horaFin = f ? formatSlotTime(f.horaFin) : '00:00'
 
                   return (
                     <tr
                       key={b.id}
+                      className="hover:bg-[var(--surface-soft)]/50 transition-colors cursor-pointer"
                       onClick={() => setSelectedBooking(b)}
-                      className="hover:bg-[var(--surface-soft)]/60 transition-colors cursor-pointer"
                     >
-                      {/* ID / Código */}
-                      <td className="py-3 pl-6 pr-3 font-mono font-bold text-xs text-[var(--ink)]">
+                      {/* Código / ID */}
+                      <td className="py-3 pl-6 pr-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate max-w-[90px]" title={b.id}>
-                            {b.id.slice(0, 8)}...
-                          </span>
+                          <code className="text-[11px] font-mono text-[var(--subtle)] bg-[var(--surface-soft)] px-1.5 py-0.5 rounded border border-[var(--line)]">
+                            {b.id.slice(0, 8)}
+                          </code>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCopy(b.id)
-                            }}
-                            className="text-[var(--subtle)] hover:text-[var(--ink)] cursor-pointer"
-                            title="Copiar UUID"
+                            title="Copiar ID de reserva"
+                            onClick={() => handleCopy(b.id)}
+                            className="p-1 text-[var(--subtle)] hover:text-[var(--ink)] rounded cursor-pointer"
                           >
                             {copiedId === b.id ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
                           </button>
@@ -542,32 +543,39 @@ export function AdminBookingsView({
 
                       {/* Cliente */}
                       <td className="py-3 px-3">
-                        <div className="font-bold text-[var(--ink)]">{titularNombre}</div>
-                        <div className="text-[11px] text-[var(--subtle)] truncate max-w-[170px]" title={titularEmail}>
-                          {titularEmail}
+                        <div className="font-bold text-xs text-[var(--ink)]">
+                          {b.titular?.nombre || 'Cliente General'}
+                        </div>
+                        <div className="text-[11px] text-[var(--subtle)] truncate max-w-[180px]">
+                          {b.titular?.correo || 'Sin correo registrado'}
                         </div>
                       </td>
 
-                      {/* Servicio */}
+                      {/* Servicio y Canal */}
                       <td className="py-3 px-3">
-                        <div className="font-medium text-[var(--ink)] truncate max-w-[180px]" title={servicioNombre}>
-                          {servicioNombre}
+                        <div className="font-bold text-xs text-[var(--ink)]">
+                          {s?.nombre || 'Servicio Desconocido'}
                         </div>
-                        <div className="text-[10px] text-[var(--subtle)]">
-                          {b.cantidadCupos} {b.cantidadCupos === 1 ? 'cupo' : 'cupos'} reservado(s)
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-[var(--subtle)]">
+                            {s?.categoria?.nombre || 'General'}
+                          </span>
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-[var(--surface-soft)] border border-[var(--line)] text-[var(--subtle)] uppercase">
+                            {b.canal}
+                          </span>
                         </div>
                       </td>
 
                       {/* Fecha y Franja */}
                       <td className="py-3 px-3">
-                        <div className="font-medium text-[var(--ink)]">{fechaStr}</div>
-                        <div className="text-[11px] text-[#557b53] dark:text-[#9ee285] font-mono font-semibold">
-                          {franjaStr}
+                        <div className="text-xs font-semibold text-[var(--ink)]">{fechaStr}</div>
+                        <div className="text-[11px] text-[#557b53] dark:text-[#9ee285] font-mono">
+                          {horaInicio} - {horaFin}
                         </div>
                       </td>
 
                       {/* Total */}
-                      <td className="py-3 px-3 text-right font-black text-sm text-[var(--ink)]">
+                      <td className="py-3 px-3 text-right font-black text-xs text-emerald-700 dark:text-emerald-400">
                         {formatMoney(b.total)}
                       </td>
 
