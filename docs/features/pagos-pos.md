@@ -1352,6 +1352,13 @@ Si la tarjeta del cliente requiere validación bancaria externa (3D-Secure en sm
 - Con claves de producción (`pk_live_...`) la aplicación **rechaza el cargo mock** y mantiene la reserva en `PENDIENTE_PAGO`; el operador debe completar el cobro mediante el enlace de Stripe Checkout de contingencia.
 - La captura de tarjetas físicas reales en producción requiere integrar Stripe Terminal SDK o Stripe Elements (fuera del alcance de TSK-FE-18).
 
+## 6. Advertencia de Stripe.js en Desarrollo Local (HTTP vs HTTPS)
+
+La advertencia en consola:
+> *"You may test your Stripe.js integration over HTTP. However, live Stripe.js integrations must use HTTPS."*
+
+es emitida por el script de Stripe en entornos locales bajo HTTP sin certificado. Es un comportamiento esperado que no bloquea los pagos en desarrollo y que desaparece en producción gracias a la terminación SSL/TLS de Caddy.
+
 ## Trazabilidad
 
 > Ref histórica: HU-10 (RF-09) · rama `feature/tsk-bd-09-idempotencia-de-pagos-con-stripe` · depende de esquema base de pagos

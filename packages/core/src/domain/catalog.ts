@@ -77,6 +77,7 @@ export type CatalogStatus = 'Disponible' | 'Mantenimiento' | 'Ocupado';
 
 export interface CatalogItem {
   id: string;
+  serviceId?: number;
   name: string;
   category: CategorySlug;
   subCategory?: string;
@@ -388,11 +389,17 @@ export function makeId(name: string): string {
  * Resuelve el ID relacional numérico en base de datos a partir de un ítem del catálogo o su ID en texto.
  * Asegura compatibilidad 1:1 entre el catálogo público y los registros de PostgreSQL / Supabase.
  */
-export function resolveCatalogServiceId(itemOrId: string | number | { id: string | number; name?: string; category?: string }): number {
-  if (typeof itemOrId === 'number' && itemOrId > 0) return itemOrId;
+export function resolveCatalogServiceId(itemOrId: string | number | { id: string | number; serviceId?: number; name?: string; category?: string }): number {
+  if (typeof itemOrId === 'number' && itemOrId > 0) return Math.floor(itemOrId);
+  if (typeof itemOrId === 'object' && itemOrId !== null) {
+    const directServiceId = (itemOrId as { serviceId?: number }).serviceId;
+    if (typeof directServiceId === 'number' && Number.isInteger(directServiceId) && directServiceId > 0) {
+      return directServiceId;
+    }
+  }
   const rawId = typeof itemOrId === 'string' ? itemOrId : typeof itemOrId === 'object' ? String(itemOrId.id) : '';
   const numeric = Number(rawId);
-  if (!isNaN(numeric) && numeric > 0) return numeric;
+  if (!isNaN(numeric) && Number.isInteger(numeric) && numeric > 0) return numeric;
 
   const idStr = rawId.toLowerCase();
   const nameStr = (typeof itemOrId === 'object' && itemOrId.name ? itemOrId.name : '').toLowerCase();
@@ -419,6 +426,7 @@ export function resolveCatalogServiceId(itemOrId: string | number | { id: string
   // 3. Fallbacks para compatibilidad con suites de pruebas existentes y búsquedas parciales
   if (idStr.includes('tenis-cancha-1') || idStr.includes('tenis-1') || (nameStr.includes('cancha 1') && nameStr.includes('tenis'))) return 17;
   if (idStr.includes('tenis-cancha-2') || idStr.includes('tenis-2') || (nameStr.includes('cancha 2') && nameStr.includes('tenis'))) return 18;
+  if (idStr.includes('cancha-de-tenis-polvo-de-ladrillo') || idStr.includes('tenis-polvo-de-ladrillo') || nameStr.includes('polvo de ladrillo')) return 17;
   if (idStr.includes('padel') || nameStr.includes('pádel')) return 19;
   if (idStr.includes('carril') || nameStr.includes('carril')) return 20;
   if (idStr.includes('piscina') || nameStr.includes('piscina')) return 4;

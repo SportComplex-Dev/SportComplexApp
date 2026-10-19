@@ -45,3 +45,11 @@ pnpm dev
 * **n8n:** `http://localhost:5678`.
 * **App:** `http://localhost:3000` (`NEXT_PUBLIC_APP_URL=http://localhost:3000`).
 * **Storage:** buckets `public-assets` / `private-assets` del proyecto Supabase dev (ver `./storage.md`). Nada en `localhost:9000/9001`.
+
+## 5. Stripe.js en Desarrollo Local (HTTP vs HTTPS)
+
+La advertencia en consola:
+> *"You may test your Stripe.js integration over HTTP. However, live Stripe.js integrations must use HTTPS."*
+
+es emitida por el script de Stripe en entornos locales bajo HTTP sin certificado. Es un comportamiento esperado que no bloquea los pagos en desarrollo y que desaparece en producción gracias a la terminación SSL/TLS de Caddy.
+

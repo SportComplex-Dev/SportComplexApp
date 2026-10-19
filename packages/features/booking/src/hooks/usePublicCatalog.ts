@@ -75,8 +75,12 @@ export function usePublicCatalog(): PublicCatalogData {
             const cat = mappedCats.find((c) => c.id === s.categoriaId)
             const catSlug = (cat?.slug ?? 'canchas') as CatalogItem['category']
             const serviceSlug = s.slug ?? s.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
+            const imageSlug = (serviceSlug === 'cancha-de-tenis-polvo-de-ladrillo' || serviceSlug === 'tenis-polvo-de-ladrillo')
+              ? 'tenis-cancha-1'
+              : serviceSlug
             const item: CatalogItem = {
               id: serviceSlug,
+              serviceId: s.id,
               name: s.nombre,
               category: catSlug,
               sede: 'Poblado',
@@ -84,7 +88,7 @@ export function usePublicCatalog(): PublicCatalogData {
               price: Number(s.tarifa) || 0,
               capacity: s.capacidadMaxima || 1,
               status: s.estado === 'ACTIVO' ? 'Disponible' : 'Mantenimiento',
-              image: getAssetUrl(`/catalogo/${serviceSlug}.webp`),
+              image: getAssetUrl(`/catalogo/${imageSlug}.webp`),
             }
             if (s.tipoPiscina) {
               item.poolType = s.tipoPiscina as 'PUBLICA' | 'PRIVADA'

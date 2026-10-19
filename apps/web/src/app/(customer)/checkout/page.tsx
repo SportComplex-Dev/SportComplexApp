@@ -71,7 +71,7 @@ function CheckoutContent() {
     searchParams.get('reservaId') ||
     searchParams.get('bookingId')
 
-  const { session, notify } = useApp()
+  const { session, ready, notify } = useApp()
   const { catalog, loading: catalogLoading } = usePublicCatalog()
   const [draft, setDraft] = useDraft()
   const [, setLastCode] = useLastCode()
@@ -79,6 +79,7 @@ function CheckoutContent() {
   const [reservationId, setReservationId] = useState<string | null>(queryReservationId)
   const [isCreatingReservation, setIsCreatingReservation] = useState(false)
   const [holdError, setHoldError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
 
@@ -137,9 +138,18 @@ function CheckoutContent() {
   // Sincronizar o crear la reserva hold en backend si no se cuenta con reservationId
   useEffect(() => {
     if (reservationId || holdError || creatingRef.current) return
+    if (!ready) return
+
     const currentDraft = activeDraft
     const currentItem = item
     if (!currentDraft || !currentItem) return
+
+    // 1. Validar previamente la sesión del usuario antes de disparar la reserva
+    if (!session) {
+      setErrorCode('UNAUTHORIZED')
+      setHoldError('Debes iniciar sesión con tu cuenta para confirmar la reserva y continuar al pago.')
+      return
+    }
 
     let cancelled = false
     async function createHold() {
@@ -147,25 +157,41 @@ function CheckoutContent() {
       creatingRef.current = true
       setIsCreatingReservation(true)
       setHoldError(null)
+      setErrorCode(null)
 
       const interval = parseSlotInterval(currentDraft.date, currentDraft.time)
       if (!interval) {
         setHoldError('El horario seleccionado tiene un formato inválido. Por favor selecciona otro turno.')
+        setErrorCode('VALIDATION_ERROR')
         setIsCreatingReservation(false)
         creatingRef.current = false
         return
       }
 
       try {
-        const serviceId = resolveCatalogServiceId(currentItem)
-        if (!serviceId || serviceId <= 0) {
-          setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
+        // Resolución estricta de serviceId numérico (entero positivo)
+        let resolvedId: number | null = null
+        try {
+          const target = currentItem || currentDraft.itemId
+          resolvedId = resolveCatalogServiceId(target)
+        } catch {
+          if (typeof currentDraft.itemId === 'number' && Number.isInteger(currentDraft.itemId) && currentDraft.itemId > 0) {
+            resolvedId = currentDraft.itemId
+          }
+        }
+
+        if (!resolvedId || !Number.isInteger(resolvedId) || resolvedId <= 0) {
+          setHoldError('No se pudo identificar el servicio en el catálogo con un identificador válido. Por favor selecciona otro servicio.')
+          setErrorCode('VALIDATION_ERROR')
+          setDraft(null)
           setIsCreatingReservation(false)
           creatingRef.current = false
           return
         }
 
-        // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales
+        const serviceId: number = resolvedId
+
+        // Intentar registrar la reserva en la DB mediante /api/bookings con horas reales y serviceId entero positivo
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,20 +203,61 @@ function CheckoutContent() {
           }),
         })
 
-        const data = await res.json()
+        const data = (await res.json().catch(() => null)) as {
+          success?: boolean
+          data?: { id?: string }
+          error?: {
+            code?: string
+            message?: string
+            details?: unknown
+          }
+        } | null
+
         if (cancelled) return
 
         if (res.ok && data?.data?.id) {
           setReservationId(data.data.id)
+          setHoldError(null)
+          setErrorCode(null)
         } else {
-          const errMsg = data?.error?.message || 'No se pudo reservar el cupo temporal en el horario seleccionado. Puede que ya no haya disponibilidad o la franja no sea válida.'
+          const code = data?.error?.code || (
+            res.status === 401 ? 'UNAUTHORIZED' :
+            res.status === 403 ? 'FORBIDDEN' :
+            res.status === 409 ? 'CONFLICT' :
+            res.status === 400 ? 'VALIDATION_ERROR' : 'SERVER_ERROR'
+          )
+          setErrorCode(code)
+
+          let errMsg = data?.error?.message
+
+          if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') {
+            errMsg = errMsg || 'Tu sesión ha expirado o no tienes permisos para reservar. Por favor inicia sesión nuevamente.'
+          } else if (code === 'VALIDATION_ERROR') {
+            errMsg = errMsg || 'Los datos de la reserva no cumplen el formato esperado por el servidor.'
+          } else if (
+            code === 'TITULAR_RESERVATION_OVERLAP' ||
+            code === 'CONFLICT' ||
+            code === 'SLOT_BLOCKED' ||
+            code === 'CAPACITY_EXCEEDED'
+          ) {
+            errMsg = errMsg || 'El horario seleccionado ya no tiene cupos disponibles o presenta solapamiento con otra reserva.'
+          } else {
+            errMsg = errMsg || 'No se pudo reservar el cupo temporal en el horario seleccionado. Puede que ya no haya disponibilidad o la franja no sea válida.'
+          }
+
           setHoldError(errMsg)
           setReservationId(null)
           creatingRef.current = false
+
+          // Estado defensivo: Ante un error 4xx, limpiar el estado del borrador para impedir reintentos con datos erróneos
+          if (res.status >= 400 && res.status < 500) {
+            setDraft(null)
+          }
         }
       } catch {
         if (!cancelled) {
           setHoldError('Error de conexión al intentar bloquear la disponibilidad. Por favor vuelve a seleccionar el horario.')
+          setErrorCode('CONNECTION_ERROR')
           setReservationId(null)
           creatingRef.current = false
         }
@@ -205,7 +272,7 @@ function CheckoutContent() {
     return () => {
       cancelled = true
     }
-  }, [activeDraft, item, reservationId, holdError])
+  }, [activeDraft, item, reservationId, holdError, session, ready, setDraft])
 
   const handleExpire = useCallback(() => {
     setIsExpired(true)
@@ -215,6 +282,7 @@ function CheckoutContent() {
   const handleRetry = useCallback(() => {
     setDraft(null)
     setHoldError(null)
+    setErrorCode(null)
     setReservationId(null)
     if (item) {
       router.push(`/services/${item.category}/${item.id}`)
@@ -361,15 +429,41 @@ function CheckoutContent() {
           ) : holdError ? (
             <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-center">
               <AlertCircle className="mx-auto size-7 text-destructive mb-2" />
-              <p className="font-bold text-destructive text-base">No se pudo reservar el horario</p>
+              <p className="font-bold text-destructive text-base">
+                {errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN'
+                  ? 'Sesión requerida'
+                  : errorCode === 'VALIDATION_ERROR'
+                    ? 'Datos de reserva inválidos'
+                    : errorCode === 'CONFLICT' || errorCode === 'TITULAR_RESERVATION_OVERLAP' || errorCode === 'CAPACITY_EXCEEDED' || errorCode === 'SLOT_BLOCKED'
+                      ? 'Conflicto de disponibilidad'
+                      : 'No se pudo reservar el horario'}
+              </p>
               <p className="mt-1 text-xs text-subtle max-w-md mx-auto">{holdError}</p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
-              >
-                Volver a seleccionar horario <ArrowRight size={14} />
-              </button>
+              {errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN' ? (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <Link
+                    href={`/login?callbackUrl=${encodeURIComponent('/checkout')}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition"
+                  >
+                    Iniciar sesión <ArrowRight size={14} />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-ink text-xs font-medium hover:bg-[var(--surface-soft)] transition"
+                  >
+                    Volver a servicios
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white text-xs font-semibold hover:opacity-90 transition"
+                >
+                  Volver a seleccionar horario <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           ) : isCreatingReservation ? (
             <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-6 text-center text-sm">

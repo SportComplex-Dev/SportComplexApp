@@ -27,6 +27,9 @@ test("resolveCatalogServiceId: mapea piscinas, gimnasio y zona húmeda a IDs rea
 test("resolveCatalogServiceId: tolera objetos de catálogo con name o id", () => {
   assert.equal(resolveCatalogServiceId({ id: "tenis-cancha-1", name: "Cancha de tenis · Cancha 1" }), 17);
   assert.equal(resolveCatalogServiceId({ id: "custom", name: "Gimnasio · Zona funcional" }), 5);
+  assert.equal(resolveCatalogServiceId({ id: "custom", serviceId: 17 }), 17);
+  assert.equal(resolveCatalogServiceId("cancha-de-tenis-polvo-de-ladrillo"), 17);
+  assert.equal(resolveCatalogServiceId({ id: "cancha-de-tenis-polvo-de-ladrillo", name: "Cancha de Tenis Polvo de Ladrillo" }), 17);
 });
 
 test("resolveCatalogServiceId: lanza error si el servicio no es reconocido", () => {

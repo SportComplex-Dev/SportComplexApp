@@ -33,6 +33,8 @@ Env (`.env.local`): `DATABASE_URL` (pooler) + `DIRECT_URL` (migraciones), `NEXT_
 
 Rutas: `(public)` estática; `(auth|customer|staff|admin)` protegidas por `proxy.ts` (Cliente→`/portal`, Vendedor→`/pos`, Lector→`/scanner`, Admin→`/admin`). Routes: auth→Zod→repo→`ok`/`fail`, nunca lógica pesada.
 
+> **Nota sobre Stripe.js en desarrollo local:** La advertencia en consola *"You may test your Stripe.js integration over HTTP. However, live Stripe.js integrations must use HTTPS."* es emitida por el script de Stripe en entornos locales bajo HTTP sin certificado. Es un comportamiento esperado que no bloquea los pagos en desarrollo y que desaparece en producción gracias a la terminación SSL/TLS de Caddy.
+
 ## Límites (No hacer)
 
 - No importar `../../packages/*/src` (solo `@sportcomplex/*` → `dist`).
