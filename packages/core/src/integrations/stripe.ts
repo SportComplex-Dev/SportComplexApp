@@ -29,8 +29,6 @@ function stripeSessionExpiresAtSec(from: Date): number {
 }
 
 export const STRIPE_CURRENCY = "cop" as const;
-/** Monto mínimo aceptado por la plataforma Stripe para COP (~$0.50 USD = 2.000 COP). */
-export const STRIPE_MIN_AMOUNT_COP = 2000 as const;
 
 // Re-exportados para conveniencia del flujo de checkout (definidos en
 // `domain/index.ts` y `services/availability.ts`; no duplicar).
