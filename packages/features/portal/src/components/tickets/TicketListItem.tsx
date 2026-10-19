@@ -1,28 +1,25 @@
 'use client'
 
-import { ArrowRight, Download, Printer, QrCode } from 'lucide-react'
+import { ArrowRight, Download, QrCode } from 'lucide-react'
 import { formatDate, formatMoney } from '@sportcomplex/core'
 import { Badge } from '@sportcomplex/ui'
 import { AccessWindowIndicator } from '../passes/AccessWindowIndicator'
+import { ReceiptPdfLink } from '../passes/ReceiptPdfLink'
 import type { PortalTicket } from '../../utils/portal-utils'
 
 interface TicketListItemProps {
   booking: PortalTicket
-  isPrinting: boolean
   downloadingId: string | null
   onOpenQR: (booking: PortalTicket) => void
   onDownloadQR: (booking: PortalTicket) => void
-  onPrint: (booking: PortalTicket) => void
   onSelectCode: (code: string) => void
 }
 
 export function TicketListItem({
   booking,
-  isPrinting,
   downloadingId,
   onOpenQR,
   onDownloadQR,
-  onPrint,
   onSelectCode,
 }: TicketListItemProps) {
   const isConfirmed = booking.status === 'Confirmada'
@@ -88,15 +85,7 @@ export function TicketListItem({
             >
               <Download size={14} /> Descargar QR
             </button>
-            <button
-              type="button"
-              onClick={() => onPrint(booking)}
-              disabled={isPrinting}
-              className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-              title="Imprimir comprobante en formato térmico 58mm"
-            >
-              <Printer size={14} /> Imprimir Recibo (58mm)
-            </button>
+            <ReceiptPdfLink reservaId={booking.id} />
             <a
               href="/confirmation"
               onClick={() => onSelectCode(booking.code)}
@@ -107,14 +96,7 @@ export function TicketListItem({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={() => onPrint(booking)}
-              disabled={isPrinting}
-              className="calendar-shortcut text-xs py-2 px-3 gap-1.5"
-            >
-              <Printer size={14} /> Imprimir Recibo (58mm)
-            </button>
+            <ReceiptPdfLink reservaId={booking.id} />
             <a
               href="/services"
               className="calendar-shortcut text-xs py-2 px-3 inline-flex items-center gap-1"

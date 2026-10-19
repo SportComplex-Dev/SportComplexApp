@@ -13,6 +13,7 @@ Despliegue y operación del VPS dedicado (`148.113.252.230`). Todo corre en el h
 | [local-dev.md](./local-dev.md) | Réplica local de n8n sin dominios ni proxy (`docker-compose.dev.yml`) |
 | [ci-cd.md](./ci-cd.md) | GitHub Actions: CI en PRs, build→GHCR y deploy SSH a `main`, secrets y bootstrap |
 | [env-setup.md](./env-setup.md) | Configuración del `.env.local`: Supabase, Auth, Stripe, n8n, reset de admin y troubleshooting |
+| [impresora-termica.md](./impresora-termica.md) | Impresora térmica de taquilla (DIG-ISH58) por Bluetooth o USB desde el navegador: Chrome/Edge, flag de Web Bluetooth en Linux, udev/`usblp` y WinUSB para USB, emparejado en `/pos` |
 | [backup-produccion.md](./backup-produccion.md) | Backup verificado de la BD de producción: dump+GPG AES-256, verificación por restauración local y custodia en Storage |
 
 ## Decisiones vigentes (2026-10-12)

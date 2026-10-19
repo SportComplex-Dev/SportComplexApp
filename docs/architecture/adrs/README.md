@@ -10,3 +10,4 @@
 - [006-grafo-dependencias.md](./006-grafo-dependencias.md) — Grafo acíclico de dependencias — dirección y reglas entre capas.
 - [007-mapeo-campos-compatibilidad.md](./007-mapeo-campos-compatibilidad.md) — Mapeo de campos contractuales — nomenclatura TS vs columnas SQL.
 - [008-cdn-storage-assets.md](./008-cdn-storage-assets.md) — Migración assets multimedia a Supabase Storage CDN — excepción CSP y helper centralizado.
+- [009-impresion-termica-navegador.md](./009-impresion-termica-navegador.md) — Impresión térmica en taquilla desde el navegador (Bluetooth o USB) — solo el operador imprime; el cliente descarga el PDF.

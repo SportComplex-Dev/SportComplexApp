@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import {
   TicketQrModal,
   QRGraphicHD,
-  PrintableReceipt,
+  ReceiptPdfLink,
   AccessWindowIndicator,
   PortalBookingsList,
   UpcomingBookingCard,
@@ -29,7 +29,7 @@ import {
 test('packages/features/portal exports all core portal components and utilities', () => {
   assert.equal(typeof TicketQrModal, 'function')
   assert.equal(typeof QRGraphicHD, 'function')
-  assert.equal(typeof PrintableReceipt, 'function')
+  assert.equal(typeof ReceiptPdfLink, 'function')
   assert.equal(typeof AccessWindowIndicator, 'function')
   assert.equal(typeof PortalBookingsList, 'function')
   assert.equal(typeof UpcomingBookingCard, 'function')
@@ -207,28 +207,11 @@ test('components rendering: UpcomingBookingCard renders empty state and booking 
   assert.ok(bookingMarkup.includes('TU PRÓXIMA RESERVA'))
 })
 
-test('components rendering: PrintableReceipt renders valid ticket receipt markup', () => {
-  const sampleTicket: PortalTicket = {
-    id: 'b1',
-    code: 'ALT-999',
-    client: 'Pedro Martinez',
-    category: 'canchas',
-    service: 'Pádel Cristal 1',
-    sede: 'Envigado',
-    date: '2026-10-22',
-    time: '18:00 — 19:30',
-    attendees: 4,
-    amount: 120000,
-    status: 'Confirmada',
-    paymentMethod: 'card',
-  }
-
-  const markup = renderToStaticMarkup(
-    React.createElement(PrintableReceipt, { ticket: sampleTicket })
-  )
-  assert.ok(markup.includes('AKROS SPORTCOMPLEX'))
-  assert.ok(markup.includes('ALT-999'))
-  assert.ok(markup.includes('Pedro Martinez'))
+test('components rendering: ReceiptPdfLink descarga el PDF del portal, no imprime', () => {
+  const markup = renderToStaticMarkup(React.createElement(ReceiptPdfLink, { reservaId: 'res 1' }))
+  assert.ok(markup.includes('href="/api/pdf/receipt/file?reservaId=res%201&amp;destinatario=PORTAL"'))
+  assert.ok(markup.includes('download'))
+  assert.ok(!markup.includes('destinatario=POS'), 'El cliente nunca pide el comprobante de taquilla')
 })
 
 test('components rendering: IconBox renders icon with tone class', () => {

@@ -142,3 +142,21 @@ export async function getReceiptReserva(
   Reflect.deleteProperty(receipt, "pagoId");
   return { ...receipt, subtotal, total } as ReceiptData;
 }
+
+/**
+ * Reimpresión en taquilla: resuelve la reserva a partir del código que tiene
+ * el operador a mano —el `codigoUuid` del boleto (leído del QR) o el id de la
+ * reserva—. Devuelve `null` si no corresponde a ninguno.
+ */
+export async function findReservaIdParaReimpresion(
+  codigo: string,
+  db: ClienteDb = prisma,
+): Promise<string | null> {
+  const ticket = await db.ticketQr.findUnique({
+    where: { codigoUuid: codigo },
+    select: { reservaId: true },
+  });
+  if (ticket) return ticket.reservaId;
+  const reserva = await db.reserva.findUnique({ where: { id: codigo }, select: { id: true } });
+  return reserva?.id ?? null;
+}

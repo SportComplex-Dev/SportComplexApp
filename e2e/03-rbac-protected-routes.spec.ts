@@ -54,6 +54,8 @@ test.describe("Flujo 3: Seguridad Perimetral, Middleware y Rutas Protegidas (RBA
       "/api/access",
       "/api/tickets/verify",
       "/api/pdf/receipt",
+      "/api/pdf/receipt/file",
+      "/api/pos/tickets/lookup",
     ];
 
     for (const apiPath of protectedApis) {
