@@ -1,5 +1,6 @@
 import { getReceiptReserva, type ClienteDb } from "@sportcomplex/db";
 import { buildTicketQrPayload, signTicket } from "@sportcomplex/core";
+import { renderTicketEmail } from "@sportcomplex/automation";
 import {
   sendReservationQrWebhook,
   type ReservationQrWebhookPayload,
@@ -63,6 +64,26 @@ export async function dispatchReservationTicketEmail(
   const franjaHoraria = `${horaInicio} - ${horaFin}`;
   const precioTotal = formatearPrecioCop(receipt.total);
 
+  let emailHtml: string | undefined;
+  try {
+    emailHtml = renderTicketEmail({
+      customerName: titular.nombre,
+      ticketCode: ticketId,
+      facilityName: disponibilidad.servicio.nombre,
+      venueName: "AKROS Club",
+      bookingDate: fechaStr,
+      timeSlot: franjaHoraria,
+      qrCodeSrc: qrImageUrl,
+      totalPaid: precioTotal,
+      paymentStatus: "PAGADO (Stripe Cashless)",
+    });
+  } catch (renderError: unknown) {
+    console.error(
+      `Aviso: No se pudo renderizar la plantilla HTML para el tiquete ${ticketId}:`,
+      renderError,
+    );
+  }
+
   const payload: ReservationQrWebhookPayload = {
     reservaId: receipt.id,
     ticketId,
@@ -75,6 +96,7 @@ export async function dispatchReservationTicketEmail(
     franjaHoraria,
     qrPayload,
     qrImageUrl,
+    html: emailHtml,
     appUrl,
     usuario: {
       nombre: titular.nombre,
