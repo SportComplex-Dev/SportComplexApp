@@ -10,14 +10,45 @@ export const bookingRequestSchema = z.object({
   canal: z.enum(["ONLINE", "TAQUILLA"]).optional(),
 });
 
-export const cartCheckoutSchema = z.object({
+const cartItemSchema = z.object({
+  serviceId: z.coerce.number().int().positive(),
+  startTime: z.iso.datetime(),
+  endTime: z.iso.datetime(),
+  cantidadCupos: z.coerce.number().int().positive().default(1),
+});
+
+const legacyCartCheckoutSchema = z.object({
   items: z.array(z.object({
-    serviceId: z.coerce.number().int().positive(),
-    startTime: z.iso.datetime(),
-    endTime: z.iso.datetime(),
-    cantidadCupos: z.coerce.number().int().positive().default(1),
+    serviceId: cartItemSchema.shape.serviceId,
+    startTime: cartItemSchema.shape.startTime,
+    endTime: cartItemSchema.shape.endTime,
+    cantidadCupos: cartItemSchema.shape.cantidadCupos,
   })).min(2),
 });
+
+const continuousCartCheckoutSchema = z.object({
+  serviceId: z.coerce.number().int().positive(),
+  franjas: z.array(z.object({ inicio: z.iso.datetime(), fin: z.iso.datetime() })).min(2),
+}).superRefine(({ franjas }, ctx) => {
+  franjas.forEach((franja, index) => {
+    const inicio = Date.parse(franja.inicio);
+    const fin = Date.parse(franja.fin);
+    if (fin <= inicio) {
+      ctx.addIssue({ code: "custom", path: ["franjas", index, "fin"], message: "La hora de fin debe ser posterior al inicio." });
+    }
+    if (index > 0 && inicio !== Date.parse(franjas[index - 1]!.fin)) {
+      ctx.addIssue({ code: "custom", path: ["franjas", index, "inicio"], message: "Las franjas deben ser consecutivas y estar ordenadas." });
+    }
+  });
+}).transform(({ serviceId, franjas }) => ({
+  mode: "continuous" as const,
+  items: franjas.map(({ inicio, fin }) => ({ serviceId, startTime: inicio, endTime: fin, cantidadCupos: 1 })),
+}));
+
+export const cartCheckoutSchema = z.union([
+  legacyCartCheckoutSchema.transform(({ items }) => ({ mode: "cart" as const, items })),
+  continuousCartCheckoutSchema,
+]);
 
 export const availabilityQuerySchema = z.object({
   serviceId: z.coerce.number().int().positive(),

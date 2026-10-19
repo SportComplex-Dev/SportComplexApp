@@ -3,6 +3,7 @@ import {
   BookingError,
   compensateFailedCheckout,
   createBookingHoldCart,
+  createContinuousBookingHoldCart,
 } from "@sportcomplex/db";
 import { createStripeCheckoutSession } from "@sportcomplex/core";
 import { cartCheckoutSchema } from "@sportcomplex/validation";
@@ -77,7 +78,10 @@ export async function handleLockCart(
     }
 
     // TX1 — bloqueo transaccional atómico multi-ítem + RESERVAS PENDIENTE_PAGO con TTL 30 min.
-    const cartResult = await createBookingHoldCart({
+    const createHoldCart = parsed.data.mode === "continuous"
+      ? createContinuousBookingHoldCart
+      : createBookingHoldCart;
+    const cartResult = await createHoldCart({
       items: parsed.data.items,
       userId: session.user.id,
     });
@@ -89,6 +93,8 @@ export async function handleLockCart(
         reservaIds: cartResult.bookings.map((b) => b.id),
         userId: session.user.id,
         total: cartResult.total,
+        // Comparte el mismo vencimiento de 30 minutos guardado en cada hold.
+        now: new Date(cartResult.expiresAt.getTime() - 30 * 60_000),
         items: cartResult.bookings.map((b) => ({
           reservaId: b.id,
           servicioNombre: b.disponibilidad.servicio.nombre,

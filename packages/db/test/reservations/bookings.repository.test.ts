@@ -9,6 +9,7 @@ const {
   BookingError,
   createBookingHold,
   createBookingHoldCart,
+  createContinuousBookingHoldCart,
   getBookableAvailability,
   getReadOnlyBookableAvailability,
 } = await import(
@@ -324,6 +325,109 @@ test("SCRUM-163: createBookingHoldCart éxito con 2+ servicios distintos", async
   const disp2 = mock._state.disponibilidades.find((d: any) => d.id === slot2.availabilityId);
   assert.equal(disp1.cuposOcupados, 2);
   assert.equal(disp2.cuposOcupados, 1);
+});
+
+test("TSK-BE-30: franjas consecutivas se reservan atómicamente con TTL de 30 minutos", async () => {
+  const first = addAforoSlot(10);
+  const franjaId = mock._state.franjas.length + 1;
+  const availabilityId = BigInt(mock._state.disponibilidades.length + 1);
+  const secondStart = new Date(`${first.date}T11:00:00-05:00`);
+  const secondEnd = new Date(`${first.date}T12:00:00-05:00`);
+  mock._state.franjas.push({
+    id: franjaId,
+    servicioId: first.serviceId,
+    diaSemana: mock._state.franjas.at(-1).diaSemana,
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 11)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 12)),
+  });
+  mock._state.disponibilidades.push({
+    id: availabilityId,
+    servicioId: first.serviceId,
+    franjaId,
+    fecha: new Date(`${first.date}T00:00:00.000Z`),
+    cuposTotales: 10,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+
+  const now = new Date();
+  const result = await createContinuousBookingHoldCart({
+    userId: "00000000-0000-4000-8000-00000000be30",
+    items: [
+      { serviceId: first.serviceId, startTime: first.startsAt.toISOString(), endTime: first.endsAt.toISOString(), cantidadCupos: 1 },
+      { serviceId: first.serviceId, startTime: secondStart.toISOString(), endTime: secondEnd.toISOString(), cantidadCupos: 1 },
+    ],
+  }, now);
+
+  assert.equal(result.bookings.length, 2);
+  assert.equal(result.expiresAt.getTime(), Math.floor(now.getTime() / 1000) * 1000 + 30 * 60_000);
+  assert.equal(result.bookings.every((booking) => booking.expiraEn?.getTime() === result.expiresAt.getTime()), true);
+});
+
+test("TSK-BE-30: rechaza huecos antes de crear holds", async () => {
+  const first = addAforoSlot(10);
+  const secondStart = new Date(first.endsAt.getTime() + 1_000);
+  const secondEnd = new Date(secondStart.getTime() + 60 * 60_000);
+  const before = mock._state.reservas.length;
+
+  await assert.rejects(
+    createContinuousBookingHoldCart({
+      userId: "00000000-0000-4000-8000-00000000be31",
+      items: [
+        { serviceId: first.serviceId, startTime: first.startsAt.toISOString(), endTime: first.endsAt.toISOString(), cantidadCupos: 1 },
+        { serviceId: first.serviceId, startTime: secondStart.toISOString(), endTime: secondEnd.toISOString(), cantidadCupos: 1 },
+      ],
+    }),
+    (error: unknown) => error instanceof BookingError && error.code === "NON_CONTIGUOUS_SLOTS",
+  );
+  assert.equal(mock._state.reservas.length, before);
+});
+
+test("TSK-BE-30: revierte todas las franjas si una ya no tiene cupo", async () => {
+  const first = addAforoSlot(1);
+  const franjaId = mock._state.franjas.length + 1;
+  const availabilityId = BigInt(mock._state.disponibilidades.length + 1);
+  const secondStart = new Date(`${first.date}T11:00:00-05:00`);
+  const secondEnd = new Date(`${first.date}T12:00:00-05:00`);
+  mock._state.franjas.push({
+    id: franjaId,
+    servicioId: first.serviceId,
+    diaSemana: mock._state.franjas.at(-1).diaSemana,
+    horaInicio: new Date(Date.UTC(1970, 0, 1, 11)),
+    horaFin: new Date(Date.UTC(1970, 0, 1, 12)),
+  });
+  mock._state.disponibilidades.push({
+    id: availabilityId,
+    servicioId: first.serviceId,
+    franjaId,
+    fecha: new Date(`${first.date}T00:00:00.000Z`),
+    cuposTotales: 1,
+    cuposOcupados: 0,
+    bloqueadaMantenimiento: false,
+  });
+  await createBookingHold({
+    serviceId: first.serviceId,
+    startTime: secondStart.toISOString(),
+    endTime: secondEnd.toISOString(),
+    cantidadCupos: 1,
+    userId: "00000000-0000-4000-8000-00000000be32",
+  });
+  const firstAvailability = mock._state.disponibilidades.find((item: any) => item.id === first.availabilityId);
+  const beforeReservations = mock._state.reservas.length;
+
+  await assert.rejects(
+    createContinuousBookingHoldCart({
+      userId: "00000000-0000-4000-8000-00000000be33",
+      items: [
+        { serviceId: first.serviceId, startTime: first.startsAt.toISOString(), endTime: first.endsAt.toISOString(), cantidadCupos: 1 },
+        { serviceId: first.serviceId, startTime: secondStart.toISOString(), endTime: secondEnd.toISOString(), cantidadCupos: 1 },
+      ],
+    }),
+    (error: unknown) => error instanceof BookingError && error.code === "CAPACITY_EXCEEDED",
+  );
+
+  assert.equal(mock._state.reservas.length, beforeReservations);
+  assert.equal(firstAvailability.cuposOcupados, 0);
 });
 
 test("SCRUM-163: fallo atómico en createBookingHoldCart si 1 ítem no tiene cupos → 0 holds creados", async () => {
