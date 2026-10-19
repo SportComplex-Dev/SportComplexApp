@@ -351,7 +351,8 @@ test('TSK-FE-12 Test 4: Maneja el error cuando una de las franjas retorna SLOT_N
     'Debe incluir franjas nocturnas',
   );
 
-  // Renderizado del ServiceSelector con franjas dinámicas
+  // Renderizado del ServiceSelector con franjas dinámicas, socio activo y tarifa real (TSK-FE-31)
+  let capturedError = '';
   const selectorHtml = renderToStaticMarkup(
     <ServiceSelector
       date={date}
@@ -363,11 +364,20 @@ test('TSK-FE-12 Test 4: Maneja el error cuando una de las franjas retorna SLOT_N
       onCategoryChange={() => {}}
       cartServiceIds={['tenis-cancha-1']}
       onAddService={() => {}}
+      basePricePerHour={50000}
+      isMember={true}
+      serviceName="Cancha de Tenis 1"
+      onValidationError={(err) => {
+        capturedError = err;
+      }}
     />,
   );
 
   assert.ok(selectorHtml.includes('Paso 1 · Fecha y horario dinámico'));
   assert.ok(selectorHtml.includes('17:00 – 18:00'));
+  assert.ok(selectorHtml.includes('30% Descuento Socio Activo'));
+  assert.ok(selectorHtml.includes('Cancha de Tenis 1'));
+  assert.equal(capturedError, '');
 
   // Caso 4.4: Fechas pasadas deben tener todas sus franjas deshabilitadas
   const pastSlots = generateDynamicTimeSlots('2020-01-01');

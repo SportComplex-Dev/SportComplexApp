@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Check, Clock3, Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import {
   type CategorySlug,
   type CatalogItem,
 } from '@sportcomplex/core';
 import { Badge } from '@sportcomplex/ui';
+import { SlotPicker } from '../SlotPicker';
 import {
   formatMoney,
   getBogotaDateAfter,
@@ -20,12 +21,22 @@ export interface ServiceSelectorProps {
   onDateChange: (date: string) => void;
   timeSlots: DynamicTimeSlot[];
   selectedSlot: DynamicTimeSlot | null;
-  onSelectSlot: (slot: DynamicTimeSlot) => void;
+  /**
+   * Callback invocado al seleccionar un horario individual o null al limpiar selección.
+   * Para selección de múltiples franjas continuas se recomienda utilizar `onSlotsChange`.
+   */
+  onSelectSlot: (slot: DynamicTimeSlot | null) => void;
+  selectedSlots?: DynamicTimeSlot[] | undefined;
+  onSlotsChange?: ((slots: DynamicTimeSlot[]) => void) | undefined;
   selectedCategory: CategorySlug | 'todos';
   onCategoryChange: (category: CategorySlug | 'todos') => void;
   cartServiceIds: string[];
   onAddService: (service: CatalogItem) => void;
-  disabledDateChange?: boolean;
+  disabledDateChange?: boolean | undefined;
+  basePricePerHour?: number | undefined;
+  isMember?: boolean | undefined;
+  serviceName?: string | undefined;
+  onValidationError?: ((errorMessage: string) => void) | undefined;
 }
 
 export function ServiceSelector({
@@ -34,6 +45,12 @@ export function ServiceSelector({
   timeSlots: initialTimeSlots,
   selectedSlot,
   onSelectSlot,
+  selectedSlots,
+  onSlotsChange,
+  basePricePerHour,
+  isMember = false,
+  serviceName,
+  onValidationError,
   selectedCategory,
   onCategoryChange,
   cartServiceIds,
@@ -45,6 +62,22 @@ export function ServiceSelector({
 
   // Consumir /api/bookings/availability?fecha=
   const [availabilitySlots, setAvailabilitySlots] = useState<DynamicTimeSlot[] | null>(null);
+  const [localSelectedSlots, setLocalSelectedSlots] = useState<DynamicTimeSlot[]>(() =>
+    selectedSlots ?? (selectedSlot ? [selectedSlot] : []),
+  );
+
+  useEffect(() => {
+    if (selectedSlots !== undefined) {
+      setLocalSelectedSlots(selectedSlots);
+    } else if (selectedSlot) {
+      setLocalSelectedSlots((prev) => {
+        if (prev.some((s) => s.startTime === selectedSlot.startTime)) return prev;
+        return [selectedSlot];
+      });
+    } else {
+      setLocalSelectedSlots([]);
+    }
+  }, [selectedSlots, selectedSlot]);
 
   useEffect(() => {
     let active = true;
@@ -156,35 +189,29 @@ export function ServiceSelector({
           </label>
         </div>
 
-        {/* Franjas Horarias Dinámicas */}
-        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Franjas horarias disponibles">
-          {activeTimeSlots.map((slot) => {
-            const isActive = selectedSlot?.startTime === slot.startTime;
-            const isBlocked = !slot.isAvailable || (disabledDateChange && !isActive);
-
-            return (
-              <motion.button
-                key={slot.startTime}
-                type="button"
-                aria-pressed={isActive}
-                disabled={isBlocked}
-                onClick={() => onSelectSlot(slot)}
-                {...(!isBlocked && !shouldReduceMotion ? { whileHover: { scale: 1.03 }, whileTap: { scale: 0.96 } } : {})}
-                title={slot.disabledReason || `${slot.label} (${slot.isAvailable ? 'Disponible' : 'No disponible'})`}
-                className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${
-                  isActive
-                    ? 'border-[#1d6048] bg-[#edf5e2] text-[#214d36] dark:border-[#7ca657] dark:bg-[#2c3c2a] dark:text-[#d8efb3]'
-                    : isBlocked
-                      ? 'cursor-not-allowed border-[#edf0eb] bg-[#f7f8f6] text-[#a0aaa2] dark:border-[#303b33] dark:bg-[#202722] dark:text-[#68756b]'
-                      : 'border-[#dce4da] bg-white text-[#354b3b] hover:border-[#72947a] hover:bg-[#f7faf4] dark:border-[#39483e] dark:bg-[#202d25] dark:text-[#d4dfd5] dark:hover:bg-[#28362c]'
-                }`}
-              >
-                <Clock3 size={15} />
-                <span>{slot.label}</span>
-                {isActive && <Check size={15} />}
-              </motion.button>
-            );
-          })}
+        {/* Franjas Horarias Dinámicas con Selección Continua (TSK-FE-31) */}
+        <div className="mt-4">
+          <SlotPicker
+            timeSlots={activeTimeSlots}
+            selectedSlots={selectedSlots ?? localSelectedSlots}
+            onSlotsChange={(slots) => {
+              setLocalSelectedSlots(slots);
+              if (onSlotsChange) {
+                onSlotsChange(slots);
+              }
+              if (slots.length > 0) {
+                const first = slots[0];
+                if (first) onSelectSlot(first);
+              } else {
+                onSelectSlot(null);
+              }
+            }}
+            basePricePerHour={basePricePerHour}
+            isMember={isMember}
+            serviceName={serviceName}
+            onValidationError={onValidationError}
+            disabled={disabledDateChange}
+          />
         </div>
       </div>
 

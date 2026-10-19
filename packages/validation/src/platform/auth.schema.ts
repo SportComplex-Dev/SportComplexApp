@@ -42,7 +42,7 @@ export const createEmployeeSchema = z.object({
   password: z.string().min(8, 'La contraseña temporal debe contener al menos 8 caracteres').max(72),
 })
 
-// TSK-FE-33: Recuperación y restablecimiento de contraseña
+// TSK-FE-33 / TSK-BE-32 / TSK-QA-05: Recuperación y restablecimiento de contraseña
 export const forgotPasswordSchema = z.object({
   email: z
     .string()
@@ -55,17 +55,19 @@ export const passwordStrengthRegex = /^(?=.*[a-zA-Z])(?=.*[\d\W]).{8,}$/
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().trim().min(1, 'El token es requerido').optional(),
+    token: z.string().trim().min(1, 'El token es requerido').max(2048),
     password: z
       .string()
       .min(8, 'La contraseña debe contener al menos 8 caracteres')
+      .max(72)
       .regex(/[a-zA-Z]/, 'La contraseña debe incluir al menos una letra')
       .regex(/[\d\W]/, 'La contraseña debe incluir al menos un número o símbolo'),
     confirmPassword: z
       .string()
-      .min(1, 'Por favor confirma la nueva contraseña'),
+      .min(1, 'Por favor confirma la nueva contraseña')
+      .optional(),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => !data.confirmPassword || data.password === data.confirmPassword, {
     message: 'Las contraseñas no coinciden',
     path: ['confirmPassword'],
   })

@@ -34,3 +34,5 @@ export {
   releaseExpiredHolds,
   assertNoTitularOverlap,
 } from "./mutaciones";
+
+export * from "./admin-bookings";

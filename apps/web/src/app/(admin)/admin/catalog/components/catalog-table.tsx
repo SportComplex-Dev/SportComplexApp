@@ -41,15 +41,15 @@ export function CatalogTable({
       </div>
 
       <div className="demo-table-wrap">
-        <table className="demo-table">
+        <table className="demo-table w-full table-auto">
           <thead>
             <tr>
-              <th>Instancia / Servicio</th>
+              <th>Servicio</th>
               <th>Categoría</th>
               <th>Sede</th>
-              <th>Precio</th>
-              <th>Aforo & Modalidad (RF-04)</th>
-              <th>Disponibilidad</th>
+              <th>Precio (COP)</th>
+              <th>Aforo & Modalidad</th>
+              <th>Estado</th>
               <th className="text-right">Acciones</th>
             </tr>
           </thead>
@@ -79,7 +79,7 @@ export function CatalogTable({
                   <td>
                     <div className="flex items-center gap-2">
                       {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-accent)] shrink-0" />}
-                      <span className="font-semibold text-ink">{item.name}</span>
+                      <span className="font-semibold text-xs text-ink truncate max-w-[160px]" title={item.name}>{item.name}</span>
                     </div>
                   </td>
                   <td>
@@ -92,7 +92,7 @@ export function CatalogTable({
                   </td>
                   <td>
                     <span className="text-xs font-semibold text-ink whitespace-nowrap">
-                      {formatMoney(item.price)} COP
+                      {formatMoney(item.price)}
                     </span>
                   </td>
                   <td>
@@ -102,12 +102,12 @@ export function CatalogTable({
                           {isShared ? 'Compartido' : 'Exclusivo'}
                         </Badge>
                         <span className="text-xs text-subtle">
-                          <b>{capacityValue}</b> {capacityValue === 1 ? 'cupo' : 'personas'}
+                          <b>{capacityValue}</b> {capacityValue === 1 ? 'cupo' : 'pers.'}
                         </span>
                       </div>
                       {item.category === 'piscinas' && (
                         <span className="text-[10px] text-brand-accent font-semibold">
-                          {item.poolType === 'PRIVADA' ? '🏊 Privada (Exclusiva)' : '🏊 Pública (Aforo)'}
+                          {item.poolType === 'PRIVADA' ? '🏊 Privada' : '🏊 Pública'}
                         </span>
                       )}
                     </div>
@@ -121,10 +121,10 @@ export function CatalogTable({
                     </Badge>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1 py-1 px-2.5 rounded-md text-xs font-semibold border border-[var(--line)] bg-[var(--surface-soft)] text-ink hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1 py-0.5 px-1.5 rounded text-[11px] font-semibold border border-[var(--line)] bg-[var(--surface-soft)] text-ink hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] transition-all cursor-pointer"
                         title={`Editar aforo y franjas de ${item.name}`}
                         onClick={() => onEditSchedule(item)}
                       >
