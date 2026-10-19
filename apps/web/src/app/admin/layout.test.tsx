@@ -87,7 +87,12 @@ test('TSK-QA-01 / HU-25: Navegación fluida y respuesta HTTP 200 sin 404 ni bucl
   // 2. Verificación de la API administrativa asociada con respuesta HTTP 200
   const { createMockPrisma } = await import('@db-test/mock-prisma')
   const mock = createMockPrisma()
-  ;(globalThis as any).__scPrisma = mock
+  type GlobalTestScope = typeof globalThis & {
+    __scPrisma?: unknown
+    __scAuthSession?: { user: { id: string } }
+  }
+  const testScope = globalThis as GlobalTestScope
+  testScope.__scPrisma = mock
   const adminId = '00000000-0000-4000-8000-000000000099'
   mock._state.usuarios.push({
     id: adminId,
@@ -98,7 +103,7 @@ test('TSK-QA-01 / HU-25: Navegación fluida y respuesta HTTP 200 sin 404 ni bucl
     rolId: 1,
     rolNombre: 'ADMINISTRADOR',
   })
-  ;(globalThis as any).__scAuthSession = { user: { id: adminId } }
+  testScope.__scAuthSession = { user: { id: adminId } }
 
   const bookingsApi = await import('@/app/api/admin/bookings/route')
   assert.equal(typeof bookingsApi.GET, 'function', 'El handler GET de /api/admin/bookings debe existir')
