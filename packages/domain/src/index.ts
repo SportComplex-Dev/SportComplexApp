@@ -9,3 +9,4 @@ export * from "./precio/index.js";
 export * from "./torneo/index.js";
 export * from "./analitica/index.js";
 export * from "./acceso/index.js";
+export * from "./assets.js";

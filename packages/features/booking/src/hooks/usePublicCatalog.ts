@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { CatalogItem } from '@sportcomplex/core'
+import { getAssetUrl } from "@sportcomplex/core/assets";
 
 export interface PublicCategory {
   id: number
@@ -83,7 +84,7 @@ export function usePublicCatalog(): PublicCatalogData {
               price: Number(s.tarifa) || 0,
               capacity: s.capacidadMaxima || 1,
               status: s.estado === 'ACTIVO' ? 'Disponible' : 'Mantenimiento',
-              image: `/images/catalogo/${serviceSlug}.webp`,
+              image: getAssetUrl(`/catalogo/${serviceSlug}.webp`),
             }
             if (s.tipoPiscina) {
               item.poolType = s.tipoPiscina as 'PUBLICA' | 'PRIVADA'
