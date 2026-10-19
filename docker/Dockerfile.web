@@ -8,11 +8,24 @@ FROM base AS deps
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY packages/application/package.json ./packages/application/package.json
+COPY packages/automation/package.json ./packages/automation/package.json
+COPY packages/config/package.json ./packages/config/package.json
 COPY packages/core/package.json ./packages/core/package.json
 COPY packages/db/package.json ./packages/db/package.json
+COPY packages/domain/package.json ./packages/domain/package.json
+COPY packages/features/admin/package.json ./packages/features/admin/package.json
+COPY packages/features/booking/package.json ./packages/features/booking/package.json
+COPY packages/features/portal/package.json ./packages/features/portal/package.json
+COPY packages/features/pos/package.json ./packages/features/pos/package.json
+COPY packages/features/scanner/package.json ./packages/features/scanner/package.json
+COPY packages/features/tournament/package.json ./packages/features/tournament/package.json
+COPY packages/printing/package.json ./packages/printing/package.json
+COPY packages/security/package.json ./packages/security/package.json
+COPY packages/seed/package.json ./packages/seed/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
 COPY packages/validation/package.json ./packages/validation/package.json
-COPY packages/config/package.json ./packages/config/package.json
 RUN pnpm fetch
 COPY . .
 RUN pnpm install --frozen-lockfile --offline
@@ -28,8 +41,12 @@ ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+# Los paquetes del monorepo resuelven a su `dist` (main/exports), así que hay
+# que construirlos antes de Next: `pnpm build` = turbo en orden de dependencias.
+# Con solo `--filter web build` Next falla con
+# "Module not found: Can't resolve '@sportcomplex/*'" (dist inexistente).
 RUN pnpm --filter @sportcomplex/db db:generate
-RUN pnpm --filter web build
+RUN pnpm build
 
 FROM node:22.14.0-alpine AS runner
 WORKDIR /app
