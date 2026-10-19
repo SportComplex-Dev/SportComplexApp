@@ -40,7 +40,7 @@ export default function CustomerDashboardPage() {
             <h1>Hola, {userName} <Sparkles aria-hidden="true" /></h1>
             <p>Un gran día para moverte. Gestiona tus reservas y accede a tus pases deportivos.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
             <Link href="/portal/membership" className="calendar-shortcut border-[#c9ef75]/40 text-[#557b53] dark:text-[#c9ef75]">
               <Sparkles size={16} className="text-[#c9ef75]" /> Membresías · 30% OFF en Reservas
             </Link>

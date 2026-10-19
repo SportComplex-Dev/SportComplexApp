@@ -97,7 +97,7 @@ export default function ServiceBookingPage() {
             </div>
 
             {/* Badges Flotantes de Estado y Sede */}
-            <div className="booking-bottom-badges">
+            <div className="booking-bottom-badges flex flex-wrap gap-2">
               <span className="booking-status-badge">
                 <i className="live-dot" style={{ background: available ? undefined : '#edb45b' }} />
                 {available ? 'DISPONIBLE' : 'NO DISPONIBLE'}

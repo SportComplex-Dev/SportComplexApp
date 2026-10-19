@@ -335,7 +335,7 @@ export default function RulesPage() {
             <span className="hidden sm:inline">6 Módulos Oficiales</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleDownloadPdf}
@@ -557,10 +557,10 @@ export default function RulesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-start sm:justify-end shrink-0">
           <Link
             href="/portal/book"
-            className="px-4 py-2.5 rounded-xl border border-[#e2e6df] dark:border-[#26352d] hover:bg-[#f7f8f5] dark:hover:bg-[#1a2620] text-xs font-bold text-[#121a16] dark:text-[#f2f5f1] transition-all"
+            className="px-4 py-2.5 rounded-xl border border-[#e2e6df] dark:border-[#26352d] hover:bg-[#f7f8f5] dark:hover:bg-[#1a2620] text-xs font-bold text-[#121a16] dark:text-[#f2f5f1] transition-all text-center flex-1 sm:flex-initial"
           >
             Ir a Reservas
           </Link>
@@ -568,7 +568,7 @@ export default function RulesPage() {
             href="https://wa.me/573001234567"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 rounded-xl bg-[#c9ef75] hover:bg-[#d6f694] text-[#123e30] font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
+            className="px-5 py-2.5 rounded-xl bg-[#c9ef75] hover:bg-[#d6f694] text-[#123e30] font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center flex-1 sm:flex-initial"
           >
             Contactar Conserjería
           </a>

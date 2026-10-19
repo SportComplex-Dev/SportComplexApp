@@ -234,7 +234,7 @@ export function HeroCarousel() {
       <button
         type="button"
         onClick={goToPrev}
-        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
+        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full hidden sm:flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
         aria-label="Anterior"
         title="Anterior"
       >
@@ -245,7 +245,7 @@ export function HeroCarousel() {
       <button
         type="button"
         onClick={goToNext}
-        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
+        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-11 md:h-11 rounded-full hidden sm:flex items-center justify-center bg-black/40 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white transition-all cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent,#c9ef75)] pointer-events-auto"
         aria-label="Siguiente"
         title="Siguiente"
       >

@@ -279,7 +279,7 @@ function MembershipPortalContent() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-xl border border-white/10 shrink-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-xl border border-white/10 shrink-0">
                   <div>
                     <span className="text-[11px] text-gray-300 flex items-center gap-1">
                       <Calendar size={12} /> Fecha de Inicio
@@ -343,7 +343,7 @@ function MembershipPortalContent() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
               {planes.map((plan) => {
                 const isCurrent = membresiaActiva?.plan?.id === plan.id && isVigente
                 const isSubscribingThis = subscribingPlanId === plan.id
@@ -360,7 +360,7 @@ function MembershipPortalContent() {
                     )}
 
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                         <span className="membership-kicker">PLAN {plan.periodicidad}</span>
                         <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#c9ef75] text-[#091b13]">
                           30% DTO. EN RESERVAS
@@ -375,7 +375,7 @@ function MembershipPortalContent() {
                           </span>
                           <span className="text-[11px] text-[var(--subtle)]">/ {plan.periodicidadLabel.toLowerCase()}</span>
                         </div>
-                        <div className="mt-2 pt-2 border-t border-[var(--line)] flex items-center justify-between text-[11px]">
+                        <div className="mt-2 pt-2 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-1 text-[11px]">
                           <span className="text-[var(--subtle)]">Beneficio exclusivo:</span>
                           <span className="text-[#557b53] dark:text-[#c9ef75] font-bold">
                             30% OFF en canchas y piscinas
