@@ -2,6 +2,7 @@ export * from "./catalog/SlotCapacityEditor";
 export * from "./dashboard/DashboardCharts";
 export * from "./dashboard/DashboardKpis";
 export * from "./dashboard/DashboardTables";
+export * from "./dashboard/AdminMembershipsView";
 export * from "./staff/EmployeeCreateModal";
 export * from "./staff/EmployeeDeactivateModal";
 export * from "./staff/EmployeeStats";
