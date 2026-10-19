@@ -157,8 +157,8 @@ function CheckoutContent() {
       }
 
       try {
-        const serviceId = Number(currentItem.id)
-        if (isNaN(serviceId) || serviceId <= 0) {
+        const serviceId = currentItem.id
+        if (!serviceId) {
           setHoldError('No se pudo identificar el servicio en el catálogo. Por favor selecciona otro servicio.')
           setIsCreatingReservation(false)
           creatingRef.current = false
