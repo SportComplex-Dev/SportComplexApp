@@ -44,7 +44,7 @@
             },
             {
               "name": "Authorization",
-              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+              "value": "=Bearer {{ $env.RESEND_API_KEY }}"
             }
           ]
         },
@@ -65,7 +65,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "{\n  \"ok\": true,\n  \"mensaje\": \"Pase con QR despachado exitosamente\",\n  \"resendMessageId\": \"{{ $json.id }}\",\n  \"entregadoA\": \"{{ $('Code in JavaScript').item.json.destinatario }}\",\n  \"ticketId\": \"{{ $('Code in JavaScript').item.json.ticketId }}\",\n  \"despachadoAt\": \"{{ $('Code in JavaScript').item.json.dispatchedAt }}\"\n}",
+        "responseBody": "={\n  \"ok\": true,\n  \"mensaje\": \"Pase con QR despachado exitosamente\",\n  \"resendMessageId\": \"{{ $json.id }}\",\n  \"entregadoA\": \"{{ $('Code in JavaScript').item.json.destinatario }}\",\n  \"ticketId\": \"{{ $('Code in JavaScript').item.json.ticketId }}\",\n  \"despachadoAt\": \"{{ $('Code in JavaScript').item.json.dispatchedAt }}\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",

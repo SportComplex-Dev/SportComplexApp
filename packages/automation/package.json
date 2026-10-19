@@ -22,7 +22,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"src/**/__tests__/**/*.test.tsx\"",
+    "test": "tsx --test \"src/**/__tests__/**/*.test.ts\" \"src/**/__tests__/**/*.test.tsx\"",
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },
