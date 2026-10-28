@@ -838,10 +838,15 @@ button { cursor: pointer; }
     padding: 12px 14px;
   }
   .catalog-hero-top {
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
   }
   .catalog-hero-pill {
-    display: none !important;
+    padding: 4px 8px;
+    font-size: 11px;
+    white-space: nowrap;
   }
   .live-conditions-bar .live-condition-chip-secondary {
     display: none !important;
