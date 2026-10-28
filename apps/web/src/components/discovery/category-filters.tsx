@@ -72,11 +72,12 @@ export function CategoryFilters({ categorySlug, activeFilter, onChange }: Catego
     <div
       role="radiogroup"
       aria-label={`Filtrar servicios de ${categorySlug}`}
-      className="flex items-center gap-2.5 overflow-x-auto py-2 my-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0"
+      className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 my-3 w-full"
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const isSelected = activeFilter === option.id
         const Icon = option.icon
+        const isOddLast = options.length % 2 !== 0 && index === options.length - 1
 
         return (
           <button
@@ -85,7 +86,9 @@ export function CategoryFilters({ categorySlug, activeFilter, onChange }: Catego
             aria-checked={isSelected}
             type="button"
             onClick={() => onChange(option.id)}
-            className={`group inline-flex shrink-0 items-center gap-3.5 rounded-full pl-2 pr-5 py-2 text-left transition-all duration-200 select-none cursor-pointer active:scale-[0.98] ${
+            className={`group flex items-center gap-2.5 sm:gap-3.5 rounded-2xl sm:rounded-full px-2.5 py-2 sm:pl-2 sm:pr-5 text-left transition-all duration-200 select-none cursor-pointer active:scale-[0.98] min-w-0 ${
+              isOddLast ? 'col-span-2 sm:col-span-1' : ''
+            } ${
               isSelected
                 ? 'bg-[#123e30] text-white shadow-md shadow-[#123e30]/15 ring-1 ring-[#123e30] dark:bg-[#c9ef75] dark:text-[#123e30] dark:ring-[#c9ef75] dark:shadow-[#c9ef75]/10'
                 : 'bg-white/95 text-[#17231e] border border-[#e7eae4] hover:border-[#ccd3c8] hover:bg-[#fafbf9] shadow-xs dark:bg-[#18231e] dark:border-[#2b3a33] dark:text-neutral-100 dark:hover:bg-[#202d27]'
@@ -93,22 +96,22 @@ export function CategoryFilters({ categorySlug, activeFilter, onChange }: Catego
           >
             {/* Badge circular con icono */}
             <span
-              className={`grid size-9 shrink-0 place-items-center rounded-full transition-colors ${
+              className={`grid size-8 sm:size-9 shrink-0 place-items-center rounded-full transition-colors ${
                 isSelected
                   ? 'bg-white text-[#123e30] dark:bg-[#123e30] dark:text-[#c9ef75]'
                   : 'bg-[#f1f4ec] text-[#42554a] group-hover:bg-[#e7ecdf] dark:bg-[#24332c] dark:text-[#b4c9b9]'
               }`}
             >
-              <Icon size={17} strokeWidth={isSelected ? 2.5 : 2} />
+              <Icon size={16} strokeWidth={isSelected ? 2.5 : 2} />
             </span>
 
             {/* Texto en dos líneas */}
-            <span className="flex flex-col leading-tight">
-              <span className="text-[13px] font-bold tracking-tight">
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="text-[12.5px] sm:text-[13px] font-bold tracking-tight truncate">
                 {option.label}
               </span>
               <span
-                className={`text-[10.5px] font-medium transition-opacity ${
+                className={`text-[10px] sm:text-[10.5px] font-medium transition-opacity truncate ${
                   isSelected
                     ? 'text-white/75 dark:text-[#123e30]/80'
                     : 'text-[#748079] dark:text-neutral-400'

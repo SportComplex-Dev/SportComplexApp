@@ -184,35 +184,35 @@ export function AvailabilityCalendar({
   const selectedDayObj = calendarDays.find((d) => d.dateISO === selectedDate)
 
   return (
-    <div className="availability-calendar-wrapper flex flex-col gap-6">
+    <div className="availability-calendar-wrapper flex flex-col gap-6 w-full max-w-full min-w-0">
       {/* Selector de Fechas con límite estricto de 15 días (TSK-FE-06 / RF-05) */}
-      <section className="calendar-date-selector">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <CalendarDays size={18} className="text-brand-accent" />
+      <section className="calendar-date-selector w-full max-w-full min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 min-w-0">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarDays size={18} className="text-brand-accent shrink-0" />
               <h3 className="text-base font-bold text-ink">Selector de Fecha</h3>
-              <Badge variant="outline" className="text-[11px] font-semibold border-brand-accent text-brand-accent">
+              <Badge variant="outline" className="text-[11px] font-semibold border-brand-accent text-brand-accent shrink-0">
                 Ventana máx. 15 días (RN-01)
               </Badge>
             </div>
-            <p className="text-xs text-subtle mt-0.5">
+            <p className="text-xs text-subtle mt-0.5 break-words">
               Zona horaria legal: <b>America/Bogota (UTC-5)</b>. Días posteriores a {maxAllowedDate || 'T+15'} deshabilitados automáticamente.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500" /> Disponible
             </span>
-            <span className="inline-flex items-center gap-1 text-subtle font-medium">
+            <span className="inline-flex items-center gap-1 text-subtle font-medium shrink-0">
               <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-600" /> Fuera de ventana
             </span>
           </div>
         </div>
 
         {/* Carrusel de Días Horizontal */}
-        <div className="flex gap-2 overflow-x-auto pb-3 pt-1 scrollbar-thin">
+        <div className="flex gap-2 overflow-x-auto pb-3 pt-1 scrollbar-thin w-full max-w-full min-w-0">
           {calendarDays.map((day) => {
             const isSelected = selectedDate === day.dateISO
             const isDisabled = day.isBeyondWindow || day.isPast
@@ -343,17 +343,17 @@ export function AvailabilityCalendar({
       )}
 
       {/* Matriz de Franjas Horarias con Contador de Aforo o Exclusividad (TSK-FE-08 / RF-07) */}
-      <section className="calendar-slots-grid">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-brand-accent" />
+      <section className="calendar-slots-grid w-full max-w-full min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 min-w-0">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Clock size={16} className="text-brand-accent shrink-0" />
               <h3 className="text-base font-bold text-ink">Franjas Horarias (Turnos de 60 min)</h3>
               {/* Badge de Modalidad (TSK-FE-08) */}
               {isPool && (
                 <Badge
                   variant={isPrivatePool ? 'secondary' : 'success'}
-                  className="text-[11px] font-semibold"
+                  className="text-[11px] font-semibold shrink-0"
                 >
                   <Waves size={11} className="mr-1 inline" />
                   {isPrivatePool ? 'Piscina Privada (Exclusiva)' : 'Piscina Pública (Aforo)'}
@@ -368,15 +368,15 @@ export function AvailabilityCalendar({
           </div>
 
           {/* Leyenda explicativa de cupos y modalidad */}
-          <div className="flex items-center gap-3 text-xs text-subtle">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-subtle">
             {isPrivatePool ? (
               <span className="inline-flex items-center gap-1 font-medium text-ink">
-                <CheckCircle2 size={13} className="text-brand-accent" />
+                <CheckCircle2 size={13} className="text-brand-accent shrink-0" />
                 Modalidad exclusiva: franja 100% reservada para el titular
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 font-medium text-ink">
-                <Users size={13} className="text-brand-accent" />
+                <Users size={13} className="text-brand-accent shrink-0" />
                 Aforo máximo: {scheduleConfig?.capacity ?? service.capacity} concurrentes
               </span>
             )}
@@ -384,7 +384,7 @@ export function AvailabilityCalendar({
         </div>
 
         {/* Grilla de Ranuras */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-2.5 w-full max-w-full min-w-0">
           {slots.map((slot) => {
             const isSelected = selectedSlotTime === slot.time
             const isDisabled = !slot.isAvailable
@@ -398,7 +398,7 @@ export function AvailabilityCalendar({
                 {...(!isDisabled && !shouldReduceMotion ? { whileHover: { scale: 1.03 }, whileTap: { scale: 0.96 } } : {})}
                 aria-pressed={isSelected}
                 aria-disabled={isDisabled}
-                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[92px] ${
+                className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[92px] min-w-0 w-full overflow-hidden ${
                   isDisabled
                     ? 'border-dashed border-destructive/30 bg-destructive/5 text-subtle opacity-75 cursor-not-allowed'
                     : isSelected
@@ -407,23 +407,23 @@ export function AvailabilityCalendar({
                 }`}
               >
                 {/* Hora de la ranura */}
-                <div className="text-xs font-bold text-ink">{slot.label}</div>
+                <div className="text-xs font-bold text-ink truncate max-w-full">{slot.label}</div>
 
                 {/* Contador de aforo / estado de exclusividad (TSK-FE-08) */}
-                <div className="my-1.5">
+                <div className="my-1.5 w-full overflow-hidden text-center">
                   {isDisabled ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-destructive">
-                      <Lock size={11} />
-                      {slot.disabledReason || 'No disponible'}
+                    <span className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-destructive max-w-full truncate">
+                      <Lock size={11} className="shrink-0" />
+                      <span className="truncate">{slot.disabledReason || 'No disponible'}</span>
                     </span>
                   ) : isPrivatePool ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-accent bg-brand-accent/10 px-2 py-0.5 rounded-full">
+                    <span className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-brand-accent bg-brand-accent/10 px-2 py-0.5 rounded-full max-w-full truncate">
                       Exclusiva
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      <Users size={11} />
-                      <b>{slot.capacity}</b> cupos restantes
+                    <span className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 max-w-full truncate">
+                      <Users size={11} className="shrink-0" />
+                      <span className="truncate"><b>{slot.capacity}</b> cupos restantes</span>
                     </span>
                   )}
                 </div>
@@ -431,7 +431,7 @@ export function AvailabilityCalendar({
                 {/* Indicador de estado */}
                 <div className="w-full flex justify-center">
                   <span
-                    className={`inline-block w-full py-0.5 text-[10px] font-semibold rounded-md ${
+                    className={`inline-block w-full py-0.5 text-[10px] font-semibold rounded-md truncate ${
                       isDisabled
                         ? 'bg-destructive/15 text-destructive'
                         : isSelected
