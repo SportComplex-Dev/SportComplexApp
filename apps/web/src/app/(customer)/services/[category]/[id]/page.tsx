@@ -125,7 +125,7 @@ export default function ServiceBookingPage() {
           <div className="court-line-divider" />
 
           {/* Componente Modular de Calendario y Franjas Horarias (TSK-FE-06, TSK-FE-07, TSK-FE-08) */}
-          <div className="demo-card p-6 mt-6">
+          <div className="demo-card p-4 sm:p-6 mt-6 min-w-0 max-w-full">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-ink">Disponibilidad de Franjas y Horarios</h2>
               <p className="text-xs text-subtle">

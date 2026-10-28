@@ -13,11 +13,11 @@ export function LiveConditions({ className = '' }: LiveConditionsProps) {
         <Sun size={13} />
         <span>23°C · El Poblado</span>
       </div>
-      <div className="live-condition-chip" title="Estado de canchas y pistas deportivas">
+      <div className="live-condition-chip live-condition-chip-secondary" title="Estado de canchas y pistas deportivas">
         <span className="live-dot" />
         <span>Pistas Secas · Juego Óptimo</span>
       </div>
-      <div className="live-condition-chip" title="Iluminación LED nocturna de alta potencia activa">
+      <div className="live-condition-chip live-condition-chip-secondary" title="Iluminación LED nocturna de alta potencia activa">
         <Zap size={13} />
         <span>Iluminación LED Activa</span>
       </div>
